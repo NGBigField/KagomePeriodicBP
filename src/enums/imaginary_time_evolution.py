@@ -1,5 +1,5 @@
 
-from enums.directions import Directions
+from tensor_networks.directions import Directions
 
 
 UpdateModes = Directions

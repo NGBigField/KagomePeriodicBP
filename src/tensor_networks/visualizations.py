@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 
 # Common types:
 from tensor_networks.node import Node, NodeFunctionality
-from enums.directions import DirectionsError, Directions
+from tensor_networks.directions import DirectionsError, Directions
 
 # for smart iterations:
 import itertools

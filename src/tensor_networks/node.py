@@ -129,7 +129,7 @@ class Node():
     def plot(self)->None:
         ## Some special imports:
         from matplotlib import pyplot as plt
-        from enums.directions import unit_vector_from_angle
+        from tensor_networks.directions import unit_vector_from_angle
         from utils import visuals
                 
         plt.figure()

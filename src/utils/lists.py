@@ -260,7 +260,24 @@ def repeated_items(l:list[_T]) -> Generator[tuple[_T, int], None, None]:
         counter += 1
     
     yield last, counter
-        
+    
+    
+def next_item_cyclic(lis:list[_T], item:_T)->_T:
+    n = len(lis)
+    i = lis.index(item)
+    if i==n-1:
+        return lis[0]
+    else:
+        return lis[i+1]
+    
+
+def prev_item_cyclic(lis:list[_T], item:_T)->_T:
+    i = lis.index(item)
+    if i==0:
+        return lis[-1]
+    else:
+        return lis[i-1]
+
 
 ## Test:
 if __name__ == "__main__":
