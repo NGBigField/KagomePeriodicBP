@@ -11,7 +11,6 @@ if __name__ == "__main__":
 import numpy as np
 from numpy import  sqrt, pi, conj
 from numpy.linalg import norm, eigvals
-from utils.config import DEBUG_MODE
 from lib.bmpslib import mps as MPS
 
 # ============================================================================ #
@@ -114,54 +113,6 @@ def init_mps_quantum(D_list, random=False) -> MPS:
 	mp.set_site(mp.A[N-1]/norm(mp.A[N-1]), N-1)
 
 	return mp
-
-
-def init_mps_classical(D_list, random=False) -> MPS:
-	"""
-
-	Initializes an MPS message for TNs representing classical systems
-
-	In this case, the MPS represents a product state of classical
-	probability distributions: either uniform (random=False) or random
-	(random=True)
-
-	Input parameters:
-	-----------------
-
-	D_list --- A list of the "physical" leg dimensions, which is simply
-							the dimension of each message.
-							
-	random --- Whether to use a random prob dist.
-
-	Output:
-	-----------
-	An MPS object which is left-canonical.
-
-
-	"""
-
-	raise NotImplementedError("This options is not maintained.")
-
-	N = len(D_list)
-	mp = MPS(N)
-
-	for i in range(N):
-		D = D_list[i]
-		
-		if random:
-			A = np.random.uniform(size=D)
-		else:
-			A = np.ones(D)  # Create a uniform probability dist'
-			
-		A = A/norm(A)
-		
-		mp.set_site(A.reshape([1,D,1]), i)
-
-	mp.left_canonical_QR()
-	mp.set_site(mp.A[N-1]/norm(mp.A[N-1]), N-1)
-
-	return mp
-
 
 
 
