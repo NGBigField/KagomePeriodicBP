@@ -1,7 +1,6 @@
 from typing import Callable, Any, ParamSpec, TypeVar, List, Tuple
 from utils import tuples, strings, errors
 from utils.arguments import Stats
-from utils.config import DEBUG_MODE
 import time
 from numpy import ndarray as np_ndarray
 from functools import wraps

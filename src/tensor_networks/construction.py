@@ -7,17 +7,17 @@ if __name__ == "__main__":
     import sys, pathlib
     sys.path.append( pathlib.Path(__file__).parent.parent.__str__() )
 
-from typing import Generator, Tuple, List, Dict
+# Global config:
+from _config_reader import DEBUG_MODE
 
-# Get Global-Config:
-from utils.config import VERBOSE_MODE, DEBUG_MODE
+from typing import Generator, Tuple, List, Dict
 
 # For more computationally cheap functions and loops:
 import itertools
 import functools
 
 # Import our shared utilities
-from utils import tuples, lists, assertions, saveload, logs, decorators, errors, visuals, strings, dicts
+from utils import tuples, lists, assertions, saveload, logs, decorators, errors, visuals, strings, dicts, project_paths
 
 # For common numeric functions:
 import numpy as np
@@ -27,12 +27,12 @@ from numpy import matlib
 # For common lattice function and classes:
 from tensor_networks.node import Node, NodeFunctionality
 from tensor_networks.tensor_network import TensorNetwork, TensorDims
+from tensor_networks import directions
+from tensor_networks.directions import Direction
 from tensor_networks.edges import edges_dict_from_edges_list
-from enums import Directions, Sides, InitialTNMode
+from enums import InitialTNMode
 from containers import TNSizesAndDimensions
 
-# For pre-designed tensor-networks from other projects:
-from translations import from_special_tensor, from_tnsu
 
 # ============================================================================ #
 #|                             Constants                                      |#
@@ -40,17 +40,26 @@ from translations import from_special_tensor, from_tnsu
 
 RANDOM_CORE_IS_ABBA_LATTICE = True
 
+L  = directions.L
+R  = directions.R
+UL = directions.UL
+UR = directions.UR
+DL = directions.DL
+DR = directions.DR
+
+
 # ============================================================================ #
 #|                            Inner Functions                                 |#
 # ============================================================================ #
 
-def _check_tensor_on_boundary(edges:List[str])->List[Directions]:
-    on_edge : List[Directions] = []
+def _check_tensor_on_boundary(edges:List[str])->List[Direction]:
+    on_boundary : List[Direction] = []
     for edge in edges:
         first_letter = edge[0]
+        raise NotImplementedError("Should change")
         if  first_letter.isalpha() and not first_letter.isdigit():
-            on_edge.append(Directions(first_letter))
-    return on_edge
+            on_boundary.append(Direction(first_letter))
+    return on_boundary
 
 
 def _derive_core_functionality(index:int, core_size:int, padding:int)->NodeFunctionality:
@@ -88,21 +97,21 @@ def _all_possible_indices(size:tuple[int,...])->Generator[Tuple[int, ...], None,
 def _get_neighbor_from_coordinates(
 	i:int,  # row
 	j:int,  # column
-	side:Sides,  # ['L', 'R', 'U', 'D']
+	direction:Direction,  # ['L', 'R', 'U', 'D']
 	N:int   # linear size of lattice
 )->int:
 	"""
 	Calculde the idx of the neighboring blocks
 	"""
-	if side=="L":
+	if direction==L:
 		return i*N + (j - 1) % N
-	if side=="R":
+	if direction==R:
 		return i*N + (j + 1) % N
-	if side=="U":
+	if direction==U:
 		return ((i - 1) % N)*N + j
-	if side=="D":
+	if direction==D:
 		return ((i + 1) % N)*N + j
-	raise ValueError(f"'{side}' not a supported input")
+	raise ValueError(f"'{direction}' not a supported input")
 
 
 def _get_index_from_coordinates(
@@ -123,7 +132,7 @@ def _get_position_from_tensor_coordinates(
 def _get_edge_from_tensor_coordinates(
 	i:int,
 	j:int,
-	side:Sides,  # ['L', 'R', 'U', 'D']
+	direction:Direction,  # ['L', 'R', 'U', 'D']
 	N:int
 )->str:
 	"""
@@ -140,20 +149,20 @@ def _get_edge_from_tensor_coordinates(
 	N    --- Linear size of the lattice
 	"""
 
-	if side=='L' and j==0:
+	if direction=='L' and j==0:
 		return f"L{i}"
 
-	if side=='R' and j==N-1:
+	if direction=='R' and j==N-1:
 		return f"R{i}"
 
-	if side=='D' and i==N-1:
+	if direction=='D' and i==N-1:
 		return f"D{j}"
 
-	if side=='U' and i==0:
+	if direction=='U' and i==0:
 		return f"U{j}"
 
 	this = _get_index_from_coordinates(i, j, N)
-	neighbor = _get_neighbor_from_coordinates(i, j, side, N)
+	neighbor = _get_neighbor_from_coordinates(i, j, direction, N)
 	return f"{min(this,neighbor)}-{max(this,neighbor)}"
 
 
@@ -201,7 +210,7 @@ def repeat_core(
     assert new_shape[0]==new_shape[1]
 
     ## Prepare commonly used params:
-    directions = list(Directions.standard_order())
+    directions = list(directions.standard_order())
     core_size = core.original_lattice_dims[0]
     network_size = new_shape[0]
     padding = network_size-core_size
@@ -341,5 +350,7 @@ def create_square_tn(
 
 
 if __name__ == "__main__":
-     from scripts.core_ite_test import main
-     main()
+    project_paths.add_scripts()
+    from scripts.build_tn import main_test
+    main_test()
+    

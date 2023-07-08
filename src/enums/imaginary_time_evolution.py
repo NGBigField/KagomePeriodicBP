@@ -1,6 +1,8 @@
 
-from tensor_networks.directions import Directions
+# from tensor_networks.directions import Directions
+from enum import Enum, auto
 
-
-UpdateModes = Directions
+class UpdateModes(Enum):
+    a = auto()
+    b = auto()
 

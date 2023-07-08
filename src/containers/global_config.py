@@ -7,7 +7,7 @@ from containers.contractions import ContractionConfig
 from utils import strings
 
 # Control flags:
-from utils.config import DEBUG_MODE, VERBOSE_MODE, MULTIPROCESSING, ALLOW_VISUALS
+from _config_reader import DEBUG_MODE, ALLOW_VISUALS
 
 @dataclass
 class Config: 

@@ -41,6 +41,7 @@ def join_sub_lists(_lists:list[list[_T]])->list[_T]:
         res.extend(_list)
     return res
 
+
 def all_same(l:List[_Numeric]|List[np.ndarray]) -> bool:
     dummy = l[0]
     if isinstance(dummy, np.ndarray):
