@@ -15,9 +15,10 @@ from typing import Generator, Tuple, List, Dict
 # For more computationally cheap functions and loops:
 import itertools
 import functools
+import project_paths
 
 # Import our shared utilities
-from utils import tuples, lists, assertions, saveload, logs, decorators, errors, visuals, strings, dicts, project_paths
+from utils import tuples, lists, assertions, saveload, logs, decorators, errors, visuals, strings, dicts
 
 # For common numeric functions:
 import numpy as np
@@ -350,7 +351,9 @@ def create_square_tn(
 
 
 if __name__ == "__main__":
+    sys.path
     project_paths.add_scripts()
+    project_paths.add_base()
     from scripts.build_tn import main_test
     main_test()
     

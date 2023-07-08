@@ -1,9 +1,10 @@
 __all__ = [
-    "ALLOW_VISUALS"
+    "ALLOW_VISUALS",
+    "DEBUG_MODE"
 ]
 
 import json
-from utils import project_paths
+import project_paths
 
 config_file_path = project_paths.base / "configuration.json"
 
