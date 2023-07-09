@@ -1,39 +1,111 @@
-from lattices._common import NodePlaceHolder
-from tensor_networks.directions import DL, DR, R, UR, UL, L
+from lattices._common import NodePlaceHolder, LatticeError, OutsideLatticeError
+from tensor_networks.directions import DL, DR, R, UR, UL, L, Direction, all_in_standard_order
+from typing import Generator
 
 
-#
-# ------------------------ total_vertices ------------------------
-#
+class TriangularLatticeError(LatticeError): ...
+
 
 def total_vertices(N):
 	"""
-	
 	Returns the total number of vertices in the *bulk* of a hex 
 	TN with linear parameter N
-	
 	"""
-	
 	return 3*N*N - 3*N + 1
 
 
+def num_rows(N):
+	return 2*N-1
+
 
 def row_width(i, N):
-	
 	"""
 	Returns the width of a row i in a hex TN of linear size N. i is the
 	row number, and is between 0 -> (2N-2)
 	"""
-	
 	if i<0 or i>2*N-2:
 		return 0
 	
 	return N+i if i<N else 3*N-i-2
 
+def _get_neighbor_coordinates_in_direction_no_boundary_check(i:int, j:int, direction:Direction, N:int)->tuple[int, int]:
+	## Simple L or R:
+	if   direction==L:  
+		return i, j-1
+	if direction==R:  
+		return i, j+1
+
+	## Row dependant:
+	middle_row_index = num_rows(N)//2   # above or below middle row
+
+	if direction==UR: 
+		if j <= middle_row_index: 
+			return i-1, j
+		else: 
+			return i-1, j+1
+	
+	if direction==UL:
+		if j <= middle_row_index:
+			return i-1, j-1
+		else:
+			return i-1, j
+		
+	if direction==DL:
+		if j < middle_row_index:
+			return i+1, j
+		else:
+			return i+1, j-1
+		
+	if direction==DR:
+		if j < middle_row_index:
+			return i+1, j+1
+		else:
+			return i+1, j
+		
+	TriangularLatticeError(f"Impossible direction {direction!r}")
+
+
+
+def get_neighbor_coordinates_in_direction(i:int, j:int, direction:Direction, N:int)->tuple[int, int]:
+	i2, j2 = _get_neighbor_coordinates_in_direction_no_boundary_check(i, j, direction, N)
+
+	if i2<0 or i2>=num_rows(N):
+		raise OutsideLatticeError()
+	
+	if j2<0 or j2>=row_width(i2, N):
+		raise OutsideLatticeError()
+	
+	return i2, j2
+
+
+def get_neighbor(index:int, direction:Direction, N:int)->tuple[int, int]:
+	i, j = get_vertex_coordinates(index, N)
+	i2, j2 = get_neighbor_coordinates_in_direction(i, j, direction, N)
+	return get_vertex_index(i2, j2, N)
+
+
+def all_neighbors(index:int, N:int)->Generator[tuple[NodePlaceHolder, Direction], None, None]:
+	for direction in all_in_standard_order():
+		try: 
+			neighbor = get_neighbor(index, direction, N)
+		except OutsideLatticeError:
+			pass
+		yield neighbor
+
+
+def get_vertex_coordinates(index, N)->tuple[int, int]:
+	running_index = 0 
+	for i in range(num_rows(N)):
+		width = row_width(i, N)
+		if index < running_index + width:
+			j = index - running_index
+			return i, j
+		running_index += width
+	raise ValueError("Not found")
+
 
 def get_vertex_index(i,j,N):
 	"""
-	
 	Given a location (i,j) of a vertex in the hexagon, return its 
 	index number. The vertices are ordered left->right, up->down.
 	
@@ -44,15 +116,10 @@ def get_vertex_index(i,j,N):
 	
 	The index j is the position of the vertex in the row. j=0 is the 
 	left-most vertex in the row.
-	
 	"""
 	
-	
-	#
 	# Calculate Aw --- the accumulated width of all rows up to row i,
 	# but not including row i.
-	# 
-	
 	if i==0:
 		Aw = 0
 	else:
@@ -70,7 +137,6 @@ def get_node_position(i,j,N):
 
 def get_edge_index(i,j,side,N):
 	"""
-
 	Get the index of an edge in the triangular PEPS.
 	
 	Given a vertex (i,j) in the bulk, we have the following rules for 
@@ -108,31 +174,18 @@ def get_edge_index(i,j,side,N):
 
 	N    --- Linear size of the lattice
 	
-	
 	OUTPUT: the label
-	
-
 	"""
 
-
-	#
 	# The index of the vertex
-	#
 	ij = get_vertex_index(i,j,N)
 
-	#
 	# Calculate the width of the row i (how many vertices are there)
-	#
-	
 	w = row_width(i, N)
 	
-	#
 	# Total number of vertices in the hexagon
-	#
-	
 	NT = total_vertices(N)
-	
-	
+		
 	if side=='L':
 		if j>0:
 			e = ij
@@ -142,7 +195,6 @@ def get_edge_index(i,j,side,N):
 			else:
 				e = f'dl{(i-N+1)*2}'
 				
-				
 	if side=='R':
 		if j<w-1:
 			e = ij+1
@@ -151,7 +203,6 @@ def get_edge_index(i,j,side,N):
 				e = f'ur{2*(N-1-i)}'
 			else:
 				e = f'dr{2*(2*N-2-i)+1}'  
-				
 				
 	if side=='UL':
 		if i<N:
@@ -171,7 +222,6 @@ def get_edge_index(i,j,side,N):
 		else:
 			# so i=N, N+1, ...
 			e = get_vertex_index(i-1,j,N) + 2*NT + 101
-			
 				
 	if side=='UR':
 		if i<N:
@@ -189,7 +239,6 @@ def get_edge_index(i,j,side,N):
 					e = f'ur{2*N-1-2*i}'
 		else:
 			e = get_vertex_index(i-1,j+1,N) + NT + 101
-			
 			
 	if side=='DL':
 		if i<N-1:
@@ -227,21 +276,12 @@ def get_edge_index(i,j,side,N):
 				else:
 					# at i=2*N-2 (last row)
 					e = f'd{2*N-1}'
-					
 				
 	return e
 
 
-
-
-#
-# ------------------------- create_hex_dicts  --------------------------
-#
-
 def create_hex_dicts(N):
-	
 	"""
-	
 	Creates two dictionaries for a two-way mapping of two different 
 	indexing of the bulk vertices in the hexagon TN. These are then used 
 	in the rotate_CW function to rotate the hexagon in 60 deg 
@@ -280,11 +320,7 @@ def create_hex_dicts(N):
 	--------
 	
 	ij_to_hex, hex_to_ij --- the two dictionaries.
-	
-	
 	"""
-	
-	
 	
 	hex_to_ij = {}
 	ij_to_hex = {}
@@ -294,12 +330,10 @@ def create_hex_dicts(N):
 	i,j = 2*N-1,-1
 
 
-	#
 	# To create the dictionaries, we walk on the hexagon counter-clockwise, 
 	# at radius n for n=N ==> n=1. 
 	#
 	# At each radius, we walk 'd' => 'dr' => 'ur' => 'u' => 'ul' => 'dl'
-	#
 
 	for n in range(N, 0, -1):
 		i -= 1
@@ -351,10 +385,6 @@ def create_hex_dicts(N):
 	
 	return ij_to_hex, hex_to_ij
 
-
-#
-# ------------------------- rotate_CW  --------------------------
-#
 
 def rotate_CW(N, ijs, ij_to_hex, hex_to_ij):
 	
@@ -446,12 +476,6 @@ def rotate_CW(N, ijs, ij_to_hex, hex_to_ij):
 			
 
 
-
-
-
-#
-# ------------------------- rotate_ACW  --------------------------
-#
 
 def rotate_ACW(N, ijs, ij_to_hex, hex_to_ij):
 	
@@ -600,6 +624,7 @@ def create_triangle_lattice(N)->list[NodePlaceHolder]:
 		w = row_width(i,N)
 		for j in range(w):
 			n = NodePlaceHolder(
+				index = index,
 				pos = get_node_position(i, j, N),
 				edges = edges_list[index],
 				directions=[L, R, UL, UR, DL, DR]

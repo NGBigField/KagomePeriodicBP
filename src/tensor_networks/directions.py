@@ -146,10 +146,13 @@ def all_in_random_order()->Generator[Direction, None, None]:
         yield direction
 
 
-def standard_order()->Generator[Direction, None, None]:
+def all_in_clockwise_order()->Generator[Direction, None, None]:
     return iter(DirectionsInClockwiseOrder)
-    
-    
+
+
 def all_in_counterclockwise_order()->Generator[Direction, None, None]:
     return reversed(DirectionsInClockwiseOrder)
-        
+
+
+def all_in_standard_order()->Generator[Direction, None, None]:
+    return all_in_clockwise_order()
