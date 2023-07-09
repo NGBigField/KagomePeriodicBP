@@ -5,13 +5,12 @@ if __name__ == "__main__":
     )
 
 from lattices import triangle as triangle_lattice
-from lattices._common import NodePlaceHolder
+from lattices._common import NodePlaceHolder, LatticeError
 from tensor_networks.directions import Direction
 from tensor_networks.directions import DL, DR, R, UR, UL, L
 from numpy import pi, cos, sin
-from utils import numerics
+from utils import numerics, tuples
 from dataclasses import dataclass, fields
-import itertools
 from typing import Generator
 
 
@@ -20,9 +19,8 @@ _three_roots_of_unity = [i*2*pi/3 for i in range(3)]
 _upper_triangle_angles = [root+pi/2 for root in _three_roots_of_unity]
 _x_length_normalization = 1/abs(cos(2*pi/3 + pi/2))
 _y_length_normalization = 2
-_delta_xs = [numerics.force_integers_on_close_to_round(cos(angle)*_x_length_normalization) for angle in _upper_triangle_angles]
-_delta_ys = [numerics.force_integers_on_close_to_round(sin(angle)*_y_length_normalization) for angle in _upper_triangle_angles]
-_delta_ys[0] = 1
+_delta_xs = [0, -1,  1]
+_delta_ys = [1, -1, -1]
 
 """
 An Upper Triagle:
@@ -34,6 +32,10 @@ An Upper Triagle:
     /   \
 Left    Right
 """
+
+
+class KagomeLatticeError(LatticeError):...
+
 
 @dataclass(frozen=False, slots=True)
 class _UpperTriangle:
@@ -50,10 +52,13 @@ class _UpperTriangle:
     def field_names()->list[str]:
         return ['up', 'left', 'right']
 
-class _UnassignedEdgeName: ...
+class _UnassignedEdgeName():
+    def __repr__(self) -> str:
+        return "_UnassignedEdgeName"
 
 
-def _edge_name_from_indices(i1:int, i2:int)->str:
+
+def edge_name_from_indices(i1:int, i2:int)->str:
     if   i1<i2:  return f"{i1}-{i2}" 
     elif i1>i2:  return f"{i2}-{i1}" 
     else:
@@ -79,12 +84,69 @@ def _create_upper_triangle(triangular_node:NodePlaceHolder, indices:list[int])->
         node = NodePlaceHolder(
             index=node_index,
             pos=(x, y),
-            edges=[_UnassignedEdgeName, _UnassignedEdgeName,_UnassignedEdgeName, _UnassignedEdgeName],
+            edges=[_UnassignedEdgeName(), _UnassignedEdgeName(), _UnassignedEdgeName(), _UnassignedEdgeName()],
             directions=_derive_node_directions(field)
         )
         upper_triangle.__setattr__(field, node)
     return upper_triangle
-        
+    
+def _connect_kagome_nodes_inside_triangle(upper_triangle:_UpperTriangle)->None:
+        up, left, right = upper_triangle.up, upper_triangle.left, upper_triangle.right 
+        # Up-Left:
+        edge_name = edge_name_from_indices(up.index, left.index)
+        up.edges[up.directions.index(DL)] = edge_name
+        left.edges[left.directions.index(UR)] = edge_name
+        # Up-Right:
+        edge_name = edge_name_from_indices(up.index, right.index)
+        up.edges[up.directions.index(DR)] = edge_name
+        right.edges[right.directions.index(UL)] = edge_name
+        # Left-Right:
+        edge_name = edge_name_from_indices(left.index, right.index)
+        left.edges[left.directions.index(R)] = edge_name
+        right.edges[right.directions.index(L)] = edge_name   
+
+def _connect_kagome_nodes_between_triangles(triangle1:_UpperTriangle, triangle2:_UpperTriangle, direction1to2:Direction)->None:
+    """ 
+    Given two upper triangles `triangle1` and `triangle2`, 
+    where the `triangle2` is in direction `direction1to2` relative to `triangle1`,
+    find the relevant nodes, and assign common edge between them
+    """
+
+    ## Choose the two relevant nodes:
+    if   direction1to2==L:
+        n1 = triangle1.left
+        n2 = triangle2.right
+
+    elif direction1to2==DL:
+        n1 = triangle1.left
+        n2 = triangle2.up
+
+    elif direction1to2==DR:
+        n1 = triangle1.right
+        n2 = triangle2.up
+
+    elif direction1to2==R:
+        n1 = triangle1.right
+        n2 = triangle2.left
+
+    elif direction1to2==UR:
+        n1 = triangle1.up
+        n2 = triangle2.left
+
+    elif direction1to2==UL:
+        n1 = triangle1.up
+        n2 = triangle2.right
+
+    else:
+        raise KagomeLatticeError(f"Impossible direction {direction1to2!r}")
+
+    ## Assign proper edge name to them:
+    edge_name = edge_name_from_indices(n1.index, n2.index)
+    leg_index1 = n1.directions.index(direction1to2)
+    leg_index2 = n2.directions.index(direction1to2.opposite())
+    n1.edges[leg_index1] = edge_name
+    n2.edges[leg_index2] = edge_name
+
 
 def create_kagome_lattice(N:int)->list[NodePlaceHolder]:
 
@@ -100,41 +162,36 @@ def create_kagome_lattice(N:int)->list[NodePlaceHolder]:
         indices = list(range(crnt_kagome_index, crnt_kagome_index+3))
         crnt_kagome_index += 3
 
+        # Scale up the distance between nodes:
+        triangular_node.pos = tuples.multiply(triangular_node.pos, (2,4))
+
         # Create triangle:
         upper_triangle = _create_upper_triangle(triangular_node, indices)
         upper_triangle_nodes = [upper_triangle.up, upper_triangle.left, upper_triangle.right]
         kagome_lattice.extend(upper_triangle_nodes)
         triangular_lattice_of_upper_triangles.append(upper_triangle)
         
-    ## Assign Edges
+    ## Assign Inner edges within the triangle:
     for upper_triangle in triangular_lattice_of_upper_triangles:
+        _connect_kagome_nodes_inside_triangle(upper_triangle)         
 
-        ## Inner edges within the triangle:
-        up, left, right = upper_triangle.up, upper_triangle.left, upper_triangle.right 
-        # Up-Left:
-        edge_name = _edge_name_from_indices(up.index, left.index)
-        up.edges[up.directions.index(DL)] = edge_name
-        left.edges[left.directions.index(UR)] = edge_name
-        # Up-Right:
-        edge_name = _edge_name_from_indices(up.index, right.index)
-        up.edges[up.directions.index(DR)] = edge_name
-        right.edges[right.directions.index(UL)] = edge_name
-        # Left-Right:
-        edge_name = _edge_name_from_indices(left.index, right.index)
-        left.edges[left.directions.index(R)] = edge_name
-        right.edges[right.directions.index(L)] = edge_name            
-
-    ## Edges between triangles:
+    ## Assign Edges between triangles:
     for index1, triangle1 in enumerate(triangular_lattice_of_upper_triangles):
-        print(index1,":")                
         for index2, direction1 in triangle_lattice.all_neighbors(index1, N):
-            print(f"    {index2}, {direction1}")                
+            triangle2 = triangular_lattice_of_upper_triangles[index2]
+            _connect_kagome_nodes_between_triangles(triangle1, triangle2, direction1)
+
+
+    ## Plot test:
+    from lattices._common import plot
+    plot(kagome_lattice)
+    # plot(original_triangular_lattice, node_color="black", edge_style="y--", node_size=5)
 
     return 
 
 
 def main_test():
-    lattice = create_kagome_lattice(4)
+    lattice = create_kagome_lattice(3)
 
 
 if __name__ == "__main__":

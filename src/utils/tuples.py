@@ -8,6 +8,7 @@ from typing import (
 )
 
 import operator
+from typing import overload
 
 _NumericType = TypeVar("_NumericType", float, complex, int)
 
@@ -26,6 +27,15 @@ def sub(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->Tuple[_NumericT
 
 def add(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->Tuple[_NumericType,...]:
     return _apply_pairwise(operator.add, t1, t2)
+
+
+def multiply(t:Tuple[_NumericType,...], scalar_or_t2:_NumericType|tuple[_NumericType,...])->Tuple[_NumericType,...]:
+    if isinstance(scalar_or_t2, tuple):
+        t2 = scalar_or_t2
+    else: 
+        t2 = tuple([scalar_or_t2 for _ in t])   # tuple with same length
+    return _apply_pairwise(operator.mul, t, t2)
+
 
 def copy_with_replaced_val_at_index(t:tuple, i:int, val:Any) -> tuple:
     temp = [x for x in t]
