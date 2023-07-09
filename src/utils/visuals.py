@@ -28,7 +28,8 @@ from typing import (
     ParamSpec,
 )
 
-from utils.config import ALLOW_VISUALS
+from _config_reader import ALLOW_VISUALS
+
 if ALLOW_VISUALS:
     # For visuals
     import matplotlib.pyplot as plt

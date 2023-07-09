@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 
 # Common types:
 from tensor_networks.node import Node, NodeFunctionality
-from enums.directions import DirectionsError, Directions
+from tensor_networks.directions import DirectionsError, Directions
 
 # for smart iterations:
 import itertools
@@ -423,8 +423,3 @@ def plot_network(
             plt.plot([x1, x2], [y1, y2], color=angle_color, alpha=alpha, linewidth=angle_linewidth )
             plt.text(x2, y2, f"{i_edge}", fontdict={'color':'olivedrab', 'size':10 } )	
 
-
-
-if __name__ == "__main__":
-    from src.scripts.core_ite_test import main_test
-    main_test()

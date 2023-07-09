@@ -41,6 +41,7 @@ def join_sub_lists(_lists:list[list[_T]])->list[_T]:
         res.extend(_list)
     return res
 
+
 def all_same(l:List[_Numeric]|List[np.ndarray]) -> bool:
     dummy = l[0]
     if isinstance(dummy, np.ndarray):
@@ -260,7 +261,24 @@ def repeated_items(l:list[_T]) -> Generator[tuple[_T, int], None, None]:
         counter += 1
     
     yield last, counter
-        
+    
+    
+def next_item_cyclic(lis:list[_T], item:_T)->_T:
+    n = len(lis)
+    i = lis.index(item)
+    if i==n-1:
+        return lis[0]
+    else:
+        return lis[i+1]
+    
+
+def prev_item_cyclic(lis:list[_T], item:_T)->_T:
+    i = lis.index(item)
+    if i==0:
+        return lis[-1]
+    else:
+        return lis[i-1]
+
 
 ## Test:
 if __name__ == "__main__":

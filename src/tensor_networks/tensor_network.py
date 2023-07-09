@@ -1,11 +1,13 @@
 ## Get config:
-from utils.config import DEBUG_MODE, VERBOSE_MODE
+from _config_reader import DEBUG_MODE
 
+from tensor_networks import directions
+from tensor_networks.directions import Direction
 from tensor_networks.node import Node, _EdgeIndicator, _PosScalarType
 from tensor_networks.errors import TensorNetworkError
 from tensor_networks.edges import edges_dict_from_edges_list
 
-from enums import Directions, NodeFunctionality
+from enums import NodeFunctionality
 from utils import assertions, lists, tuples
 
 import numpy as np
@@ -90,7 +92,7 @@ class TensorNetwork():
         d["positions"] = self.positions
         return d
 
-    def nodes_on_boundary(self, edge_side:Directions)->list[Node]: 
+    def nodes_on_boundary(self, edge_side:Direction)->list[Node]: 
         return [t for t in self.nodes if edge_side in t.on_boundary ] 
 
     def nodes_connected_to_edge(self, edge:str)->list[Node]:
@@ -108,9 +110,9 @@ class TensorNetwork():
         else:
             raise TensorNetworkError(f"Couldn't find a neighbor due to a bug with the tensors connected to the same edge '{edge}'")
         
-    def find_neighbor(self, node:Node, dir:Directions|float|None)->Node:
+    def find_neighbor(self, node:Node, dir:Direction|None)->Node:
         # Get edge of this node:
-        if isinstance(dir, Directions|float):
+        if isinstance(dir, Direction):
             edge = node.edge_in_dir(dir)
         elif dir is None:
             edge = lists.random_item( node.edges )
@@ -251,7 +253,7 @@ class TensorNetwork():
                 pair = edges[edge]
                 if pair[0]==pair[1]:
                     side = node.directions[node.edges.index(edge)]
-                    assert isinstance(side, Directions)
+                    assert isinstance(side, Direction)
                     node.on_boundary.append(side)
         
         ## Copy additional straight-forward info:
@@ -319,7 +321,7 @@ class TensorNetwork():
                 neighbor = self.find_neighbor(node, dir)
                 # Is neighbors pointing back to us?
                 _neigbor_error_message = _error_message+f"\nnode '{node.name}' is not the neighbor of '{neighbor.name}' on edge '{edge_name}'"
-                opposite_dir = Directions.opposite_direction(dir)
+                opposite_dir = dir.opposite()
                 assert self._find_neighbor_by_edge(neighbor, edge_name) is node, _neigbor_error_message
                 assert self.find_neighbor(neighbor, opposite_dir) is node, _neigbor_error_message
                 assert neighbor.edge_in_dir(opposite_dir) == edge_name
@@ -334,8 +336,8 @@ class TensorNetwork():
                 raise KeyError(_error_message)
             assert nodes[0].dims[indices_of_this_edge[0]] == nodes[1].dims[indices_of_this_edge[1]] , _error_message
             dir1 = nodes[0].directions[indices_of_this_edge[0]]
-            dir2 = Directions.opposite_direction(nodes[1].directions[indices_of_this_edge[1]])
-            assert Directions.is_equal(dir1, dir2), _error_message
+            dir2 = nodes[1].directions[indices_of_this_edge[1]].opposite()
+            assert dir1 == dir2, _error_message
             for node, node_index in zip(nodes, node_indices, strict=True):
                 assert node.index == node_index , _error_message
         # Check lattice dimensions:
@@ -404,7 +406,7 @@ def _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn:TensorNetwork, 
                 neigbor = tn._find_neighbor_by_edge(n, e)
                 angle = tuples.angle(pos, neigbor.pos) 
                 try:                        
-                    dir = Directions.from_angle(angle)
+                    dir = Direction.from_angle(angle)
                 except ValueError:
                     dir = angle
                     # Also fix neighbours direction:

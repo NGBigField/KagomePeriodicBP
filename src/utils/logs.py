@@ -14,9 +14,6 @@ from utils import strings, saveload
 from enum import Enum, auto
 import types
 
-# Get global config:
-from utils.config import VERBOSE_MODE
-
 
 # ============================================================================ #
 #|                                  Helpers                                   |#

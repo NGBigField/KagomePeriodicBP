@@ -5,10 +5,6 @@ if __name__ == "__main__":
         pathlib.Path(__file__).parent.parent.__str__()
     )
 
-## Get config:
-from utils.config import DEBUG_MODE, VERBOSE_MODE
-
-
 import numpy as np
 from numpy import ndarray as np_ndarray
 
@@ -21,34 +17,27 @@ from utils import lists
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
 
-# For lattice methods and types:
+# For TN methods and types:
 from tensor_networks.operations import fuse_tensor
-from enums import Directions, NodeFunctionality
+from tensor_networks.directions import Direction
+from enums import NodeFunctionality, CoreCellType
 
 _EdgeIndicator : TypeAlias = str
 _PosScalarType : TypeAlias = int
 
 
-def _angle(direction:Directions|float)->float:
-    if isinstance(direction, Directions):
-        return direction.angle
-    elif isinstance(direction, float):
-        return direction
-    else:
-        raise TypeError(f"Not an expected type '{type(direction)}'")
-
-
 @dataclass
 class Node():
-    is_ket : bool
-    tensor : np.ndarray
-    functionality : NodeFunctionality
-    edges : list[_EdgeIndicator]
-    directions : list[Directions|float]  # if Direction enum then less expansive than floats
-    pos : Tuple[_PosScalarType,...]
     index : int
     name : str 
-    on_boundary : list[Directions] = field(default_factory=list) 
+    tensor : np.ndarray
+    is_ket : bool
+    pos : Tuple[_PosScalarType, ...]
+    edges : list[_EdgeIndicator]
+    directions : list[Direction] 
+    functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
+    core_cell_type : CoreCellType = field(default=CoreCellType.NoCore) 
+    on_boundary : list[Direction] = field(default_factory=list) 
 
 
     @property
@@ -66,7 +55,7 @@ class Node():
 
     @property
     def angles(self) -> list[float]:
-        return [_angle(direction) for direction in self.directions ]
+        return [direction.angle for direction in self.directions ]
 
     @property
     def dims(self) -> Tuple[int]:
@@ -76,6 +65,10 @@ class Node():
     def norm(self) -> np.float64:
         return np.linalg.norm(self.tensor)
     
+    def legs(self) -> Generator[tuple[Direction, _EdgeIndicator, int], None, None]:
+        for direction, edge, dim in zip(self.directions, self.edges, self.dims, strict=True):
+            yield direction, edge, dim
+
     def normalize(self) -> None:
         self.tensor = self.tensor / self.norm
     
@@ -93,13 +86,9 @@ class Node():
             setattr(new, f.name, val)
         return new
 
-    def edge_in_dir(self, dir:Directions|float)->_EdgeIndicator:
-        if isinstance(dir, Directions):
-            index = self.directions.index(dir)
-        elif isinstance(dir, float):
-            index = lists.index_by_approx_value(self.directions, dir)
-        else:
-            raise TypeError(f"Not an expected type '{type(dir)}'")
+    def edge_in_dir(self, dir:Direction)->_EdgeIndicator:
+        assert isinstance(dir, Direction), f"Not an expected type '{type(dir)}'"
+        index = self.directions.index(dir)
         return self.edges[index]
     
     def permute(self, axes:list[int]):
@@ -112,10 +101,6 @@ class Node():
             self.tensor = self.tensor.transpose(axes)
         self.edges = lists.rearrange(self.edges, axes)
         self.directions = lists.rearrange(self.directions, axes)      
-      
-    def all_legs_data_gen(self)->Generator[tuple[str, int, Directions|float, int], None, None]:
-        for edge_index, (edge_name, edge_dim, edge_direction) in enumerate(zip(self.edges, self.dims, self.directions, strict=True)):
-            yield edge_name, edge_dim, edge_direction, edge_index
 
     def validate(self)->None:
         # Generic validation error message:
@@ -129,7 +114,7 @@ class Node():
     def plot(self)->None:
         ## Some special imports:
         from matplotlib import pyplot as plt
-        from enums.directions import unit_vector_from_angle
+        from tensor_networks.directions import unit_vector_from_angle
         from utils import visuals
                 
         plt.figure()
@@ -141,11 +126,8 @@ class Node():
         text = f"{self.name} [{self.index}]"
         plt.text(0, 0, text)
                 
-        for edge_name, edge_dim, edge_direction, edge_index in self.all_legs_data_gen():
-            if isinstance(edge_direction, Directions):
-                vector = edge_direction.unit_vector()
-            else:
-                vector = unit_vector_from_angle(edge_direction)                            
+        for edge_index, (edge_direction, edge_name, edge_dim)  in enumerate(self.legs()):
+            vector = edge_direction.unit_vector()
             x, y = vector[0], vector[1]
             plt.plot([0, x], [0, y], color="black", alpha=0.8, linewidth=1.5 )
             plt.text(x/2, y/2, f"{edge_name}:\n{edge_dim} [{edge_index}]")
