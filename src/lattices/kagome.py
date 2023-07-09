@@ -124,16 +124,17 @@ def create_kagome_lattice(N:int)->list[NodePlaceHolder]:
         left.edges[left.directions.index(R)] = edge_name
         right.edges[right.directions.index(L)] = edge_name            
 
-        ## Edges between triangles:
-        for index1, triangle1 in enumerate(triangular_lattice_of_upper_triangles):
-            for triangle2, direction1 in triangle_lattice.all_neighbors(index1, N):
-                print(triangle1, triangle2)                
+    ## Edges between triangles:
+    for index1, triangle1 in enumerate(triangular_lattice_of_upper_triangles):
+        print(index1,":")                
+        for index2, direction1 in triangle_lattice.all_neighbors(index1, N):
+            print(f"    {index2}, {direction1}")                
 
     return 
 
 
 def main_test():
-    lattice = create_kagome_lattice(2)
+    lattice = create_kagome_lattice(4)
 
 
 if __name__ == "__main__":

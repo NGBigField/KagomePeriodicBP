@@ -55,9 +55,7 @@ class Direction():
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Direction):
             return False
-        if self.name==other.name:
-            return True
-        if _dist(self.angle, other.angle)<EPSILON:
+        if self.name==other.name and _dist(self.angle, other.angle)<EPSILON:
             return True
         return False
     
@@ -90,12 +88,12 @@ class Direction():
 #|                            Main Directions                                 |#
 # ============================================================================ #    
 
-DL : Final[Direction] = Direction("Down-Left", 4*pi/3)
-DR : Final[Direction] = Direction("Down-Right", 5*pi/3)
 R  : Final[Direction] = Direction("Right" , 0)
 UR : Final[Direction] = Direction("Up-Right", pi/3)
 UL : Final[Direction] = Direction("Up-Left", 2*pi/3)
-L  : Final[Direction] = Direction("Left" , 2*pi/3)
+L  : Final[Direction] = Direction("Left" , pi)
+DL : Final[Direction] = Direction("Down-Left", 4*pi/3)
+DR : Final[Direction] = Direction("Down-Right", 5*pi/3)
 
 
 # ============================================================================ #

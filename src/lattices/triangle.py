@@ -30,7 +30,7 @@ def row_width(i, N):
 
 def _get_neighbor_coordinates_in_direction_no_boundary_check(i:int, j:int, direction:Direction, N:int)->tuple[int, int]:
 	## Simple L or R:
-	if   direction==L:  
+	if direction==L:  
 		return i, j-1
 	if direction==R:  
 		return i, j+1
@@ -39,25 +39,25 @@ def _get_neighbor_coordinates_in_direction_no_boundary_check(i:int, j:int, direc
 	middle_row_index = num_rows(N)//2   # above or below middle row
 
 	if direction==UR: 
-		if j <= middle_row_index: 
+		if i <= middle_row_index: 
 			return i-1, j
 		else: 
 			return i-1, j+1
 	
 	if direction==UL:
-		if j <= middle_row_index:
+		if i <= middle_row_index:
 			return i-1, j-1
 		else:
 			return i-1, j
 		
 	if direction==DL:
-		if j < middle_row_index:
+		if i < middle_row_index:
 			return i+1, j
 		else:
 			return i+1, j-1
 		
 	if direction==DR:
-		if j < middle_row_index:
+		if i < middle_row_index:
 			return i+1, j+1
 		else:
 			return i+1, j
@@ -78,19 +78,19 @@ def get_neighbor_coordinates_in_direction(i:int, j:int, direction:Direction, N:i
 	return i2, j2
 
 
-def get_neighbor(index:int, direction:Direction, N:int)->tuple[int, int]:
-	i, j = get_vertex_coordinates(index, N)
+def get_neighbor(i:int, j:int, direction:Direction, N:int)->tuple[int, int]:	
 	i2, j2 = get_neighbor_coordinates_in_direction(i, j, direction, N)
 	return get_vertex_index(i2, j2, N)
 
 
 def all_neighbors(index:int, N:int)->Generator[tuple[NodePlaceHolder, Direction], None, None]:
+	i, j = get_vertex_coordinates(index, N)
 	for direction in all_in_standard_order():
 		try: 
-			neighbor = get_neighbor(index, direction, N)
+			neighbor = get_neighbor(i, j, direction, N)
 		except OutsideLatticeError:
-			pass
-		yield neighbor
+			continue
+		yield neighbor, direction
 
 
 def get_vertex_coordinates(index, N)->tuple[int, int]:
@@ -101,7 +101,7 @@ def get_vertex_coordinates(index, N)->tuple[int, int]:
 			j = index - running_index
 			return i, j
 		running_index += width
-	raise ValueError("Not found")
+	raise TriangularLatticeError("Not found")
 
 
 def get_vertex_index(i,j,N):
