@@ -53,15 +53,6 @@ DR = directions.DR
 #|                            Inner Functions                                 |#
 # ============================================================================ #
 
-def _check_tensor_on_boundary(edges:List[str])->List[Direction]:
-    on_boundary : List[Direction] = []
-    for edge in edges:
-        first_letter = edge[0]
-        raise NotImplementedError("Should change")
-        if  first_letter.isalpha() and not first_letter.isdigit():
-            on_boundary.append(Direction(first_letter))
-    return on_boundary
-
 
 def _derive_core_functionality(index:int, core_size:int, padding:int)->NodeFunctionality:
     # Basic Data:
@@ -129,6 +120,7 @@ def _get_position_from_tensor_coordinates(
 	N:int
 )->tuple[int,...]:
     return (j, N-i-1)
+
 
 def _get_edge_from_tensor_coordinates(
 	i:int,

@@ -1,4 +1,4 @@
-from tensor_networks.node import _EdgeIndicator, _PosScalarType
+from tensor_networks.node import _EdgeIndicator, _PosScalarType, Direction
 from dataclasses import dataclass, field
 
 
@@ -6,3 +6,4 @@ from dataclasses import dataclass, field
 class NodePlaceHolder():
     pos : tuple[_PosScalarType, ...]
     edges : list[_EdgeIndicator]
+    directions : list[Direction]

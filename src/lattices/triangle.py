@@ -1,4 +1,5 @@
 from lattices._common import NodePlaceHolder
+from tensor_networks.directions import DL, DR, R, UR, UL, L
 
 
 #
@@ -16,9 +17,6 @@ def total_vertices(N):
 	return 3*N*N - 3*N + 1
 
 
-#
-# ------------------------ row_width ------------------------
-#
 
 def row_width(i, N):
 	
@@ -32,11 +30,6 @@ def row_width(i, N):
 	
 	return N+i if i<N else 3*N-i-2
 
-
-
-#
-# ------------------------ get_vertex_index ------------------------
-#
 
 def get_vertex_index(i,j,N):
 	"""
@@ -74,10 +67,6 @@ def get_node_position(i,j,N):
 	y = 2*N - i
 	return x, y
 
-
-#
-# ------------------------ get_edge_index ------------------------
-#
 
 def get_edge_index(i,j,side,N):
 	"""
@@ -612,7 +601,8 @@ def create_triangle_lattice(N)->list[NodePlaceHolder]:
 		for j in range(w):
 			n = NodePlaceHolder(
 				pos = get_node_position(i, j, N),
-				edges = edges_list[index]
+				edges = edges_list[index],
+				directions=[L, R, UL, UR, DL, DR]
 			)
 			nodes_list.append(n)
 			index += 1

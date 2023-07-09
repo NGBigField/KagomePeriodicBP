@@ -49,6 +49,9 @@ class Direction():
     def __str__(self)->str:
         return self.name
     
+    def __repr__(self) -> str:
+        return f"Direction {self.name!r} {self.angle}"
+    
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Direction):
             return False
