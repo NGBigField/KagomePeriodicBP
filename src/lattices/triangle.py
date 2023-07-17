@@ -1,5 +1,6 @@
 from lattices._common import NodePlaceHolder, LatticeError, OutsideLatticeError
-from tensor_networks.directions import DL, DR, R, UR, UL, L, Direction, all_in_standard_order
+from tensor_networks.directions import DL, DR, R, UR, UL, L, Direction, U, D 
+from tensor_networks.directions import lattice_directions_in_standard_order
 from typing import Generator
 
 
@@ -65,6 +66,34 @@ def _get_neighbor_coordinates_in_direction_no_boundary_check(i:int, j:int, direc
 	TriangularLatticeError(f"Impossible direction {direction!r}")
 
 
+def check_boundary_vertex(index:int, N)->list[Direction]:
+	on_boundaries = []
+
+	# Basic Info:
+	i, j = get_vertex_coordinates(index, N)
+	height = num_rows(N)
+	width = row_width(i,N)
+	middle_row_index = height//2
+
+	# Boundaries:
+	if i==0:
+		on_boundaries.append(U)
+	if i==height-1:
+		on_boundaries.append(D)
+	if j==0: 
+		if i<=middle_row_index:
+			on_boundaries.append(UL)
+		if i>=middle_row_index:
+			on_boundaries.append(DL)
+	if j == width-1:
+		if i<=middle_row_index:
+			on_boundaries.append(UR)
+		if i>=middle_row_index:
+			on_boundaries.append(DR)
+	
+	return on_boundaries
+
+
 
 def get_neighbor_coordinates_in_direction(i:int, j:int, direction:Direction, N:int)->tuple[int, int]:
 	i2, j2 = _get_neighbor_coordinates_in_direction_no_boundary_check(i, j, direction, N)
@@ -85,7 +114,7 @@ def get_neighbor(i:int, j:int, direction:Direction, N:int)->tuple[int, int]:
 
 def all_neighbors(index:int, N:int)->Generator[tuple[NodePlaceHolder, Direction], None, None]:
 	i, j = get_vertex_coordinates(index, N)
-	for direction in all_in_standard_order():
+	for direction in lattice_directions_in_standard_order():
 		try: 
 			neighbor = get_neighbor(i, j, direction, N)
 		except OutsideLatticeError:
