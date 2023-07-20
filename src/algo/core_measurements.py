@@ -10,7 +10,7 @@ from utils.config import DEBUG_MODE, ALLOW_VISUALS, VERBOSE_MODE
 
 import numpy as np
 
-from tensor_networks import TensorNetwork, Node
+from tensor_networks import KagomeTensorNetwork, Node
 from tensor_networks.construction import repeat_core
 from algo.tensor_network import reduce_tn_to_core_and_environment, calc_edge_environment, calc_mean_values
 from lib.ITE import rho_ij
@@ -50,7 +50,7 @@ def _get_z_projection(rho:np.ndarray)->complex:
     return rho[0,0] - rho[1,1] 
 
 
-def measure_xyz_expectation_values_with_tn(tn_stable_around_core:TensorNetwork, reduce:bool=True, bubblecon_trunc_dim:int=18)->dict[str, float|complex]:
+def measure_xyz_expectation_values_with_tn(tn_stable_around_core:KagomeTensorNetwork, reduce:bool=True, bubblecon_trunc_dim:int=18)->dict[str, float|complex]:
     res = calc_mean_values(tn_stable_around_core, operators=all_paulis, bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=reduce)
     return dict(x=res[0], y=res[1], z=res[2])
 
@@ -105,7 +105,7 @@ def measure_xyz_expectation_values_with_rdms(rdms:list[np.ndarray])->dict[str, f
         
 
 def measure_core_energies(
-    tn_stable_around_core:TensorNetwork, hamiltonian:np.ndarray, bubblecon_trunc_dim:int
+    tn_stable_around_core:KagomeTensorNetwork, hamiltonian:np.ndarray, bubblecon_trunc_dim:int
 )->tuple[
     list[complex],
     list[np.ndarray]
@@ -133,7 +133,7 @@ def measure_core_energies(
 
 
 def _measurements_everything_on_duplicated_core_specific_size(
-    core:TensorNetwork, 
+    core:KagomeTensorNetwork, 
     repeats:int,
     config:Config,
     logger:logs.Logger,
@@ -181,7 +181,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
 
 
 def measurements_everything_on_duplicated_core(
-    core:TensorNetwork, 
+    core:KagomeTensorNetwork, 
     repeats:int,
     config:Config,
     logger:logs.Logger|None = None

@@ -10,7 +10,7 @@ if __name__ == "__main__":
 from utils.config import DEBUG_MODE
 
 from typing import Callable
-from tensor_networks import TensorNetwork
+from tensor_networks import KagomeTensorNetwork
 from enums import Directions, ContractionDepth, NodeFunctionality
 from containers import ContractionConfig
 
@@ -33,7 +33,7 @@ R = Directions.Right
 
 
 def _derive_axes(
-    tn:TensorNetwork,
+    tn:KagomeTensorNetwork,
     direction:Directions,
 )->tuple[
     list[int],   # axis1
@@ -115,7 +115,7 @@ def _determine_direction(axis2:list[int], _pos_func:_PosFuncType) -> Directions:
 
 
 def derive_contraction_orders(
-    tn:TensorNetwork,  
+    tn:KagomeTensorNetwork,  
     direction:Directions,
     depth:ContractionDepth|int,
     plot_:bool=False

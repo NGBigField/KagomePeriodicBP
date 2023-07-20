@@ -11,7 +11,7 @@ from utils.config import VERBOSE_MODE, DEBUG_MODE, MULTIPROCESSING
 import numpy as np
 
 # other used types in our code:
-from tensor_networks import TensorNetwork, MPS
+from tensor_networks import KagomeTensorNetwork, MPS
 from enums import Directions, ContractionDepth, MessageModel
 from containers import BPStats, BPConfig
 
@@ -37,7 +37,7 @@ _MsgDictType = dict[Directions, tuple[MPS, Directions]]
 
 
 def _out_going_message(
-    tn:TensorNetwork, direction:Directions, bubblecon_trunc_dim:int, print_progress:bool, hermitize:bool
+    tn:KagomeTensorNetwork, direction:Directions, bubblecon_trunc_dim:int, print_progress:bool, hermitize:bool
 ) -> tuple[
     MPS, 
     Directions
@@ -71,14 +71,14 @@ def _bp_error_str(error:float|None):
 
 
 def _belief_propagation_step(
-    open_tn:TensorNetwork,
+    open_tn:KagomeTensorNetwork,
     prev_error:float|None,
-    prev_tn_with_messages:TensorNetwork,
+    prev_tn_with_messages:KagomeTensorNetwork,
     prev_messages:_MsgDictType,
     prog_bar:strings.ProgressBar,
     bp_config:BPConfig
 )->tuple[
-    TensorNetwork,  # next_tn_with_messages
+    KagomeTensorNetwork,  # next_tn_with_messages
     _MsgDictType,   # next_messages
     float           # next_eerror
 ]:
@@ -162,11 +162,11 @@ def initial_message(
 
 @decorators.add_stats()
 def belief_propagation_pashtida(
-    open_tn:TensorNetwork, 
+    open_tn:KagomeTensorNetwork, 
     messages:_MsgDictType|None, # initial messages
     bp_config:BPConfig
 ) -> tuple[ 
-    TensorNetwork,
+    KagomeTensorNetwork,
     _MsgDictType, # final messages
     BPStats
 ]:
@@ -221,12 +221,12 @@ def belief_propagation_pashtida(
 
 @decorators.add_stats()
 def belief_propagation(
-    open_tn:TensorNetwork, 
+    open_tn:KagomeTensorNetwork, 
     messages:_MsgDictType|None, # initial messages
     bp_config:BPConfig,
     live_plots:bool=False
 ) -> tuple[ 
-    TensorNetwork,
+    KagomeTensorNetwork,
     _MsgDictType, # final messages
     BPStats
 ]:

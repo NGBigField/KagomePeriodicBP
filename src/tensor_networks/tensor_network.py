@@ -32,7 +32,7 @@ def _is_open_edge(edge:tuple[int, int])->bool:
     else:                   return False
 
 
-class TensorNetwork():
+class KagomeTensorNetwork():
 
     # ================================================= #
     #|                Basic Attributes                 |#
@@ -226,7 +226,7 @@ class TensorNetwork():
         plot_network(nodes=self.nodes, edges=self.edges, detailed=detailed)
         
 
-    def copy(self)->"TensorNetwork":
+    def copy(self)->"KagomeTensorNetwork":
         cls = type(self)
         nodes = [node.copy() for node in self.nodes]
         edges = deepcopy(self.edges)
@@ -236,7 +236,7 @@ class TensorNetwork():
         if DEBUG_MODE: new.validate()
         return new
     
-    def sub_tn(self, indices)->"TensorNetwork":
+    def sub_tn(self, indices)->"KagomeTensorNetwork":
         cls = type(self)
         
         ## the nodes in the sub-system must be indexed again:
@@ -407,7 +407,7 @@ def get_common_edge(n1:Node, n2:Node)->EdgeIndicator:
     raise ValueError(f"Nodes '{n1}' and '{n2}' don't have a common edge.")
 
 
-def _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn:TensorNetwork, n1:Node, n2:Node):
+def _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn:KagomeTensorNetwork, n1:Node, n2:Node):
     contraction_edge = get_common_edge(n1, n2)
     if n1.functionality is n2.functionality:
         functionality = n1.functionality

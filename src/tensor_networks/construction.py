@@ -26,7 +26,7 @@ from numpy import matlib
 
 # For common lattice function and classes:
 from tensor_networks.node import Node, NodeFunctionality
-from tensor_networks.tensor_network import TensorNetwork, TensorDims
+from tensor_networks.tensor_network import KagomeTensorNetwork, TensorDims
 from lattices import directions
 from lattices.directions import Direction
 from lattices.edges import edges_dict_from_edges_list
@@ -174,9 +174,9 @@ def _get_coordinates_from_index(
 # ============================================================================ #
 
 def repeat_core(
-    core:TensorNetwork,
+    core:KagomeTensorNetwork,
     repeats:int
-) -> TensorNetwork:
+) -> KagomeTensorNetwork:
     
     repeats = assertions.odd(repeats, reason="No support yet for odd big tensors")
     
@@ -231,7 +231,7 @@ def repeat_core(
     ## Create TN:
     edges_dict = edges_dict_from_edges_list([node.edges for node in nodes])
     tensor_dims = core.tensor_dims
-    tn = TensorNetwork( nodes=nodes, edges=edges_dict, tensor_dims=tensor_dims )
+    tn = KagomeTensorNetwork( nodes=nodes, edges=edges_dict, tensor_dims=tensor_dims )
     if DEBUG_MODE: tn.validate()
 
     return tn
@@ -243,7 +243,7 @@ def create_kagome_tn(
     D : int,  # Virutal\Bond dimenstion  
     N : int,  # Lattice-size - Number of upper-triangles at each edge of the hexagon-block
     unit_cell : UnitCell|None = None
-) -> TensorNetwork:
+) -> KagomeTensorNetwork:
 
     # Get the kagome lattice without tensors:
     lattice = KagomeLattice(N)
@@ -256,7 +256,7 @@ def create_kagome_tn(
              C = _random_tensor(d, D)
         )
 
-    tn = TensorNetwork(lattice, unit_cell, d=d, D=D)
+    tn = KagomeTensorNetwork(lattice, unit_cell, d=d, D=D)
     
     print(tn)
 

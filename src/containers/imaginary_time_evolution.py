@@ -3,7 +3,7 @@ from physics.hamiltonians import HamiltonianFuncType, zero
 from dataclasses import dataclass, field, fields
 from utils import strings, saveload, assertions
 from utils.arguments import Stats
-from tensor_networks import TensorNetwork
+from tensor_networks import KagomeTensorNetwork
 from typing import Generator, Union, Any
 from copy import deepcopy
 
@@ -82,14 +82,14 @@ class ITESegmentStats(Stats):
 
 
 
-_TrackerStepOutputs = tuple[float, complex|None, ITESegmentStats, dict, TensorNetwork, dict]  # delta_t, energy, env_hermicity, expectation, value, core, messages
+_TrackerStepOutputs = tuple[float, complex|None, ITESegmentStats, dict, KagomeTensorNetwork, dict]  # delta_t, energy, env_hermicity, expectation, value, core, messages
 
 
 class ITEProgressTracker():
 
-    def __init__(self, core:TensorNetwork, messages:dict|None, config:Any):
+    def __init__(self, core:KagomeTensorNetwork, messages:dict|None, config:Any):
         # From input:
-        self.last_core : TensorNetwork = core.copy()
+        self.last_core : KagomeTensorNetwork = core.copy()
         self.last_messages : dict = deepcopy(messages)  #type: ignore
         self.config = config
         # Fresh variables:
@@ -100,11 +100,11 @@ class ITEProgressTracker():
         self.delta_ts : list[float] = []
         self.energies : list[complex|None] = []
         self.expectation_values : list[dict] = []
-        self.cores : list[TensorNetwork] = []
+        self.cores : list[KagomeTensorNetwork] = []
         self.messages : list[dict] = []
         self.stats : list[ITESegmentStats] = []
     
-    def log_segment(self, delta_t:float, core:TensorNetwork, messages:dict, expectation_values:dict, energy:complex, stats:ITESegmentStats )->None:
+    def log_segment(self, delta_t:float, core:KagomeTensorNetwork, messages:dict, expectation_values:dict, energy:complex, stats:ITESegmentStats )->None:
         # Get a solid copy
         _core = core.copy()
         messages = deepcopy(messages)

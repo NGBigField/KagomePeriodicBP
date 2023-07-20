@@ -15,7 +15,7 @@ import numpy as np
 from typing import List, Tuple, Iterable, TypeVar
 
 # Common types in the code:
-from tensor_networks import TensorNetwork, Node, NodeFunctionality, MPS, TensorNetworkError
+from tensor_networks import KagomeTensorNetwork, Node, NodeFunctionality, MPS, TensorNetworkError
 from enums import Sides, Directions, ContractionDepth, ReduceToEdgeMethod, ReduceToCoreMethod
 from containers import BubbleConConfig, ContractionConfig
 from physics import pauli
@@ -46,7 +46,7 @@ def _fix_angle(a:float)->float:
         a -= 2*np.pi
     return a
 
-def _get_corner_tensors(tn:TensorNetwork) -> list[Node]:
+def _get_corner_tensors(tn:KagomeTensorNetwork) -> list[Node]:
     min_x, max_x, min_y, max_y = tn.boundaries()
     corner_tesnors = [] 
     for x in [min_x, max_x]:
@@ -55,7 +55,7 @@ def _get_corner_tensors(tn:TensorNetwork) -> list[Node]:
             corner_tesnors.append(t)    
     return corner_tesnors
 
-def _sandwich_fused_tensors_with_expectation_values(tn_in:TensorNetwork, mat:np.matrix, ind:int, plot_:bool=False)->TensorNetwork:
+def _sandwich_fused_tensors_with_expectation_values(tn_in:KagomeTensorNetwork, mat:np.matrix, ind:int, plot_:bool=False)->KagomeTensorNetwork:
 
     ## Get peps tensor and node data
     node = tn_in.nodes[ind]
@@ -93,7 +93,7 @@ def _sandwich_fused_tensors_with_expectation_values(tn_in:TensorNetwork, mat:np.
 
 
 
-def _ordered_nodes_on_edge(tn:TensorNetwork, edge_side:Sides, mps_order_dir:Directions)->list[Node]:
+def _ordered_nodes_on_edge(tn:KagomeTensorNetwork, edge_side:Sides, mps_order_dir:Directions)->list[Node]:
     nodes_on_edge = tn.nodes_on_boundary(edge_side)
     ## Sort nodes by position along `msg_mps_dir`. 
     # nodes must be ordered from left to right, as seen from the direction of the mps:
@@ -112,11 +112,11 @@ def _ordered_nodes_on_edge(tn:TensorNetwork, edge_side:Sides, mps_order_dir:Dire
 
 
 def _fuse_mps_with_tn(
-    tn : TensorNetwork,
+    tn : KagomeTensorNetwork,
     mps : MPS,
     mps_order_dir : Directions,
     edge_side : Sides
-) -> TensorNetwork:
+) -> KagomeTensorNetwork:
 
     ## Check data:
     assert Directions.is_orthogonal(edge_side, mps_order_dir), f"MPS must be oethogonal in its own ordering direction to the lattice"
@@ -193,9 +193,9 @@ def _fuse_mps_with_tn(
 
 
 def fuse_messages_with_tn(
-    tn : TensorNetwork,
+    tn : KagomeTensorNetwork,
     mps_dict : dict[Directions, tuple[MPS, Directions]]
-) -> TensorNetwork:   
+) -> KagomeTensorNetwork:   
     # Start with new copy of tn: 
     tn_with_messages = tn.copy()
 
@@ -253,7 +253,7 @@ def _calc_and_check_expectation_value(numerator, denominator, force_real:bool) -
 
 def _sandwich_with_operator_and_contract_fully(
     node_ind:int,
-    tn:TensorNetwork, 
+    tn:KagomeTensorNetwork, 
     operator:np.matrix,
     max_con_dim:int, 
     direction:Directions
@@ -330,9 +330,9 @@ def _find_tensor_in_direction(dir:Directions, n1:Node, n2:Node)->Node:
 
 
 def calc_reduced_tn_around_edge(
-    tn_stable:TensorNetwork, side:Sides, 
+    tn_stable:KagomeTensorNetwork, side:Sides, 
     bubblecon_trunc_dim:int, method:ReduceToEdgeMethod, allready_reduced_to_core:bool=False, swallow_corners_:bool=True
-)->TensorNetwork:
+)->KagomeTensorNetwork:
     """
         Get reduced tensor_network using bubblecon.
     """
@@ -376,7 +376,7 @@ def calc_reduced_tn_around_edge(
 
 
 
-def swallow_corners(tn:TensorNetwork, _if_no_corners_error:bool=True)->TensorNetwork:
+def swallow_corners(tn:KagomeTensorNetwork, _if_no_corners_error:bool=True)->KagomeTensorNetwork:
     # Find corner tensors:
     corner_tensors = tn.get_corner_nodes()
     ## contract corners to a nehigboring tensor in the wide direction
@@ -399,11 +399,11 @@ def swallow_corners(tn:TensorNetwork, _if_no_corners_error:bool=True)->TensorNet
 
 
 def get_edge_environment_pashtida(
-    tn:TensorNetwork, side:Sides, bubblecon_trunc_dim:int
+    tn:KagomeTensorNetwork, side:Sides, bubblecon_trunc_dim:int
 )->tuple[
     Node, Node,         # core1+2
     list[np.ndarray],   # environment
-    TensorNetwork       # small_tn
+    KagomeTensorNetwork       # small_tn
 ]:
     """
     A wrapper for the Pashtida version of BP
@@ -582,7 +582,7 @@ def get_edge_environment_pashtida(
         "c2-6" : (1,1),
     }
 
-    tn_env = TensorNetwork(
+    tn_env = KagomeTensorNetwork(
         nodes=cores,
         edges=edges,
         tensor_dims=tn.tensor_dims,
@@ -653,7 +653,7 @@ def get_edge_environment_pashtida(
 
 
 def rearange_tensors_legs_to_canonical_order(
-    tn_env:TensorNetwork, side:Sides
+    tn_env:KagomeTensorNetwork, side:Sides
 )->tuple[Node, Node, list[np.ndarray]]:
     core_tensors = tn_env.get_core_nodes()
     core1 = _find_tensor_in_direction(side.next_counterclockwise(), *core_tensors)
@@ -674,11 +674,11 @@ def rearange_tensors_legs_to_canonical_order(
 
 
 def calc_edge_environment(
-    tn:TensorNetwork, side:Sides, bubblecon_trunc_dim:int, method:ReduceToEdgeMethod=ReduceToEdgeMethod.default(), already_reduced_to_core:bool=False
+    tn:KagomeTensorNetwork, side:Sides, bubblecon_trunc_dim:int, method:ReduceToEdgeMethod=ReduceToEdgeMethod.default(), already_reduced_to_core:bool=False
 )->tuple[
     Node, Node,         # core1/2
     list[np.ndarray],         # environment
-    TensorNetwork       # small_tn
+    KagomeTensorNetwork       # small_tn
 ]:
     ## Get the smallest Tensor-Network around the mode (edge):
     tn_env = calc_reduced_tn_around_edge(tn, side, bubblecon_trunc_dim, method, already_reduced_to_core)
@@ -689,7 +689,7 @@ def calc_edge_environment(
     return core1, core2, environment_tensors, tn_env
 
 
-def calc_interaction_energies_in_core(tn:TensorNetwork, interaction_hamiltonain:np.ndarray, bubblecon_trunc_dim:int) -> list[float]:
+def calc_interaction_energies_in_core(tn:KagomeTensorNetwork, interaction_hamiltonain:np.ndarray, bubblecon_trunc_dim:int) -> list[float]:
     energies = []
     reduced_tn = reduce_tn_to_core_and_environment(tn, bubblecon_trunc_dim, swallow_corners_=False)
     for side in Sides:
@@ -702,7 +702,7 @@ def calc_interaction_energies_in_core(tn:TensorNetwork, interaction_hamiltonain:
 
 
 def calc_mean_values(
-    tn:TensorNetwork, 
+    tn:KagomeTensorNetwork, 
     operators:list[np.matrix], 
     bubblecon_trunc_dim:int, 
     direction:Directions=Directions.random(), 
@@ -730,7 +730,7 @@ def calc_mean_values(
 
 
 def calc_mean_value(
-    tn:TensorNetwork, 
+    tn:KagomeTensorNetwork, 
     node_indices:List[int], 
     operator:np.matrix,
     bubblecon_trunc_dim:int, 
@@ -773,7 +773,7 @@ def calc_mean_value(
 
 
 def contract_tensor_network(
-    tn:TensorNetwork, 
+    tn:KagomeTensorNetwork, 
     direction:Directions,
     depth:ContractionDepth|int,
     bubblecon_trunc_dim:int,
@@ -814,7 +814,7 @@ def contract_tensor_network(
     return mp, contraction_order, mps_direction
 
 
-def reduce_tn_using_bubblecon(tn:TensorNetwork, bubblecon_trunc_dim:int, directions:Iterable[Directions], depth:ContractionDepth|int, parallel:bool=False)->TensorNetwork:
+def reduce_tn_using_bubblecon(tn:KagomeTensorNetwork, bubblecon_trunc_dim:int, directions:Iterable[Directions], depth:ContractionDepth|int, parallel:bool=False)->KagomeTensorNetwork:
 
     # prepare inputs:
     fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=bubblecon_trunc_dim, depth=depth)
@@ -850,8 +850,8 @@ def reduce_tn_using_bubblecon(tn:TensorNetwork, bubblecon_trunc_dim:int, directi
 
 
 def reduce_core_and_environment_to_edge_and_environment(
-    tn_small:TensorNetwork, side:Sides, bubblecon_trunc_dim:int
-)->TensorNetwork:
+    tn_small:KagomeTensorNetwork, side:Sides, bubblecon_trunc_dim:int
+)->KagomeTensorNetwork:
     tn_env = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[side], depth=2)
     ## Find and Swallow the two corner tensors:
     remaining_core_tensors = [t for t in tn_env.nodes if t.functionality is NodeFunctionality.Core]
@@ -869,7 +869,7 @@ def reduce_core_and_environment_to_edge_and_environment(
     return tn_env
 
 
-def _reduce_tn_to_core_and_environment_EachDirectionToCore(small_tn:TensorNetwork, bubblecon_trunc_dim:int, swallow_corners_:bool, parallel:bool) -> TensorNetwork:
+def _reduce_tn_to_core_and_environment_EachDirectionToCore(small_tn:KagomeTensorNetwork, bubblecon_trunc_dim:int, swallow_corners_:bool, parallel:bool) -> KagomeTensorNetwork:
     for directions in Directions.all_opposite_pairs():
         small_tn = reduce_tn_using_bubblecon(
             tn=small_tn, directions=directions, bubblecon_trunc_dim=bubblecon_trunc_dim, depth=ContractionDepth.ToCore, 
@@ -881,7 +881,7 @@ def _reduce_tn_to_core_and_environment_EachDirectionToCore(small_tn:TensorNetwor
 
     return small_tn
 
-def _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn:TensorNetwork, bubblecon_trunc_dim:int, swallow_corners_:bool, parallel:bool) -> TensorNetwork:
+def _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn:KagomeTensorNetwork, bubblecon_trunc_dim:int, swallow_corners_:bool, parallel:bool) -> KagomeTensorNetwork:
     
     ## Check inputs:
     assert swallow_corners_ is True, f"Zipping methods always swallows the corners"
@@ -1026,7 +1026,7 @@ def _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn:TensorNetwork, bubble
     return small_tn
 
 
-def reduce_tn_to_core_and_environment(tn:TensorNetwork, bubblecon_trunc_dim:int, swallow_corners_:bool=True, method:ReduceToCoreMethod=ReduceToCoreMethod.default()) -> TensorNetwork:
+def reduce_tn_to_core_and_environment(tn:KagomeTensorNetwork, bubblecon_trunc_dim:int, swallow_corners_:bool=True, method:ReduceToCoreMethod=ReduceToCoreMethod.default()) -> KagomeTensorNetwork:
     tn_copy = tn.copy()
     
     ## Decide if parallel contraction benefit us in this case:   #TODO  needs verification
@@ -1047,7 +1047,7 @@ def reduce_tn_to_core_and_environment(tn:TensorNetwork, bubblecon_trunc_dim:int,
     return small_tn
 
 
-def full_contraction(tn:TensorNetwork, /,*, max_dim:int, direction:Directions=Directions.Right):
+def full_contraction(tn:KagomeTensorNetwork, /,*, max_dim:int, direction:Directions=Directions.Right):
     # Basic info:    
     min_x, max_x, min_y, max_y = tn.boundaries()
     min_x = int(min_x) 
