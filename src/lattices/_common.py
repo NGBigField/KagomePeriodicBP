@@ -1,4 +1,5 @@
-from tensor_networks.node import _EdgeIndicator, _PosScalarType, Direction
+from lattices.directions import Direction
+from _types import EdgeIndicator, PosScalarType
 from utils import tuples
 from dataclasses import dataclass, field
 
@@ -10,17 +11,17 @@ class OutsideLatticeError(LatticeError): ...
 @dataclass
 class NodePlaceHolder():
     index : int
-    pos : tuple[_PosScalarType, ...]
-    edges : list[_EdgeIndicator]
+    pos : tuple[PosScalarType, ...]
+    edges : list[EdgeIndicator]
     directions : list[Direction]
     boundaries : set[Direction] = field(default_factory=set)
 
 
-    def get_edge_in_direction(self, direction:Direction) -> _EdgeIndicator:
+    def get_edge_in_direction(self, direction:Direction) -> EdgeIndicator:
         edge_index = self.directions.index(direction)
         return self.edges[edge_index]
     
-    def set_edge_in_direction(self, direction:Direction, value:_EdgeIndicator) -> None:
+    def set_edge_in_direction(self, direction:Direction, value:EdgeIndicator) -> None:
         edge_index = self.directions.index(direction)
         self.edges[edge_index] = value
 

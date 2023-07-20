@@ -8,22 +8,23 @@ if __name__ == "__main__":
 import numpy as np
 from numpy import ndarray as np_ndarray
 
-from typing import NamedTuple, TypeAlias, Tuple, Generator
+from typing import Tuple, Generator
 
 # Use some of our utilities:
 from utils import lists
+
+# for type namings:
+from _types import EdgeIndicator, PosScalarType
 
 # For OOP Style:
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
 
 # For TN methods and types:
-from tensor_networks.operations import fuse_tensor
-from tensor_networks.directions import Direction
+from tensor_networks.operations import fuse_tensor_to_itself
+from lattices.directions import Direction
 from enums import NodeFunctionality, CoreCellType
 
-_EdgeIndicator : TypeAlias = str
-_PosScalarType : TypeAlias = int
 
 
 @dataclass
@@ -32,8 +33,8 @@ class Node():
     name : str 
     tensor : np.ndarray
     is_ket : bool
-    pos : Tuple[_PosScalarType, ...]
-    edges : list[_EdgeIndicator]
+    pos : Tuple[PosScalarType, ...]
+    edges : list[EdgeIndicator]
     directions : list[Direction] 
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
     core_cell_type : CoreCellType = field(default=CoreCellType.NoCore) 
@@ -49,7 +50,7 @@ class Node():
     @property
     def fused_tensor(self) -> np_ndarray:
         if self.is_ket:
-            return fuse_tensor(self.tensor)
+            return fuse_tensor_to_itself(self.tensor)
         else:
             return self.tensor
 
@@ -65,7 +66,7 @@ class Node():
     def norm(self) -> np.float64:
         return np.linalg.norm(self.tensor)
     
-    def legs(self) -> Generator[tuple[Direction, _EdgeIndicator, int], None, None]:
+    def legs(self) -> Generator[tuple[Direction, EdgeIndicator, int], None, None]:
         for direction, edge, dim in zip(self.directions, self.edges, self.dims, strict=True):
             yield direction, edge, dim
 
@@ -86,7 +87,7 @@ class Node():
             setattr(new, f.name, val)
         return new
 
-    def edge_in_dir(self, dir:Direction)->_EdgeIndicator:
+    def edge_in_dir(self, dir:Direction)->EdgeIndicator:
         assert isinstance(dir, Direction), f"Not an expected type '{type(dir)}'"
         index = self.directions.index(dir)
         return self.edges[index]
@@ -114,7 +115,7 @@ class Node():
     def plot(self)->None:
         ## Some special imports:
         from matplotlib import pyplot as plt
-        from tensor_networks.directions import unit_vector_from_angle
+        from lattices.directions import unit_vector_from_angle
         from utils import visuals
                 
         plt.figure()

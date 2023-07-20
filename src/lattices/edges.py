@@ -1,7 +1,6 @@
-from typing import List, Dict, Tuple
 
 
-def edges_dict_from_edges_list(edges_list:List[List[str]])->Dict[str, Tuple[int, int]]:
+def edges_dict_from_edges_list(edges_list:list[list[str]])->dict[str, tuple[int, int]]:
     vertices = {}
     for i, i_edges in enumerate(edges_list):
         for e in i_edges:

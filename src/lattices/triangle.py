@@ -1,6 +1,6 @@
 from lattices._common import NodePlaceHolder, LatticeError, OutsideLatticeError
-from tensor_networks.directions import DL, DR, R, UR, UL, L, Direction, U, D 
-from tensor_networks.directions import lattice_directions_in_standard_order
+from lattices.directions import DL, DR, R, UR, UL, L, Direction, U, D 
+from lattices.directions import lattice_directions_in_standard_order
 from typing import Generator
 
 

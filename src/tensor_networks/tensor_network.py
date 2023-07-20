@@ -1,11 +1,14 @@
 ## Get config:
 from _config_reader import DEBUG_MODE
 
-from tensor_networks import directions
-from tensor_networks.directions import Direction
-from tensor_networks.node import Node, _EdgeIndicator, _PosScalarType
+from lattices.directions import Direction
+from tensor_networks.node import Node
 from tensor_networks.errors import TensorNetworkError
-from tensor_networks.edges import edges_dict_from_edges_list
+from lattices.edges import edges_dict_from_edges_list
+from tensor_networks.unit_cell import UnitCell
+
+from lattices.kagome import KagomeLattice
+from _types import EdgeIndicator, PosScalarType
 
 from enums import NodeFunctionality
 from utils import assertions, lists, tuples
@@ -36,21 +39,34 @@ class TensorNetwork():
     # ================================================= #
     def __init__(
         self, 
-        nodes:list[Node],
-        edges:dict[str, tuple[int, int]],
-        tensor_dims:TensorDims,
-        _copied:bool=False
+        lattice : KagomeLattice,
+        unit_cell : UnitCell,
+        d : int,
+        D : int
     ) -> None:
-        # Derive info:
-        if _copied:
-            edge_size = -1
-        else:
-            edge_size = assertions.integer( np.sqrt( len(nodes) ) )
         # Save data:
-        self.nodes : list[Node] = nodes        
-        self.edges : dict[str, tuple[int, int]] = edges        
-        self.original_lattice_dims : tuple[int, ...] = (edge_size, edge_size)
-        self.tensor_dims : TensorDims = tensor_dims
+        self.lattice : KagomeLattice = lattice
+        self.messages : dict[Direction, Node] = {}
+        self.unit_cell = unit_cell
+        self.d : int = d
+        self.D : int = D
+
+    # ================================================= #
+    #|                   Add messages                  |#
+    # ================================================= #
+
+
+    # ================================================= #
+    #|                Network Structure                |#
+    # ================================================= #
+    @property
+    def nodes(self)->list[Node]:
+        pass
+
+    @property
+    def edges(self)->dict[str, tuple[int, int]]:
+        edges = self.lattice.edges
+        return edges
 
     # ================================================= #
     #|              Basic Derived Properties           |#
@@ -64,11 +80,11 @@ class TensorNetwork():
         return [v.is_ket for v in self.nodes]
     
     @property
-    def edges_list(self)->list[list[_EdgeIndicator]]:
+    def edges_list(self)->list[list[EdgeIndicator]]:
         return [v.edges for v in self.nodes]
 
     @property
-    def positions(self)->list[tuple[_PosScalarType,...]]:
+    def positions(self)->list[tuple[PosScalarType,...]]:
         return [v.pos for v in self.nodes]
 
     @property
@@ -100,7 +116,7 @@ class TensorNetwork():
         indices = list(set(indices))  # If the tensor apears twice, get only 1 copy of its index.
         return [ self.nodes[node_ind] for node_ind in indices ]
 
-    def _find_neighbor_by_edge(self, node:Node, edge:_EdgeIndicator)->Node:
+    def _find_neighbor_by_edge(self, node:Node, edge:EdgeIndicator)->Node:
         nodes = self.nodes_connected_to_edge(edge)
         assert len(nodes)==2, f"Only tensor '{node.index}' is connected to edge '{edge}' in direction '{str(dir)}'  "
         if nodes[0] is node:
@@ -298,7 +314,7 @@ class TensorNetwork():
             else:
                 self.edges[new_edge] = (new_node_index, new_node_index)
 
-    def get_tensor_in_pos(self, pos:tuple[_PosScalarType, ...]) -> Node:
+    def get_tensor_in_pos(self, pos:tuple[PosScalarType, ...]) -> Node:
         tensors_in_position = [node for node in self.nodes if node.pos == pos]
         if len(tensors_in_position)==0:
             raise TensorNetworkError(f"Couldn't find any tensor in position {pos}")
@@ -383,7 +399,7 @@ def get_common_edge_legs(
     return i1, i2
 
 
-def get_common_edge(n1:Node, n2:Node)->_EdgeIndicator:
+def get_common_edge(n1:Node, n2:Node)->EdgeIndicator:
     for e1 in n1.edges:
         for e2 in n2.edges:
             if e1==e2:

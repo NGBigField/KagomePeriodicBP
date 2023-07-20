@@ -22,17 +22,18 @@ from utils import tuples, lists, assertions, saveload, logs, decorators, errors,
 
 # For common numeric functions:
 import numpy as np
-from numpy import pi
 from numpy import matlib
 
 # For common lattice function and classes:
 from tensor_networks.node import Node, NodeFunctionality
 from tensor_networks.tensor_network import TensorNetwork, TensorDims
-from tensor_networks import directions
-from tensor_networks.directions import Direction
-from tensor_networks.edges import edges_dict_from_edges_list
-from enums import InitialTNMode
+from lattices import directions
+from lattices.directions import Direction
+from lattices.edges import edges_dict_from_edges_list
+from tensor_networks.unit_cell import UnitCell
+
 from containers import TNSizesAndDimensions
+from lattices.kagome import KagomeLattice
 
 
 # ============================================================================ #
@@ -234,105 +235,32 @@ def repeat_core(
     if DEBUG_MODE: tn.validate()
 
     return tn
-          
-
-
-def create_physical_peps(
-    size:int,
-    d_virtual:int,
-    d_physical:int,
-    creation_mode:InitialTNMode,
-    h:float|None=None
-)->list[np.ndarray]:
-    if creation_mode==InitialTNMode._SimpleUpdateResult:
-        assert hasattr(creation_mode, "h"), f"A workaround where the enumeration has also a property"
-        h = getattr(creation_mode, "h")
-        assert isinstance(h, float)
-        return from_tnsu.construct_full_lattice_from_itf_experiment_core(edge_size=size, physical_dim=d_physical, virtual_dim=d_virtual, h=h)
-    elif creation_mode==InitialTNMode.SpecialTensor:
-        assert d_virtual==3, f"Special-Tensor is a tensor with virtual dimension 3. Got d_virtual={d_virtual}"
-        return from_special_tensor.construct_full_lattice_from_special_tensor(size)
-    elif creation_mode==InitialTNMode.Random:
-        if RANDOM_CORE_IS_ABBA_LATTICE:
-            a = _random_tensor(D=d_virtual, d=d_physical)
-            b = _random_tensor(D=d_virtual, d=d_physical)
-            return [a, b, b, a]
-        else:
-            return [_random_tensor(D=d_virtual, d=d_physical) for _ in range(size**2) ]
-    else:
-        raise ValueError(f"Not a valid option. got initial_tn={creation_mode!r}.")    
-
-
-def create_core(
-    config:TNSizesAndDimensions,
-    creation_mode:InitialTNMode|list[np.ndarray]=InitialTNMode.Random,
-    _check_core:bool=True
-) -> TensorNetwork:
-    core = create_square_tn(core_size=config.core_size, padding=0, d_physical=config.physical_dim, d_virtual=config.virtual_dim, creation_mode=creation_mode)
-    core.nodes[0].name = "A"
-    core.nodes[1].name = "B"
-    core.nodes[2].name = "B"
-    core.nodes[3].name = "A"
-    if DEBUG_MODE and _check_core:
-         assert core.nodes[0] == core.nodes[3]  # A
-         assert core.nodes[1] == core.nodes[2]  # B
-    return core
+         
      
      
-def create_square_tn(
-    core_size   : int, 
-    d_virtual   : int, 
-    d_physical  : int,
-    padding:int=0, 
-    creation_mode:InitialTNMode|list[np.ndarray]=InitialTNMode.Random,
+def create_kagome_tn(
+    d : int,  # Physical dimenstion 
+    D : int,  # Virutal\Bond dimenstion  
+    N : int,  # Lattice-size - Number of upper-triangles at each edge of the hexagon-block
+    unit_cell : UnitCell|None = None
 ) -> TensorNetwork:
-    # Derive from inputs:
-    tn_size = core_size + padding
 
-    ## Physical Tensors:
-    if isinstance(creation_mode, InitialTNMode):
-        physical_peps = create_physical_peps(size=tn_size, d_physical=d_physical, d_virtual=d_virtual, creation_mode=creation_mode)
-    elif isinstance(creation_mode, list) and isinstance(creation_mode[0], np.ndarray):
-        physical_peps = [p.copy() for p in creation_mode]  
-    else:
-        raise ValueError(f"Not a valid option. got initial_tn={creation_mode!r}.")    
-    
-    ## Init lists:
-    edges_list = []
-    pos_list = []
-    directions = list(Directions.standard_order())
+    # Get the kagome lattice without tensors:
+    lattice = KagomeLattice(N)
 
-    ## Edges and Positions:
-    for i, j in _all_possible_couples(tn_size):
-        edges = [_get_edge_from_tensor_coordinates(i, j, direction, tn_size) for direction in directions]
-        edges_list.append(edges)
-        pos_list.append( _get_position_from_tensor_coordinates(i, j, tn_size) )
-
-    # Derive edges dict. each key is an edge and each value is the tensors connected to it:
-    edges_dict = edges_dict_from_edges_list(edges_list)
-
-    # Validate:
-    if DEBUG_MODE: assert len(physical_peps)==len(edges_list)==len(pos_list)
-
-    # Wrap all data:
-    nodes = [
-        Node(
-            tensor=physical,
-            is_ket=True,
-            edges=edges,
-            pos=pos, 
-            on_boundary=_check_tensor_on_boundary(edges),
-            directions=directions,
-            index=index,
-            name=f"T{index}",
-            functionality=_derive_core_functionality(index, core_size=core_size, padding=padding)
+    ## Unit cell:
+    if unit_cell is None:
+        unit_cell = UnitCell(
+             A = _random_tensor(d, D),
+             B = _random_tensor(d, D),
+             C = _random_tensor(d, D)
         )
-        for index, (physical, edges, pos) 
-        in enumerate(zip(physical_peps, edges_list, pos_list))
-    ]
-    tensor_dims = TensorDims(virtual=d_virtual, physical=d_physical)
 
-    return TensorNetwork( nodes=nodes, edges=edges_dict, tensor_dims=tensor_dims )
+    tn = TensorNetwork(lattice, unit_cell, d=d, D=D)
+    
+    print(tn)
+
+    return tn
 
 
 
@@ -343,9 +271,8 @@ def create_square_tn(
 
 
 if __name__ == "__main__":
-    sys.path
     project_paths.add_scripts()
     project_paths.add_base()
-    from scripts.build_tn import main_test
-    main_test()
+    from scripts.build_tn import draw_lattice
+    draw_lattice()
     

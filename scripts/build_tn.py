@@ -1,24 +1,31 @@
-import _import_src
+# To call src files from scripts:
+import _import_src 
+
+# Basics:
 from matplotlib import pyplot as plt
-from lattices.triangle import create_triangle_lattice
 from utils import visuals
 
+# Tensor-Networks creation:
+from lattices.kagome import create_kagome_lattice
+from tensor_networks.construction import create_kagome_tn
 
 
 
-def main_test():
-    triangle_lattice = create_triangle_lattice(N=3)
+
+def draw_lattice():
+    lattice = create_kagome_lattice(N=2)
+    create_kagome_tn()
 
     node_color = 'red'
 
-    for node in triangle_lattice:
+    for node in lattice:
         x, y = node.pos
         plt.scatter(x, y, c=node_color, zorder=3)
 
-    edges_list = [node.edges for node in triangle_lattice]
+    edges_list = [node.edges for node in lattice]
     for edges in edges_list:
         for edge in edges:
-            nodes = [node for node in triangle_lattice if edge in node.edges]
+            nodes = [node for node in lattice if edge in node.edges]
             if len(nodes)==2:
                 n1, n2 = nodes
                 x1, y1 = n1.pos
@@ -31,7 +38,14 @@ def main_test():
     print("Done")
     
 
+def add_messages():
+    d = 2
+    D = 3
+    N = 2
+    tn = create_kagome_tn(d=d, D=D, N=N)
+    print(tn)
 
 
 if __name__ == "__main__":
-    main_test()
+    add_messages()
+    # draw_lattice()

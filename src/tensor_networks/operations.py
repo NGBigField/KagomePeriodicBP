@@ -1,6 +1,6 @@
 import numpy as np
 
-def fuse_tensor(tensor:np.ndarray):
+def fuse_tensor_to_itself(tensor:np.ndarray):
 	"""
 		Given a PEPS tensor T of the form [d, D1, D2, ...],
 		contract it with its conjugate T^* along the physical leg (bond d),

@@ -5,11 +5,13 @@ if __name__ == "__main__":
     )
 
 from lattices import triangle as triangle_lattice
+from lattices import edges
 from lattices._common import NodePlaceHolder, LatticeError, DirectionError
-from tensor_networks import directions
-from tensor_networks.directions import Direction
-from tensor_networks.directions import DL, DR, R, UR, UL, L  # main kagome directions
-from tensor_networks.directions import U, D  # used for hexagonal cell boundaries
+from lattices import directions
+from lattices.directions import Direction
+from lattices.directions import DL, DR, R, UR, UL, L  # main kagome directions
+from lattices.directions import U, D  # used for hexagonal cell boundaries
+
 from numpy import pi, cos, sin
 from utils import numerics, tuples
 from dataclasses import dataclass, fields
@@ -232,7 +234,12 @@ def get_upper_triangle(node_index:int, nodes:list[NodePlaceHolder], N:int)->Uppe
     )
 
 
-def create_kagome_lattice(N:int)->list[NodePlaceHolder]:
+def create_kagome_lattice(
+    N:int
+)->tuple[
+    list[NodePlaceHolder],
+    list[UpperTriangle]
+]:
 
     ## Create the triangular lattice we're based on:
     original_triangular_lattice = triangle_lattice.create_triangle_lattice(N)
@@ -280,15 +287,27 @@ def create_kagome_lattice(N:int)->list[NodePlaceHolder]:
     bottom_left_corner_node = sorted_boundary_nodes(kagome_lattice, D)[0]
     bottom_left_corner_node.set_edge_in_direction(DL, f"{D}-0")
 
-        
-
+    
     ## Plot test:
-    from lattices._common import plot
-    plot(kagome_lattice)
+    # from lattices._common import plot
+    # plot(kagome_lattice)
     # plot(original_triangular_lattice, node_color="black", edge_style="y--", node_size=5)
 
-    return 
+    return kagome_lattice, triangular_lattice_of_upper_triangles
 
+
+class KagomeLattice():
+    __slots__ =  "N", "nodes", "triangles", "edges"
+    
+    def __init__(self, N:int) -> None:
+        kagome_lattice, triangular_lattice_of_upper_triangles = create_kagome_lattice(N)
+        self.N : int = N
+        self.nodes     : list[NodePlaceHolder] = kagome_lattice
+        self.triangles : list[UpperTriangle]   = triangular_lattice_of_upper_triangles
+        self.edges     : dict[str, tuple[int, int]] = edges.edges_dict_from_edges_list(
+            [node.edges for node in kagome_lattice]
+        )
+        
 
 def main_test():
     lattice = create_kagome_lattice(2)

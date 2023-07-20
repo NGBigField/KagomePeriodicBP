@@ -28,7 +28,7 @@ from utils import tuples, lists, assertions, parallel_exec
 
 # Our needed algos:
 from tensor_networks.tensor_network import get_common_edge_legs
-from tensor_networks.construction import create_square_tn, _get_edge_from_tensor_coordinates
+from tensor_networks.construction import create_kagome_tn, _get_edge_from_tensor_coordinates
 from algo.contraction_order import derive_contraction_orders
 from algo.mps import physical_tensor_with_split_mid_leg
 from lib.bubblecon import bubblecon
@@ -499,7 +499,7 @@ def get_edge_environment_pashtida(
     Ti = small_T_list[i].transpose(Ti_perm) #type: ignore
     Tj = small_T_list[j].transpose(Tj_perm) #type: ignore
 
-    from tensor_networks.operations import fuse_tensor
+    from tensor_networks.operations import fuse_tensor_to_itself
 
     match side:
         case Sides.Left:  poses = [(0,0), (0,1)]
@@ -953,7 +953,7 @@ def _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn:TensorNetwork, bubble
 
     # first create the small TN
     peps = [n.physical_tensor for n in tn.get_core_nodes()]
-    small_tn = create_square_tn(core_size=n, d_virtual=d_virtual, d_physical=d_physical, padding=0, creation_mode=peps)
+    small_tn = create_kagome_tn(core_size=n, D=d_virtual, d=d_physical, padding=0, creation_mode=peps)
 
     ## Add the surrounding MPS tensors in the edge order D, R, U, L
     env_tensors = lower_mps.A[(jD+n//2):(jD+2*n)] \
