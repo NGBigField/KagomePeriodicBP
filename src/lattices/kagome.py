@@ -17,6 +17,8 @@ from utils import numerics, tuples
 from dataclasses import dataclass, fields
 from typing import Generator
 
+import itertools
+
 
 _delta_xs = [0, -1,  1]
 _delta_ys = [1, -1, -1]
@@ -307,6 +309,13 @@ class KagomeLattice():
         self.edges     : dict[str, tuple[int, int]] = edges.edges_dict_from_edges_list(
             [node.edges for node in kagome_lattice]
         )
+        
+            
+    def nodes_and_triangles(self)->Generator[tuple[NodePlaceHolder, UpperTriangle, ], None, None]:
+        triangles_repeated_3_times = itertools.chain.from_iterable(itertools.repeat(triangle, 3) for triangle in self.triangles)
+        return zip(triangles_repeated_3_times, self.nodes, strict=True)
+            
+            
         
 
 def main_test():

@@ -1,5 +1,7 @@
 from pathlib import Path
 import sys
 
-src = Path(__file__).parent.parent/"src"
+base = Path(__file__).parent.parent
+sys.path.append(base.__str__())
+src = base/"src"
 sys.path.append(src.__str__())

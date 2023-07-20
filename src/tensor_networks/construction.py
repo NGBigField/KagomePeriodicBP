@@ -220,7 +220,7 @@ def repeat_core(
             is_ket = True,
             edges = edges,
             pos = _get_position_from_tensor_coordinates(i, j, network_size), 
-            on_boundary=_check_tensor_on_boundary(edges),
+            boundaries=_check_tensor_on_boundary(edges),
             directions=directions,  #type: ignore  #TODO fix!
             index=ind,
             name=core_node.name,
@@ -258,8 +258,6 @@ def create_kagome_tn(
 
     tn = KagomeTensorNetwork(lattice, unit_cell, d=d, D=D)
     
-    print(tn)
-
     return tn
 
 

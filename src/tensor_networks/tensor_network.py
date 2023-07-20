@@ -3,21 +3,23 @@ from _config_reader import DEBUG_MODE
 
 from lattices.directions import Direction
 from tensor_networks.node import Node
-from tensor_networks.errors import TensorNetworkError
 from lattices.edges import edges_dict_from_edges_list
 from tensor_networks.unit_cell import UnitCell
 
 from lattices.kagome import KagomeLattice
+import lattices.triangle as triangle_lattice
 from _types import EdgeIndicator, PosScalarType
 
 from enums import NodeFunctionality
 from utils import assertions, lists, tuples
 
 import numpy as np
-from typing import NamedTuple
+from typing import NamedTuple, Generator
 from copy import deepcopy
 
 import itertools
+
+from _error_types import TensorNetworkError
 
 class _ReplaceHere(): ... 
 
@@ -61,7 +63,27 @@ class KagomeTensorNetwork():
     # ================================================= #
     @property
     def nodes(self)->list[Node]:
-        pass
+        
+        # init lists and iterators:
+        unit_cell_tensors = itertools.cycle(self.unit_cell.all())
+        
+        # Prepare info:
+        center_triangle_index = triangle_lattice.center_vertex_index(self.lattice.N)
+        
+        # Iterate:
+        return [
+            Node(
+                index=node.index,
+                tensor=tensor,
+                is_ket=True,
+                pos=node.pos,
+                edges=node.edges,
+                functionality=NodeFunctionality.Core if triangle.index == center_triangle_index else NodeFunctionality.Padding,
+                core_cell_type=cell_type,
+                boundaries=node.boundaries
+            )
+            for (node, triangle), (tensor, cell_type) in zip(self.lattice.nodes_and_triangles(), unit_cell_tensors)
+        ]
 
     @property
     def edges(self)->dict[str, tuple[int, int]]:
@@ -109,7 +131,7 @@ class KagomeTensorNetwork():
         return d
 
     def nodes_on_boundary(self, edge_side:Direction)->list[Node]: 
-        return [t for t in self.nodes if edge_side in t.on_boundary ] 
+        return [t for t in self.nodes if edge_side in t.boundaries ] 
 
     def nodes_connected_to_edge(self, edge:str)->list[Node]:
         indices = self.edges[edge]
@@ -209,7 +231,7 @@ class KagomeTensorNetwork():
             pos=pos,
             index=len(self.nodes),  # Two old nodes are already deleted from list, new will be appended to the end.
             name=name,
-            on_boundary=on_boundary
+            boundaries=on_boundary
         )
         self.nodes.append(new_node)
         ## Fix edges in edges-dict that point to either n1 or n2:
@@ -223,7 +245,9 @@ class KagomeTensorNetwork():
 
     def plot(self, detailed:bool=True)->None:
         from tensor_networks.visualizations import plot_network
-        plot_network(nodes=self.nodes, edges=self.edges, detailed=detailed)
+        nodes = self.nodes
+        edges = self.edges
+        plot_network(nodes=nodes, edges=edges, detailed=detailed)
         
 
     def copy(self)->"KagomeTensorNetwork":
@@ -254,7 +278,7 @@ class KagomeTensorNetwork():
                 directions=deepcopy(old_node.directions),
                 index=new_index,
                 name=old_node.name, 
-                on_boundary=deepcopy(old_node.on_boundary)
+                boundaries=deepcopy(old_node.on_boundary)
             )
             # add to list:
             nodes.append(new_node)
@@ -270,7 +294,7 @@ class KagomeTensorNetwork():
                 if pair[0]==pair[1]:
                     side = node.directions[node.edges.index(edge)]
                     assert isinstance(side, Direction)
-                    node.on_boundary.append(side)
+                    node.boundaries.append(side)
         
         ## Copy additional straight-forward info:
         t_dims = self.tensor_dims
@@ -387,6 +411,10 @@ class KagomeTensorNetwork():
             node.normalize()
 
 
+    
+    
+
+
 def get_common_edge_legs(
     n1:Node, n2:Node
 )->tuple[
@@ -432,6 +460,6 @@ def _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn:KagomeTensorNet
                 edges.append(e)        
                 directions.append(dir)        
     name = n1.name+"+"+n2.name
-    on_boundary = list(set(n1.on_boundary+n2.on_boundary))
+    on_boundary = list(set(n1.boundaries+n2.boundaries))
 
     return contraction_edge, edges, directions, functionality, pos, name, on_boundary

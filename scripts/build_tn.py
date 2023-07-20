@@ -6,8 +6,8 @@ from matplotlib import pyplot as plt
 from utils import visuals
 
 # Tensor-Networks creation:
-from lattices.kagome import create_kagome_lattice
-from tensor_networks.construction import create_kagome_tn
+from src.lattices.kagome import create_kagome_lattice
+from src.tensor_networks.construction import create_kagome_tn
 
 
 
@@ -43,7 +43,13 @@ def add_messages():
     D = 3
     N = 2
     tn = create_kagome_tn(d=d, D=D, N=N)
+    
+    nodes = tn.nodes
+    
+    tn.plot()
     print(tn)
+    
+    
 
 
 if __name__ == "__main__":

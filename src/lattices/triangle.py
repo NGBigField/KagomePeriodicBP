@@ -15,6 +15,12 @@ def total_vertices(N):
 	return 3*N*N - 3*N + 1
 
 
+def center_vertex_index(N):
+    i = num_rows(N)//2
+    j = i
+    return get_vertex_index(i, j, N)
+
+
 def num_rows(N):
 	return 2*N-1
 

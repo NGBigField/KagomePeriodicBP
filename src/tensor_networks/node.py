@@ -38,7 +38,7 @@ class Node():
     directions : list[Direction] 
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
     core_cell_type : CoreCellType = field(default=CoreCellType.NoCore) 
-    on_boundary : list[Direction] = field(default_factory=list) 
+    boundaries : list[Direction] = field(default_factory=list) 
 
 
     @property
@@ -46,6 +46,7 @@ class Node():
         if not self.is_ket:
             raise ValueError("Not a ket tensor")
         return self.tensor
+
     
     @property
     def fused_tensor(self) -> np_ndarray:
@@ -54,24 +55,30 @@ class Node():
         else:
             return self.tensor
 
+
     @property
     def angles(self) -> list[float]:
         return [direction.angle for direction in self.directions ]
+
 
     @property
     def dims(self) -> Tuple[int]:
         return self.fused_tensor.shape
     
+    
     @property
     def norm(self) -> np.float64:
         return np.linalg.norm(self.tensor)
+    
     
     def legs(self) -> Generator[tuple[Direction, EdgeIndicator, int], None, None]:
         for direction, edge, dim in zip(self.directions, self.edges, self.dims, strict=True):
             yield direction, edge, dim
 
+
     def normalize(self) -> None:
         self.tensor = self.tensor / self.norm
+    
     
     def copy(self) -> "Node":
         new = Node.empty()
@@ -87,10 +94,12 @@ class Node():
             setattr(new, f.name, val)
         return new
 
+
     def edge_in_dir(self, dir:Direction)->EdgeIndicator:
         assert isinstance(dir, Direction), f"Not an expected type '{type(dir)}'"
         index = self.directions.index(dir)
         return self.edges[index]
+    
     
     def permute(self, axes:list[int]):
         """Like numpy.transpose but permutes "physical_tensor", "fused_tensor", "edges" & "direction" all together
@@ -103,6 +112,7 @@ class Node():
         self.edges = lists.rearrange(self.edges, axes)
         self.directions = lists.rearrange(self.directions, axes)      
 
+
     def validate(self)->None:
         # Generic validation error message:
         _failed_validation_error_msg = f"Node at index {self.index} failed its validation."
@@ -111,6 +121,7 @@ class Node():
         assert len(self.fused_tensor.shape)==len(self.edges)==len(self.directions)==len(self.dims)==len(self.angles) , _failed_validation_error_msg
         # check all directions are different:
         assert len(self.directions)==len(set(self.directions)), _failed_validation_error_msg+f"\nNot all directions are different: {self.directions}"
+         
          
     def plot(self)->None:
         ## Some special imports:
@@ -135,6 +146,7 @@ class Node():
         
         visuals.draw_now()
 
+
     @classmethod
     def empty(cls)->"Node":
         return Node(
@@ -146,8 +158,9 @@ class Node():
             pos=(0,0),
             index=-1,
             name="",
-            on_boundary=[]
+            boundaries=[]
         )
+        
         
     def __eq__(self, other)->bool:
         assert isinstance(other, Node), "Must be same Node type for comparison"

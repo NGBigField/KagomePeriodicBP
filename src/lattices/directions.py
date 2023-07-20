@@ -10,6 +10,8 @@ from utils import strings, lists, numerics
 from functools import cache, cached_property
 from abc import ABC, abstractclassmethod
 
+from _error_types import DirectionsError
+
 # ============================================================================ #
 #|                             Constants                                      |#
 # ============================================================================ #
@@ -36,7 +38,6 @@ def unit_vector_from_angle(angle:float)->Tuple[int, int]:
 #|                           Class Defimition                                 |#
 # ============================================================================ #    
 
-class DirectionsError(ValueError): ...
 
 
 class Direction():

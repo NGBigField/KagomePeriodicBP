@@ -82,7 +82,7 @@ def _sandwich_fused_tensors_with_expectation_values(tn_in:KagomeTensorNetwork, m
         pos             = node.pos,
         index           = node.index,
         name            = node.name,
-        on_boundary     = node.on_boundary,
+        on_boundary     = node.boundaries,
         functionality   = node.functionality
     )
     if DEBUG_MODE: tn_out.validate()

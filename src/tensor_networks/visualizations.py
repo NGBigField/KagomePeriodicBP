@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 
 # Common types:
 from tensor_networks.node import Node, NodeFunctionality
-from lattices.directions import DirectionsError, Directions
+from lattices.directions import DirectionsError, Direction
 
 # for smart iterations:
 import itertools
@@ -115,8 +115,8 @@ def _check_skip_vec(order:str, edge_index:str, on_boundary:str, x_vec:list, y_ve
     return False
     
     
-def _outer_directions_vectors(x_vec:List[int], y_vec:List[int], dir:str|Directions, delta:float)->Tuple[List[float], ...]:     
-    if isinstance(dir, str) and not isinstance(dir, Directions):
+def _outer_directions_vectors(x_vec:List[int], y_vec:List[int], dir:str|Direction, delta:float)->Tuple[List[float], ...]:     
+    if isinstance(dir, str) and not isinstance(dir, Direction):
         if dir=='x':
             low, high  = min(x_vec), max(x_vec)
             x_vec1 = [low,  low-delta]
@@ -137,23 +137,23 @@ def _outer_directions_vectors(x_vec:List[int], y_vec:List[int], dir:str|Directio
         if len(y_vec1)==1: y_vec1.append(y_vec1[0])
         if len(y_vec2)==1: y_vec2.append(y_vec2[0])
     
-    elif isinstance(dir, Directions):
+    elif isinstance(dir, Direction):
         x = float(x_vec[0])
         y = float(y_vec[0])
         x_vec1 : list[float]
         y_vec1 : list[float]
         x_vec2 : list[float] = []
         y_vec2 : list[float] = []
-        if dir is Directions.Left:
+        if dir is Direction.Left:
             x_vec1 = [x, x-delta]
             y_vec1 = [y, y]
-        elif dir is Directions.Right:
+        elif dir is Direction.Right:
             x_vec1 = [x, x+delta]
             y_vec1 = [y, y]
-        elif dir is Directions.Up:
+        elif dir is Direction.Up:
             x_vec1 = [x, x]
             y_vec1 = [y, y+delta]
-        elif dir is Directions.Down:
+        elif dir is Direction.Down:
             x_vec1 = [x, x]
             y_vec1 = [y, y-delta]
         else: 
@@ -183,11 +183,11 @@ def _get_block_plot_props(block_indices, block_colors, include_blocks:bool):
         linewidth = 1
     return color ,alpha ,linewidth
 
-def _neighbors_pos(this_pos:tuple[int, ...], dir:Directions, delta:float)->tuple[float, ...]:
-    if   dir is Directions.Left:  return (this_pos[0]-delta , this_pos[1]+0.0  )
-    elif dir is Directions.Right: return (this_pos[0]+delta , this_pos[1]+0.0  )
-    elif dir is Directions.Up:    return (this_pos[0]+0.0   , this_pos[1]+delta)
-    elif dir is Directions.Down:  return (this_pos[0]+0.0   , this_pos[1]-delta)
+def _neighbors_pos(this_pos:tuple[int, ...], dir:Direction, delta:float)->tuple[float, ...]:
+    if   dir is Direction.Left:  return (this_pos[0]-delta , this_pos[1]+0.0  )
+    elif dir is Direction.Right: return (this_pos[0]+delta , this_pos[1]+0.0  )
+    elif dir is Direction.Up:    return (this_pos[0]+0.0   , this_pos[1]+delta)
+    elif dir is Direction.Down:  return (this_pos[0]+0.0   , this_pos[1]-delta)
     raise DirectionsError(f"Not a valid option dir={dir}")     
 
 
@@ -199,7 +199,7 @@ def _check_periodic_boundary_connected_tensors(
     edge_name:str,
     nodes:List[Node],
     delta:float
-)->str|Directions|None:
+)->str|Direction|None:
 
     assert isinstance(tensor_indices, tuple)
     if len(tensor_indices)==1:
@@ -361,7 +361,7 @@ def plot_network(
         assert dim1==dim2, f"Dimensions don't agree on edge '{edge_name}'"
         dir1 = node1.directions[edge_ind1]
         dir2 = node2.directions[edge_ind2]
-        assert Directions.is_equal(dir1, Directions.opposite_direction(dir2)), f"Legs of connection in a lattice must be of opposite directions"
+        assert Direction.is_equal(dir1, Direction.opposite_direction(dir2)), f"Legs of connection in a lattice must be of opposite directions"
         return dim1
 
         

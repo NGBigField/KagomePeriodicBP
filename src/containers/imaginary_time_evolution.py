@@ -11,7 +11,8 @@ from copy import deepcopy
 from enums.imaginary_time_evolution import UpdateModes
 from containers.beliefe_propagation import BPStats
 from containers.density_matrices import MatrixMetrics 
-from lib.ITE import ITEError
+from _error_types import ITEError
+
 
 SUB_FOLDER = "ite_trackers"
 # DEFAULT_TIME_STEPS = lambda:  [0.1]*20 + [0.01]*50 + [0.001]*50 + [0.0001]*50

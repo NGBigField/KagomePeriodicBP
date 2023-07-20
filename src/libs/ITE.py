@@ -50,12 +50,6 @@ from lib.ncon import ncon
 
 HERMICITY_ERR = 1e-5
 
-class ITEError(Exception): ...
-
-
-
-
-
 def open_mps_env(mps_env):
 	"""
 	
