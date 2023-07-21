@@ -6,11 +6,14 @@ if __name__ == "__main__":
 
 from lattices import triangle as triangle_lattice
 from lattices import edges
-from lattices._common import NodePlaceHolder, LatticeError, DirectionError
+from lattices._common import NodePlaceHolder
 from lattices import directions
 from lattices.directions import Direction
 from lattices.directions import DL, DR, R, UR, UL, L  # main kagome directions
 from lattices.directions import U, D  # used for hexagonal cell boundaries
+
+from _error_types import LatticeError, DirectionError
+from _types import EdgeIndicator
 
 from numpy import pi, cos, sin
 from utils import numerics, tuples
@@ -309,11 +312,28 @@ class KagomeLattice():
         self.edges     : dict[str, tuple[int, int]] = edges.edges_dict_from_edges_list(
             [node.edges for node in kagome_lattice]
         )
-        
-            
+                    
     def nodes_and_triangles(self)->Generator[tuple[NodePlaceHolder, UpperTriangle, ], None, None]:
         triangles_repeated_3_times = itertools.chain.from_iterable(itertools.repeat(triangle, 3) for triangle in self.triangles)
-        return zip(triangles_repeated_3_times, self.nodes, strict=True)
+        return zip(self.nodes, triangles_repeated_3_times, strict=True)
+    
+    
+    def get_neighbor(self, node:NodePlaceHolder, edge_or_dir:EdgeIndicator|Direction)->NodePlaceHolder:
+        if isinstance(edge_or_dir, EdgeIndicator):
+            edge = edge_or_dir
+        elif isinstance(edge_or_dir, Direction):
+            edge = node.get_edge_in_direction(edge_or_dir)
+        else:
+            raise TypeError(f"Not an expected type {type(edge_or_dir)!r}")
+
+        i1, i2 = self.edges[edge]
+        assert i1!=i2
+        if i1 == node.index:
+            return self.nodes[i2]
+        elif i2 == node.index:
+            return self.nodes[i1]
+        else:
+            raise LatticeError("No neighbor")
             
             
         

@@ -1,3 +1,14 @@
+if __name__ == "__main__":
+    import sys, pathlib
+    sys.path.append(
+        pathlib.Path(__file__).parent.parent.__str__()
+    )
+    from project_paths import add_src, add_base, add_scripts
+    add_src()
+    add_base()
+    add_scripts()
+
+
 ## Get config:
 from _config_reader import DEBUG_MODE
 
@@ -19,7 +30,7 @@ from copy import deepcopy
 
 import itertools
 
-from _error_types import TensorNetworkError
+from _error_types import TensorNetworkError, LatticeError
 
 class _ReplaceHere(): ... 
 
@@ -69,21 +80,42 @@ class KagomeTensorNetwork():
         
         # Prepare info:
         center_triangle_index = triangle_lattice.center_vertex_index(self.lattice.N)
+        center_nodes : list[Node] = []
         
-        # Iterate:
-        return [
-            Node(
-                index=node.index,
+        # Create all nodes:
+        nodes : list[Node] = []
+        for (lattice_node, triangle), (tensor, cell_type) in zip(self.lattice.nodes_and_triangles(), unit_cell_tensors):            
+            # Which type of node:
+            functionality = NodeFunctionality.Core if triangle.index == center_triangle_index else NodeFunctionality.Padding
+
+            # Add:
+            network_node = Node(
+                index=lattice_node.index,
                 tensor=tensor,
                 is_ket=True,
-                pos=node.pos,
-                edges=node.edges,
-                functionality=NodeFunctionality.Core if triangle.index == center_triangle_index else NodeFunctionality.Padding,
+                pos=lattice_node.pos,
+                edges=lattice_node.edges,
+                directions=lattice_node.directions,
+                functionality=functionality,
                 core_cell_type=cell_type,
-                boundaries=node.boundaries
+                boundaries=lattice_node.boundaries,
+                name=f"{cell_type}"
             )
-            for (node, triangle), (tensor, cell_type) in zip(self.lattice.nodes_and_triangles(), unit_cell_tensors)
-        ]
+            nodes.append(network_node)
+
+            if functionality is NodeFunctionality.Core:
+                center_nodes.append(network_node)
+
+        # Nearest-neighbors of the center triangles are also part of the core:
+        for node in center_nodes:
+            for edge in node.edges:
+                neighbor_index = self.lattice.get_neighbor(node, edge).index
+                neihgbor = nodes[neighbor_index]
+                neihgbor.functionality = NodeFunctionality.Core
+                    
+
+
+        print(nodes)
 
     @property
     def edges(self)->dict[str, tuple[int, int]]:
@@ -463,3 +495,9 @@ def _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn:KagomeTensorNet
     on_boundary = list(set(n1.boundaries+n2.boundaries))
 
     return contraction_edge, edges, directions, functionality, pos, name, on_boundary
+
+
+
+if __name__ == "__main__":
+    from scripts.build_tn import main_test
+    main_test()

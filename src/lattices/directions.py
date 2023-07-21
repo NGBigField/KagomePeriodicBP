@@ -10,7 +10,7 @@ from utils import strings, lists, numerics
 from functools import cache, cached_property
 from abc import ABC, abstractclassmethod
 
-from _error_types import DirectionsError
+from _error_types import DirectionError
 
 # ============================================================================ #
 #|                             Constants                                      |#
@@ -83,7 +83,7 @@ class Direction():
         for dir in LatticeDirectionsInClockwiseOrder:
             if _dist(dir.angle, angle)<EPSILON:
                 return dir
-        raise DirectionsError(f"Given angle does not match with any known side")
+        raise DirectionError(f"Given angle does not match with any known side")
     
     
     

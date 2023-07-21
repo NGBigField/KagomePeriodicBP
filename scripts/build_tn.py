@@ -45,13 +45,20 @@ def add_messages():
     tn = create_kagome_tn(d=d, D=D, N=N)
     
     nodes = tn.nodes
+    tn.validate()
     
     tn.plot()
     print(tn)
     
-    
+
+
+
+
+
+def main_test():
+    # draw_lattice()
+    add_messages()
 
 
 if __name__ == "__main__":
-    add_messages()
-    # draw_lattice()
+    main_test()

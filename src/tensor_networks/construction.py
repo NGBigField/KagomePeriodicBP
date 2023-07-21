@@ -255,6 +255,8 @@ def create_kagome_tn(
              B = _random_tensor(d, D),
              C = _random_tensor(d, D)
         )
+    else:
+        assert isinstance(unit_cell, UnitCell)
 
     tn = KagomeTensorNetwork(lattice, unit_cell, d=d, D=D)
     

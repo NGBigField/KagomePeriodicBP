@@ -12,3 +12,6 @@ class CoreCellType(Enum):
     B = auto()
     C = auto()
     NoCore = auto()
+
+    def __str__(self) -> str:
+        return self.name

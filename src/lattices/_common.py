@@ -4,10 +4,6 @@ from utils import tuples
 from dataclasses import dataclass, field
 
 
-class LatticeError(ValueError): ...
-class DirectionError(ValueError): ...
-class OutsideLatticeError(LatticeError): ...
-
 @dataclass
 class NodePlaceHolder():
     index : int

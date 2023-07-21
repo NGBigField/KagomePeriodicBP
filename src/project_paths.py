@@ -7,8 +7,15 @@ base = src.parent
 scripts = base/"scripts"
 
 
+def _unique_paths()->None:
+    s = set(sys.path)
+    sys.path = list(s)
+
+
 def _add_path(path:Path)->None:
-    sys.path.append(path.__str__())
+    s = path.__str__()
+    if s not in sys.path:
+        sys.path.append(s)
 
 
 def add_base()->None:
