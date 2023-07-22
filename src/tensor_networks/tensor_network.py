@@ -35,7 +35,7 @@ import itertools
 import functools
 
 from _error_types import TensorNetworkError, LatticeError, DirectionError
-from containers import MessageDictType, Message
+from containers import MessageDictType, Message, TNSizesAndDimensions
 
 from libs.bmpslib import mps as MPS
 
@@ -69,8 +69,12 @@ class KagomeTensorNetwork():
         self.lattice : KagomeLattice = lattice
         self.messages : MessageDictType = {}
         self.unit_cell : UnitCell = unit_cell
-        self.d : int = d
-        self.D : int = D
+        self.dimensions : TNSizesAndDimensions = TNSizesAndDimensions(
+            virtual_dim=D,
+            physical_dim=d,
+            core_size=2,
+            big_lattice_size=lattice.N
+        )
 
     # ================================================= #
     #|                Begaviour Control                |#
@@ -83,9 +87,9 @@ class KagomeTensorNetwork():
     #|                   Add messages                  |#
     # ================================================= #
 
-    def connect_messages(self, mps_dict:MessageDictType) -> None:   
+    def connect_messages(self, messages:MessageDictType) -> None:   
         # Fuse:
-        for block_side, message in mps_dict.items():
+        for block_side, message in messages.items():
             self.messages[block_side] = message
         self.clear_cache()
 
@@ -354,8 +358,8 @@ class KagomeTensorNetwork():
         new = KagomeTensorNetwork(
             lattice=self.lattice,
             unit_cell=self.unit_cell.copy(),
-            d=self.d,
-            D=self.D,
+            d=self.dimensions.physical_dim,
+            D=self.dimensions.virtual_dim,
         )
 
         if DEBUG_MODE: new.validate()
@@ -463,8 +467,12 @@ class KagomeTensorNetwork():
                 _neigbor_error_message = _error_message+f"\nnode '{node.name}' is not the neighbor of '{neighbor.name}' on edge '{edge_name}'"
                 opposite_dir = dir.opposite()
                 assert self._find_neighbor_by_edge(neighbor, edge_name) is node, _neigbor_error_message
+                # Messages don't pass this check:
+                if NodeFunctionality.Message in [node.functionality, neighbor.functionality] :
+                    continue
                 assert self.find_neighbor(neighbor, opposite_dir) is node, _neigbor_error_message
                 assert neighbor.edge_in_dir(opposite_dir) == edge_name
+
         # Check edges:
         for edge_name, node_indices in self.edges.items():
             if node_indices[0] == node_indices[1]:  # happens in outer legs (going outside of the lattice without any connection)

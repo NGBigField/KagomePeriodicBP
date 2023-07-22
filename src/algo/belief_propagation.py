@@ -12,12 +12,12 @@ import numpy as np
 
 # other used types in our code:
 from tensor_networks import KagomeTensorNetwork, MPS
-from lattices.directions import Direction
+from lattices.directions import BlockSide, LatticeDirection
 from enums import ContractionDepth, MessageModel
-from containers import BPStats, BPConfig, MessageDictType
+from containers import BPStats, BPConfig, MessageDictType, Message
 
 # needed algo:
-from algo.tensor_network import contract_tensor_network, connect_messages_with_tn
+from algo.tensor_network import contract_tensor_network
 
 # initial messages creation:
 from tensor_networks.mps import init_mps_quantum
@@ -33,11 +33,9 @@ from copy import deepcopy
 
 
 def _out_going_message(
-    tn:KagomeTensorNetwork, direction:Direction, bubblecon_trunc_dim:int, print_progress:bool, hermitize:bool
-) -> tuple[
-    MPS, 
-    Direction
-]:
+    tn:KagomeTensorNetwork, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool, hermitize:bool
+) -> Message:
+    
     ## use bubble con to compute outgoing message:
     mps, _, mps_direction = contract_tensor_network(
         tn, 
@@ -118,11 +116,11 @@ def _belief_propagation_step(
 
 def initial_message(
 	D : int,  # Physical-Lattice bond dimension
-    num_edge_tensors : int,  # number of tensors in the edge of the lattice
+    N : int,  # number of tensors in the edge of the lattice
 	message_model:MessageModel|str=MessageModel.RANDOM_QUANTUM
 ) -> MPS:
 
-    dims : list[int] = [D]*num_edge_tensors
+    dims : list[int] = [D]*N
 
 
     # Convert message model:
@@ -228,19 +226,23 @@ def belief_propagation(
 
     ## Derive first incoming messages:  
     if messages is None:
-        virtual_dim = open_tn.tensor_dims.virtual
-        num_edge_tensors = open_tn.original_lattice_dims[0]
+        D = open_tn.dimensions.virtual_dim
+        message_length = open_tn.num_message_connections
         messages = { 
-            edge_side: (initial_message(bp_config.init_msg, virtual_dim, num_edge_tensors), edge_side.next_counterclockwise() ) \
-            for edge_side in Direction.all_in_counterclockwise_order()  \
+            edge_side : Message(
+                mps=initial_message(D=D, N=message_length), 
+                order_direction=edge_side.orthogonal_counterclockwise_lattice_direction() 
+            ) 
+            for edge_side in BlockSide.all_in_counter_clockwise_order()  \
         }
 
     ## Visualizations:
-    if max_iterations is None:  prog_bar = strings.ProgressBar.unlimited( "Performing BlockBP...  ")
-    else:                       prog_bar = strings.ProgressBar(max_iterations, "Performing BlockBP...  ")
+    if max_iterations is None:  prog_bar = prints.ProgressBar.unlimited( "Performing BlockBP...  ")
+    else:                       prog_bar = prints.ProgressBar(max_iterations, "Performing BlockBP...  ")
 
     ## Start with the initial message:
-    tn_with_messages = connect_messages_with_tn(open_tn, messages)
+    tn_with_messages = open_tn.copy()
+    tn_with_messages.connect_messages(messages)
     if DEBUG_MODE: tn_with_messages.validate()
 
     ## Initial values (In case no iteration will perform, these are the default values)
