@@ -26,6 +26,9 @@ import itertools
 _delta_xs = [0, -1,  1]
 _delta_ys = [1, -1, -1]
 
+_CONSTANT_X_SHIFT = 3
+_CONSTANT_y_SHIFT = 1
+
 """
 An Upper Triagle:
      Up
@@ -100,8 +103,8 @@ def _create_upper_triangle(triangular_node:NodePlaceHolder, indices:list[int])->
 
     ## Derive Position and Directions:
     for node_index, field, delta_x, delta_y in zip(indices, UpperTriangle.field_names(), _delta_xs, _delta_ys, strict=True):
-        x = x0 + delta_x
-        y = y0 + delta_y
+        x = x0 + delta_x + _CONSTANT_X_SHIFT
+        y = y0 + delta_y + _CONSTANT_y_SHIFT
         node = NodePlaceHolder(
             index=node_index,
             pos=(x, y),

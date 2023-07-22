@@ -46,8 +46,8 @@ def add_messages():
     
     nodes = tn.nodes
     tn.validate()
-    
     tn.plot()
+    
     print(tn)
     
 

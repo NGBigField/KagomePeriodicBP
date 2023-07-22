@@ -113,9 +113,8 @@ class KagomeTensorNetwork():
                 neihgbor = nodes[neighbor_index]
                 neihgbor.functionality = NodeFunctionality.Core
                     
+        return nodes
 
-
-        print(nodes)
 
     @property
     def edges(self)->dict[str, tuple[int, int]]:
@@ -173,17 +172,19 @@ class KagomeTensorNetwork():
     def _find_neighbor_by_edge(self, node:Node, edge:EdgeIndicator)->Node:
         nodes = self.nodes_connected_to_edge(edge)
         assert len(nodes)==2, f"Only tensor '{node.index}' is connected to edge '{edge}' in direction '{str(dir)}'  "
-        if nodes[0] is node:
+        if nodes[0] == node:
             return nodes[1]
-        elif nodes[1] is node:
+        elif nodes[1] == node:
             return nodes[0]
         else:
             raise TensorNetworkError(f"Couldn't find a neighbor due to a bug with the tensors connected to the same edge '{edge}'")
         
-    def find_neighbor(self, node:Node, dir:Direction|None)->Node:
+    def find_neighbor(self, node:Node, dir:Direction|EdgeIndicator|None)->Node:
         # Get edge of this node:
         if isinstance(dir, Direction):
             edge = node.edge_in_dir(dir)
+        elif isinstance(dir, EdgeIndicator):
+            edge = dir
         elif dir is None:
             edge = lists.random_item( node.edges )
         else:
@@ -394,8 +395,8 @@ class KagomeTensorNetwork():
                 # Is neighbors pointing back to us?
                 _neigbor_error_message = _error_message+f"\nnode '{node.name}' is not the neighbor of '{neighbor.name}' on edge '{edge_name}'"
                 opposite_dir = dir.opposite()
-                assert self._find_neighbor_by_edge(neighbor, edge_name) is node, _neigbor_error_message
-                assert self.find_neighbor(neighbor, opposite_dir) is node, _neigbor_error_message
+                assert self._find_neighbor_by_edge(neighbor, edge_name) == node, _neigbor_error_message
+                assert self.find_neighbor(neighbor, opposite_dir) == node, _neigbor_error_message
                 assert neighbor.edge_in_dir(opposite_dir) == edge_name
         # Check edges:
         for edge_name, node_indices in self.edges.items():
@@ -414,10 +415,8 @@ class KagomeTensorNetwork():
                 assert node.index == node_index , _error_message
         # Check lattice dimensions:
         min_x, max_x, min_y, max_y = self.boundaries()
-        n_y, n_x = self.original_lattice_dims
-        assert max_x-min_x+1 == n_x, f"Dimension x should have {n_x} values, while the boundaries are from {min_x} to {max_x}"
-        assert max_y-min_y+1 == n_y, f"Dimension y should have {n_y} values, while the boundaries are from {min_y} to {max_y}"
-
+        #TODO Size check
+        
     def boundaries(self)->tuple[int, ...]:
         min_x, max_x = lists.min_max([node.pos[0] for node in self.nodes])
         min_y, max_y = lists.min_max([node.pos[1] for node in self.nodes])

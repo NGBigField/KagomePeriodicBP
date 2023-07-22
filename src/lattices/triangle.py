@@ -167,7 +167,7 @@ def get_vertex_index(i,j,N):
 def get_node_position(i,j,N):
 	w = row_width(i, N)
 	x = N - w + 2*j	
-	y = 2*N - i
+	y = N - i
 	return x, y
 
 

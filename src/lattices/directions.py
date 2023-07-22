@@ -29,8 +29,6 @@ def _dist(x:float, y:float)->float:
 def unit_vector_from_angle(angle:float)->Tuple[int, int]:
     x = numerics.force_integers_on_close_to_round(np.cos(angle))
     y = numerics.force_integers_on_close_to_round(np.sin(angle))
-    # assert isinstance(x, int)
-    # assert isinstance(y, int)
     return (x, y)
     
 

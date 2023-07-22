@@ -34,8 +34,9 @@ from typing import (
 from dataclasses import dataclass, field
 
 # Common types:
-from tensor_networks.node import Node, NodeFunctionality
-from lattices.directions import DirectionsError, Direction
+from tensor_networks.node import Node, NodeFunctionality, CoreCellType
+from lattices.directions import Direction
+from _error_types import DirectionError
 
 # for smart iterations:
 import itertools
@@ -96,7 +97,6 @@ class _OnBounds():
         return s
 
 
-
 def _check_skip_vec(order:str, edge_index:str, on_boundary:str, x_vec:list, y_vec:list)->bool:
     
     if len(x_vec)==len(y_vec)==0:
@@ -115,54 +115,13 @@ def _check_skip_vec(order:str, edge_index:str, on_boundary:str, x_vec:list, y_ve
     return False
     
     
-def _outer_directions_vectors(x_vec:List[int], y_vec:List[int], dir:str|Direction, delta:float)->Tuple[List[float], ...]:     
-    if isinstance(dir, str) and not isinstance(dir, Direction):
-        if dir=='x':
-            low, high  = min(x_vec), max(x_vec)
-            x_vec1 = [low,  low-delta]
-            x_vec2 = [high, high+delta]
-            y_vec1 = y_vec
-            y_vec2 = y_vec
-        elif dir=="y":
-            low, high  = min(y_vec), max(y_vec)
-            x_vec1 = x_vec
-            x_vec2 = x_vec
-            y_vec1 = [low,  low-delta]
-            y_vec2 = [high, high+delta]    
-        else: 
-            raise ValueError(f"Not a valid option dir={dir}")
+def _outer_directions_vectors(x_vec:List[int], y_vec:List[int], dir:Direction, delta:float)->Tuple[List[float], ...]:     
+    x = float(x_vec[0])
+    y = float(y_vec[0])
+    x_vec : list[float] = [ x, x + dir.unit_vector[0] ]
+    y_vec : list[float] = [ y, y + dir.unit_vector[1] ]
         
-        if len(x_vec1)==1: x_vec1.append(x_vec1[0])
-        if len(x_vec2)==1: x_vec2.append(x_vec2[0])
-        if len(y_vec1)==1: y_vec1.append(y_vec1[0])
-        if len(y_vec2)==1: y_vec2.append(y_vec2[0])
-    
-    elif isinstance(dir, Direction):
-        x = float(x_vec[0])
-        y = float(y_vec[0])
-        x_vec1 : list[float]
-        y_vec1 : list[float]
-        x_vec2 : list[float] = []
-        y_vec2 : list[float] = []
-        if dir is Direction.Left:
-            x_vec1 = [x, x-delta]
-            y_vec1 = [y, y]
-        elif dir is Direction.Right:
-            x_vec1 = [x, x+delta]
-            y_vec1 = [y, y]
-        elif dir is Direction.Up:
-            x_vec1 = [x, x]
-            y_vec1 = [y, y+delta]
-        elif dir is Direction.Down:
-            x_vec1 = [x, x]
-            y_vec1 = [y, y-delta]
-        else: 
-            raise ValueError(f"Not a valid option dir={dir}")        
-    
-    else: 
-        raise TypeError(f"Not a supported type for dir of type <{type(dir)}>")
-    
-    return x_vec1, x_vec2, y_vec1, y_vec2
+    return x_vec, y_vec
 
 def _opposite(ob1:_OnBoundsPerDim, ob2:_OnBoundsPerDim)->bool:
     if ob1.max==True and ob2.min==True:
@@ -188,76 +147,29 @@ def _neighbors_pos(this_pos:tuple[int, ...], dir:Direction, delta:float)->tuple[
     elif dir is Direction.Right: return (this_pos[0]+delta , this_pos[1]+0.0  )
     elif dir is Direction.Up:    return (this_pos[0]+0.0   , this_pos[1]+delta)
     elif dir is Direction.Down:  return (this_pos[0]+0.0   , this_pos[1]-delta)
-    raise DirectionsError(f"Not a valid option dir={dir}")     
+    raise DirectionError(f"Not a valid option dir={dir}")     
 
 
 
-def _check_periodic_boundary_connected_tensors(
+def _check_on_boundaries(
     tensor_indices:tuple[int, int], 
     network_bounds:List[Tuple[int, ...]], 
     pos_list:List[Tuple[int, int]],
     edge_name:str,
     nodes:List[Node],
     delta:float
-)->str|Direction|None:
+)->Direction|None:
 
     assert isinstance(tensor_indices, tuple)
     if len(tensor_indices)==1:
-        assert isinstance(edge_name, str)
-        if edge_name[0] in ["D", "U"]:
-            return 'y'
-        elif edge_name[0] in ["L", "R"]:
-            return 'x'
-        else:
-            raise ValueError("Not supported")
-        
+        raise ValueError("")
     elif len(tensor_indices)==2:
-    
-        t1 = tensor_indices[0]
-        t2 = tensor_indices[1]
-        
-        ## if an edge of an unconnected node:
-        if t1==t2:
-            node = nodes[t1]
-            # Definitely a boundary edge
-            edge_ind = node.edges.index(edge_name)
-            edge_dir = node.directions[edge_ind]
-            return edge_dir
-        
-        ## if an inner edge:
-        these_nodes = [nodes[ind] for ind in tensor_indices]
-        edges_indices = [node.edges.index(edge_name) for node in these_nodes]
-        edges_dirs = [node.directions[edge_ind] for node, edge_ind in zip(these_nodes, edges_indices)]
-        these_poses = [node.pos for node in these_nodes]
-        try:
-            neighbors_poses = [_neighbors_pos(this_pos, dir, delta) for this_pos, dir in zip(these_poses, edges_dirs)]
-            if tuples.equal(these_poses[0], neighbors_poses[1]) and tuples.equal(these_poses[1], neighbors_poses[0]):
-                return None
-        except DirectionsError:
-            return None
-            
-        t1_on_bounds = _OnBounds()
-        t2_on_bounds = _OnBounds()
-        tensors_on_bounds : List[_OnBounds] = [t1_on_bounds, t2_on_bounds]
-
-        positions = [pos_list[t] for t in [t1, t2]]
-        for i_tensor, (pos, tensor_ind) in enumerate(zip(positions, [t1, t2])):
-            for i_axis, axis in [(0, 'x'), (1, 'y')] :
-                pos_projection = pos[i_axis]
-                for boundary_pos, min_max in zip(network_bounds[i_axis], ['min', 'max']):
-                    if pos_projection == boundary_pos:
-                        tensors_on_bounds[i_tensor][axis][min_max] = True
-
-        # Tensors are connected through the periodic boundary if 
-        # for one of the dimensions, one tensor is at max while the other
-        # is at min
-        for axis in ['x', 'y']:
-            if _opposite( t1_on_bounds[axis], t2_on_bounds[axis]):
-                return axis
-            
-    else: 
-        raise ValueError(f"Not a possible input tensor_indices={tensor_indices}")
-    
+        if tensor_indices[0]==tensor_indices[1]:
+            node = nodes[tensor_indices[0]]
+            edge_index = node.edges.index(edge_name)
+            return node.directions[edge_index]
+    else:
+        raise ValueError("")
     return None
 
 def _derive_smallest_distance(pos_list:List[Tuple[int, int]]) -> float:
@@ -308,7 +220,7 @@ def plot_network(
     
     ## Constants:
     edge_color ,alpha ,linewidth = 'gray', 0.5, 3
-    angle_color, angle_linewidth, angle_dis = 'green', 2, 0.2
+    angle_color, angle_linewidth, angle_dis = 'green', 2, 0.5
     
     ## Complete data:
     edges_list = [node.edges for node in nodes]
@@ -317,6 +229,34 @@ def plot_network(
 
     ## Define helper functions:
     average = lambda lst: sum(lst) / len(lst)
+
+    def node_style(node:Node):
+        # Marker:
+        if node.functionality is NodeFunctionality.Core:
+            marker = f"${node.core_cell_type}$"
+            size1 = 120
+            size2 = 180
+            name = " "
+        else:
+            marker = "o"
+            size1 = 15
+            size2 = 30
+            name = f"{node.name}"
+        # Color:
+        match node.core_cell_type:
+            case CoreCellType.A:
+                color = 'green'
+            case CoreCellType.B:
+                color = 'red'
+            case CoreCellType.C:
+                color = 'gold'
+            case CoreCellType.NoneLattice:
+                if node.functionality is NodeFunctionality.Message:
+                    color = "orange"
+                else:
+                    color = "blue"
+        return color, marker, size1, size2, name
+
     def _tensor_indices(edge_name:str, assert_connections:bool=False) -> List[int]:
         tensors_indices = [t for t, edges in enumerate(edges_list) if edge_name in edges]
         ## Some double checks:
@@ -361,7 +301,7 @@ def plot_network(
         assert dim1==dim2, f"Dimensions don't agree on edge '{edge_name}'"
         dir1 = node1.directions[edge_ind1]
         dir2 = node2.directions[edge_ind2]
-        assert Direction.is_equal(dir1, Direction.opposite_direction(dir2)), f"Legs of connection in a lattice must be of opposite directions"
+        assert dir1==dir2.opposite(), f"Legs of connection in a lattice must be of opposite directions"
         return dim1
 
         
@@ -370,12 +310,10 @@ def plot_network(
         node = nodes[i]
         assert node.pos == pos
         x, y = pos
-        if node.functionality is NodeFunctionality.Core:
-            node_color = 'blue'
-        else:
-            node_color = 'red'
-        plt.scatter(x, y, c=node_color)
-        text = f"{node.name}"
+        color, marker, size1, size2, name = node_style(node)
+        plt.scatter(x, y, c="black", s=size2, marker=marker, zorder=3)
+        plt.scatter(x, y, c=color, s=size1, marker=marker, zorder=4)
+        text = f"{name}"
         if detailed:
             text += f" [{node.index}]"
         plt.text(x, y, text)
@@ -390,26 +328,26 @@ def plot_network(
         ## Gather info:
         x_vec, y_vec = _edge_positions(edge_name)
         edge_dim = _edge_dim(edge_name)      
-        on_boundary = _check_periodic_boundary_connected_tensors(tensors_indices, network_bounds=network_bounds, pos_list=pos_list, edge_name=edge_name, nodes=nodes, delta=smallest_distance)
         
         ## Define plot function:      
-        def plot_and_text(x_vec, y_vec):
-            plt.plot(x_vec, y_vec, color=edge_color, alpha=alpha, linewidth=linewidth )
+        def plot_and_text(x_vec, y_vec, on_boundary):
+            plt.plot(x_vec, y_vec, color=edge_color, alpha=alpha, linewidth=linewidth, zorder=1 )
             if detailed:
-                plt.text(
-                    average(x_vec), average(y_vec), f"{edge_name}:\n{edge_dim}",
-                    fontdict={'color':'darkorchid', 'size':10 }
-                )
+                if on_boundary is None:
+                    x = average(x_vec)
+                    y = average(y_vec)
+                else: 
+                    x = x_vec[1]
+                    y = y_vec[1]
+                plt.text(x, y, f"{edge_name!r}\n", fontdict={'color':'darkorchid', 'size':10 } )
+                plt.text(x, y, f"\n{edge_dim}", fontdict={'color':'crimson', 'size':10 } )
             
         ## Plot this edge:
+        on_boundary = _check_on_boundaries(tensors_indices, network_bounds=network_bounds, pos_list=pos_list, edge_name=edge_name, nodes=nodes, delta=smallest_distance)
         if on_boundary is not None:
-            x_vec1, x_vec2, y_vec1, y_vec2 = _outer_directions_vectors(x_vec, y_vec, on_boundary, smallest_distance)            
-            for order, x_vec, y_vec in zip(['low', 'high'], [x_vec1, x_vec2], [y_vec1, y_vec2]):
-                if _check_skip_vec(order, edge_name, on_boundary, x_vec, y_vec):
-                    continue
-                plot_and_text(x_vec, y_vec)
-        else:
-            plot_and_text(x_vec, y_vec)
+            x_vec, y_vec = _outer_directions_vectors(x_vec, y_vec, on_boundary, smallest_distance)            
+
+        plot_and_text(x_vec, y_vec, on_boundary)
 
     # Plot angles of all edges per node:
     for i_node, (angles, origin, edges_) in enumerate(zip(angles_list, pos_list, edges_list, strict=True)):
@@ -421,5 +359,5 @@ def plot_network(
             x1, y1 = origin
             x2, y2 = x1+dx, y1+dy
             plt.plot([x1, x2], [y1, y2], color=angle_color, alpha=alpha, linewidth=angle_linewidth )
-            plt.text(x2, y2, f"{i_edge}", fontdict={'color':'olivedrab', 'size':10 } )	
+            plt.text(x2, y2, f"{i_edge}", fontdict={'color':'olivedrab', 'size':8 } )	
 

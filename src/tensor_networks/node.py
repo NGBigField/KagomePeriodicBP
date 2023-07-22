@@ -37,7 +37,7 @@ class Node():
     edges : list[EdgeIndicator]
     directions : list[Direction] 
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
-    core_cell_type : CoreCellType = field(default=CoreCellType.NoCore) 
+    core_cell_type : CoreCellType = field(default=CoreCellType.NoneLattice) 
     boundaries : list[Direction] = field(default_factory=list) 
 
 
