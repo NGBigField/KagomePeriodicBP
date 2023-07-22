@@ -25,7 +25,7 @@ import numpy as np
 from numpy import matlib
 
 # For common lattice function and classes:
-from tensor_networks.node import Node, NodeFunctionality
+from tensor_networks.node import TensorNode, NodeFunctionality
 from tensor_networks.tensor_network import KagomeTensorNetwork, TensorDims
 from lattices import directions
 from lattices.directions import Direction
@@ -181,7 +181,7 @@ def repeat_core(
     repeats = assertions.odd(repeats, reason="No support yet for odd big tensors")
     
     ## create a matrix of references to core 
-    mat_nodes = np.empty( core.original_lattice_dims, dtype=Node)
+    mat_nodes = np.empty( core.original_lattice_dims, dtype=TensorNode)
     mat_references = np.empty( core.original_lattice_dims, dtype=int)
     for ind, ((i, j), node) in enumerate(zip( _all_possible_indices(core.original_lattice_dims), core.nodes)):
         mat_nodes[i, j] = node
@@ -191,11 +191,11 @@ def repeat_core(
     expanded_references = matlib.repmat(mat_references, repeats, repeats)    
 
     @functools.cache
-    def get_core_node(ind:int)->Node:
+    def get_core_node(ind:int)->TensorNode:
         indices = np.where(mat_references==ind)
         indices = [ i[0] for i in indices]
         node = mat_nodes[tuple(indices)]
-        assert isinstance(node, Node)
+        assert isinstance(node, TensorNode)
         return node
 
     ## Check result:
@@ -210,12 +210,12 @@ def repeat_core(
     padding = network_size-core_size
 
     ## Assign correct values to all nodes:
-    nodes : list[Node] = []
+    nodes : list[TensorNode] = []
     for ind, (i, j) in enumerate(_all_possible_indices((network_size, network_size))):
         edges = [_get_edge_from_tensor_coordinates(i, j, direction, network_size) for direction in Directions]
         core_node = get_core_node(expanded_references[i,j])
         assert core_node.is_ket == True
-        node = Node(
+        node = TensorNode(
             tensor = core_node.tensor,
             is_ket = True,
             edges = edges,

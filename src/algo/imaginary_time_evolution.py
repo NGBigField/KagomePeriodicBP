@@ -21,7 +21,7 @@ from containers import Config
 
 # Import need types:
 from enums import UpdateModes, Directions, InitialTNMode
-from tensor_networks import KagomeTensorNetwork, NodeFunctionality, Node
+from tensor_networks import KagomeTensorNetwork, NodeFunctionality, TensorNode
 
 # Common errors:
 from lib.ITE import ITEError
@@ -189,7 +189,7 @@ def get_imaginary_time_evolution_operator(h:np.ndarray, delta_t:float)->tuple[np
     return h, g
 
 
-def _duplicate_to_core(core1:Node, core2:Node, update_mode:UpdateModes, config:Config)->KagomeTensorNetwork:
+def _duplicate_to_core(core1:TensorNode, core2:TensorNode, update_mode:UpdateModes, config:Config)->KagomeTensorNetwork:
     """ Arrange 2 cell tensors into a 2x2 core.
 
     core tensor network is of basic cell
@@ -295,15 +295,15 @@ def _fix_config_if_bp_struggled(config:Config, bp_stats:BPStats, logger:logs.Log
 
 def update_core_tensors(
     mode_tn:KagomeTensorNetwork,
-    core1:Node,
-    core2:Node,
+    core1:TensorNode,
+    core2:TensorNode,
     environment_tensors:list[np.ndarray],
     ite_config:ITEConfig,
     delta_t:float,
     logger:logs.Logger
 )->tuple[
-    Node,  # core1
-    Node,  # core2 
+    TensorNode,  # core1
+    TensorNode,  # core2 
     float, # energy
     MatrixMetrics # env_data
 ]:

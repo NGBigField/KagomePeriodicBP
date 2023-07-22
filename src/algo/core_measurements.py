@@ -10,7 +10,7 @@ from utils.config import DEBUG_MODE, ALLOW_VISUALS, VERBOSE_MODE
 
 import numpy as np
 
-from tensor_networks import KagomeTensorNetwork, Node
+from tensor_networks import KagomeTensorNetwork, TensorNode
 from tensor_networks.construction import repeat_core
 from algo.tensor_network import reduce_tn_to_core_and_environment, calc_edge_environment, calc_mean_values
 from lib.ITE import rho_ij

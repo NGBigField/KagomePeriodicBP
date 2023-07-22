@@ -34,7 +34,7 @@ from typing import (
 from dataclasses import dataclass, field
 
 # Common types:
-from tensor_networks.node import Node, NodeFunctionality, CoreCellType
+from tensor_networks.node import TensorNode, NodeFunctionality, CoreCellType
 from lattices.directions import Direction
 from _error_types import DirectionError
 
@@ -156,7 +156,7 @@ def _check_on_boundaries(
     network_bounds:List[Tuple[int, ...]], 
     pos_list:List[Tuple[int, int]],
     edge_name:str,
-    nodes:List[Node],
+    nodes:List[TensorNode],
     delta:float
 )->Direction|None:
 
@@ -213,7 +213,7 @@ def plot_contraction_order(positions:List[Tuple[int,...]], con_order:List[int])-
 
 @visuals.matplotlib_wrapper()
 def plot_network(
-	nodes : List[Node],
+	nodes : List[TensorNode],
 	edges : Dict[str, Tuple[int, int]],
     detailed : bool = True
 )-> None:
@@ -230,7 +230,7 @@ def plot_network(
     ## Define helper functions:
     average = lambda lst: sum(lst) / len(lst)
 
-    def node_style(node:Node):
+    def node_style(node:TensorNode):
         # Marker:
         if node.functionality is NodeFunctionality.Core:
             marker = f"${node.core_cell_type}$"
@@ -301,7 +301,10 @@ def plot_network(
         assert dim1==dim2, f"Dimensions don't agree on edge '{edge_name}'"
         dir1 = node1.directions[edge_ind1]
         dir2 = node2.directions[edge_ind2]
-        assert dir1==dir2.opposite(), f"Legs of connection in a lattice must be of opposite directions"
+        if NodeFunctionality.Message in [node1.functionality, node2.functionality]:
+            pass
+        else:
+            assert dir1==dir2.opposite(), f"Legs of connection in a lattice must be of opposite directions"
         return dim1
 
         
