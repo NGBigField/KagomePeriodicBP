@@ -1,13 +1,12 @@
 from tensor_networks import MPS
-from enums import Directions
 from tensor_networks import Node
+from lattices.directions import Direction
 import numpy as np
 from utils import assertions
+from _types import MsgDictType
 
-_MsgDictType = dict[Directions, MPS]
 
-
-def normalize_messages(mpss:_MsgDictType)->_MsgDictType:
+def normalize_messages(mpss:MsgDictType)->MsgDictType:
     exponents = [ mps.nr_exp for mps in mpss.values() ]
     mean_exponents = int(sum(exponents)/len(exponents))
     for mps in mpss.values():

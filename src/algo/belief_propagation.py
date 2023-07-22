@@ -5,42 +5,39 @@ if __name__ == "__main__":
 	)
 
 # Get Global-Config:
-from utils.config import VERBOSE_MODE, DEBUG_MODE, MULTIPROCESSING
+from _config_reader import DEBUG_MODE
 
 # Everyone needs numpy:
 import numpy as np
 
 # other used types in our code:
 from tensor_networks import KagomeTensorNetwork, MPS
-from enums import Directions, ContractionDepth, MessageModel
+from lattices.directions import Direction
+from enums import ContractionDepth, MessageModel
 from containers import BPStats, BPConfig
+from _types import MsgDictType
 
 # needed algo:
 from algo.tensor_network import contract_tensor_network, fuse_messages_with_tn
-from algo._pashtida import robust_BP
 
 # initial messages creation:
-from tensor_networks.mps import init_mps_classical, init_mps_quantum
+from tensor_networks.mps import init_mps_quantum
 
 # for ite stuff:
-from lib import ITE as ite
+from libs import ITE as ite
 
 # Common used utilities:
-from utils import decorators, strings, parallel_exec, lists, visuals
+from utils import decorators, strings, parallel_exec, lists, visuals, prints
 
+# OOP:
 from copy import deepcopy
 
 
-
-_MsgDictType = dict[Directions, tuple[MPS, Directions]]
-
-
-
 def _out_going_message(
-    tn:KagomeTensorNetwork, direction:Directions, bubblecon_trunc_dim:int, print_progress:bool, hermitize:bool
+    tn:KagomeTensorNetwork, direction:Direction, bubblecon_trunc_dim:int, print_progress:bool, hermitize:bool
 ) -> tuple[
     MPS, 
-    Directions
+    Direction
 ]:
     ## use bubble con to compute outgoing message:
     mps, _, mps_direction = contract_tensor_network(
@@ -74,12 +71,12 @@ def _belief_propagation_step(
     open_tn:KagomeTensorNetwork,
     prev_error:float|None,
     prev_tn_with_messages:KagomeTensorNetwork,
-    prev_messages:_MsgDictType,
-    prog_bar:strings.ProgressBar,
+    prev_messages:MsgDictType,
+    prog_bar:prints.ProgressBar,
     bp_config:BPConfig
 )->tuple[
     KagomeTensorNetwork,  # next_tn_with_messages
-    _MsgDictType,   # next_messages
+    MsgDictType,   # next_messages
     float           # next_eerror
 ]:
     
@@ -92,11 +89,11 @@ def _belief_propagation_step(
     )
     if multi_processing:
         prog_bar.append_extra_str(f" error={_bp_error_str(prev_error)}")
-        directions=list(Directions)
+        directions=list(Direction)
         fixed_arguments["print_progress"]=False
         out_messages = parallel_exec.parallel(func=_out_going_message, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
     else:
-        directions=Directions.iterator_with_str_output(lambda s: prog_bar.append_extra_str(s+f" error={_bp_error_str(prev_error)}"))
+        directions=Direction.iterator_with_str_output(lambda s: prog_bar.append_extra_str(s+f" error={_bp_error_str(prev_error)}"))
         fixed_arguments["print_progress"] = True
         out_messages = parallel_exec.concurrent(func=_out_going_message, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
 
@@ -108,7 +105,7 @@ def _belief_propagation_step(
 
     ## Check error between messages:
     # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:
-    distances = [ MPS.l2_distance(prev_messages[dir][0], next_messages[dir][0]) for dir in Directions ]
+    distances = [ MPS.l2_distance(prev_messages[dir][0], next_messages[dir][0]) for dir in Direction ]
     if bp_config.msg_diff_squared:
         next_error = sum(distances)/len(distances)
     else:
@@ -121,9 +118,9 @@ def _belief_propagation_step(
 
 
 def initial_message(
-	message_model:MessageModel|str, 
 	D : int,  # Physical-Lattice bond dimension
-    num_edge_tensors : int  # number of tensors in the edge of the lattice
+    num_edge_tensors : int,  # number of tensors in the edge of the lattice
+	message_model:MessageModel|str=MessageModel.RANDOM_QUANTUM
 ) -> MPS:
 
     dims : list[int] = [D]*num_edge_tensors
@@ -138,36 +135,30 @@ def initial_message(
        raise TypeError(f"Expected `initial_m_mode` to be of type <str> or <MessageModel> enum. Got {type(message_model)}")
     
     # Initial messages are uniform probability dist'
-    if message_model==MessageModel.UNIFORM_CLASSIC:
-        mp = init_mps_classical(dims, random=False)
+    if message_model==MessageModel.UNIFORM_CLASSIC: raise NotADirectoryError("We do not support classical messages in this code")
         
     # Initial messages are random probability dist'
-    elif message_model==MessageModel.RANDOM_CLASSIC:
-        mp = init_mps_classical(dims, random=True)
+    elif message_model==MessageModel.RANDOM_CLASSIC: raise NotADirectoryError("We do not support classical messages in this code")
     
     # Initial messages are uniform quantum density matrices
-    elif message_model==MessageModel.UNIFORM_QUANTUM:
-        mp = init_mps_quantum(dims, random=False)
+    elif message_model==MessageModel.UNIFORM_QUANTUM: return init_mps_quantum(dims, random=False)
         
     # Initial messages are random |v><v| quantum states
-    elif message_model==MessageModel.RANDOM_QUANTUM:
-        mp = init_mps_quantum(dims, random=True)
+    elif message_model==MessageModel.RANDOM_QUANTUM: return init_mps_quantum(dims, random=True)
 
     else:
         raise ValueError("Not a valid option")
-
-    return mp
 
 
 
 @decorators.add_stats()
 def belief_propagation_pashtida(
     open_tn:KagomeTensorNetwork, 
-    messages:_MsgDictType|None, # initial messages
+    messages:MsgDictType|None, # initial messages
     bp_config:BPConfig
 ) -> tuple[ 
     KagomeTensorNetwork,
-    _MsgDictType, # final messages
+    MsgDictType, # final messages
     BPStats
 ]:
     """
@@ -192,7 +183,7 @@ def belief_propagation_pashtida(
     if messages is None:
         prev_BP_mps_messages = None
     else:
-        prev_BP_mps_messages = [messages[direction][0] for direction in Directions.all_in_counterclockwise_order()]
+        prev_BP_mps_messages = [messages[direction][0] for direction in Direction.all_in_counterclockwise_order()]
     # bubblecon cofig:
     D_trunc = bp_config.max_swallowing_dim
     delta = bp_config.target_msg_diff
@@ -209,7 +200,7 @@ def belief_propagation_pashtida(
 
     ## Pack results
     messages = {}
-    for mps, direction in zip(BP_mps_messages, Directions.all_in_counterclockwise_order(), strict=True):
+    for mps, direction in zip(BP_mps_messages, Direction.all_in_counterclockwise_order(), strict=True):
         messages[direction] = (mps, direction.next_counterclockwise())
     tn_with_messages = fuse_messages_with_tn(open_tn, messages) 
     tn_with_messages.validate()
@@ -222,12 +213,12 @@ def belief_propagation_pashtida(
 @decorators.add_stats()
 def belief_propagation(
     open_tn:KagomeTensorNetwork, 
-    messages:_MsgDictType|None, # initial messages
+    messages:MsgDictType|None, # initial messages
     bp_config:BPConfig,
     live_plots:bool=False
 ) -> tuple[ 
     KagomeTensorNetwork,
-    _MsgDictType, # final messages
+    MsgDictType, # final messages
     BPStats
 ]:
 
@@ -242,7 +233,7 @@ def belief_propagation(
         num_edge_tensors = open_tn.original_lattice_dims[0]
         messages = { 
             edge_side: (initial_message(bp_config.init_msg, virtual_dim, num_edge_tensors), edge_side.next_counterclockwise() ) \
-            for edge_side in Directions.all_in_counterclockwise_order()  \
+            for edge_side in Direction.all_in_counterclockwise_order()  \
         }
 
     ## Visualizations:
@@ -340,7 +331,7 @@ def _test():
     prev_messages = d["prev_messages"]
     next_messages = d["next_messages"]
 
-    up_message = prev_messages[Directions.Up][0]
+    up_message = prev_messages[Direction.Up][0]
     up_open_tensors = [_physical_tensor_with_split_mid_leg(t) for t in up_message.A]
 
 

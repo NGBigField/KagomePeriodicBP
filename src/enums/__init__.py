@@ -5,7 +5,7 @@ from typing import TypeAlias
 from enums.contractions import ContractionDepth, ReduceToEdgeMethod, ReduceToCoreMethod
 from enums.tensor_networks import NodeFunctionality, CoreCellType
 from enums.imaginary_time_evolution import UpdateModes
-from enums.block_bp import MessageModel
+from enums.belief_propagation import MessageModel
 
 
 # Some aliases for better readability:

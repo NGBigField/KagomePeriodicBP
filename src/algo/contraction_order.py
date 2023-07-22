@@ -7,12 +7,14 @@ if __name__ == "__main__":
 
 
 # Get Global-Config:
-from utils.config import DEBUG_MODE
+from _config_reader import DEBUG_MODE
 
 from typing import Callable
 from tensor_networks import KagomeTensorNetwork
-from enums import Directions, ContractionDepth, NodeFunctionality
+from lattices.directions import Direction
+from enums import ContractionDepth, NodeFunctionality
 from containers import ContractionConfig
+
 
 # Everyone needs numpy:
 import numpy as np
@@ -26,19 +28,14 @@ import itertools
 
 _PosFuncType = Callable[[int, int], tuple[int, int] ]
 
-D = Directions.Down
-U = Directions.Up
-L = Directions.Left
-R = Directions.Right
-
 
 def _derive_axes(
     tn:KagomeTensorNetwork,
-    direction:Directions,
+    direction:Direction,
 )->tuple[
     list[int],   # axis1
     tuple[list[int], list[int]],   # axis2_variations
-    tuple[Directions, Directions], # axis2_directions
+    tuple[Direction, Direction], # axis2_directions
     _PosFuncType,   # pos_func
     bool  # has corners
 ]:
@@ -50,20 +47,20 @@ def _derive_axes(
     ys_u2d = np.linspace(max_y, min_y, tn.original_lattice_dims[0]).tolist()
 
     ## Direction dictates the axis:
-    if direction in [Directions.Left, Directions.Right]:
+    if direction in [Direction.Left, Direction.Right]:
         axis2_variations = (ys_u2d, ys_d2u)
         axis2_directions = (D, U)
         _pos_func : Callable[ [int, int], tuple[int, int] ] = lambda p1, p2: (p1, p2)  # Define which is the x value, and which is the y value
-        if   direction is Directions.Left:   axis1 = xs_r2l
-        elif direction is Directions.Right:  axis1 = xs_l2r  
+        if   direction is Direction.Left:   axis1 = xs_r2l
+        elif direction is Direction.Right:  axis1 = xs_l2r  
         else: raise ValueError(f"Not an option")
     
-    elif direction in [Directions.Up, Directions.Down]:
+    elif direction in [Direction.Up, Direction.Down]:
         axis2_variations = (xs_l2r, xs_r2l)
         axis2_directions = (R, L)
         _pos_func : Callable[ [int, int], tuple[int, int] ] = lambda p1, p2: (p2, p1)  # Define which is the x value, and which is the y value
-        if   direction is Directions.Down:   axis1 = ys_u2d            
-        elif direction is Directions.Up:     axis1 = ys_d2u
+        if   direction is Direction.Down:   axis1 = ys_u2d            
+        elif direction is Direction.Up:     axis1 = ys_d2u
         else: raise ValueError(f"Not an option")
 
     else:
@@ -84,7 +81,7 @@ def _derive_axes(
     return axis1, axis2_variations, axis2_directions, _pos_func, has_corners
 
 
-def _determine_direction(axis2:list[int], _pos_func:_PosFuncType) -> Directions:
+def _determine_direction(axis2:list[int], _pos_func:_PosFuncType) -> Direction:
     ## Prepare locations:
     p1 = 0
     positions = [_pos_func(p1, p2) for p2 in axis2]
@@ -94,12 +91,12 @@ def _determine_direction(axis2:list[int], _pos_func:_PosFuncType) -> Directions:
     ## Is the main axis X or Y:
     if all([p==0 for p in x_pos]):
         main_positions = y_pos
-        sorted_answer   = Directions.Up
-        opposite_answer = Directions.Down 
+        sorted_answer   = Direction.Up
+        opposite_answer = Direction.Down 
     elif all([p==0 for p in y_pos]):
         main_positions = x_pos
-        sorted_answer   = Directions.Right
-        opposite_answer = Directions.Left
+        sorted_answer   = Direction.Right
+        opposite_answer = Direction.Left
     else: 
         raise ValueError("This option is not accounted for ): ")
 
@@ -116,12 +113,12 @@ def _determine_direction(axis2:list[int], _pos_func:_PosFuncType) -> Directions:
 
 def derive_contraction_orders(
     tn:KagomeTensorNetwork,  
-    direction:Directions,
+    direction:Direction,
     depth:ContractionDepth|int,
     plot_:bool=False
 )->tuple[
     list[int],
-    Directions
+    Direction
 ]:
 
     ## Derive iterations info:
@@ -140,7 +137,7 @@ def derive_contraction_orders(
     has_seen_core = False
     # the second axis - alternating:
     axis2 : list[int] = []
-    dir2 : Directions = None  #type: ignore
+    dir2 : Direction = None  #type: ignore
     
     # Firstly, go over all values of the first axis:
     for i1, (first1, last1, p1) in enumerate(lists.iterate_with_edge_indicators(axis1)):

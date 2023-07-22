@@ -13,6 +13,7 @@ if __name__ == "__main__":
 from _config_reader import DEBUG_MODE
 
 from lattices.directions import Direction
+from lattices import directions
 from tensor_networks.node import Node
 from lattices.edges import edges_dict_from_edges_list
 from tensor_networks.unit_cell import UnitCell
@@ -148,6 +149,22 @@ class KagomeTensorNetwork():
     @property
     def size(self)->int:
         return len(self.nodes)
+    
+    @property
+    def num_message_connections(self)->int:
+        return 2*self.lattice.N - 1
+
+    # ================================================= #
+    #|              Geometry Functions                 |#
+    # ================================================= #
+    def num_boundary_tensors(self, boundary:Direction)->int:
+        if boundary in [directions.U, directions.DR, directions.DL]:
+            return self.lattice.N
+        elif boundary in [directions.D, directions.UR, directions.UL]:
+            return 2*self.lattice.N
+        else:
+            raise directions.DirectionError("Not a possible boundary direction")
+        
 
     # ================================================= #
     #|               instance methods                  |#

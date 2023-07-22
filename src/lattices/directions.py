@@ -82,7 +82,7 @@ class Direction():
             if _dist(dir.angle, angle)<EPSILON:
                 return dir
         raise DirectionError(f"Given angle does not match with any known side")
-    
+            
     
     
 # ============================================================================ #

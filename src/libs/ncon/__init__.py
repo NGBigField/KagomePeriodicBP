@@ -1,1 +1,1 @@
-from lib.ncon.src.ncon import ncon
+from libs.ncon.src.ncon import ncon

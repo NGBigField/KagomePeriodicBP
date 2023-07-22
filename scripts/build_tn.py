@@ -9,7 +9,9 @@ from utils import visuals
 from src.lattices.kagome import create_kagome_lattice
 from src.tensor_networks.construction import create_kagome_tn
 
-
+# MPS Messages:
+from algo.belief_propagation import initial_message
+from enums import MessageModel
 
 
 def draw_lattice():
@@ -43,11 +45,17 @@ def add_messages():
     D = 3
     N = 2
     tn = create_kagome_tn(d=d, D=D, N=N)
+
     
     tn.validate()
         
+    message = initial_message(D=D, num_edge_tensors=tn.num_message_connections)    
 
 
+    messages = { 
+        edge_side: (initial_message(bp_config.init_msg, virtual_dim, num_edge_tensors), edge_side.next_counterclockwise() ) \
+        for edge_side in Directions.all_in_counterclockwise_order()  \
+    }
 
 
 

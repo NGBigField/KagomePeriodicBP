@@ -11,11 +11,12 @@ if __name__ == "__main__":
 import numpy as np
 from numpy import  sqrt, pi, conj
 from numpy.linalg import norm, eigvals
-from lib.bmpslib import mps as MPS
 
-# ============================================================================ #
-#                                   Types                                      #
-# ============================================================================ #
+# MPS Object:
+from libs.bmpslib import mps as MPS
+
+# Control:
+from _config_reader import DEBUG_MODE
 
 # ============================================================================ #
 #                                 Constants                                    #
@@ -67,7 +68,7 @@ def init_mps_quantum(D_list, random=False) -> MPS:
 	"""
 
 	N = len(D_list)
-	mp = MPS(N)
+	mps = MPS(N)
 
 	for i, D in enumerate(D_list):
 		D2 = D*D
@@ -102,22 +103,15 @@ def init_mps_quantum(D_list, random=False) -> MPS:
 		if i==N-1:
 			ketbra = ketbra[:, :, 0].reshape([D2, D2, 1])
 
-		mp.set_site(ketbra, i)
+		mps.set_site(ketbra, i)
   
 	#	
 	# Make it left-canonical and normalize
 	#
 
-	mp.left_canonical_QR()
+	mps.left_canonical_QR()
 
-	mp.set_site(mp.A[N-1]/norm(mp.A[N-1]), N-1)
+	mps.set_site(mps.A[N-1]/norm(mps.A[N-1]), N-1)
 
-	return mp
-
-
-
-
-if __name__ == "__main__":
-    from scripts.core_ite_test import main
-    main()
+	return mps
 

@@ -43,9 +43,9 @@ from scipy.linalg import expm
 
 from sys import exit
 
-from lib import bmpslib
-from lib import bubblecon
-from lib.ncon import ncon
+from libs import bmpslib
+from libs import bubblecon
+from libs.ncon import ncon
 
 
 HERMICITY_ERR = 1e-5

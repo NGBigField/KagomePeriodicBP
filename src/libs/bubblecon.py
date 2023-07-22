@@ -69,7 +69,7 @@ from scipy.linalg import sqrtm, polar, expm
 from numpy.linalg import norm
 from numpy import sqrt, tensordot, array, eye, zeros, ones, pi, conj
 
-from lib import bmpslib
+from libs import bmpslib
 
 from utils.prints import ProgressBar
 
