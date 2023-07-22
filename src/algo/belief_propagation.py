@@ -14,8 +14,7 @@ import numpy as np
 from tensor_networks import KagomeTensorNetwork, MPS
 from lattices.directions import Direction
 from enums import ContractionDepth, MessageModel
-from containers import BPStats, BPConfig
-from _types import MsgDictType
+from containers import BPStats, BPConfig, MessageDictType
 
 # needed algo:
 from algo.tensor_network import contract_tensor_network, connect_messages_with_tn
@@ -71,12 +70,12 @@ def _belief_propagation_step(
     open_tn:KagomeTensorNetwork,
     prev_error:float|None,
     prev_tn_with_messages:KagomeTensorNetwork,
-    prev_messages:MsgDictType,
+    prev_messages:MessageDictType,
     prog_bar:prints.ProgressBar,
     bp_config:BPConfig
 )->tuple[
     KagomeTensorNetwork,  # next_tn_with_messages
-    MsgDictType,   # next_messages
+    MessageDictType,   # next_messages
     float           # next_eerror
 ]:
     
@@ -154,11 +153,11 @@ def initial_message(
 @decorators.add_stats()
 def belief_propagation_pashtida(
     open_tn:KagomeTensorNetwork, 
-    messages:MsgDictType|None, # initial messages
+    messages:MessageDictType|None, # initial messages
     bp_config:BPConfig
 ) -> tuple[ 
     KagomeTensorNetwork,
-    MsgDictType, # final messages
+    MessageDictType, # final messages
     BPStats
 ]:
     """
@@ -213,12 +212,12 @@ def belief_propagation_pashtida(
 @decorators.add_stats()
 def belief_propagation(
     open_tn:KagomeTensorNetwork, 
-    messages:MsgDictType|None, # initial messages
+    messages:MessageDictType|None, # initial messages
     bp_config:BPConfig,
     live_plots:bool=False
 ) -> tuple[ 
     KagomeTensorNetwork,
-    MsgDictType, # final messages
+    MessageDictType, # final messages
     BPStats
 ]:
 

@@ -3,7 +3,6 @@ from physics.hamiltonians import HamiltonianFuncType, zero
 from dataclasses import dataclass, field, fields
 from utils import strings, saveload, assertions
 from utils.arguments import Stats
-from tensor_networks import KagomeTensorNetwork
 from typing import Generator, Union, Any
 from copy import deepcopy
 
@@ -12,6 +11,10 @@ from enums.imaginary_time_evolution import UpdateModes
 from containers.beliefe_propagation import BPStats
 from containers.density_matrices import MatrixMetrics 
 from _error_types import ITEError
+
+
+KagomeTensorNetwork = None  #TODO fix
+
 
 
 SUB_FOLDER = "ite_trackers"

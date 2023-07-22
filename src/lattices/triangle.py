@@ -1,7 +1,6 @@
-from lattices._common import NodePlaceHolder
+from lattices._common import Node
 from lattices.directions import lattice, block
 from lattices.directions import LatticeDirection, BlockSide
-from lattices.directions import lattice_directions_in_standard_order
 from typing import Generator
 from _error_types import LatticeError, OutsideLatticeError
 
@@ -120,9 +119,9 @@ def get_neighbor(i:int, j:int, direction:LatticeDirection, N:int)->tuple[int, in
 	return get_vertex_index(i2, j2, N)
 
 
-def all_neighbors(index:int, N:int)->Generator[tuple[NodePlaceHolder, LatticeDirection], None, None]:
+def all_neighbors(index:int, N:int)->Generator[tuple[Node, LatticeDirection], None, None]:
 	i, j = get_vertex_coordinates(index, N)
-	for direction in lattice_directions_in_standard_order():
+	for direction in LatticeDirection.all_in_counter_clockwise_order():
 		try: 
 			neighbor = get_neighbor(i, j, direction, N)
 		except OutsideLatticeError:
@@ -607,7 +606,7 @@ def rotate_ACW(N, ijs, ij_to_hex, hex_to_ij):
 
     
 
-def create_triangle_lattice(N)->list[NodePlaceHolder]:
+def create_triangle_lattice(N)->list[Node]:
 
 	"""
 	The structure of every node in the list is:
@@ -660,7 +659,7 @@ def create_triangle_lattice(N)->list[NodePlaceHolder]:
 	for i in range(2*N-1):
 		w = row_width(i,N)
 		for j in range(w):
-			n = NodePlaceHolder(
+			n = Node(
 				index = index,
 				pos = get_node_position(i, j, N),
 				edges = edges_list[index],

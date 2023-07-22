@@ -6,16 +6,16 @@ if __name__ == "__main__":
 
 from lattices import triangle as triangle_lattice
 from lattices import edges
-from lattices._common import NodePlaceHolder
+from lattices._common import Node
 from lattices import directions
 from lattices.directions import LatticeDirection, BlockSide, lattice, block
 from lattices.directions import L, R, UL, UR, DL, DR  # Lattice directions:
 
 from _error_types import LatticeError, DirectionError
-from _types import EdgeIndicator
+from _types import EdgeIndicatorType
 
 from numpy import pi, cos, sin
-from utils import numerics, tuples
+from utils import numerics, tuples, lists
 from dataclasses import dataclass, fields
 from typing import Generator
 
@@ -45,13 +45,13 @@ class KagomeLatticeError(LatticeError):...
 
 @dataclass(frozen=False, slots=True)
 class UpperTriangle:
-    up    : NodePlaceHolder = None
-    left  : NodePlaceHolder = None
-    right : NodePlaceHolder = None
+    up    : Node = None
+    left  : Node = None
+    right : Node = None
     #
     index : int = -1
 
-    def all_nodes(self)->Generator[NodePlaceHolder, None, None]:
+    def all_nodes(self)->Generator[Node, None, None]:
         yield self.up
         yield self.left
         yield self.right
@@ -82,7 +82,7 @@ def _derive_node_directions(field:str)->list[LatticeDirection]:
 
 
 def _tag_boundary_nodes(triangle:UpperTriangle, boundary:BlockSide)->None:
-    touching_nodes : list[NodePlaceHolder] = []
+    touching_nodes : list[Node] = []
     if   boundary is block.U:     touching_nodes = [triangle.up]
     elif boundary is block.DL:    touching_nodes = [triangle.left]
     elif boundary is block.DR:    touching_nodes = [triangle.right]
@@ -96,7 +96,7 @@ def _tag_boundary_nodes(triangle:UpperTriangle, boundary:BlockSide)->None:
         node.boundaries.add(boundary)
 
 
-def _create_upper_triangle(triangular_node:NodePlaceHolder, indices:list[int])->UpperTriangle:
+def _create_upper_triangle(triangular_node:Node, indices:list[int])->UpperTriangle:
     upper_triangle = UpperTriangle()
     x0, y0 = triangular_node.pos
 
@@ -104,7 +104,7 @@ def _create_upper_triangle(triangular_node:NodePlaceHolder, indices:list[int])->
     for node_index, field, delta_x, delta_y in zip(indices, UpperTriangle.field_names(), _delta_xs, _delta_ys, strict=True):
         x = x0 + delta_x + _CONSTANT_X_SHIFT
         y = y0 + delta_y + _CONSTANT_y_SHIFT
-        node = NodePlaceHolder(
+        node = Node(
             index=node_index,
             pos=(x, y),
             edges=[_UnassignedEdgeName(), _UnassignedEdgeName(), _UnassignedEdgeName(), _UnassignedEdgeName()],
@@ -129,7 +129,7 @@ def _connect_kagome_nodes_inside_triangle(upper_triangle:UpperTriangle)->None:
         right.edges[right.directions.index(L)] = edge_name   
 
 
-def _name_outer_edges(node:NodePlaceHolder, order_ind:int, boundary:BlockSide, kagome_lattice:list[NodePlaceHolder], N:int)->None:
+def _name_outer_edges(node:Node, order_ind:int, boundary:BlockSide, kagome_lattice:list[Node], N:int)->None:
     upper_triangle = get_upper_triangle(node.index, kagome_lattice, N)
     _edge_name = lambda ind: f"{boundary}-{ind}"
 
@@ -212,7 +212,7 @@ def _connect_kagome_nodes_between_triangles(triangle1:UpperTriangle, triangle2:U
     n1.edges[leg_index1] = edge_name
     n2.edges[leg_index2] = edge_name
 
-def sorted_boundary_nodes(nodes:list[NodePlaceHolder], boundary:BlockSide)->list[NodePlaceHolder]:
+def _sorted_boundary_nodes(nodes:list[Node], boundary:BlockSide)->list[Node]:
     # Get relevant nodes:
     boundary_nodes = [node for node in nodes if boundary in node.boundaries]
 
@@ -230,7 +230,7 @@ def sorted_boundary_nodes(nodes:list[NodePlaceHolder], boundary:BlockSide)->list
     return sorted(boundary_nodes, key=sorting_key)
 
 
-def get_upper_triangle(node_index:int, nodes:list[NodePlaceHolder], N:int)->UpperTriangle:
+def get_upper_triangle(node_index:int, nodes:list[Node], N:int)->UpperTriangle:
     triangle_index = node_index//3
     up_index = triangle_index*3
     left_index, right_index = up_index+1, up_index+2
@@ -244,7 +244,7 @@ def get_upper_triangle(node_index:int, nodes:list[NodePlaceHolder], N:int)->Uppe
 def create_kagome_lattice(
     N:int
 )->tuple[
-    list[NodePlaceHolder],
+    list[Node],
     list[UpperTriangle]
 ]:
 
@@ -253,7 +253,7 @@ def create_kagome_lattice(
     triangular_lattice_of_upper_triangles : list[UpperTriangle] = []
 
     ## Position upper-triangles at each node of the kagome lattice:
-    kagome_lattice : list[NodePlaceHolder] = []
+    kagome_lattice : list[Node] = []
     crnt_kagome_index = 0
     for triangular_node in original_triangular_lattice:
         # Assign crnt indices for the triangle:
@@ -286,12 +286,12 @@ def create_kagome_lattice(
             _tag_boundary_nodes(triangle, boundary)
 
     ## Use ordered nodes to name Outer Edges
-    for boundary in directions.hexagonal_block_boundaries():
-        sorted_nodes = sorted_boundary_nodes(kagome_lattice, boundary)
+    for boundary in BlockSide.all_in_counter_clockwise_order():
+        sorted_nodes = _sorted_boundary_nodes(kagome_lattice, boundary)
         for i, node in enumerate(sorted_nodes):
             _name_outer_edges(node, i, boundary, kagome_lattice, N)
     # The bottom-left node is falsely on its DL leg, fix it:
-    bottom_left_corner_node = sorted_boundary_nodes(kagome_lattice, block.D)[0]
+    bottom_left_corner_node = _sorted_boundary_nodes(kagome_lattice, block.D)[0]
     bottom_left_corner_node.set_edge_in_direction(DL, f"{block.D}-0")
 
     
@@ -309,19 +309,45 @@ class KagomeLattice():
     def __init__(self, N:int) -> None:
         kagome_lattice, triangular_lattice_of_upper_triangles = create_kagome_lattice(N)
         self.N : int = N
-        self.nodes     : list[NodePlaceHolder] = kagome_lattice
+        self.nodes     : list[Node] = kagome_lattice
         self.triangles : list[UpperTriangle]   = triangular_lattice_of_upper_triangles
         self.edges     : dict[str, tuple[int, int]] = edges.edges_dict_from_edges_list(
             [node.edges for node in kagome_lattice]
         )
                     
-    def nodes_and_triangles(self)->Generator[tuple[NodePlaceHolder, UpperTriangle, ], None, None]:
+    # ================================================= #
+    #|              Basic Derived Properties           |#
+    # ================================================= #                    
+    @property
+    def num_message_connections(self)->int:
+        return 2*self.N - 1
+    
+    @property
+    def size(self)->int:
+        return len(self.nodes)
+
+    # ================================================= #
+    #|              Geometry Functions                 |#
+    # ================================================= #
+    def num_boundary_nodes(self, boundary:BlockSide)->int:
+        if boundary in [block.U, block.DR, block.DL]:
+            return self.N
+        elif boundary in [block.D, block.UR, block.UL]:
+            return 2*self.N
+        else:
+            raise DirectionError("Not a possible boundary direction")
+
+    # ================================================= #
+    #|            Retrieve Inner Objects               |#
+    # ================================================= #
+
+    def nodes_and_triangles(self)->Generator[tuple[Node, UpperTriangle, ], None, None]:
         triangles_repeated_3_times = itertools.chain.from_iterable(itertools.repeat(triangle, 3) for triangle in self.triangles)
         return zip(self.nodes, triangles_repeated_3_times, strict=True)
     
     
-    def get_neighbor(self, node:NodePlaceHolder, edge_or_dir:EdgeIndicator|LatticeDirection)->NodePlaceHolder:
-        if isinstance(edge_or_dir, EdgeIndicator):
+    def get_neighbor(self, node:Node, edge_or_dir:EdgeIndicatorType|LatticeDirection)->Node:
+        if isinstance(edge_or_dir, EdgeIndicatorType):
             edge = edge_or_dir
         elif isinstance(edge_or_dir, Direction):
             edge = node.get_edge_in_direction(edge_or_dir)
@@ -336,7 +362,45 @@ class KagomeLattice():
             return self.nodes[i1]
         else:
             raise LatticeError("No neighbor")
-            
+        
+    def sorted_boundary_nodes(self, boundary:BlockSide)->list[Node]:
+        return _sorted_boundary_nodes(self.nodes, boundary)
+    
+    def sorted_boundary_edges(self, boundary:BlockSide)->list[EdgeIndicatorType]:
+        # Basic info:
+        num_boundary_nodes = self.num_boundary_nodes(boundary)
+        boundary_nodes = self.sorted_boundary_nodes(boundary)
+        assert len(boundary_nodes)==num_boundary_nodes
+
+        # Logic of participating directions:
+        match boundary:
+            case block.D : participating_directions = [lattice.DL, lattice.DR]
+            case block.DR: participating_directions = [lattice.DR, lattice.R ]
+            case block.UR: participating_directions = [lattice.R,  lattice.UR]
+            case block.U : participating_directions = [lattice.UR, lattice.UL]
+            case block.UL: participating_directions = [lattice.UL, lattice.L ]
+            case block.DL: participating_directions = [lattice.L , lattice.DL]
+
+        # Logic of participating edges and nodes:
+        omit_last_edge = num_boundary_nodes==self.N
+        omit_last_node = not omit_last_edge
+        
+        # Get all edges in order:
+        boundary_edges = []
+        for _, is_last_node, node in lists.iterate_with_edge_indicators(boundary_nodes):
+            if omit_last_node and is_last_node:
+                break
+
+            for _, is_last_direction, direction in lists.iterate_with_edge_indicators(participating_directions):
+                if omit_last_edge and is_last_node and is_last_direction:
+                    break
+
+                if direction in node.directions:
+                    boundary_edges.append(node.get_edge_in_direction(direction))
+
+        assert self.num_message_connections == len(boundary_edges)
+        return boundary_edges
+        
             
         
 

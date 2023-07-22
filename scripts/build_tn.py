@@ -6,14 +6,16 @@ from matplotlib import pyplot as plt
 from utils import visuals
 
 # Tensor-Networks creation:
-from src.lattices.kagome import create_kagome_lattice
-from src.lattices import directions
-from src.tensor_networks.construction import create_kagome_tn
+from lattices.kagome import create_kagome_lattice
+from lattices.directions import BlockSide
+from lattices import directions
+from tensor_networks.construction import create_kagome_tn
 
 # MPS Messages:
 from algo.belief_propagation import initial_message
-from enums import MessageModel
 from algo.tensor_network import connect_messages_with_tn
+from containers.beliefe_propagation import Message
+
 
 
 def draw_lattice():
@@ -48,18 +50,20 @@ def add_messages():
     N = 2
     tn = create_kagome_tn(d=d, D=D, N=N)
 
-    
     tn.validate()
-        
 
     messages = { 
-        edge_side: (initial_message(D=D, num_edge_tensors=tn.num_message_connections), edge_side.next_counterclockwise() ) \
-        for edge_side in directions.hexagonal_block_boundaries()  \
+        edge_side : Message(
+            mps=initial_message(D=D, num_edge_tensors=tn.num_message_connections), 
+            order_direction=edge_side.orthogonal_counterclockwise_lattice_direction() 
+        ) 
+        for edge_side in BlockSide.all_in_counter_clockwise_order()  \
     }
 
-    tn_with_message = connect_messages_with_tn(tn, messages)
-
-    tn_with_message.plot()
+    tn.connect_messages(messages)
+    nodes = tn.nodes
+    edges = tn.edges
+    tn.plot()
 
 
 

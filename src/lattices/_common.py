@@ -1,28 +1,28 @@
 from lattices.directions import Direction
-from _types import EdgeIndicator, PosScalarType
+from _types import EdgeIndicatorType, PosScalarType
 from utils import tuples
 from dataclasses import dataclass, field
 
 
 @dataclass
-class NodePlaceHolder():
+class Node():
     index : int
     pos : tuple[PosScalarType, ...]
-    edges : list[EdgeIndicator]
+    edges : list[EdgeIndicatorType]
     directions : list[Direction]
     boundaries : set[Direction] = field(default_factory=set)
 
 
-    def get_edge_in_direction(self, direction:Direction) -> EdgeIndicator:
+    def get_edge_in_direction(self, direction:Direction) -> EdgeIndicatorType:
         edge_index = self.directions.index(direction)
         return self.edges[edge_index]
     
-    def set_edge_in_direction(self, direction:Direction, value:EdgeIndicator) -> None:
+    def set_edge_in_direction(self, direction:Direction, value:EdgeIndicatorType) -> None:
         edge_index = self.directions.index(direction)
         self.edges[edge_index] = value
 
 
-def plot(lattice:list[NodePlaceHolder], node_color:str="red", node_size=40, edge_style:str="b-")->None:
+def plot(lattice:list[Node], node_color:str="red", node_size=40, edge_style:str="b-")->None:
     from matplotlib import pyplot as plt
     from utils import visuals
 

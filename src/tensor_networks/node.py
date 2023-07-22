@@ -14,7 +14,7 @@ from typing import Tuple, Generator
 from utils import lists
 
 # for type namings:
-from _types import EdgeIndicator, PosScalarType
+from _types import EdgeIndicatorType, PosScalarType
 
 # For OOP Style:
 from copy import deepcopy
@@ -28,13 +28,13 @@ from enums import NodeFunctionality, CoreCellType
 
 
 @dataclass
-class Node():
+class TensorNode():
     index : int
     name : str 
     tensor : np.ndarray
     is_ket : bool
     pos : Tuple[PosScalarType, ...]
-    edges : list[EdgeIndicator]
+    edges : list[EdgeIndicatorType]
     directions : list[LatticeDirection] 
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
     core_cell_type : CoreCellType = field(default=CoreCellType.NoneLattice) 
@@ -71,7 +71,7 @@ class Node():
         return np.linalg.norm(self.tensor)
     
     
-    def legs(self) -> Generator[tuple[LatticeDirection, EdgeIndicator, int], None, None]:
+    def legs(self) -> Generator[tuple[LatticeDirection, EdgeIndicatorType, int], None, None]:
         for direction, edge, dim in zip(self.directions, self.edges, self.dims, strict=True):
             yield direction, edge, dim
 
@@ -80,8 +80,8 @@ class Node():
         self.tensor = self.tensor / self.norm
     
     
-    def copy(self) -> "Node":
-        new = Node.empty()
+    def copy(self) -> "TensorNode":
+        new = TensorNode.empty()
         for f in fields(self):
             val = getattr(self, f.name)
             if hasattr(val, "copy"):
@@ -95,7 +95,7 @@ class Node():
         return new
 
 
-    def edge_in_dir(self, dir:LatticeDirection)->EdgeIndicator:
+    def edge_in_dir(self, dir:LatticeDirection)->EdgeIndicatorType:
         assert isinstance(dir, LatticeDirection), f"Not an expected type '{type(dir)}'"
         index = self.directions.index(dir)
         return self.edges[index]
@@ -148,8 +148,8 @@ class Node():
 
 
     @classmethod
-    def empty(cls)->"Node":
-        return Node(
+    def empty(cls)->"TensorNode":
+        return TensorNode(
             is_ket=False,
             tensor=np.zeros((2,2)),
             functionality=NodeFunctionality.Undefined,
@@ -163,7 +163,7 @@ class Node():
         
         
     def __eq__(self, other)->bool:
-        assert isinstance(other, Node), "Must be same Node type for comparison"
+        assert isinstance(other, TensorNode), "Must be same Node type for comparison"
         if self.physical_tensor is None and other.physical_tensor is not None:
             return False
         if self.physical_tensor is not None and other.physical_tensor is None:

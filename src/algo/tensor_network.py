@@ -15,14 +15,13 @@ import numpy as np
 from typing import List, Tuple, Iterable, TypeVar
 
 # Common types in the code:
-from tensor_networks import KagomeTensorNetwork, Node, MPS
+from tensor_networks import KagomeTensorNetwork, TensorNode, MPS
 from lattices.directions import LatticeDirection, BlockSide
 from lattices import directions
 from _error_types import TensorNetworkError
 from enums import ContractionDepth, ReduceToEdgeMethod, ReduceToCoreMethod, NodeFunctionality
-from containers import BubbleConConfig, ContractionConfig
+from containers import BubbleConConfig, ContractionConfig, MessageDictType
 from physics import pauli
-from _types import MsgDictType
 
 # Our utilities:
 from utils import tuples, lists, assertions, parallel_exec
@@ -48,7 +47,7 @@ def _fix_angle(a:float)->float:
         a -= 2*np.pi
     return a
 
-def _get_corner_tensors(tn:KagomeTensorNetwork) -> list[Node]:
+def _get_corner_tensors(tn:KagomeTensorNetwork) -> list[TensorNode]:
     min_x, max_x, min_y, max_y = tn.boundaries()
     corner_tesnors = [] 
     for x in [min_x, max_x]:
@@ -76,7 +75,7 @@ def _sandwich_fused_tensors_with_expectation_values(tn_in:KagomeTensorNetwork, m
 
     ## Replace node in original tensor_network:
     tn_out = tn_in.copy()
-    tn_out.nodes[ind] = Node(
+    tn_out.nodes[ind] = TensorNode(
         is_ket          = False,
         tensor          = fused_data,
         edges           = node.edges,
@@ -95,18 +94,18 @@ def _sandwich_fused_tensors_with_expectation_values(tn_in:KagomeTensorNetwork, m
 
 
 
-def _ordered_nodes_on_boundary(tn:KagomeTensorNetwork, edge_side:BlockSide, mps_order_dir:LatticeDirection)->list[Node]:
+def _ordered_nodes_on_boundary(tn:KagomeTensorNetwork, edge_side:BlockSide, mps_order_dir:LatticeDirection)->list[TensorNode]:
     nodes_on_edge = tn.nodes_on_boundary(edge_side)
     ## Sort nodes by position along `msg_mps_dir`. 
     # nodes must be ordered from left to right, as seen from the direction of the mps:
     if   mps_order_dir==Direction.Down:    
-        def pos_ordering(node:Node)->int: return -node.pos[1]
+        def pos_ordering(node:TensorNode)->int: return -node.pos[1]
     elif mps_order_dir==Direction.Up:    
-        def pos_ordering(node:Node)->int: return +node.pos[1]
+        def pos_ordering(node:TensorNode)->int: return +node.pos[1]
     elif mps_order_dir==Direction.Right:    
-        def pos_ordering(node:Node)->int: return +node.pos[0]
+        def pos_ordering(node:TensorNode)->int: return +node.pos[0]
     elif mps_order_dir==Direction.Left:    
-        def pos_ordering(node:Node)->int: return -node.pos[0]
+        def pos_ordering(node:TensorNode)->int: return -node.pos[0]
     else:
         raise ValueError(f"Not a valid option msg_mps_dir={mps_order_dir}")
     # sort:        
@@ -173,7 +172,7 @@ def _fuse_mps_with_tn(
 
         ## Add new node to Tensor-Network:
         index = tn.size
-        new_node = Node(
+        new_node = TensorNode(
             is_ket=False,
             tensor=new_tensor,
             edges=edges,
@@ -196,15 +195,15 @@ def _fuse_mps_with_tn(
 
 def connect_messages_with_tn(
     tn : KagomeTensorNetwork,
-    mps_dict : MsgDictType
+    mps_dict : MessageDictType
 ) -> KagomeTensorNetwork:   
     # Start with new copy of tn: 
     tn_with_messages = tn.copy()
 
     # Fuse:
-    for edge_side in Direction.all_in_counterclockwise_order():
-        mps, mps_direction = mps_dict[edge_side]
-        tn_with_messages = _fuse_mps_with_tn(tn_with_messages, mps, mps_direction, edge_side)
+    for block_side in BlockSide.all_in_counterclockwise_order():
+        mps, mps_direction = mps_dict[block_side]
+        tn_with_messages = _fuse_mps_with_tn(tn_with_messages, mps, mps_direction, block_side)
     return tn_with_messages
 
 
@@ -275,11 +274,11 @@ def _sandwich_with_operator_and_contract_fully(
 
 
 def _rearrange_legs(
-    c1:Node,
-    c2:Node,
-    env:list[Node],
+    c1:TensorNode,
+    c2:TensorNode,
+    env:list[TensorNode],
 )->tuple[
-    Node, Node, list[Node]
+    TensorNode, TensorNode, list[TensorNode]
 ]:
     ## init Indices:
     env_left_legs_indices = []
@@ -321,7 +320,7 @@ def _rearrange_legs(
     return c1, c2, env
 
 
-def _find_node_in_relative_direction(dir:LatticeDirection, n1:Node, n2:Node)->Node:
+def _find_node_in_relative_direction(dir:LatticeDirection, n1:TensorNode, n2:TensorNode)->TensorNode:
     vec = dir.unit_vector()
     if tuples.equal( n1.pos, tuples.add(vec, n2.pos) ):
         return n1
@@ -402,7 +401,7 @@ def swallow_corners(tn:KagomeTensorNetwork, _if_no_corners_error:bool=True)->Kag
 
 def rearange_tensors_legs_to_canonical_order(
     tn_env:KagomeTensorNetwork, side:None # Fix mode\side
-)->tuple[Node, Node, list[np.ndarray]]:
+)->tuple[TensorNode, TensorNode, list[np.ndarray]]:
     core_tensors = tn_env.get_core_nodes()
     core1 = _find_node_in_relative_direction(side.next_counterclockwise(), *core_tensors)
     core2 = _find_node_in_relative_direction(side.next_clockwise(), *core_tensors)
@@ -425,7 +424,7 @@ def calc_edge_environment(
     tn:KagomeTensorNetwork, mode:None,  #TODO fix mode type
     bubblecon_trunc_dim:int, method:ReduceToEdgeMethod=ReduceToEdgeMethod.default(), already_reduced_to_core:bool=False
 )->tuple[
-    Node, Node,         # core1/2
+    TensorNode, TensorNode,         # core1/2
     list[np.ndarray],         # environment
     KagomeTensorNetwork       # small_tn
 ]:
@@ -711,7 +710,7 @@ def _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn:KagomeTensorNetwork, 
         + upper_mps.A[jU:(jU+2*n)] + lower_mps.A[jD:(jD+n//2)]
 
 
-    env_nodes : list[Node] = []
+    env_nodes : list[TensorNode] = []
     num_mps_tensors = len(Direction)*n
     i_mps = 0
     ## Add env:
@@ -728,7 +727,7 @@ def _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn:KagomeTensorNetwork, 
             edges = [f'env{i_mps}', bulk_edge_name, f'env{i_mps_next}']
             dirs = [dir_to_lattice.next_counterclockwise(),  dir_to_lattice, dir_to_lattice.next_clockwise()]
 
-            new_node = Node(
+            new_node = TensorNode(
                 is_ket=False,
                 tensor=env_tensors[i_mps],
                 functionality=NodeFunctionality.Message,
