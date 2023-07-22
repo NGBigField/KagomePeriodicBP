@@ -29,6 +29,7 @@ from typing import NamedTuple, Generator
 from copy import deepcopy
 
 import itertools
+import functools
 
 from _error_types import TensorNetworkError, LatticeError
 
@@ -72,7 +73,7 @@ class KagomeTensorNetwork():
     # ================================================= #
     #|                Network Structure                |#
     # ================================================= #
-    @property
+    @functools.cached_property
     def nodes(self)->list[Node]:
         
         # init lists and iterators:
@@ -172,9 +173,9 @@ class KagomeTensorNetwork():
     def _find_neighbor_by_edge(self, node:Node, edge:EdgeIndicator)->Node:
         nodes = self.nodes_connected_to_edge(edge)
         assert len(nodes)==2, f"Only tensor '{node.index}' is connected to edge '{edge}' in direction '{str(dir)}'  "
-        if nodes[0] == node:
+        if nodes[0] is node:
             return nodes[1]
-        elif nodes[1] == node:
+        elif nodes[1] is node:
             return nodes[0]
         else:
             raise TensorNetworkError(f"Couldn't find a neighbor due to a bug with the tensors connected to the same edge '{edge}'")
@@ -355,7 +356,6 @@ class KagomeTensorNetwork():
         # replace:
         self.nodes[ind] = node
 
-
     def add(self, node:Node):
         # Add node:
         assert node.index == len(self.nodes)
@@ -395,8 +395,8 @@ class KagomeTensorNetwork():
                 # Is neighbors pointing back to us?
                 _neigbor_error_message = _error_message+f"\nnode '{node.name}' is not the neighbor of '{neighbor.name}' on edge '{edge_name}'"
                 opposite_dir = dir.opposite()
-                assert self._find_neighbor_by_edge(neighbor, edge_name) == node, _neigbor_error_message
-                assert self.find_neighbor(neighbor, opposite_dir) == node, _neigbor_error_message
+                assert self._find_neighbor_by_edge(neighbor, edge_name) is node, _neigbor_error_message
+                assert self.find_neighbor(neighbor, opposite_dir) is node, _neigbor_error_message
                 assert neighbor.edge_in_dir(opposite_dir) == edge_name
         # Check edges:
         for edge_name, node_indices in self.edges.items():

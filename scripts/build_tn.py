@@ -44,12 +44,8 @@ def add_messages():
     N = 2
     tn = create_kagome_tn(d=d, D=D, N=N)
     
-    nodes = tn.nodes
     tn.validate()
-    tn.plot()
-    
-    print(tn)
-    
+        
 
 
 
