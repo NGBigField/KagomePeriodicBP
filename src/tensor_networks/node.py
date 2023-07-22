@@ -8,36 +8,37 @@ if __name__ == "__main__":
 import numpy as np
 from numpy import ndarray as np_ndarray
 
-from typing import NamedTuple, TypeAlias, Tuple, Generator
+from typing import Tuple, Generator
 
 # Use some of our utilities:
 from utils import lists
+
+# for type namings:
+from _types import EdgeIndicatorType, PosScalarType
 
 # For OOP Style:
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
 
 # For TN methods and types:
-from tensor_networks.operations import fuse_tensor
-from tensor_networks.directions import Direction
+from tensor_networks.operations import fuse_tensor_to_itself
+from lattices.directions import LatticeDirection, BlockSide
 from enums import NodeFunctionality, CoreCellType
 
-_EdgeIndicator : TypeAlias = str
-_PosScalarType : TypeAlias = int
 
 
 @dataclass
-class Node():
+class TensorNode():
     index : int
     name : str 
     tensor : np.ndarray
     is_ket : bool
-    pos : Tuple[_PosScalarType, ...]
-    edges : list[_EdgeIndicator]
-    directions : list[Direction] 
+    pos : Tuple[PosScalarType, ...]
+    edges : list[EdgeIndicatorType]
+    directions : list[LatticeDirection] 
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
-    core_cell_type : CoreCellType = field(default=CoreCellType.NoCore) 
-    on_boundary : list[Direction] = field(default_factory=list) 
+    core_cell_type : CoreCellType = field(default=CoreCellType.NoneLattice) 
+    boundaries : list[BlockSide] = field(default_factory=list) 
 
 
     @property
@@ -45,35 +46,42 @@ class Node():
         if not self.is_ket:
             raise ValueError("Not a ket tensor")
         return self.tensor
+
     
     @property
     def fused_tensor(self) -> np_ndarray:
         if self.is_ket:
-            return fuse_tensor(self.tensor)
+            return fuse_tensor_to_itself(self.tensor)
         else:
             return self.tensor
+
 
     @property
     def angles(self) -> list[float]:
         return [direction.angle for direction in self.directions ]
 
+
     @property
     def dims(self) -> Tuple[int]:
         return self.fused_tensor.shape
+    
     
     @property
     def norm(self) -> np.float64:
         return np.linalg.norm(self.tensor)
     
-    def legs(self) -> Generator[tuple[Direction, _EdgeIndicator, int], None, None]:
+    
+    def legs(self) -> Generator[tuple[LatticeDirection, EdgeIndicatorType, int], None, None]:
         for direction, edge, dim in zip(self.directions, self.edges, self.dims, strict=True):
             yield direction, edge, dim
+
 
     def normalize(self) -> None:
         self.tensor = self.tensor / self.norm
     
-    def copy(self) -> "Node":
-        new = Node.empty()
+    
+    def copy(self) -> "TensorNode":
+        new = TensorNode.empty()
         for f in fields(self):
             val = getattr(self, f.name)
             if hasattr(val, "copy"):
@@ -86,10 +94,12 @@ class Node():
             setattr(new, f.name, val)
         return new
 
-    def edge_in_dir(self, dir:Direction)->_EdgeIndicator:
-        assert isinstance(dir, Direction), f"Not an expected type '{type(dir)}'"
+
+    def edge_in_dir(self, dir:LatticeDirection)->EdgeIndicatorType:
+        assert isinstance(dir, LatticeDirection), f"Not an expected type '{type(dir)}'"
         index = self.directions.index(dir)
         return self.edges[index]
+    
     
     def permute(self, axes:list[int]):
         """Like numpy.transpose but permutes "physical_tensor", "fused_tensor", "edges" & "direction" all together
@@ -102,6 +112,7 @@ class Node():
         self.edges = lists.rearrange(self.edges, axes)
         self.directions = lists.rearrange(self.directions, axes)      
 
+
     def validate(self)->None:
         # Generic validation error message:
         _failed_validation_error_msg = f"Node at index {self.index} failed its validation."
@@ -111,10 +122,11 @@ class Node():
         # check all directions are different:
         assert len(self.directions)==len(set(self.directions)), _failed_validation_error_msg+f"\nNot all directions are different: {self.directions}"
          
+         
     def plot(self)->None:
         ## Some special imports:
         from matplotlib import pyplot as plt
-        from tensor_networks.directions import unit_vector_from_angle
+        from lattices.directions import unit_vector_from_angle
         from utils import visuals
                 
         plt.figure()
@@ -134,9 +146,10 @@ class Node():
         
         visuals.draw_now()
 
+
     @classmethod
-    def empty(cls)->"Node":
-        return Node(
+    def empty(cls)->"TensorNode":
+        return TensorNode(
             is_ket=False,
             tensor=np.zeros((2,2)),
             functionality=NodeFunctionality.Undefined,
@@ -145,11 +158,12 @@ class Node():
             pos=(0,0),
             index=-1,
             name="",
-            on_boundary=[]
+            boundaries=[]
         )
         
+        
     def __eq__(self, other)->bool:
-        assert isinstance(other, Node), "Must be same Node type for comparison"
+        assert isinstance(other, TensorNode), "Must be same Node type for comparison"
         if self.physical_tensor is None and other.physical_tensor is not None:
             return False
         if self.physical_tensor is not None and other.physical_tensor is None:

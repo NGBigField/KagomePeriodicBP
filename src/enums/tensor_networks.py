@@ -11,16 +11,7 @@ class CoreCellType(Enum):
     A = auto()
     B = auto()
     C = auto()
-    NoCore = auto()
+    NoneLattice = auto()
 
-
-class InitialTNMode(Enum):
-    _SimpleUpdateResult = auto()
-    SpecialTensor = auto()
-    Random = auto()
-    
-    @classmethod
-    def SimpleUpdateResult(cls, h:float)->"InitialTNMode":
-        obj = cls._SimpleUpdateResult
-        obj.h = h
-        return obj
+    def __str__(self) -> str:
+        return self.name

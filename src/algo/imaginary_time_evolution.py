@@ -21,7 +21,7 @@ from containers import Config
 
 # Import need types:
 from enums import UpdateModes, Directions, InitialTNMode
-from tensor_networks import TensorNetwork, NodeFunctionality, Node
+from tensor_networks import KagomeTensorNetwork, NodeFunctionality, TensorNode
 
 # Common errors:
 from lib.ITE import ITEError
@@ -131,7 +131,7 @@ def _print_or_log_bp_message(config:BPConfig, not_converged_causes_error:bool, s
             logger.warn(space+_msg)
 
 
-def _core_to_big_open_tn(core:TensorNetwork, tn_config:TNSizesAndDimensions) -> TensorNetwork:
+def _core_to_big_open_tn(core:KagomeTensorNetwork, tn_config:TNSizesAndDimensions) -> KagomeTensorNetwork:
     assert tn_config.core_size == core.original_lattice_dims[0] == core.original_lattice_dims[1]
     repeats = assertions.odd(tn_config.big_lattice_size/tn_config.core_size)
     return repeat_core(core, repeats=repeats)
@@ -189,7 +189,7 @@ def get_imaginary_time_evolution_operator(h:np.ndarray, delta_t:float)->tuple[np
     return h, g
 
 
-def _duplicate_to_core(core1:Node, core2:Node, update_mode:UpdateModes, config:Config)->TensorNetwork:
+def _duplicate_to_core(core1:TensorNode, core2:TensorNode, update_mode:UpdateModes, config:Config)->KagomeTensorNetwork:
     """ Arrange 2 cell tensors into a 2x2 core.
 
     core tensor network is of basic cell
@@ -294,16 +294,16 @@ def _fix_config_if_bp_struggled(config:Config, bp_stats:BPStats, logger:logs.Log
 
 
 def update_core_tensors(
-    mode_tn:TensorNetwork,
-    core1:Node,
-    core2:Node,
+    mode_tn:KagomeTensorNetwork,
+    core1:TensorNode,
+    core2:TensorNode,
     environment_tensors:list[np.ndarray],
     ite_config:ITEConfig,
     delta_t:float,
     logger:logs.Logger
 )->tuple[
-    Node,  # core1
-    Node,  # core2 
+    TensorNode,  # core1
+    TensorNode,  # core2 
     float, # energy
     MatrixMetrics # env_data
 ]:
@@ -376,14 +376,14 @@ def update_core_tensors(
 
 @decorators.add_stats()
 def ite_per_mode(
-    core:TensorNetwork,
+    core:KagomeTensorNetwork,
     messages:_BPMessagesType|None,
     delta_t:float,
     logger:logs.Logger,
     config:Config,
     update_mode:UpdateModes
 )->tuple[
-    TensorNetwork,          # core
+    KagomeTensorNetwork,          # core
     _BPMessagesType,        # messages
     float,                  # edge_energy
     ITEPerModeStats         # Stats
@@ -400,7 +400,7 @@ def ite_per_mode(
     config = _fix_config_if_bp_struggled(config, bp_stats, logger)
 
     ## Reduce to core and its close environment:   
-    core1, core2, environment, tn_mode = calc_edge_environment(tn_stable, side=update_mode, bubblecon_trunc_dim=config.bubblecon_trunc_dim, method=config.reduce2edge_method)
+    core1, core2, environment, tn_mode = calc_edge_environment(tn_stable, mode=update_mode, bubblecon_trunc_dim=config.bubblecon_trunc_dim, method=config.reduce2edge_method)
     # core1, core2, environment, tn_mode = get_edge_environment_pashtida(tn_stable, side=update_mode, bubblecon_trunc_dim=config.bubblecon_trunc_dim)
     
     ## Perform the update step:
@@ -421,16 +421,16 @@ def ite_per_mode(
 @decorators.add_stats()
 @decorators.multiple_tries(3)
 def ite_segment(
-    core:TensorNetwork,
+    core:KagomeTensorNetwork,
     messages:_BPMessagesType|None,
     delta_t:float,
     logger:logs.Logger,
     config_in:Config,
     prev_stats:ITESegmentStats
 )->tuple[
-    TensorNetwork,          # core
+    KagomeTensorNetwork,          # core
     _BPMessagesType,        # messages
-    TensorNetwork,          # tn_stable
+    KagomeTensorNetwork,          # tn_stable
     ITESegmentStats         # stats
 ]:
 
@@ -472,10 +472,10 @@ def ite_segment(
 
 # @decorators.multiple_tries(3)
 def ite_per_delta_t(
-    core:TensorNetwork, messages:_BPMessagesType|None, delta_t:float, num_repeats:int, config:Config, 
+    core:KagomeTensorNetwork, messages:_BPMessagesType|None, delta_t:float, num_repeats:int, config:Config, 
     plots:ITEPlots, logger:logs.Logger, tracker:ITEProgressTracker, step_stats:ITESegmentStats
 ) -> tuple[
-    TensorNetwork, _BPMessagesType|None, bool, ITESegmentStats
+    KagomeTensorNetwork, _BPMessagesType|None, bool, ITESegmentStats
     # core, messages, at_least_one_succesful_run, step_stats
 ]:
 
@@ -528,11 +528,11 @@ def ite_per_delta_t(
 
 
 def full_ite(
-    initial_core:TensorNetwork|None=None,
+    initial_core:KagomeTensorNetwork|None=None,
     config:Config|None=None,
     logger:logs.Logger|None=None
 )->tuple[
-    TensorNetwork,          # core
+    KagomeTensorNetwork,          # core
     ITEProgressTracker,     # ITE-Tracker
     logs.Logger             # Logger
 ]:
@@ -542,7 +542,7 @@ def full_ite(
         config = Config.from_D(DEFAULT_D)
     if initial_core is None:
         core_in = create_core(config.tn, creation_mode=InitialTNMode.Random, _check_core=False)
-    elif isinstance(initial_core, TensorNetwork):
+    elif isinstance(initial_core, KagomeTensorNetwork):
         core_in = initial_core.copy()
     else:
         raise TypeError(f"Not an expected type for input 'initial_core' of type {type(initial_core)!r}")
@@ -594,11 +594,11 @@ def full_ite(
 
 
 def robust_full_ite(
-    initial_core:TensorNetwork|None=None,
+    initial_core:KagomeTensorNetwork|None=None,
     config:Config|None=None,
     logger:logs.Logger|None=None
 )->tuple[
-    TensorNetwork,          # core
+    KagomeTensorNetwork,          # core
     ITEProgressTracker,     # ITE-Tracker
     logs.Logger             # Logger
 ]:
@@ -607,7 +607,7 @@ def robust_full_ite(
         assert isinstance(config, Config)
         config = deepcopy(config)
     if initial_core is not None:
-        assert isinstance(initial_core, TensorNetwork)
+        assert isinstance(initial_core, KagomeTensorNetwork)
         initial_core = initial_core.copy()
         initial_core.normalize_tensors()
 

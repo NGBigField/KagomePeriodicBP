@@ -1,6 +1,8 @@
-from lattices._common import NodePlaceHolder, LatticeError, OutsideLatticeError
-from tensor_networks.directions import DL, DR, R, UR, UL, L, Direction, all_in_standard_order
+from lattices._common import Node
+from lattices.directions import lattice, block
+from lattices.directions import LatticeDirection, BlockSide
 from typing import Generator
+from _error_types import LatticeError, OutsideLatticeError
 
 
 class TriangularLatticeError(LatticeError): ...
@@ -12,6 +14,12 @@ def total_vertices(N):
 	TN with linear parameter N
 	"""
 	return 3*N*N - 3*N + 1
+
+
+def center_vertex_index(N):
+    i = num_rows(N)//2
+    j = i
+    return get_vertex_index(i, j, N)
 
 
 def num_rows(N):
@@ -28,35 +36,35 @@ def row_width(i, N):
 	
 	return N+i if i<N else 3*N-i-2
 
-def _get_neighbor_coordinates_in_direction_no_boundary_check(i:int, j:int, direction:Direction, N:int)->tuple[int, int]:
+def _get_neighbor_coordinates_in_direction_no_boundary_check(i:int, j:int, direction:LatticeDirection, N:int)->tuple[int, int]:
 	## Simple L or R:
-	if direction==L:  
+	if direction==lattice.L:  
 		return i, j-1
-	if direction==R:  
+	if direction==lattice.R:  
 		return i, j+1
 
 	## Row dependant:
 	middle_row_index = num_rows(N)//2   # above or below middle row
 
-	if direction==UR: 
+	if direction==lattice.UR: 
 		if i <= middle_row_index: 
 			return i-1, j
 		else: 
 			return i-1, j+1
 	
-	if direction==UL:
+	if direction==lattice.UL:
 		if i <= middle_row_index:
 			return i-1, j-1
 		else:
 			return i-1, j
 		
-	if direction==DL:
+	if direction==lattice.DL:
 		if i < middle_row_index:
 			return i+1, j
 		else:
 			return i+1, j-1
 		
-	if direction==DR:
+	if direction==lattice.DR:
 		if i < middle_row_index:
 			return i+1, j+1
 		else:
@@ -65,8 +73,36 @@ def _get_neighbor_coordinates_in_direction_no_boundary_check(i:int, j:int, direc
 	TriangularLatticeError(f"Impossible direction {direction!r}")
 
 
+def check_boundary_vertex(index:int, N)->list[BlockSide]:
+	on_boundaries = []
 
-def get_neighbor_coordinates_in_direction(i:int, j:int, direction:Direction, N:int)->tuple[int, int]:
+	# Basic Info:
+	i, j = get_vertex_coordinates(index, N)
+	height = num_rows(N)
+	width = row_width(i,N)
+	middle_row_index = height//2
+
+	# Boundaries:
+	if i==0:
+		on_boundaries.append(block.U)
+	if i==height-1:
+		on_boundaries.append(block.D)
+	if j==0: 
+		if i<=middle_row_index:
+			on_boundaries.append(block.UL)
+		if i>=middle_row_index:
+			on_boundaries.append(block.DL)
+	if j == width-1:
+		if i<=middle_row_index:
+			on_boundaries.append(block.UR)
+		if i>=middle_row_index:
+			on_boundaries.append(block.DR)
+	
+	return on_boundaries
+
+
+
+def get_neighbor_coordinates_in_direction(i:int, j:int, direction:LatticeDirection, N:int)->tuple[int, int]:
 	i2, j2 = _get_neighbor_coordinates_in_direction_no_boundary_check(i, j, direction, N)
 
 	if i2<0 or i2>=num_rows(N):
@@ -78,14 +114,14 @@ def get_neighbor_coordinates_in_direction(i:int, j:int, direction:Direction, N:i
 	return i2, j2
 
 
-def get_neighbor(i:int, j:int, direction:Direction, N:int)->tuple[int, int]:	
+def get_neighbor(i:int, j:int, direction:LatticeDirection, N:int)->tuple[int, int]:	
 	i2, j2 = get_neighbor_coordinates_in_direction(i, j, direction, N)
 	return get_vertex_index(i2, j2, N)
 
 
-def all_neighbors(index:int, N:int)->Generator[tuple[NodePlaceHolder, Direction], None, None]:
+def all_neighbors(index:int, N:int)->Generator[tuple[Node, LatticeDirection], None, None]:
 	i, j = get_vertex_coordinates(index, N)
-	for direction in all_in_standard_order():
+	for direction in LatticeDirection.all_in_counter_clockwise_order():
 		try: 
 			neighbor = get_neighbor(i, j, direction, N)
 		except OutsideLatticeError:
@@ -131,7 +167,7 @@ def get_vertex_index(i,j,N):
 def get_node_position(i,j,N):
 	w = row_width(i, N)
 	x = N - w + 2*j	
-	y = 2*N - i
+	y = N - i
 	return x, y
 
 
@@ -570,7 +606,7 @@ def rotate_ACW(N, ijs, ij_to_hex, hex_to_ij):
 
     
 
-def create_triangle_lattice(N)->list[NodePlaceHolder]:
+def create_triangle_lattice(N)->list[Node]:
 
 	"""
 	The structure of every node in the list is:
@@ -623,11 +659,11 @@ def create_triangle_lattice(N)->list[NodePlaceHolder]:
 	for i in range(2*N-1):
 		w = row_width(i,N)
 		for j in range(w):
-			n = NodePlaceHolder(
+			n = Node(
 				index = index,
 				pos = get_node_position(i, j, N),
 				edges = edges_list[index],
-				directions=[L, R, UL, UR, DL, DR]
+				directions=[lattice.L, lattice.R, lattice.UL, lattice.UR, lattice.DL, lattice.DR]
 			)
 			nodes_list.append(n)
 			index += 1
