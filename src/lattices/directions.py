@@ -50,7 +50,7 @@ class Direction():
         return self.name
     
     def __repr__(self) -> str:
-        return f"Direction {self.name!r} {self.angle}"
+        return f"{self.__class__.__name__} {self.name!r} {self.angle}"
     
     def __eq__(self, other: object) -> bool:
         # Type check:
@@ -65,59 +65,99 @@ class Direction():
         return False
     
     def __hash__(self) -> int:
-        return hash((self.name, self.angle))
+        return hash((self.__class__.__name__, self.name))
 
     def opposite(self)->"Direction":
         return OppositeDirections[self]
-
+    
     def next_clockwise(self)->"Direction":
-        return lists.next_item_cyclic(LatticeDirectionsInClockwiseOrder, self)
+        return lists.next_item_cyclic(ORDERED_LISTS[type(self)], self)
 
     def next_counterclockwise(self)->"Direction":
-        return lists.prev_item_cyclic(LatticeDirectionsInClockwiseOrder, self)
+        return lists.prev_item_cyclic(ORDERED_LISTS[type(self)], self)
     
-    @staticmethod
-    def from_angle(angle:float)->"Direction":
-        for dir in LatticeDirectionsInClockwiseOrder:
+    @classmethod
+    def from_angle(cls, angle:float)->"Direction":
+        for dir in ORDERED_LISTS[cls]:
             if _dist(dir.angle, angle)<EPSILON:
                 return dir
         raise DirectionError(f"Given angle does not match with any known side")
-            
     
+    @classmethod
+    def random(cls)->"Direction":
+        return lists.random_item(ORDERED_LISTS[cls])
+
+
+class LatticeDirection(Direction): ...    
+class BlockSide(Direction): ...
+
+            
+
     
 # ============================================================================ #
 #|                            Main Directions                                 |#
 # ============================================================================ #    
 
 # Main direction in the Kagome lattice:
-R  : Final[Direction] = Direction("R" , 0)
-UR : Final[Direction] = Direction("UR", pi/3)
-UL : Final[Direction] = Direction("UL", 2*pi/3)
-L  : Final[Direction] = Direction("L" , pi)
-DL : Final[Direction] = Direction("DL", 4*pi/3)
-DR : Final[Direction] = Direction("DR", 5*pi/3)
+R  : Final[LatticeDirection] = LatticeDirection("R" , 0)
+UR : Final[LatticeDirection] = LatticeDirection("UR", pi/3)
+UL : Final[LatticeDirection] = LatticeDirection("UL", 2*pi/3)
+L  : Final[LatticeDirection] = LatticeDirection("L" , pi)
+DL : Final[LatticeDirection] = LatticeDirection("DL", 4*pi/3)
+DR : Final[LatticeDirection] = LatticeDirection("DR", 5*pi/3)
 
 # Directions that apear in the hexagonal cell:
-U  : Final[Direction] = Direction("U", pi/2)
-D  : Final[Direction] = Direction("D", 3*pi/2)
+block_U  : Final[BlockSide] = BlockSide("U", pi/2)
+block_D  : Final[BlockSide] = BlockSide("D", 3*pi/2)
+block_UR : Final[BlockSide] = BlockSide("UR", pi/3)
+block_UL : Final[BlockSide] = BlockSide("UL", 2*pi/3)
+block_DL : Final[BlockSide] = BlockSide("DL", 4*pi/3)
+block_DR : Final[BlockSide] = BlockSide("DR", 5*pi/3)
 
 # ============================================================================ #
 #|                        Relations between Directions                        |#
 # ============================================================================ #    
 
 LatticeDirectionsInClockwiseOrder : Final[list[Direction]] = [DL, DR, R, UR, UL, L]
-HexagonalBlockDirections : Final[list[Direction]] = [D, DR, UR, U, UL, DL]
+HexagonalBlockDirectionsInClockwiseOrder : Final[list[Direction]] = [block_U, block_D, block_UR, block_UL, block_DL, block_DR]
+
+ORDERED_LISTS = {
+    LatticeDirection : LatticeDirectionsInClockwiseOrder,
+    BlockSide : HexagonalBlockDirectionsInClockwiseOrder
+}
 
 OppositeDirections : Final[dict[Direction, Direction]] = {
+    # Lattice:
     R  : L ,
     UR : DL,
     UL : DR, 
     L  : R ,
     DL : UR,
     DR : UL,
-    U  : D,
-    D  : U,
+    # Block:
+    block_U  : block_D,
+    block_D  : block_U,
+    block_UR : block_DL,
+    block_DL : block_UR,
+    block_UL : block_DR,
+    block_DR : block_UL
 }
+
+class lattice:
+    R   = R
+    UR  = UR
+    UL  = UL
+    L   = L
+    DL  = DL
+    DR  = DR    
+    
+class block:
+    U   = block_U
+    D   = block_D
+    UL  = block_UL
+    DL  = block_DL
+    UR  = block_UR
+    DR  = block_DR    
 
 
 # ============================================================================ #
@@ -130,8 +170,6 @@ MAX_DIRECTIONS_STR_LENGTH = max([len(str(side.name)) for side in LatticeDirectio
 #|                           Declared Function                                |#
 # ============================================================================ #
 
-def random()->Direction:
-    return lists.random_item(LatticeDirectionsInClockwiseOrder)
 
 
 def iterator_with_str_output(output_func:Callable[[str], Any])->Generator[Direction, None, None]:
@@ -165,4 +203,4 @@ def lattice_directions_in_standard_order()->Generator[Direction, None, None]:
 
 
 def hexagonal_block_boundaries()->Generator[Direction, None, None]:
-    return iter(HexagonalBlockDirections)
+    return iter(HexagonalBlockDirectionsInClockwiseOrder)

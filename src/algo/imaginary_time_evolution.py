@@ -400,7 +400,7 @@ def ite_per_mode(
     config = _fix_config_if_bp_struggled(config, bp_stats, logger)
 
     ## Reduce to core and its close environment:   
-    core1, core2, environment, tn_mode = calc_edge_environment(tn_stable, side=update_mode, bubblecon_trunc_dim=config.bubblecon_trunc_dim, method=config.reduce2edge_method)
+    core1, core2, environment, tn_mode = calc_edge_environment(tn_stable, mode=update_mode, bubblecon_trunc_dim=config.bubblecon_trunc_dim, method=config.reduce2edge_method)
     # core1, core2, environment, tn_mode = get_edge_environment_pashtida(tn_stable, side=update_mode, bubblecon_trunc_dim=config.bubblecon_trunc_dim)
     
     ## Perform the update step:

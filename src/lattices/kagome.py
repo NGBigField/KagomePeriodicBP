@@ -8,9 +8,8 @@ from lattices import triangle as triangle_lattice
 from lattices import edges
 from lattices._common import NodePlaceHolder
 from lattices import directions
-from lattices.directions import Direction
-from lattices.directions import DL, DR, R, UR, UL, L  # main kagome directions
-from lattices.directions import U, D  # used for hexagonal cell boundaries
+from lattices.directions import LatticeDirection, BlockSide, lattice, block
+from lattices.directions import L, R, UL, UR, DL, DR  # Lattice directions:
 
 from _error_types import LatticeError, DirectionError
 from _types import EdgeIndicator
@@ -74,22 +73,22 @@ def edge_name_from_indices(i1:int, i2:int)->str:
         raise ValueError("Indices must be of different nodes") 
 
 
-def _derive_node_directions(field:str)->list[Direction]:
+def _derive_node_directions(field:str)->list[LatticeDirection]:
     match field:
-        case "up"   : return [UL, DL, DR, UR]
-        case "left" : return [L, DL, R, UR]
-        case "right": return [UL, L, DR, R]
+        case "up"   : return [lattice.UL, lattice.DL, lattice.DR, lattice.UR]
+        case "left" : return [lattice.L, lattice.DL, lattice.R, lattice.UR]
+        case "right": return [lattice.UL, lattice.L, lattice.DR, lattice.R]
         case _: raise ValueError(f"Unexpected string {field!r}")
 
 
-def _tag_boundary_nodes(triangle:UpperTriangle, boundary:Direction)->None:
+def _tag_boundary_nodes(triangle:UpperTriangle, boundary:BlockSide)->None:
     touching_nodes : list[NodePlaceHolder] = []
-    if   boundary is U:     touching_nodes = [triangle.up]
-    elif boundary is DL:    touching_nodes = [triangle.left]
-    elif boundary is DR:    touching_nodes = [triangle.right]
-    elif boundary is D:     touching_nodes = [triangle.left, triangle.right]
-    elif boundary is UR:    touching_nodes = [triangle.up, triangle.right]
-    elif boundary is UL:    touching_nodes = [triangle.up, triangle.left]
+    if   boundary is block.U:     touching_nodes = [triangle.up]
+    elif boundary is block.DL:    touching_nodes = [triangle.left]
+    elif boundary is block.DR:    touching_nodes = [triangle.right]
+    elif boundary is block.D:     touching_nodes = [triangle.left, triangle.right]
+    elif boundary is block.UR:    touching_nodes = [triangle.up, triangle.right]
+    elif boundary is block.UL:    touching_nodes = [triangle.up, triangle.left]
     else: 
         raise DirectionError()
 
@@ -130,39 +129,39 @@ def _connect_kagome_nodes_inside_triangle(upper_triangle:UpperTriangle)->None:
         right.edges[right.directions.index(L)] = edge_name   
 
 
-def _name_outer_edges(node:NodePlaceHolder, order_ind:int, boundary:Direction, kagome_lattice:list[NodePlaceHolder], N:int)->None:
+def _name_outer_edges(node:NodePlaceHolder, order_ind:int, boundary:BlockSide, kagome_lattice:list[NodePlaceHolder], N:int)->None:
     upper_triangle = get_upper_triangle(node.index, kagome_lattice, N)
     _edge_name = lambda ind: f"{boundary}-{ind}"
 
-    if boundary is D:     
+    if boundary is block.D:     
         if   node is upper_triangle.left:   node.set_edge_in_direction(DL, _edge_name(order_ind))
         elif node is upper_triangle.right:  node.set_edge_in_direction(DR, _edge_name(order_ind))
         else:
             raise LatticeError()
         
-    elif boundary is DR:    
+    elif boundary is block.DR:    
         assert node is upper_triangle.right
         node.set_edge_in_direction(DR, _edge_name(2*order_ind))
         node.set_edge_in_direction(R, _edge_name(2*order_ind+1))
 
-    elif boundary is UR:    
+    elif boundary is block.UR:    
         if   node is upper_triangle.right:  node.set_edge_in_direction(R,  _edge_name(order_ind))
         elif node is upper_triangle.up:     node.set_edge_in_direction(UR, _edge_name(order_ind))
         else: 
             raise LatticeError()
 
-    elif boundary is U:     
+    elif boundary is block.U:     
         assert node is upper_triangle.up
         node.set_edge_in_direction(UR, _edge_name(2*order_ind))
         node.set_edge_in_direction(UL, _edge_name(2*order_ind+1))
 
-    elif boundary is UL:    
+    elif boundary is block.UL:    
         if   node is upper_triangle.up:     node.set_edge_in_direction(UL, _edge_name(order_ind))
         elif node is upper_triangle.left:   node.set_edge_in_direction(L,  _edge_name(order_ind))
         else: 
             raise LatticeError()
 
-    elif boundary is DL:    
+    elif boundary is block.DL:    
         assert node is upper_triangle.left
         node.set_edge_in_direction(L,  _edge_name(2*order_ind))
         node.set_edge_in_direction(DL, _edge_name(2*order_ind+1))
@@ -171,7 +170,7 @@ def _name_outer_edges(node:NodePlaceHolder, order_ind:int, boundary:Direction, k
         raise DirectionError("Not a possible hexagonal lattice direction")    
 
 
-def _connect_kagome_nodes_between_triangles(triangle1:UpperTriangle, triangle2:UpperTriangle, direction1to2:Direction)->None:
+def _connect_kagome_nodes_between_triangles(triangle1:UpperTriangle, triangle2:UpperTriangle, direction1to2:LatticeDirection)->None:
     """ 
     Given two upper triangles `triangle1` and `triangle2`, 
     where the `triangle2` is in direction `direction1to2` relative to `triangle1`,
@@ -213,17 +212,17 @@ def _connect_kagome_nodes_between_triangles(triangle1:UpperTriangle, triangle2:U
     n1.edges[leg_index1] = edge_name
     n2.edges[leg_index2] = edge_name
 
-def sorted_boundary_nodes(nodes:list[NodePlaceHolder], boundary:Direction)->list[NodePlaceHolder]:
+def sorted_boundary_nodes(nodes:list[NodePlaceHolder], boundary:BlockSide)->list[NodePlaceHolder]:
     # Get relevant nodes:
     boundary_nodes = [node for node in nodes if boundary in node.boundaries]
 
     # Choose sorting key:
-    if   boundary is U:     sorting_key = lambda node: -node.pos[0]
-    elif boundary is UR:    sorting_key = lambda node: +node.pos[1] 
-    elif boundary is DR:    sorting_key = lambda node: +node.pos[1]
-    elif boundary is UL:    sorting_key = lambda node: -node.pos[1]
-    elif boundary is DL:    sorting_key = lambda node: -node.pos[1]
-    elif boundary is D:     sorting_key = lambda node: +node.pos[0]
+    if   boundary is block.U:     sorting_key = lambda node: -node.pos[0]
+    elif boundary is block.UR:    sorting_key = lambda node: +node.pos[1] 
+    elif boundary is block.DR:    sorting_key = lambda node: +node.pos[1]
+    elif boundary is block.UL:    sorting_key = lambda node: -node.pos[1]
+    elif boundary is block.DL:    sorting_key = lambda node: -node.pos[1]
+    elif boundary is block.D:     sorting_key = lambda node: +node.pos[0]
     else:
         raise DirectionError(f"Impossible direction {boundary!r}")
 
@@ -292,8 +291,8 @@ def create_kagome_lattice(
         for i, node in enumerate(sorted_nodes):
             _name_outer_edges(node, i, boundary, kagome_lattice, N)
     # The bottom-left node is falsely on its DL leg, fix it:
-    bottom_left_corner_node = sorted_boundary_nodes(kagome_lattice, D)[0]
-    bottom_left_corner_node.set_edge_in_direction(DL, f"{D}-0")
+    bottom_left_corner_node = sorted_boundary_nodes(kagome_lattice, block.D)[0]
+    bottom_left_corner_node.set_edge_in_direction(DL, f"{block.D}-0")
 
     
     ## Plot test:
@@ -321,7 +320,7 @@ class KagomeLattice():
         return zip(self.nodes, triangles_repeated_3_times, strict=True)
     
     
-    def get_neighbor(self, node:NodePlaceHolder, edge_or_dir:EdgeIndicator|Direction)->NodePlaceHolder:
+    def get_neighbor(self, node:NodePlaceHolder, edge_or_dir:EdgeIndicator|LatticeDirection)->NodePlaceHolder:
         if isinstance(edge_or_dir, EdgeIndicator):
             edge = edge_or_dir
         elif isinstance(edge_or_dir, Direction):

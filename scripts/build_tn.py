@@ -7,11 +7,13 @@ from utils import visuals
 
 # Tensor-Networks creation:
 from src.lattices.kagome import create_kagome_lattice
+from src.lattices import directions
 from src.tensor_networks.construction import create_kagome_tn
 
 # MPS Messages:
 from algo.belief_propagation import initial_message
 from enums import MessageModel
+from algo.tensor_network import connect_messages_with_tn
 
 
 def draw_lattice():
@@ -49,13 +51,15 @@ def add_messages():
     
     tn.validate()
         
-    message = initial_message(D=D, num_edge_tensors=tn.num_message_connections)    
-
 
     messages = { 
-        edge_side: (initial_message(bp_config.init_msg, virtual_dim, num_edge_tensors), edge_side.next_counterclockwise() ) \
-        for edge_side in Directions.all_in_counterclockwise_order()  \
+        edge_side: (initial_message(D=D, num_edge_tensors=tn.num_message_connections), edge_side.next_counterclockwise() ) \
+        for edge_side in directions.hexagonal_block_boundaries()  \
     }
+
+    tn_with_message = connect_messages_with_tn(tn, messages)
+
+    tn_with_message.plot()
 
 
 

@@ -18,7 +18,7 @@ from containers import BPStats, BPConfig
 from _types import MsgDictType
 
 # needed algo:
-from algo.tensor_network import contract_tensor_network, fuse_messages_with_tn
+from algo.tensor_network import contract_tensor_network, connect_messages_with_tn
 
 # initial messages creation:
 from tensor_networks.mps import init_mps_quantum
@@ -101,7 +101,7 @@ def _belief_propagation_step(
     next_messages = {direction.opposite() : mps_data for direction, mps_data in out_messages.items() }
     
     ## Connect new incoming massages to tensor-network:
-    next_tn_with_messages = fuse_messages_with_tn(open_tn, next_messages)
+    next_tn_with_messages = connect_messages_with_tn(open_tn, next_messages)
 
     ## Check error between messages:
     # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:
@@ -134,17 +134,17 @@ def initial_message(
     else:
        raise TypeError(f"Expected `initial_m_mode` to be of type <str> or <MessageModel> enum. Got {type(message_model)}")
     
-    # Initial messages are uniform probability dist'
-    if message_model==MessageModel.UNIFORM_CLASSIC: raise NotADirectoryError("We do not support classical messages in this code")
-        
-    # Initial messages are random probability dist'
-    elif message_model==MessageModel.RANDOM_CLASSIC: raise NotADirectoryError("We do not support classical messages in this code")
-    
+    # Initial messages are random |v><v| quantum states
+    if message_model==MessageModel.RANDOM_QUANTUM: return init_mps_quantum(dims, random=True)
+
     # Initial messages are uniform quantum density matrices
     elif message_model==MessageModel.UNIFORM_QUANTUM: return init_mps_quantum(dims, random=False)
+
+    # Initial messages are uniform probability dist'
+    elif message_model==MessageModel.UNIFORM_CLASSIC: raise NotADirectoryError("We do not support classical messages in this code")
         
-    # Initial messages are random |v><v| quantum states
-    elif message_model==MessageModel.RANDOM_QUANTUM: return init_mps_quantum(dims, random=True)
+    # Initial messages are random probability dist'
+    elif message_model==MessageModel.RANDOM_CLASSIC: raise NotADirectoryError("We do not support classical messages in this code")     
 
     else:
         raise ValueError("Not a valid option")
@@ -202,7 +202,7 @@ def belief_propagation_pashtida(
     messages = {}
     for mps, direction in zip(BP_mps_messages, Direction.all_in_counterclockwise_order(), strict=True):
         messages[direction] = (mps, direction.next_counterclockwise())
-    tn_with_messages = fuse_messages_with_tn(open_tn, messages) 
+    tn_with_messages = connect_messages_with_tn(open_tn, messages) 
     tn_with_messages.validate()
     stats = BPStats( )
 
@@ -241,7 +241,7 @@ def belief_propagation(
     else:                       prog_bar = strings.ProgressBar(max_iterations, "Performing BlockBP...  ")
 
     ## Start with the initial message:
-    tn_with_messages = fuse_messages_with_tn(open_tn, messages)
+    tn_with_messages = connect_messages_with_tn(open_tn, messages)
     if DEBUG_MODE: tn_with_messages.validate()
 
     ## Initial values (In case no iteration will perform, these are the default values)
@@ -300,7 +300,7 @@ def belief_propagation(
         
         else:
             messages = min_messages
-            tn_with_messages = fuse_messages_with_tn(open_tn, messages)            
+            tn_with_messages = connect_messages_with_tn(open_tn, messages)            
 
     # Check result and finish:
     if DEBUG_MODE: tn_with_messages.validate()

@@ -22,7 +22,7 @@ from dataclasses import dataclass, field, fields
 
 # For TN methods and types:
 from tensor_networks.operations import fuse_tensor_to_itself
-from lattices.directions import Direction
+from lattices.directions import LatticeDirection, BlockSide
 from enums import NodeFunctionality, CoreCellType
 
 
@@ -35,10 +35,10 @@ class Node():
     is_ket : bool
     pos : Tuple[PosScalarType, ...]
     edges : list[EdgeIndicator]
-    directions : list[Direction] 
+    directions : list[LatticeDirection] 
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
     core_cell_type : CoreCellType = field(default=CoreCellType.NoneLattice) 
-    boundaries : list[Direction] = field(default_factory=list) 
+    boundaries : list[BlockSide] = field(default_factory=list) 
 
 
     @property
@@ -71,7 +71,7 @@ class Node():
         return np.linalg.norm(self.tensor)
     
     
-    def legs(self) -> Generator[tuple[Direction, EdgeIndicator, int], None, None]:
+    def legs(self) -> Generator[tuple[LatticeDirection, EdgeIndicator, int], None, None]:
         for direction, edge, dim in zip(self.directions, self.edges, self.dims, strict=True):
             yield direction, edge, dim
 
@@ -95,8 +95,8 @@ class Node():
         return new
 
 
-    def edge_in_dir(self, dir:Direction)->EdgeIndicator:
-        assert isinstance(dir, Direction), f"Not an expected type '{type(dir)}'"
+    def edge_in_dir(self, dir:LatticeDirection)->EdgeIndicator:
+        assert isinstance(dir, LatticeDirection), f"Not an expected type '{type(dir)}'"
         index = self.directions.index(dir)
         return self.edges[index]
     

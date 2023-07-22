@@ -12,7 +12,7 @@ if __name__ == "__main__":
 ## Get config:
 from _config_reader import DEBUG_MODE
 
-from lattices.directions import Direction
+from lattices.directions import BlockSide, LatticeDirection
 from lattices import directions
 from tensor_networks.node import Node
 from lattices.edges import edges_dict_from_edges_list
@@ -157,10 +157,10 @@ class KagomeTensorNetwork():
     # ================================================= #
     #|              Geometry Functions                 |#
     # ================================================= #
-    def num_boundary_tensors(self, boundary:Direction)->int:
-        if boundary in [directions.U, directions.DR, directions.DL]:
+    def num_boundary_tensors(self, boundary:BlockSide)->int:
+        if boundary in [directions.block_U, directions.block_DR, directions.block_DL]:
             return self.lattice.N
-        elif boundary in [directions.D, directions.UR, directions.UL]:
+        elif boundary in [directions.block_D, directions.block_UR, directions.block_UL]:
             return 2*self.lattice.N
         else:
             raise directions.DirectionError("Not a possible boundary direction")
@@ -179,8 +179,8 @@ class KagomeTensorNetwork():
         d["positions"] = self.positions
         return d
 
-    def nodes_on_boundary(self, edge_side:Direction)->list[Node]: 
-        return [t for t in self.nodes if edge_side in t.boundaries ] 
+    def nodes_on_boundary(self, side:BlockSide)->list[Node]: 
+        return [t for t in self.nodes if side in t.boundaries ] 
 
     def nodes_connected_to_edge(self, edge:str)->list[Node]:
         indices = self.edges[edge]
@@ -197,9 +197,9 @@ class KagomeTensorNetwork():
         else:
             raise TensorNetworkError(f"Couldn't find a neighbor due to a bug with the tensors connected to the same edge '{edge}'")
         
-    def find_neighbor(self, node:Node, dir:Direction|EdgeIndicator|None)->Node:
+    def find_neighbor(self, node:Node, dir:LatticeDirection|EdgeIndicator|None)->Node:
         # Get edge of this node:
-        if isinstance(dir, Direction):
+        if isinstance(dir, LatticeDirection):
             edge = node.edge_in_dir(dir)
         elif isinstance(dir, EdgeIndicator):
             edge = dir
