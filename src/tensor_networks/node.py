@@ -22,7 +22,7 @@ from dataclasses import dataclass, field, fields
 
 # For TN methods and types:
 from tensor_networks.operations import fuse_tensor_to_itself
-from lattices.directions import LatticeDirection, BlockSide
+from lattices.directions import LatticeDirection, BlockSide, Direction
 from enums import NodeFunctionality, CoreCellType
 
 
@@ -95,8 +95,8 @@ class TensorNode():
         return new
 
 
-    def edge_in_dir(self, dir:LatticeDirection)->EdgeIndicatorType:
-        assert isinstance(dir, LatticeDirection), f"Not an expected type '{type(dir)}'"
+    def edge_in_dir(self, dir:Direction)->EdgeIndicatorType:
+        assert isinstance(dir, Direction), f"Not an expected type '{type(dir)}'"
         index = self.directions.index(dir)
         return self.edges[index]
     

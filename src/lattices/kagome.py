@@ -373,13 +373,7 @@ class KagomeLattice():
         assert len(boundary_nodes)==num_boundary_nodes
 
         # Logic of participating directions:
-        match boundary:
-            case block.D : participating_directions = [lattice.DL, lattice.DR]
-            case block.DR: participating_directions = [lattice.DR, lattice.R ]
-            case block.UR: participating_directions = [lattice.R,  lattice.UR]
-            case block.U : participating_directions = [lattice.UR, lattice.UL]
-            case block.UL: participating_directions = [lattice.UL, lattice.L ]
-            case block.DL: participating_directions = [lattice.L , lattice.DL]
+        participating_directions = boundary.matching_lattice_directions()
 
         # Logic of participating edges and nodes:
         omit_last_edge = num_boundary_nodes==self.N

@@ -126,6 +126,12 @@ class LatticeDirection(Direction): ...
 class BlockSide(Direction):
     def orthogonal_counterclockwise_lattice_direction(self)->LatticeDirection:
         return ORTHOGONAL_LATTICE_DIRECTIONS_TO_BLOCK_SIDES[self]
+    
+    def matching_lattice_directions(self)->list[LatticeDirection]:
+        return MATCHING_LATTICE_DIRECTIONS_TO_BLOCK_SIDES[self]
+    
+    def opposite_lattice_directions(self)->list[LatticeDirection]:
+        return [dir.opposite() for dir in MATCHING_LATTICE_DIRECTIONS_TO_BLOCK_SIDES[self]]
 
             
 
@@ -148,6 +154,23 @@ block_UL : Final[BlockSide] = BlockSide("UL", pi/2+pi/3)
 block_D  : Final[BlockSide] = BlockSide("D", 3*pi/2)
 block_DL : Final[BlockSide] = BlockSide("DL", 3*pi/2-pi/3)
 block_DR : Final[BlockSide] = BlockSide("DR", 3*pi/2+pi/3)
+
+
+class lattice:
+    R   = R
+    UR  = UR
+    UL  = UL
+    L   = L
+    DL  = DL
+    DR  = DR    
+    
+class block:
+    U   = block_U
+    D   = block_D
+    UL  = block_UL
+    DL  = block_DL
+    UR  = block_UR
+    DR  = block_DR    
 
 # ============================================================================ #
 #|                        Relations between Directions                        |#
@@ -187,21 +210,16 @@ ORTHOGONAL_LATTICE_DIRECTIONS_TO_BLOCK_SIDES : Final[dict[BlockSide, LatticeDire
     block_UL : DL
 }
 
-class lattice:
-    R   = R
-    UR  = UR
-    UL  = UL
-    L   = L
-    DL  = DL
-    DR  = DR    
-    
-class block:
-    U   = block_U
-    D   = block_D
-    UL  = block_UL
-    DL  = block_DL
-    UR  = block_UR
-    DR  = block_DR    
+MATCHING_LATTICE_DIRECTIONS_TO_BLOCK_SIDES : Final[dict[BlockSide, list[LatticeDirection]]] = {
+    block_D  : [DL, DR],
+    block_DR : [DR, R ],
+    block_UR : [R,  UR],
+    block_U  : [UR, UL],
+    block_UL : [UL, L ],
+    block_DL : [L , DL]
+}
+
+
 
 
 # ============================================================================ #
@@ -215,9 +233,28 @@ MAX_DIRECTIONS_STR_LENGTH = 2
 # ============================================================================ #
 
 class check:
-    def is_orthogonal(dir1:Direction, dir2:Direction):
+    def is_orthogonal(dir1:Direction, dir2:Direction)->bool:
         dir1_ortho_options = [dir1.angle+pi/2, dir1.angle-pi/2]
         for dir1_ortho in dir1_ortho_options:
             if _angle_dist(dir1_ortho, dir2.angle)<EPSILON:
                 return True
         return False
+    
+    def is_opposite(dir1:Direction, dir2:Direction)->bool:
+        if isinstance(dir1, BlockSide) and isinstance(dir2, LatticeDirection):
+            lattice_options = dir1.opposite_lattice_directions()
+            lattice_dir = dir2
+            mixed_cased = True
+        elif isinstance(dir2, BlockSide) and isinstance(dir1, LatticeDirection) :
+            lattice_options = dir2.opposite_lattice_directions()
+            lattice_dir = dir1
+            mixed_cased = True
+        else:
+            mixed_cased = False
+
+        if mixed_cased:
+            return lattice_dir in lattice_options
+        else:
+            return dir1.opposite() is dir2
+
+            

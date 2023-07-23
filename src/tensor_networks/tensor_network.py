@@ -13,7 +13,7 @@ if __name__ == "__main__":
 from _config_reader import DEBUG_MODE
 
 # Directions:
-from lattices.directions import BlockSide, LatticeDirection
+from lattices.directions import BlockSide, LatticeDirection, Direction
 from lattices.directions import block, lattice, check
 
 from tensor_networks.node import TensorNode
@@ -247,9 +247,9 @@ class KagomeTensorNetwork():
         else:
             raise TensorNetworkError(f"Couldn't find a neighbor due to a bug with the tensors connected to the same edge '{edge}'")
         
-    def find_neighbor(self, node:TensorNode, dir:LatticeDirection|EdgeIndicatorType|None)->TensorNode:
+    def find_neighbor(self, node:TensorNode, dir:Direction|EdgeIndicatorType|None)->TensorNode:
         # Get edge of this node:
-        if isinstance(dir, LatticeDirection):
+        if isinstance(dir, Direction):
             edge = node.edge_in_dir(dir)
         elif isinstance(dir, EdgeIndicatorType):
             edge = dir
@@ -466,12 +466,13 @@ class KagomeTensorNetwork():
                 # Is neighbors pointing back to us?
                 _neigbor_error_message = _error_message+f"\nnode '{node.name}' is not the neighbor of '{neighbor.name}' on edge '{edge_name}'"
                 opposite_dir = dir.opposite()
+                neighnors_dir = neighbor.directions[neighbor.edges.index(edge_name)]
+                assert check.is_opposite(neighnors_dir, dir)
                 assert self._find_neighbor_by_edge(neighbor, edge_name) is node, _neigbor_error_message
-                # Messages don't pass this check:
-                if NodeFunctionality.Message in [node.functionality, neighbor.functionality] :
-                    continue
-                assert self.find_neighbor(neighbor, opposite_dir) is node, _neigbor_error_message
-                assert neighbor.edge_in_dir(opposite_dir) == edge_name
+                assert self.find_neighbor(neighbor, neighnors_dir) is node, _neigbor_error_message
+                # Messages struggle with this check:
+                if not isinstance(dir, LatticeDirection) and isinstance(neighnors_dir, BlockSide):
+                    assert neighbor.edge_in_dir(opposite_dir) == edge_name
 
         # Check edges:
         for edge_name, node_indices in self.edges.items():
@@ -484,8 +485,8 @@ class KagomeTensorNetwork():
                 raise KeyError(_error_message)
             assert nodes[0].dims[indices_of_this_edge[0]] == nodes[1].dims[indices_of_this_edge[1]] , _error_message
             dir1 = nodes[0].directions[indices_of_this_edge[0]]
-            dir2 = nodes[1].directions[indices_of_this_edge[1]].opposite()
-            assert dir1 == dir2, _error_message
+            dir2 = nodes[1].directions[indices_of_this_edge[1]]
+            assert check.is_opposite(dir1, dir2)
             for node, node_index in zip(nodes, node_indices, strict=True):
                 assert node.index == node_index , _error_message
         # Check lattice dimensions:
