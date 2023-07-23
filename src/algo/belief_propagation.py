@@ -81,16 +81,16 @@ def _belief_propagation_step(
     # prepare inputs:
     fixed_arguments = dict(tn=prev_tn_with_messages, bubblecon_trunc_dim=bp_config.max_swallowing_dim, hermitize=bp_config.hermitize_messages_between_iterations)
     # The message going-out to the left returns from the right as the new incoming message:
-    multi_processing = MULTIPROCESSING and (
+    multi_processing = bp_config.parallel_computing and (
         open_tn.tensor_dims.virtual>2 or bp_config.max_swallowing_dim>=16
     )
     if multi_processing:
         prog_bar.append_extra_str(f" error={_bp_error_str(prev_error)}")
-        directions=list(Direction)
+        directions=BlockSide.all_in_counter_clockwise_order()
         fixed_arguments["print_progress"]=False
         out_messages = parallel_exec.parallel(func=_out_going_message, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
     else:
-        directions=Direction.iterator_with_str_output(lambda s: prog_bar.append_extra_str(s+f" error={_bp_error_str(prev_error)}"))
+        directions=BlockSide.iterator_with_str_output(lambda s: prog_bar.append_extra_str(s+f" error={_bp_error_str(prev_error)}"))
         fixed_arguments["print_progress"] = True
         out_messages = parallel_exec.concurrent(func=_out_going_message, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
 

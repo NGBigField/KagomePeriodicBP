@@ -25,7 +25,7 @@ import lattices.triangle as triangle_lattice
 from _types import EdgeIndicatorType, PosScalarType
 
 from enums import NodeFunctionality
-from utils import assertions, lists, tuples
+from utils import assertions, lists, tuples, numerics
 
 import numpy as np
 from typing import NamedTuple, Generator
@@ -80,8 +80,17 @@ class KagomeTensorNetwork():
     #|                Begaviour Control                |#
     # ================================================= #
     def clear_cache(self)->None:
-        del self.nodes
-        del self.edges
+        # nodes
+        try:    
+            del self.nodes
+        except AttributeError:  
+            pass
+
+        # edges:
+        try:
+            del self.edges
+        except AttributeError:  
+            pass
 
     # ================================================= #
     #|                   Add messages                  |#
@@ -523,6 +532,7 @@ def _derive_message_node_position(nodes_on_boundary:list[Node], edge:EdgeIndicat
     node = next(node for node in nodes_on_boundary if edge in node.edges)
     direction = node.directions[ node.edges.index(edge) ]
     delta = tuples.add(boundary_delta, direction.unit_vector)
+    delta = (numerics.furthest_absolute_integer(delta[0]), numerics.furthest_absolute_integer(delta[1]))
     return tuples.add(node.pos, delta)     
 
 
