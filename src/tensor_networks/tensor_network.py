@@ -381,16 +381,16 @@ class KagomeTensorNetwork():
         else:
             raise TensorNetworkError(f"Couldn't find a neighbor due to a bug with the tensors connected to the same edge '{edge}'")
         
-    def find_neighbor(self, node:TensorNode, dir:Direction|EdgeIndicatorType|None)->TensorNode:
+    def find_neighbor(self, node:TensorNode, dir_or_edge:Direction|EdgeIndicatorType|None)->TensorNode:
         # Get edge of this node:
-        if isinstance(dir, Direction):
-            edge = node.edge_in_dir(dir)
-        elif isinstance(dir, EdgeIndicatorType):
-            edge = dir
-        elif dir is None:
+        if isinstance(dir_or_edge, Direction):
+            edge = node.edge_in_dir(dir_or_edge)
+        elif isinstance(dir_or_edge, EdgeIndicatorType):
+            edge = dir_or_edge
+        elif dir_or_edge is None:
             edge = lists.random_item( node.edges )
         else:
-            raise TypeError(f"Not a valid type of variable `dir`. Given type '{type(dir)}'")
+            raise TypeError(f"Not a valid type of variable `dir`. Given type '{type(dir_or_edge)}'")
         
         # Find neihbor connected with this edge
         return self._find_neighbor_by_edge(node, edge=edge)

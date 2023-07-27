@@ -273,7 +273,7 @@ def swallow_corners(tn:KagomeTensorNetwork, _if_no_corners_error:bool=True)->Kag
         # Find another tensor to swallow this corner-tensor into:
         for direction in Direction.all_in_random_order():
             try:
-                neighbor_in_direction = tn.find_neighbor(t, dir=direction)
+                neighbor_in_direction = tn.find_neighbor(t, dir_or_edge=direction)
             except ValueError:
                 continue
             else:

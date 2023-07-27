@@ -3,6 +3,9 @@ if __name__ == "__main__":
 	sys.path.append(
 		pathlib.Path(__file__).parent.parent.__str__()
 	)
+	sys.path.append(
+		pathlib.Path(__file__).parent.parent.parent.__str__()
+	)
 
 
 
@@ -11,7 +14,7 @@ from _config_reader import DEBUG_MODE
 
 from typing import Callable
 from tensor_networks import KagomeTensorNetwork
-from lattices.directions import Direction, BlockSide
+from lattices.directions import Direction, BlockSide, LatticeDirection
 from enums import ContractionDepth, NodeFunctionality
 from containers import ContractionConfig
 
@@ -61,6 +64,28 @@ def _determine_direction(axis2:list[int], _pos_func:_PosFuncType) -> Direction:
     raise ValueError("The lists are not ordered at all! ): ")
 
 
+def  _sorted_side_outer_edges(
+    tn:KagomeTensorNetwork, direction:BlockSide,
+)->tuple[
+    list[str],
+    list[str]
+]:
+    ## Get all boundary edges. They are sorted to "the right"
+    sorted_right_boundary_edges : dict[BlockSide, list[str]] = {
+        side: tn.lattice.sorted_boundary_edges(side) for side in BlockSide.all_in_counter_clockwise_order()
+    }
+    right_last = direction.next_clockwise()
+    right_first = right_last.next_clockwise()
+    left_last = direction.next_counterclockwise()
+    left_first = left_last.next_counterclockwise()
+
+    ## Right edge orders:
+    right_edges = sorted_right_boundary_edges[right_first] + sorted_right_boundary_edges[right_last]
+    left_edges = sorted_right_boundary_edges[left_last] + sorted_right_boundary_edges[left_first]
+    left_edges.reverse()
+
+    return left_edges, right_edges
+
 
 def derive_contraction_orders(
     tn:KagomeTensorNetwork,  
@@ -74,53 +99,83 @@ def derive_contraction_orders(
     
     #TODO For debug:
     from lattices.directions import block
+    plot_ = True
     direction = block.U
 
     ## Prepare output:
     con_order = []    
 
     # Define Directions:
-    major_forward = direction
-    major_back = major_forward.opposite()
+    major_direction = direction
     minor_right = direction.orthogonal_clockwise_lattice_direction()
-    minor_left = minor_right.opposite()
 
     ## Start by fetching the lattice-nodes in order and the messages:
-    lattice_rows_ordered_right = tn.lattice.nodes_indices_rows_in_direction(major_forward, minor_right)
-    sorted_boundary_edges : dict[BlockSide, list[str]] = {
-        side: tn.lattice.sorted_boundary_edges(side) for side in BlockSide.all_in_counter_clockwise_order()
-    }
+    lattice_rows_ordered_right = tn.lattice.nodes_indices_rows_in_direction(major_direction, minor_right)
+    # Side edges:
+    left_sorted_outer_edges, right_sorted_outer_edges = _sorted_side_outer_edges(tn, major_direction)
+    iterators = dict(
+        left  = (edge for edge in left_sorted_outer_edges+["End"] ),
+        right = (edge for edge in right_sorted_outer_edges+["End"] )
+    )
+    edges = {side: next(iterator) for side, iterator in iterators.items()}
+    append_methods = dict(
+        first = lambda lis, i: lis.insert(0, i),
+        last  = lambda lis, i: lis.append(i)
+    )
+    last_side_msg = dict(
+        left  = False,
+        right = False 
+    )
 
     ## First message:
-    if major_back in tn.messages:
-        first_message_indices = tn.message_indices(major_back)
-        con_order.append(first_message_indices)
+    con_order = tn.message_indices(major_direction.opposite())
 
-    ## with messages?        
+    ## Iterator to switch contraction direction every two rows:
+    reverse_order = itertools.cycle([True, True, False, False])
+
+    ## Lattice and its connected nodes:
     for row in lattice_rows_ordered_right:
+
+        # Node at each side
+        nodes = dict(
+            left  = tn.nodes[row[0]],
+            right = tn.nodes[row[-1]]
+        )
+
+        # which side is first?       
+        is_reverse_order = next(reverse_order)
+        if is_reverse_order:
+            row.reverse()
+            side_order = dict(first='right', last='left')
+        else:
+            side_order = dict(first='left', last='right')
+
         ## Add neighbors if they exist:
-        first, last = tn.nodes[row[0]], tn.nodes[row[-1]]
-    
+        for order in ['first', 'last']:
+            # Collect respective values:
+            side = side_order[order]
+            append_method = append_methods[order]
+            iterator = iterators[side]
+            node = nodes[side]
+            edge = edges[side]
+            # Try to add the next msg node:
+            while edge in node.edges:                
+                neighbor = tn.find_neighbor(node, edge)
+                append_method(row, neighbor.index)
+                try:
+                    edge = next(iterator)
+                except StopIteration:
+                    pass
+                edges[side] = edge
 
+        ## add row to con_order:
+        con_order.extend(row)
 
+    if DEBUG_MODE:
+        assert edges['left']=='End'
+        assert edges['right']=='End'
 
-
-        # First:
-        # try:
-        #     new_first = tn.find_neighbor(first, minor_left)                
-        # except NetworkConnectionError:
-        #     pass
-        # else:
-        #     row.insert(0, new_first.index)   
-        # # Last:
-        # try:
-        #     new_last = tn.find_neighbor(last, minor_right)                
-        # except NetworkConnectionError:
-        #     pass
-        # else:
-        #     row.append(new_last)
-
-
+    ## Plot result:
     if plot_:
         # For plotting contraction order, if needed:
         import matplotlib.pyplot as plt
@@ -129,11 +184,19 @@ def derive_contraction_orders(
         plot_contraction_order(tn.positions, con_order)
         plt.title(f"Contraction in Direction {str(direction)}" )
 
+    ## Last minor-direction of contraction:
+    if is_reverse_order:
+        last_direction = minor_right.opposite()
+    else:
+        last_direction = minor_right
+
     return con_order, last_direction
 
 
 
 if __name__ == "__main__":
-    from scripts.core_ite_test import main
-    main()
+    from project_paths import add_scripts; 
+    add_scripts()
+    from scripts import bp_test
+    bp_test.main_test()
 
