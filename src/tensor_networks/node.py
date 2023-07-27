@@ -15,6 +15,7 @@ from utils import lists
 
 # for type namings:
 from _types import EdgeIndicatorType, PosScalarType
+from _error_types import NetworkConnectionError
 
 # For OOP Style:
 from copy import deepcopy
@@ -97,7 +98,10 @@ class TensorNode():
 
     def edge_in_dir(self, dir:Direction)->EdgeIndicatorType:
         assert isinstance(dir, Direction), f"Not an expected type '{type(dir)}'"
-        index = self.directions.index(dir)
+        try:
+            index = self.directions.index(dir)
+        except Exception as e:
+            raise NetworkConnectionError(f"Direction {dir!r} is not in directions of nodes: {[dir.name for dir in self.directions]}")
         return self.edges[index]
     
     

@@ -9,6 +9,9 @@ from algo.belief_propagation import belief_propagation
 # Config and containers:
 from containers import BPConfig
 
+# Directions defining the lattice and the block:
+from lattices.directions import block, lattice, BlockSide
+
 
 def bp_test(
     d = 2,
@@ -27,9 +30,9 @@ def bp_test(
 
 
     ## With messages:
+    
     from containers import Message
     from algo.belief_propagation import initial_message
-    from lattices.directions import BlockSide
     D = tn.dimensions.virtual_dim
     message_length = tn.num_message_connections
     messages = { 
@@ -40,9 +43,9 @@ def bp_test(
         for edge_side in BlockSide.all_in_counter_clockwise_order()  \
     }
     tn.connect_messages(messages)
-    tn.nodes
+    # tn.plot()
 
-    ## Apply BP:
+
     tn_with_messages, messages, stats = belief_propagation(tn, messages=None, bp_config=bp_config)
 
     print(stats)

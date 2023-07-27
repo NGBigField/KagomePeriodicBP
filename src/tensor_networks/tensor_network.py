@@ -25,7 +25,7 @@ import lattices.triangle as triangle_lattice
 from _types import EdgeIndicatorType, PosScalarType
 
 from enums import NodeFunctionality
-from utils import assertions, lists, tuples, numerics
+from utils import assertions, lists, tuples, numerics, indices
 
 import numpy as np
 from typing import NamedTuple, Generator
@@ -34,7 +34,7 @@ from copy import deepcopy
 import itertools
 import functools
 
-from _error_types import TensorNetworkError, LatticeError, DirectionError
+from _error_types import TensorNetworkError, LatticeError, DirectionError, NetworkConnectionError
 from containers import MessageDictType, Message, TNSizesAndDimensions
 
 from libs.bmpslib import mps as MPS
@@ -52,6 +52,15 @@ def _is_open_edge(edge:tuple[int, int])->bool:
     if edge[0]==edge[1]:    return True
     else:                   return False
 
+functools.cache
+def _derive_message_indices(N:int, direction:BlockSide)->list[int]:
+    # Get info:
+    num_lattice_nodes = triangle_lattice.total_vertices(N)*3
+    message_size = 2*N - 1
+    direction_index_in_order = indices.index_of_first_appearance( BlockSide.all_in_counter_clockwise_order(), direction )
+    # Compute:
+    res = np.arange(message_size) + num_lattice_nodes + message_size*direction_index_in_order
+    return res.tolist()
 
 class KagomeTensorNetwork():
 
@@ -223,11 +232,59 @@ class KagomeTensorNetwork():
     # ================================================= #
     def num_boundary_nodes(self, boundary:BlockSide)->int:
         return self.lattice.num_boundary_nodes(boundary)
-        
+
+    
+    def positions_min_max(self)->tuple[int, ...]:
+        min_x, max_x = lists.min_max([node.pos[0] for node in self.nodes])
+        min_y, max_y = lists.min_max([node.pos[1] for node in self.nodes])
+        return min_x, max_x, min_y, max_y
 
     # ================================================= #
     #|               instance methods                  |#
     # ================================================= #
+   
+    def validate(self)->None:
+        # Generic error message:
+        _error_message = f"Failed validation of tensor-network."
+        # Check each node individually:
+        for node in self.nodes:
+            # Self validation:
+            node.validate()
+            # Validation with neighbors in lattice:
+            for dir in node.directions:
+                edge_name = node.edge_in_dir(dir)
+                if _is_open_edge(self.edges[edge_name]):
+                    continue
+                neighbor = self.find_neighbor(node, dir)
+                # Is neighbors pointing back to us?
+                _neigbor_error_message = _error_message+f"\nnode '{node.name}' is not the neighbor of '{neighbor.name}' on edge '{edge_name}'"
+                opposite_dir = dir.opposite()
+                neighnors_dir = neighbor.directions[neighbor.edges.index(edge_name)]
+                assert check.is_opposite(neighnors_dir, dir)
+                assert self._find_neighbor_by_edge(neighbor, edge_name) is node, _neigbor_error_message
+                assert self.find_neighbor(neighbor, neighnors_dir) is node, _neigbor_error_message
+                # Messages struggle with this check:
+                if not isinstance(dir, LatticeDirection) and isinstance(neighnors_dir, BlockSide):
+                    assert neighbor.edge_in_dir(opposite_dir) == edge_name
+
+        # Check edges:
+        for edge_name, node_indices in self.edges.items():
+            if node_indices[0] == node_indices[1]:  # happens in outer legs (going outside of the lattice without any connection)
+                continue
+            nodes = [self.nodes[ind] for ind in node_indices ]
+            try:
+                indices_of_this_edge = [node.edges.index(edge_name) for node in nodes]
+            except:
+                raise KeyError(_error_message)
+            assert nodes[0].dims[indices_of_this_edge[0]] == nodes[1].dims[indices_of_this_edge[1]] , _error_message
+            dir1 = nodes[0].directions[indices_of_this_edge[0]]
+            dir2 = nodes[1].directions[indices_of_this_edge[1]]
+            assert check.is_opposite(dir1, dir2)
+            for node, node_index in zip(nodes, node_indices, strict=True):
+                assert node.index == node_index , _error_message
+        # Check lattice dimensions:
+        min_x, max_x, min_y, max_y = self.positions_min_max()
+        #TODO Size check
 
     def to_dict(self)->dict:
         d = dict()
@@ -241,6 +298,74 @@ class KagomeTensorNetwork():
     def nodes_on_boundary(self, side:BlockSide)->list[TensorNode]: 
         return [t for t in self.nodes if side in t.boundaries ] 
 
+    def plot(self, detailed:bool=True)->None:
+        from tensor_networks.visualizations import plot_network
+        nodes = self.nodes
+        edges = self.edges
+        plot_network(nodes=nodes, edges=edges, detailed=detailed)
+        
+    def copy(self)->"KagomeTensorNetwork":
+        new = KagomeTensorNetwork(
+            lattice=self.lattice,
+            unit_cell=self.unit_cell.copy(),
+            d=self.dimensions.physical_dim,
+            D=self.dimensions.virtual_dim,
+        )
+
+        if DEBUG_MODE: new.validate()
+        return new
+    
+    def sub_tn(self, indices)->"KagomeTensorNetwork":
+        cls = type(self)
+        
+        ## the nodes in the sub-system must be indexed again:
+        nodes : list[TensorNode] = []
+        for new_index, old_index in enumerate(indices):
+            # Basic info:
+            old_node = self.nodes[old_index]
+            # Create new node:
+            new_node = TensorNode(
+                is_ket=old_node.is_ket,   
+                tensor=old_node.tensor.copy(),
+                functionality=old_node.functionality,
+                edges=deepcopy(old_node.edges),  # These are the old edges names
+                pos=deepcopy(old_node.pos),
+                directions=deepcopy(old_node.directions),
+                index=new_index,
+                name=old_node.name, 
+                boundaries=deepcopy(old_node.on_boundary)
+            )
+            # add to list:
+            nodes.append(new_node)
+        
+        ## The edges of the sub-system are the same, but the node indices must change:
+        edges_list = [node.edges for node in nodes ]
+        edges = edges_dict_from_edges_list(edges_list)
+        
+        ## Fill in boundary information:
+        for node in nodes:
+            for edge in node.edges:
+                pair = edges[edge]
+                if pair[0]==pair[1]:
+                    side = node.directions[node.edges.index(edge)]
+                    assert isinstance(side, LatticeDirection)
+                    node.boundaries.append(side)
+        
+        ## Copy additional straight-forward info:
+        t_dims = self.tensor_dims
+        new = cls(nodes=nodes, edges=edges, _copied=True, tensor_dims=t_dims)
+        min_x, max_x, min_y, max_y = new.positions_min_max()
+        new.original_lattice_dims = ( int(max_y-min_y+1), int(max_x-min_x+1) )
+        return new
+        
+    # ========== # Messages # ============= #                 
+    #=======================================#
+    def message_indices(self, direction:BlockSide)->list[int]:
+        return _derive_message_indices(self.lattice.N, direction)
+
+    # ========== # Neigbours # ============ #                 
+    #=======================================#
+    
     def nodes_connected_to_edge(self, edge:str)->list[TensorNode]:
         indices = self.edges[edge]
         indices = list(set(indices))  # If the tensor apears twice, get only 1 copy of its index.
@@ -276,7 +401,9 @@ class KagomeTensorNetwork():
             if edge in n2.edges:
                 return True
         return False    
-
+    
+    # ========= # Node control # ========== #                 
+    #=======================================#
     def _pop_node(self, ind:int)->TensorNode:
         #TODO should be here?
 
@@ -354,69 +481,7 @@ class KagomeTensorNetwork():
             self.edges[edge] = (ia, ib)
         ## Check:
         if DEBUG_MODE: self.validate()
-       
 
-    def plot(self, detailed:bool=True)->None:
-        from tensor_networks.visualizations import plot_network
-        nodes = self.nodes
-        edges = self.edges
-        plot_network(nodes=nodes, edges=edges, detailed=detailed)
-        
-
-    def copy(self)->"KagomeTensorNetwork":
-        new = KagomeTensorNetwork(
-            lattice=self.lattice,
-            unit_cell=self.unit_cell.copy(),
-            d=self.dimensions.physical_dim,
-            D=self.dimensions.virtual_dim,
-        )
-
-        if DEBUG_MODE: new.validate()
-        return new
-    
-    def sub_tn(self, indices)->"KagomeTensorNetwork":
-        cls = type(self)
-        
-        ## the nodes in the sub-system must be indexed again:
-        nodes : list[TensorNode] = []
-        for new_index, old_index in enumerate(indices):
-            # Basic info:
-            old_node = self.nodes[old_index]
-            # Create new node:
-            new_node = TensorNode(
-                is_ket=old_node.is_ket,   
-                tensor=old_node.tensor.copy(),
-                functionality=old_node.functionality,
-                edges=deepcopy(old_node.edges),  # These are the old edges names
-                pos=deepcopy(old_node.pos),
-                directions=deepcopy(old_node.directions),
-                index=new_index,
-                name=old_node.name, 
-                boundaries=deepcopy(old_node.on_boundary)
-            )
-            # add to list:
-            nodes.append(new_node)
-        
-        ## The edges of the sub-system are the same, but the node indices must change:
-        edges_list = [node.edges for node in nodes ]
-        edges = edges_dict_from_edges_list(edges_list)
-        
-        ## Fill in boundary information:
-        for node in nodes:
-            for edge in node.edges:
-                pair = edges[edge]
-                if pair[0]==pair[1]:
-                    side = node.directions[node.edges.index(edge)]
-                    assert isinstance(side, LatticeDirection)
-                    node.boundaries.append(side)
-        
-        ## Copy additional straight-forward info:
-        t_dims = self.tensor_dims
-        new = cls(nodes=nodes, edges=edges, _copied=True, tensor_dims=t_dims)
-        min_x, max_x, min_y, max_y = new.boundaries()
-        new.original_lattice_dims = ( int(max_y-min_y+1), int(max_x-min_x+1) )
-        return new
-        
     def replace(self, node:TensorNode):
         # validate:
         ind = node.index
@@ -451,7 +516,7 @@ class KagomeTensorNetwork():
             else:
                 self.edges[new_edge] = (new_node_index, new_node_index)
 
-    def get_tensor_in_pos(self, pos:tuple[PosScalarType, ...]) -> TensorNode:
+    def get_node_in_pos(self, pos:tuple[PosScalarType, ...]) -> TensorNode:
         tensors_in_position = [node for node in self.nodes if node.pos == pos]
         if len(tensors_in_position)==0:
             raise TensorNetworkError(f"Couldn't find any tensor in position {pos}")
@@ -459,60 +524,12 @@ class KagomeTensorNetwork():
             raise TensorNetworkError(f"Found more than 1 tensor in position {pos}")
         return tensors_in_position[0]
     
-    def validate(self)->None:
-        # Generic error message:
-        _error_message = f"Failed validation of tensor-network."
-        # Check each node individually:
-        for node in self.nodes:
-            # Self validation:
-            node.validate()
-            # Validation with neighbors in lattice:
-            for dir in node.directions:
-                edge_name = node.edge_in_dir(dir)
-                if _is_open_edge(self.edges[edge_name]):
-                    continue
-                neighbor = self.find_neighbor(node, dir)
-                # Is neighbors pointing back to us?
-                _neigbor_error_message = _error_message+f"\nnode '{node.name}' is not the neighbor of '{neighbor.name}' on edge '{edge_name}'"
-                opposite_dir = dir.opposite()
-                neighnors_dir = neighbor.directions[neighbor.edges.index(edge_name)]
-                assert check.is_opposite(neighnors_dir, dir)
-                assert self._find_neighbor_by_edge(neighbor, edge_name) is node, _neigbor_error_message
-                assert self.find_neighbor(neighbor, neighnors_dir) is node, _neigbor_error_message
-                # Messages struggle with this check:
-                if not isinstance(dir, LatticeDirection) and isinstance(neighnors_dir, BlockSide):
-                    assert neighbor.edge_in_dir(opposite_dir) == edge_name
-
-        # Check edges:
-        for edge_name, node_indices in self.edges.items():
-            if node_indices[0] == node_indices[1]:  # happens in outer legs (going outside of the lattice without any connection)
-                continue
-            nodes = [self.nodes[ind] for ind in node_indices ]
-            try:
-                indices_of_this_edge = [node.edges.index(edge_name) for node in nodes]
-            except:
-                raise KeyError(_error_message)
-            assert nodes[0].dims[indices_of_this_edge[0]] == nodes[1].dims[indices_of_this_edge[1]] , _error_message
-            dir1 = nodes[0].directions[indices_of_this_edge[0]]
-            dir2 = nodes[1].directions[indices_of_this_edge[1]]
-            assert check.is_opposite(dir1, dir2)
-            for node, node_index in zip(nodes, node_indices, strict=True):
-                assert node.index == node_index , _error_message
-        # Check lattice dimensions:
-        min_x, max_x, min_y, max_y = self.boundaries()
-        #TODO Size check
-        
-    def boundaries(self)->tuple[int, ...]:
-        min_x, max_x = lists.min_max([node.pos[0] for node in self.nodes])
-        min_y, max_y = lists.min_max([node.pos[1] for node in self.nodes])
-        return min_x, max_x, min_y, max_y
-    
     def get_corner_nodes(self)->list[TensorNode]:
-        min_x, max_x, min_y, max_y = self.boundaries()
+        min_x, max_x, min_y, max_y = self.positions_min_max()
         corner_nodes = []
         for x, y in itertools.product([min_x, max_x], [min_y, max_y]):
             try:
-                node = self.get_tensor_in_pos((x,y))
+                node = self.get_node_in_pos((x,y))
             except TensorNetworkError:
                 continue
             else:
@@ -523,8 +540,11 @@ class KagomeTensorNetwork():
         return [n for n in self.nodes if n.functionality is NodeFunctionality.Core]
 
     def normalize_tensors(self)->None:
+        #TODO do we use it?
+        raise ValueError("Do we use this?")
         for node in self.nodes:
             node.normalize()
+
 
 
 
@@ -532,7 +552,7 @@ def _derive_message_node_position(nodes_on_boundary:list[Node], edge:EdgeIndicat
     node = next(node for node in nodes_on_boundary if edge in node.edges)
     direction = node.directions[ node.edges.index(edge) ]
     delta = tuples.add(boundary_delta, direction.unit_vector)
-    delta = (numerics.furthest_absolute_integer(delta[0]), numerics.furthest_absolute_integer(delta[1]))
+    # delta = (numerics.furthest_absolute_integer(delta[0]), numerics.furthest_absolute_integer(delta[1]))
     return tuples.add(node.pos, delta)     
 
 

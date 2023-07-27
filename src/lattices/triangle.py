@@ -1,13 +1,17 @@
 from lattices._common import Node
 from lattices.directions import lattice, block
-from lattices.directions import LatticeDirection, BlockSide
+from lattices.directions import LatticeDirection, BlockSide, Direction
 from typing import Generator
 from _error_types import LatticeError, OutsideLatticeError
 
+from utils import tuples
+
+import functools 
 
 class TriangularLatticeError(LatticeError): ...
 
 
+@functools.cache
 def total_vertices(N):
 	"""
 	Returns the total number of vertices in the *bulk* of a hex 
@@ -16,12 +20,14 @@ def total_vertices(N):
 	return 3*N*N - 3*N + 1
 
 
+@functools.cache
 def center_vertex_index(N):
     i = num_rows(N)//2
     j = i
     return get_vertex_index(i, j, N)
 
 
+@functools.cache
 def num_rows(N):
 	return 2*N-1
 
@@ -671,5 +677,45 @@ def create_triangle_lattice(N)->list[Node]:
 
 	return nodes_list
 
+
+def all_coordinates(N:int)->Generator[tuple[int, int], None, None]:
+	for i in range(num_rows(N)):
+		for j in range(row_width(i, N)):
+			yield i, j
+
+
+def sort_coordinates_by_direction(items:list[tuple[int, int]], direction:Direction, N:int)->list[tuple[int, int]]:
+	unit_vector = direction.unit_vector
+	def key(ij:tuple[int, int])->float:
+		i, j = ij[0], ij[1]
+		pos = get_node_position(i, j, N)
+		return tuples.dot_product(pos, unit_vector)  # vector dot product
+	return sorted(items, key=key)
+	
+
+@functools.cache
+def verices_indices_rows_in_direction(N:int, major_direction:BlockSide, minor_direction:LatticeDirection)->list[list[int]]:
+	""" arrange nodes by direction:
+	"""
+	## Arrange indices by position relative to direction, in reverse order
+	coordinates = sort_coordinates_by_direction(all_coordinates(N), major_direction.opposite(), N)
+
+	## Bunch vertices by the number of nodes at each possible row (doesn't matter from wich direction we look)
+	list_of_rows = []
+	for i in range(num_rows(N)):
+
+		# collect vertices as much as the row has:
+		row = []
+		n = row_width(i, N)
+		for _ in range(n):
+			item = coordinates.pop()
+			row.append(item)
+		
+		# sort row by minor axis:
+		sorted_row = sort_coordinates_by_direction(row, minor_direction, N)
+		indices = [get_vertex_index(i, j, N) for i,j in sorted_row]
+		list_of_rows.append(indices)
+
+	return list_of_rows
 
 

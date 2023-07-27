@@ -48,11 +48,11 @@ def _fix_angle(a:float)->float:
     return a
 
 def _get_corner_tensors(tn:KagomeTensorNetwork) -> list[TensorNode]:
-    min_x, max_x, min_y, max_y = tn.boundaries()
+    min_x, max_x, min_y, max_y = tn.positions_min_max()
     corner_tesnors = [] 
     for x in [min_x, max_x]:
         for y in  [min_y, max_y]:
-            t = tn.get_tensor_in_pos((x, y))
+            t = tn.get_node_in_pos((x, y))
             corner_tesnors.append(t)    
     return corner_tesnors
 
@@ -685,7 +685,7 @@ def reduce_tn_to_core_and_environment(tn:KagomeTensorNetwork, bubblecon_trunc_di
 
 def full_contraction(tn:KagomeTensorNetwork, /,*, max_dim:int, direction:BlockSide=BlockSide.random()):
     # Basic info:    
-    min_x, max_x, min_y, max_y = tn.boundaries()
+    min_x, max_x, min_y, max_y = tn.positions_min_max()
     min_x = int(min_x) 
     max_x = int(max_x) 
     min_y = int(min_y) 
@@ -699,7 +699,7 @@ def full_contraction(tn:KagomeTensorNetwork, /,*, max_dim:int, direction:BlockSi
         
         for y in y_range:
             try:
-                node = tn.get_tensor_in_pos((x,y))
+                node = tn.get_node_in_pos((x,y))
             except ValueError:
                 continue
             con_order.append(node.index)

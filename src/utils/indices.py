@@ -2,8 +2,11 @@
 from typing import (
     Tuple, 
     Iterator,
+    Iterable,
     Generator,
+    TypeVar
 )
+_T = TypeVar("_T")
 
 # For smart iterations:
 import itertools
@@ -32,3 +35,9 @@ def indices_gen() -> Generator[int, None, None]:
     while True:
         yield i
         i += 1
+
+def index_of_first_appearance(it:Iterable[_T], item:_T) -> int:
+    for i, val in enumerate(it):
+        if val==item:
+            return i
+    raise ValueError("Not found")

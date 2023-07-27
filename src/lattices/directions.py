@@ -127,6 +127,9 @@ class BlockSide(Direction):
     def orthogonal_counterclockwise_lattice_direction(self)->LatticeDirection:
         return ORTHOGONAL_LATTICE_DIRECTIONS_TO_BLOCK_SIDES[self]
     
+    def orthogonal_clockwise_lattice_direction(self)->LatticeDirection:
+        return ORTHOGONAL_LATTICE_DIRECTIONS_TO_BLOCK_SIDES[self].opposite()
+    
     def matching_lattice_directions(self)->list[LatticeDirection]:
         return MATCHING_LATTICE_DIRECTIONS_TO_BLOCK_SIDES[self]
     
