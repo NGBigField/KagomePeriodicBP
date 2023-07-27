@@ -200,14 +200,17 @@ def _derive_boundary(pos_list:List[Tuple[int, int]])->List[Tuple[int, ...]]:
 
 
 def plot_contraction_order(positions:List[Tuple[int,...]], con_order:List[int])->None:
-    not_all_the_way = 0.80
+    not_all_the_way = 0.85
     for (from_, to_), color in zip(itertools.pairwise(con_order), visuals.color_gradient(len(positions)) ):
+        if from_<0 or to_<0:
+            continue  # just a marker for something
         x1, y1 = positions[from_]
         x2, y2 = positions[to_]
         plt.arrow(
             x1, y1, (x2-x1)*not_all_the_way, (y2-y1)*not_all_the_way, 
-            width=0.04,
-            color=color
+            width=0.20,
+            color=color,
+            zorder=0
         )
 
 
@@ -219,7 +222,7 @@ def plot_network(
 )-> None:
     
     ## Constants:
-    edge_color ,alpha ,linewidth = 'gray', 0.5, 3
+    edge_color ,alpha ,linewidth = 'dimgray', 0.5, 3
     angle_color, angle_linewidth, angle_dis = 'green', 2, 0.5
     
     ## Complete data:

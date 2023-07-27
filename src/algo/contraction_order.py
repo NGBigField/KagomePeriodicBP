@@ -33,6 +33,7 @@ import itertools
 
 _PosFuncType = Callable[[int, int], tuple[int, int] ]
 
+BREAK_MARKER = -100
 
 
 def _determine_direction(axis2:list[int], _pos_func:_PosFuncType) -> Direction:
@@ -64,8 +65,8 @@ def _determine_direction(axis2:list[int], _pos_func:_PosFuncType) -> Direction:
     raise ValueError("The lists are not ordered at all! ): ")
 
 
-def  _sorted_side_outer_edges(
-    tn:KagomeTensorNetwork, direction:BlockSide,
+def _sorted_side_outer_edges(
+    tn:KagomeTensorNetwork, direction:BlockSide, with_break:bool=False
 )->tuple[
     list[str],
     list[str]
@@ -80,8 +81,12 @@ def  _sorted_side_outer_edges(
     left_first = left_last.next_counterclockwise()
 
     ## Right edge orders:
-    right_edges = sorted_right_boundary_edges[right_first] + sorted_right_boundary_edges[right_last]
-    left_edges = sorted_right_boundary_edges[left_last] + sorted_right_boundary_edges[left_first]
+    if with_break:
+        right_edges = sorted_right_boundary_edges[right_first] + ['Break'] + sorted_right_boundary_edges[right_last] 
+        left_edges = sorted_right_boundary_edges[left_last] + ['Break'] + sorted_right_boundary_edges[left_first] 
+    else:
+        right_edges = sorted_right_boundary_edges[right_first] + sorted_right_boundary_edges[right_last] 
+        left_edges = sorted_right_boundary_edges[left_last] + sorted_right_boundary_edges[left_first] 
     left_edges.reverse()
 
     return left_edges, right_edges
@@ -112,20 +117,12 @@ def derive_contraction_orders(
     ## Start by fetching the lattice-nodes in order and the messages:
     lattice_rows_ordered_right = tn.lattice.nodes_indices_rows_in_direction(major_direction, minor_right)
     # Side edges:
-    left_sorted_outer_edges, right_sorted_outer_edges = _sorted_side_outer_edges(tn, major_direction)
+    left_sorted_outer_edges, right_sorted_outer_edges = _sorted_side_outer_edges(tn, major_direction, with_break=True)
     iterators = dict(
-        left  = (edge for edge in left_sorted_outer_edges+["End"] ),
-        right = (edge for edge in right_sorted_outer_edges+["End"] )
+        left  = iter(left_sorted_outer_edges+["End"]), 
+        right = iter(right_sorted_outer_edges+["End"])
     )
     edges = {side: next(iterator) for side, iterator in iterators.items()}
-    append_methods = dict(
-        first = lambda lis, i: lis.insert(0, i),
-        last  = lambda lis, i: lis.append(i)
-    )
-    last_side_msg = dict(
-        left  = False,
-        right = False 
-    )
 
     ## First message:
     con_order = tn.message_indices(major_direction.opposite())
@@ -141,6 +138,7 @@ def derive_contraction_orders(
             left  = tn.nodes[row[0]],
             right = tn.nodes[row[-1]]
         )
+        msg_neighbors = dict(first=[], last=[])
 
         # which side is first?       
         is_reverse_order = next(reverse_order)
@@ -152,28 +150,30 @@ def derive_contraction_orders(
 
         ## Add neighbors if they exist:
         for order in ['first', 'last']:
-            # Collect respective values:
-            side = side_order[order]
-            append_method = append_methods[order]
+            # unpack respective values:
+            side = side_order[order]            
             iterator = iterators[side]
             node = nodes[side]
             edge = edges[side]
-            # Try to add the next msg node:
+            # Find msg neigbors:
             while edge in node.edges:                
                 neighbor = tn.find_neighbor(node, edge)
-                append_method(row, neighbor.index)
-                try:
-                    edge = next(iterator)
-                except StopIteration:
-                    pass
+                msg_neighbors[order].append(neighbor.index)
+                edge = next(iterator)
+                edges[side] = edge
+            ## Mark places where messages break:
+            if edge == 'Break':
+                msg_neighbors[order].append(BREAK_MARKER)
+                edge = next(iterator)
                 edges[side] = edge
 
-        ## add row to con_order:
-        con_order.extend(row)
 
-    if DEBUG_MODE:
-        assert edges['left']=='End'
-        assert edges['right']=='End'
+        ## add row to con_order:
+        con_order.extend( msg_neighbors['first'] + row + msg_neighbors['last'] )
+
+
+    ## Last msg:
+    con_order += tn.message_indices(major_direction)
 
     ## Plot result:
     if plot_:
