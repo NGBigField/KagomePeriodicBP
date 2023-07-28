@@ -29,7 +29,7 @@ from utils import tuples, lists, assertions, parallel_exec
 # Our needed algos:
 from tensor_networks.tensor_network import get_common_edge_legs
 from tensor_networks.construction import create_kagome_tn, _get_edge_from_tensor_coordinates
-from algo.contraction_order import derive_contraction_orders
+from algo.contraction_order import derive_contraction_order
 from algo.mps import physical_tensor_with_split_mid_leg
 from libs.bubblecon import bubblecon
 from libs import bmpslib
@@ -419,7 +419,7 @@ def contract_tensor_network(
 ]:
 
     ## derive basic data:
-    contraction_order, last_direction = derive_contraction_orders(tn, direction, depth=depth)
+    contraction_order, last_direction = derive_contraction_order(tn, direction, depth=depth)
 
     ## Call main function:
     mp = bubblecon(
@@ -532,7 +532,7 @@ def _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn:KagomeTensorNetwork, 
 
     ## Prepare two MPSs:
     for direction in [Direction.Down, Direction.Up]:
-        con_order, _ = derive_contraction_orders(tn, direction, depth=ContractionDepth.Full)
+        con_order, _ = derive_contraction_order(tn, direction, depth=ContractionDepth.Full)
         con_order = con_order[0:len(con_order)//2]
         for core_index in core_indices:
             if core_index in con_order:

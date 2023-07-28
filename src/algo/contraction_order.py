@@ -13,13 +13,14 @@ if __name__ == "__main__":
 from _config_reader import DEBUG_MODE
 
 from typing import Callable
-from tensor_networks import KagomeTensorNetwork
+from tensor_networks import KagomeTensorNetwork, TensorNode
 from lattices.directions import Direction, BlockSide, LatticeDirection
 from enums import ContractionDepth, NodeFunctionality
 from containers import ContractionConfig
 
 ## For common types:
 from _error_types import NetworkConnectionError
+from _types import EdgeIndicatorType
 
 # Everyone needs numpy:
 import numpy as np
@@ -30,10 +31,128 @@ from utils import lists
 # For smart iterations:
 import itertools
 
+# For oop:
+from enum import Enum, auto
+from typing import Generic, TypeVar
+from dataclasses import dataclass, fields
 
+
+# Types:
+_T = TypeVar("_T")
+_EnumType = TypeVar("_EnumType")
 _PosFuncType = Callable[[int, int], tuple[int, int] ]
 
+# Constants:
 BREAK_MARKER = -100
+
+
+class _Bound(Enum):
+    first = auto()
+    last  = auto()
+
+    def opposite(self)->"_Bound":
+        if   self is First: return Last            
+        elif self is Last: return First
+        else:
+            raise ValueError("Not possible")                
+    
+First = _Bound.first 
+Last  = _Bound.last
+
+class _Side(Enum):
+    left  = auto() 
+    right = auto() 
+Left = _Side.left
+Right = _Side.right
+
+
+class _EnumContainer(Generic[_EnumType, _T]):
+    def __getitem__(self, key:_EnumType)->_T:
+        for field in fields(self):
+            if field.name == key.name:
+                return getattr(self, field.name)
+        raise KeyError(f"No a valid option {key!r}")
+    
+    def __setitem__(self, key:_EnumType, value:_T)->None:
+        for field in fields(self):
+            if field.name == key.name:
+                return setattr(self, field.name, value)
+        raise KeyError(f"No a valid option {key!r}")
+            
+
+@dataclass
+class _PerBound(_EnumContainer[_Bound, _T]):
+    first : _T 
+    last  : _T   
+
+
+@dataclass
+class _PerSide(_EnumContainer[_Side, _T]):
+    left  : _T 
+    right : _T   
+
+
+class _SideEdges:
+    def __init__(self, left_sorted_outer_edges:list[str], right_sorted_outer_edges:list[str]) -> None:
+        self.lists : _PerSide[list[str]] = _PerSide(
+            left = left_sorted_outer_edges,
+            right = right_sorted_outer_edges
+        )
+        self.crnt_index : _PerSide[int] = _PerSide(
+            left = 0,
+            right = 0 
+        )
+        self.exhausted : _PerSide[bool] = _PerSide(
+            left = False,
+            right = False,
+        )
+
+    def crnt(self, side:_Side)->str:
+        if self.exhausted[side]:
+            return "End"
+        index = self.crnt_index[side] 
+        item = self.lists[side][index]
+        return item
+
+    def next(self, side:_Side)->str:
+        self.crnt_index[side] += 1
+        try:
+            next_item = self.crnt(side)
+        except IndexError as e:
+            next_item = None
+            self.exhausted[side] = True
+        return next_item
+    
+    def __getitem__(self, key:_Side)->_T:
+        return self.crnt(key)
+
+class _ReverseOrder:
+    __slots__ = ["state", "counter"]
+    
+    def __init__(self) -> None:
+        self.counter = 0
+        self.state = True
+    
+    def __bool__(self)->bool:
+        res = self.state
+        self.counter += 1
+        if self.counter > 1:
+            ~self
+        return res
+    
+    def __invert__(self)->None:
+        self.counter = 0
+        self.state = not self.state
+
+    def set_true(self)->None:
+        self.counter = 0
+        self.state = True 
+
+    def set_false(self)->None:
+        self.counter = 0
+        self.state = False 
+
+    
 
 
 def _determine_direction(axis2:list[int], _pos_func:_PosFuncType) -> Direction:
@@ -92,7 +211,86 @@ def _sorted_side_outer_edges(
     return left_edges, right_edges
 
 
-def derive_contraction_orders(
+def _add_all_side_neighbors( 
+    tn:KagomeTensorNetwork, first_last:_Bound,
+    nodes:_PerSide[TensorNode], side_order:_PerBound[_Side], 
+    side_edges:_SideEdges, msg_neighbors:_PerBound[list[int]],
+    force_assigning_at_end=False
+)->EdgeIndicatorType:
+     # unpack respective values:
+    side = side_order[first_last]            
+    node = nodes[side]
+    edge = side_edges[side]           
+    while edge in node.edges:     
+        # get neighbor:
+        neighbor = tn.find_neighbor(node, edge)
+        # Where to assign the neighbor:
+        if force_assigning_at_end:  put_at = Last
+        else:                       put_at = first_last
+        # assign neighbor:
+        msg_neighbors[put_at].append(neighbor.index)  # Add to end 
+        # move iterator and get next edge
+        edge = side_edges.next(side)  
+    return edge  # return last edge
+
+
+def _derive_message_neighbors(
+    tn:KagomeTensorNetwork, row:list[int], reverse_order:_ReverseOrder,
+    side_edges:_SideEdges
+) -> _PerBound[list[int]]:
+    # Node at each side
+    nodes = _PerSide[TensorNode](
+        left  = tn.nodes[row[0]],
+        right = tn.nodes[row[-1]]
+    )
+    msg_neighbors = _PerBound[list[int]](first=[], last=[])
+
+    # which side is first?       
+    if reverse_order:
+        row.reverse()
+        side_order = _PerBound[_Side](first=Right, last=Left)
+    else:
+        side_order = _PerBound[_Side](first=Left, last=Right)
+
+    ## Add neighbors if they exist:
+    for first_last in _Bound:
+        last_edge = _add_all_side_neighbors(tn, first_last, nodes, side_order, side_edges, msg_neighbors)
+            
+        ## Special case when MPS messages change from one to another:
+        if last_edge == 'Break':
+            side = side_order[first_last]
+            side_edges.next(side)  # move iterator
+
+    ## At a break, decide if switch direction or not:
+    # and collect the 'lost' neighbor of the first/last node
+    if last_edge == 'Break': 
+
+        ## Decide if switch direction or not by checking how has neighbors from both messages:
+        if len(msg_neighbors[First])==1:
+            next_first_side = side_order[First]
+        elif len(msg_neighbors[Last])==1:
+            next_first_side = side_order[Last]
+        else: 
+            raise ValueError("Not an expected option!")
+        # Force side order to start from `next_first_side`:
+        if next_first_side is Left:
+            reverse_order.set_false()
+        elif next_first_side is Right:
+            reverse_order.set_true()
+        else:
+            raise ValueError("Not an expected option!")
+
+        # Collect lost neighnors
+        for first_last in _Bound:
+            _add_all_side_neighbors(tn, first_last, nodes, side_order, side_edges, msg_neighbors, force_assigning_at_end=True)
+
+        ## Assert that now both have 2 neighbours:
+        # assert len(msg_neighbors[First])==len(msg_neighbors[Last])==2
+        #TODO Check
+
+    return msg_neighbors
+
+def derive_contraction_order(
     tn:KagomeTensorNetwork,  
     direction:BlockSide,
     depth:ContractionDepth|int,
@@ -118,59 +316,20 @@ def derive_contraction_orders(
     lattice_rows_ordered_right = tn.lattice.nodes_indices_rows_in_direction(major_direction, minor_right)
     # Side edges:
     left_sorted_outer_edges, right_sorted_outer_edges = _sorted_side_outer_edges(tn, major_direction, with_break=True)
-    iterators = dict(
-        left  = iter(left_sorted_outer_edges+["End"]), 
-        right = iter(right_sorted_outer_edges+["End"])
-    )
-    edges = {side: next(iterator) for side, iterator in iterators.items()}
+    side_edges = _SideEdges(left_sorted_outer_edges, right_sorted_outer_edges)
+    
+    ## Helper objects: 
+    # # Iterator to switch contraction direction every two rows:
+    reverse_order = _ReverseOrder()
 
     ## First message:
-    con_order = tn.message_indices(major_direction.opposite())
-
-    ## Iterator to switch contraction direction every two rows:
-    reverse_order = itertools.cycle([True, True, False, False])
+    con_order.extend( tn.message_indices(major_direction.opposite()) )
 
     ## Lattice and its connected nodes:
     for row in lattice_rows_ordered_right:
-
-        # Node at each side
-        nodes = dict(
-            left  = tn.nodes[row[0]],
-            right = tn.nodes[row[-1]]
-        )
-        msg_neighbors = dict(first=[], last=[])
-
-        # which side is first?       
-        is_reverse_order = next(reverse_order)
-        if is_reverse_order:
-            row.reverse()
-            side_order = dict(first='right', last='left')
-        else:
-            side_order = dict(first='left', last='right')
-
-        ## Add neighbors if they exist:
-        for order in ['first', 'last']:
-            # unpack respective values:
-            side = side_order[order]            
-            iterator = iterators[side]
-            node = nodes[side]
-            edge = edges[side]
-            # Find msg neigbors:
-            while edge in node.edges:                
-                neighbor = tn.find_neighbor(node, edge)
-                msg_neighbors[order].append(neighbor.index)
-                edge = next(iterator)
-                edges[side] = edge
-            ## Mark places where messages break:
-            if edge == 'Break':
-                msg_neighbors[order].append(BREAK_MARKER)
-                edge = next(iterator)
-                edges[side] = edge
-
-
+        msg_neighbors = _derive_message_neighbors(tn, row, reverse_order, side_edges)
         ## add row to con_order:
-        con_order.extend( msg_neighbors['first'] + row + msg_neighbors['last'] )
-
+        con_order.extend( msg_neighbors.first + row + msg_neighbors.last )
 
     ## Last msg:
     con_order += tn.message_indices(major_direction)
@@ -184,8 +343,14 @@ def derive_contraction_orders(
         plot_contraction_order(tn.positions, con_order)
         plt.title(f"Contraction in Direction {str(direction)}" )
 
+    ## Check:
+    if DEBUG_MODE:
+        # Both list of messages are in `con_order`:
+        assert side_edges.exhausted.left
+        assert side_edges.exhausted.right
+
     ## Last minor-direction of contraction:
-    if is_reverse_order:
+    if reverse_order:
         last_direction = minor_right.opposite()
     else:
         last_direction = minor_right
