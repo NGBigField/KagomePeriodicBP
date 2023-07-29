@@ -67,14 +67,17 @@ class _UnassignedEdgeName():
 
 
 
+
+
+def num_message_connections(N:int)->int:
+    return 2*N - 1
+
+
 def edge_name_from_indices(i1:int, i2:int)->str:
     if   i1<i2:  return f"{i1}-{i2}" 
     elif i1>i2:  return f"{i2}-{i1}" 
     else:
         raise ValueError("Indices must be of different nodes") 
-
-
-
 
 
 def _derive_node_directions(field:str)->list[LatticeDirection]:
@@ -345,7 +348,7 @@ class KagomeLattice():
     # ================================================= #                    
     @property
     def num_message_connections(self)->int:
-        return 2*self.N - 1
+        return num_message_connections(self.N)
     
     @property
     def size(self)->int:

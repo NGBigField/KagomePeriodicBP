@@ -10,6 +10,7 @@ from typing import (
 import operator
 from typing import overload
 
+_T1 = TypeVar("_T1")
 _NumericType = TypeVar("_NumericType", float, complex, int)
 
 def angle(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->float:
@@ -53,3 +54,8 @@ def equal(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->bool:
 def mean_itemwise(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->Tuple[_NumericType,...]:
     l = [(v1+v2)/2 for v1, v2 in zip(t1, t2, strict=True)]
     return tuple(l)
+
+def add_element(t:Tuple[_T1,...], element:_T1)->Tuple[_T1,...]:
+    lis = list(t)
+    lis.append(element)
+    return tuple(lis)

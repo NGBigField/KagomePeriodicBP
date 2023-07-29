@@ -24,28 +24,10 @@ def bp_test(
         max_swallowing_dim=18        
     )
     
-
     ## first network:
     tn = create_kagome_tn(d=d, D=D, N=N)
 
-
-    ## With messages:
-    
-    from containers import Message
-    from algo.belief_propagation import initial_message
-    D = tn.dimensions.virtual_dim
-    message_length = tn.num_message_connections
-    messages = { 
-        edge_side : Message(
-            mps=initial_message(D=D, N=message_length), 
-            order_direction=edge_side.orthogonal_counterclockwise_lattice_direction() 
-        ) 
-        for edge_side in BlockSide.all_in_counter_clockwise_order()  \
-    }
-    tn.connect_messages(messages)
-    # tn.plot()
-
-
+    ## BP:
     tn_with_messages, messages, stats = belief_propagation(tn, messages=None, bp_config=bp_config)
 
     print(stats)

@@ -172,7 +172,7 @@ def belief_propagation_pashtida(
 
     ## Unpack Inputs:
     # Tensor-Network data:
-    T_list = open_tn.tesnors
+    T_list = open_tn.tensors
     e_list = open_tn.edges_list
     a_list = open_tn.angles
     N = open_tn.original_lattice_dims[0]

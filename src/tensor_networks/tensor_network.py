@@ -204,7 +204,7 @@ class KagomeTensorNetwork():
         return len(self.nodes)
     
     @property
-    def tesnors(self)->list[np.ndarray]:
+    def tensors(self)->list[np.ndarray]:
         return [v.tensor for v in self.nodes]
     
     @property
@@ -288,7 +288,7 @@ class KagomeTensorNetwork():
 
     def to_dict(self)->dict:
         d = dict()
-        d["tensors"], d["is_ket"] = self.tesnors
+        d["tensors"], d["is_ket"] = self.tensors
         d["edgs"] = self.edges_list
         d["edgs_dict"] = self.edges
         d["angles"] = self.angles
@@ -304,15 +304,18 @@ class KagomeTensorNetwork():
         edges = self.edges
         plot_network(nodes=nodes, edges=edges, detailed=detailed)
         
-    def copy(self)->"KagomeTensorNetwork":
+    def copy(self, with_messages:bool=True)->"KagomeTensorNetwork":
         new = KagomeTensorNetwork(
             lattice=self.lattice,
             unit_cell=self.unit_cell.copy(),
             d=self.dimensions.physical_dim,
             D=self.dimensions.virtual_dim,
         )
+        if with_messages:
+            new.messages = self.messages
 
-        if DEBUG_MODE: new.validate()
+        if DEBUG_MODE: 
+            new.validate()
         return new
     
     def sub_tn(self, indices)->"KagomeTensorNetwork":

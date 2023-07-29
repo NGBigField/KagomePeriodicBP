@@ -20,8 +20,9 @@ from lattices.directions import LatticeDirection, BlockSide
 from lattices import directions
 from _error_types import TensorNetworkError
 from enums import ContractionDepth, ReduceToEdgeMethod, ReduceToCoreMethod, NodeFunctionality
-from containers import BubbleConConfig, ContractionConfig, MessageDictType
+from containers import BubbleConConfig, MessageDictType
 from physics import pauli
+from _types import EdgeIndicatorType
 
 # Our utilities:
 from utils import tuples, lists, assertions, parallel_exec
@@ -29,16 +30,23 @@ from utils import tuples, lists, assertions, parallel_exec
 # Our needed algos:
 from tensor_networks.tensor_network import get_common_edge_legs
 from tensor_networks.construction import create_kagome_tn, _get_edge_from_tensor_coordinates
-from algo.contraction_order import derive_contraction_order
+from algo.contraction_order import derive_contraction_order, contraction_order_at_depth
 from algo.mps import physical_tensor_with_split_mid_leg
 from libs.bubblecon import bubblecon
 from libs import bmpslib
 import itertools
 
+# For a little bit of OOP:
+from typing import Any, NamedTuple
 
 # For energy estimation:
 from libs.ITE import rho_ij
 
+
+def _derive_angle(p1:tuple[int,int], p2:tuple[int,int])->float:
+    dx = p2[0] - p1[0]
+    dy = p2[1] - p1[1]
+    return np.arctan2(dx, dy)
 
 def _fix_angle(a:float)->float:
     while a < 0:
@@ -406,6 +414,53 @@ def calc_mean_value(
     return lists.average(expectation_values)
 
 
+def connect_corner_messages(
+    tn:KagomeTensorNetwork, outgoing_dir:BlockSide
+)->tuple[
+    list[np.ndarray], list[list[EdgeIndicatorType]], list[list[float]]
+]:
+    
+    ## Get the output lists:
+    tensors = tn.tensors
+    edges_list = tn.edges_list
+    angles = tn.angles
+
+    ## Derive basic info:
+    first_msg_dir = outgoing_dir.opposite()
+    msg_indices1 = tn.message_indices(first_msg_dir)
+    msg_indices2 = tn.message_indices(first_msg_dir.next_counterclockwise())
+    index = [msg_indices1[-1], msg_indices2[0]]
+
+    ## Expand both tensors with a fake leg of dim 1:
+    new_tensor, new_edges, pos, old_angles = [], [], [], []
+    for i in [0, 1]:
+        grand_index = index[i]
+        pos.append( tn.positions[grand_index] )
+        tensor = tensors[grand_index]
+        new_shape = tuples.add_element(tensor.shape, 1) 
+        new_edges.append( edges_list[grand_index] + ['fake_leg']  )        
+        new_tensor.append( tensor.copy().reshape(new_shape) )
+        old_angles.append( angles[grand_index] )
+
+        
+    ## Derive new angles:
+    new_a = [0.0, 0.0]
+    new_a[0] = _derive_angle(pos[0], pos[1])
+    new_a[1] = _fix_angle(new_a[0]+np.pi)
+    new_angle = [old_angles[i]+[new_a[i]] for i in [0, 1]]
+
+    ## Assign results to list
+    for i in [0, 1]:
+        grand_index = index[i]
+        tensors[grand_index] = new_tensor[i]
+        edges_list[grand_index] = new_edges[i]
+        angles[grand_index] = new_angle[i]
+
+    ## Return:
+    return tensors, edges_list, angles
+    
+
+
 def contract_tensor_network(
     tn:KagomeTensorNetwork, 
     direction:BlockSide,
@@ -418,15 +473,20 @@ def contract_tensor_network(
     LatticeDirection,
 ]:
 
-    ## derive basic data:
-    contraction_order, last_direction = derive_contraction_order(tn, direction)
-    contraction_order, last_direction = derive_contraction_order(tn, direction)
+    ## Derive Contraction Order:
+    # get or derive full con-oder:
+    full_contraction_order, last_direction = derive_contraction_order(tn, direction)
+    # Cut con order according to `depth`:
+    contraction_order = contraction_order_at_depth(full_contraction_order, depth, tn.lattice.N)
+
+    ## Connect first MPS message to a side tensor, to allow efficient contraction:
+    tensors, edges_list, angles = connect_corner_messages(tn, direction)
 
     ## Call main function:
     mp = bubblecon(
-        tn.tesnors, 
-        tn.edges_list, 
-        tn.angles, 
+        tensors, 
+        edges_list, 
+        angles, 
         bubble_angle=direction.angle,
         swallow_order=contraction_order, 
         D_trunc=bubblecon_trunc_dim,
@@ -438,11 +498,7 @@ def contract_tensor_network(
 
 
     ## Derive outgoing mps direction
-    #TODO Lattice direction of MPS out-  
-    if ContractionConfig.last_con_order_determines_mps_order:
-        mps_direction = last_direction
-    else:
-        mps_direction = direction.next_clockwise()
+    mps_direction = direction.orthogonal_clockwise_lattice_direction()
 
     ## Check outputs:
     assert not isinstance(mp, list)  # This is not an expected output
@@ -540,7 +596,7 @@ def _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn:KagomeTensorNetwork, 
                 con_order.remove(core_index)
 
         mps = bubblecon(
-            tn.tesnors, 
+            tn.tensors, 
             tn.edges_list, 
             tn.angles, 
             bubble_angle=direction.angle,

@@ -12,15 +12,17 @@ if __name__ == "__main__":
 # Get Global-Config:
 from _config_reader import DEBUG_MODE
 
-from typing import Callable
+# Import our types and calsses:
 from tensor_networks import KagomeTensorNetwork, TensorNode
 from lattices.directions import Direction, BlockSide, LatticeDirection
 from enums import ContractionDepth, NodeFunctionality
-from containers import ContractionConfig
 
 ## For common types:
 from _error_types import NetworkConnectionError
 from _types import EdgeIndicatorType
+
+# For lattice logic:
+from lattices import kagome
 
 # Everyone needs numpy:
 import numpy as np
@@ -28,12 +30,13 @@ import numpy as np
 # Use our common utilities:
 from utils import lists
 
-# For smart iterations:
+# For smart iterations and function caching:
 import itertools
+import functools
 
 # For oop:
 from enum import Enum, auto
-from typing import Generic, TypeVar, Final
+from typing import Generic, TypeVar, Final, Callable
 from dataclasses import dataclass, fields
 from copy import deepcopy
 
@@ -352,8 +355,8 @@ def _derive_row_message_neighbors(
 
     return msg_neighbors_at_bounds
 
-
-def get_contraction_order(
+@functools.cache  #TODO:  Check cache
+def derive_contraction_order(
     tn:KagomeTensorNetwork,  
     direction:BlockSide,
     plot_:bool=False
@@ -420,6 +423,20 @@ def get_contraction_order(
         assert side_edges.exhausted.right
 
     return con_order, last_minor_direction
+
+
+def contraction_order_at_depth(
+    full_contraction_order:list[int], depth:ContractionDepth, N:int
+)->list[int]:
+    match depth:
+        case ContractionDepth.Full:
+            return full_contraction_order
+        case ContractionDepth.ToMessage:
+            m = kagome.num_message_connections(N)
+            return full_contraction_order[:-m]
+        case ContractionDepth.ToCore:
+            raise NotImplementedError(" ")
+        
 
 
 
