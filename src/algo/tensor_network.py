@@ -473,28 +473,36 @@ def contract_tensor_network(
     LatticeDirection,
 ]:
 
-    ## Derive Contraction Order:
-    # get or derive full con-oder:
-    full_contraction_order, last_direction = derive_contraction_order(tn, direction)
-    # Cut con order according to `depth`:
-    contraction_order = contraction_order_at_depth(full_contraction_order, depth, tn.lattice.N)
+    #TODO Test:
+    for direction in BlockSide.all_in_counter_clockwise_order():
 
-    ## Connect first MPS message to a side tensor, to allow efficient contraction:
-    tensors, edges_list, angles = connect_corner_messages(tn, direction)
+        ## Derive Contraction Order:
+        # get or derive full con-oder:
+        full_contraction_order, last_direction = derive_contraction_order(tn, direction)
+        # Cut con order according to `depth`:
+        contraction_order = contraction_order_at_depth(full_contraction_order, depth, tn.lattice.N)
 
-    ## Call main function:
-    mp = bubblecon(
-        tensors, 
-        edges_list, 
-        angles, 
-        bubble_angle=direction.angle,
-        swallow_order=contraction_order, 
-        D_trunc=bubblecon_trunc_dim,
-        opt='high',
-        progress_bar=BubbleConConfig.progress_bar and print_progress,
-        separate_exp=BubbleConConfig.separate_exp,
-        ket_tensors=tn.kets
-    )
+        ## Connect first MPS message to a side tensor, to allow efficient contraction:
+        tensors, edges_list, angles = connect_corner_messages(tn, direction)
+
+        try:
+            ## Call main function:
+            mp = bubblecon(
+                tensors, 
+                edges_list, 
+                angles, 
+                bubble_angle=direction.angle,
+                swallow_order=contraction_order, 
+                D_trunc=bubblecon_trunc_dim,
+                opt='high',
+                progress_bar=BubbleConConfig.progress_bar and print_progress,
+                separate_exp=BubbleConConfig.separate_exp,
+                ket_tensors=tn.kets
+            )
+        except Exception as e:
+            print("")
+            print(direction)
+            print(e)
 
 
     ## Derive outgoing mps direction
