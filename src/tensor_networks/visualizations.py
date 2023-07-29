@@ -319,10 +319,9 @@ def plot_network(
         color, marker, size1, size2, name = node_style(node)
         plt.scatter(x, y, c="black", s=size2, marker=marker, zorder=3)
         plt.scatter(x, y, c=color, s=size1, marker=marker, zorder=4)
-        text = f"{name}"
         if detailed:
-            text += f" [{node.index}]"
-        plt.text(x, y, text)
+            text = f"{name}" + f" [{node.index}]"
+            plt.text(x, y, text)
 
     ## Collect basic data:
     network_bounds = _derive_boundary(pos_list)

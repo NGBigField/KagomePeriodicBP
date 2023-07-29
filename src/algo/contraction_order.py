@@ -33,8 +33,9 @@ import itertools
 
 # For oop:
 from enum import Enum, auto
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Final
 from dataclasses import dataclass, fields
+from copy import deepcopy
 
 
 # Types:
@@ -126,23 +127,34 @@ class _SideEdges:
     def __getitem__(self, key:_Side)->_T:
         return self.crnt(key)
 
+
 class _ReverseOrder:
     __slots__ = ["state", "counter"]
+    _num_repeats : Final[int] = 2
     
     def __init__(self) -> None:
         self.counter = 0
         self.state = True
     
     def __bool__(self)->bool:
-        res = self.state
-        self.counter += 1
-        if self.counter > 1:
-            ~self
-        return res
+        return self.check_state_and_update()
     
     def __invert__(self)->None:
-        self.counter = 0
         self.state = not self.state
+        self.counter = 0
+
+    def prev_state(self)->bool:
+        if self.counter - 1 < 0:
+            return not self.state
+        else:
+            return self.state
+
+    def check_state_and_update(self)->bool:
+        res = self.state
+        self.counter += 1
+        if self.counter > _ReverseOrder._num_repeats-1:
+            ~self   # call invert
+        return res
 
     def set_true(self)->None:
         self.counter = 0
@@ -210,52 +222,85 @@ def _sorted_side_outer_edges(
 
     return left_edges, right_edges
 
-def _message_break_logic(
-    reverse_order:_ReverseOrder, seen_break:_PerBound[bool], 
-    msg_neighbors:_PerBound[list[int]], side_order:_PerBound[_Side]
+def _decide_by_future_neighbors(
+    side_order:_PerBound[_Side], 
+    num_neighbors_per_side_before:_PerBound[list[int]], 
+    num_neighbors_per_side_after:_PerBound[list[int]]
+)->_Side|None:
+    ## Decide which side should continue the break:
+    for first_last in _Bound:            
+        side = side_order[first_last]
+        ## How many MPS messages are and were connected:
+        num_bfore = num_neighbors_per_side_before[side]
+        num_after = num_neighbors_per_side_after[side]
+        if num_bfore==0 or num_after==0:
+            raise ValueError("Not an expected case")
+        elif num_bfore==1: 
+            if num_after==2:
+                return side
+            else:
+                continue
+        elif num_bfore==2:
+            assert num_after==2, "if before we had 2 neighbors, we must still have 2 after."
+        else:
+            raise ValueError("Not an expected case")
+    return None
+
+
+def _message_break_next_order_logic(
+    reverse_order:_ReverseOrder, seen_break:_PerBound[bool], side_order:_PerBound[_Side],
+    num_neighbors_per_side_before:_PerBound[list[int]],
+    num_neighbors_per_side_after:_PerBound[list[int]],
 )->_ReverseOrder:
-    ## Decide if switch direction or not by checking how has neighbors from both messages:
-    for first_last in _Bound:
-        if seen_break[first_last]:
-            next_first_side = side_order[first_last]
-            break
-    else: 
-        raise ValueError("Not seen break! Bug.")
-    # Force side order to start from `next_first_side`:
-    if next_first_side is Left:
+    
+    ## If only one of the sides seen the break:
+    if seen_break.first and not seen_break.last:
+        next_side = side_order[Last]
+    elif seen_break.last and not seen_break.first:
+        next_side = side_order[First]
+    elif not seen_break.first and not seen_break.last:
+        raise ValueError("Bug. We shouldn't be here.")
+    else:
+        next_side = _decide_by_future_neighbors(side_order, num_neighbors_per_side_before, num_neighbors_per_side_after)
+    
+    ## Decide on new order::
+    if next_side is Left:
         reverse_order.set_false()
-    elif next_first_side is Right:
+    elif next_side is Right:
         reverse_order.set_true()
+    elif next_side is None:
+        pass   # Keep it as it is
     else:
         raise ValueError("Not an expected option!")
     #
     return reverse_order
 
 
-def _add_all_side_neighbors( 
+def _find_all_side_neighbors( 
     tn:KagomeTensorNetwork, first_last:_Bound,
     nodes:_PerSide[TensorNode], side_order:_PerBound[_Side], 
-    side_edges:_SideEdges, msg_neighbors:_PerBound[list[int]],
-    force_assigning_at_end=False
-)->EdgeIndicatorType:
-     # unpack respective values:
+    side_edges:_SideEdges
+)->tuple[
+    EdgeIndicatorType,  # last_edge
+    list[int]  # neighbor indices
+]:
+    # prepare results:
+    res = []
+    # unpack respective values:
     side = side_order[first_last]            
     node = nodes[side]
     edge = side_edges[side]           
     while edge in node.edges:     
         # get neighbor:
         neighbor = tn.find_neighbor(node, edge)
-        # Where to assign the neighbor:
-        if force_assigning_at_end:  put_at = Last
-        else:                       put_at = first_last
-        # assign neighbor:
-        msg_neighbors[put_at].append(neighbor.index)  # Add to end 
+        # add neighbor:
+        res.append(neighbor.index)  # Add to end 
         # move iterator and get next edge
         edge = side_edges.next(side)  
-    return edge  # return last edge
+    return edge, res  # return last edge
 
 
-def _derive_message_neighbors(
+def _derive_row_message_neighbors(
     tn:KagomeTensorNetwork, row:list[int], reverse_order:_ReverseOrder,
     side_edges:_SideEdges
 ) -> _PerBound[list[int]]:
@@ -264,7 +309,7 @@ def _derive_message_neighbors(
         left  = tn.nodes[row[0]],
         right = tn.nodes[row[-1]]
     )
-    msg_neighbors = _PerBound[list[int]](first=[], last=[])
+    msg_neighbors_at_bounds = _PerBound[list[int]](first=[], last=[])
 
     # which side is first?       
     if reverse_order:
@@ -278,7 +323,8 @@ def _derive_message_neighbors(
 
     ## Add neighbors if they exist:
     for first_last in _Bound:
-        last_edge = _add_all_side_neighbors(tn, first_last, nodes, side_order, side_edges, msg_neighbors)
+        last_edge, neighbors = _find_all_side_neighbors(tn, first_last, nodes, side_order, side_edges )
+        msg_neighbors_at_bounds[first_last] += neighbors
             
         ## Special case when MPS messages change from one to another:
         if last_edge == 'Break':
@@ -286,33 +332,36 @@ def _derive_message_neighbors(
             side_edges.next(side)  # move iterator
             seen_break[first_last] = True
 
-    ## At a break, decide if switch direction or not:
-    # and collect the 'lost' neighbor of the first/last node
+    ## At a break in the side MPS messages:
     if seen_break.first or seen_break.last: 
-        reverse_order = _message_break_logic(reverse_order, seen_break, msg_neighbors, side_order)
+
+        # Keep data about beighbors per side:
+        num_neighbors_per_side_before = _PerSide[int](left=0, right=0)
+        num_neighbors_per_side_before[side_order[First]] = len(msg_neighbors_at_bounds[First])
+        num_neighbors_per_side_before[side_order[Last]] = len(msg_neighbors_at_bounds[Last])
+        num_neighbors_per_side_after = deepcopy(num_neighbors_per_side_before)
 
         # Collect lost neighnors
         for first_last in _Bound:
-            _add_all_side_neighbors(tn, first_last, nodes, side_order, side_edges, msg_neighbors, force_assigning_at_end=True)
+            _, neighbors = _find_all_side_neighbors(tn, first_last, nodes, side_order, side_edges )
+            msg_neighbors_at_bounds[Last] += neighbors # force_assigning_at_end
+            num_neighbors_per_side_after[side_order[first_last]] += len(neighbors)
+
+        # Next order logic
+        reverse_order = _message_break_next_order_logic(reverse_order, seen_break, side_order, num_neighbors_per_side_before, num_neighbors_per_side_after)
+
+    return msg_neighbors_at_bounds
 
 
-    return msg_neighbors
-
-def derive_contraction_order(
+def get_contraction_order(
     tn:KagomeTensorNetwork,  
     direction:BlockSide,
-    depth:ContractionDepth|int,
     plot_:bool=False
 )->tuple[
     list[int],
     Direction
 ]:
     
-    #TODO For debug:
-    from lattices.directions import block
-    plot_ = True
-    direction = block.U
-
     ## Prepare output:
     con_order = []    
 
@@ -331,16 +380,28 @@ def derive_contraction_order(
     reverse_order = _ReverseOrder()
 
     ## First message:
-    con_order.extend( tn.message_indices(major_direction.opposite()) )
+    con_order += tn.message_indices(major_direction.opposite()) 
 
     ## Lattice and its connected nodes:
     for row in lattice_rows_ordered_right:
-        msg_neighbors = _derive_message_neighbors(tn, row, reverse_order, side_edges)
+        msg_neighbors = _derive_row_message_neighbors(tn, row, reverse_order, side_edges)
         ## add row to con_order:
         con_order.extend( msg_neighbors.first + row + msg_neighbors.last )
 
+    ## Last minor-direction of contraction:
+    # make opposite than last direction
+    last_order_was_reversed = reverse_order.prev_state()
+    final_order_is_reversed = not last_order_was_reversed
+    if final_order_is_reversed:
+        last_minor_direction = minor_right.opposite()
+    else:
+        last_minor_direction = minor_right
+
     ## Last msg:
-    con_order += tn.message_indices(major_direction)
+    last_msg = tn.message_indices(major_direction)
+    if not final_order_is_reversed:
+        last_msg.reverse()
+    con_order += last_msg
 
     ## Plot result:
     if plot_:
@@ -358,13 +419,7 @@ def derive_contraction_order(
         assert side_edges.exhausted.left
         assert side_edges.exhausted.right
 
-    ## Last minor-direction of contraction:
-    if reverse_order:
-        last_direction = minor_right.opposite()
-    else:
-        last_direction = minor_right
-
-    return con_order, last_direction
+    return con_order, last_minor_direction
 
 
 

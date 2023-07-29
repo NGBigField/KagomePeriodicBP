@@ -419,7 +419,8 @@ def contract_tensor_network(
 ]:
 
     ## derive basic data:
-    contraction_order, last_direction = derive_contraction_order(tn, direction, depth=depth)
+    contraction_order, last_direction = derive_contraction_order(tn, direction)
+    contraction_order, last_direction = derive_contraction_order(tn, direction)
 
     ## Call main function:
     mp = bubblecon(
