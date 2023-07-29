@@ -210,6 +210,27 @@ def _sorted_side_outer_edges(
 
     return left_edges, right_edges
 
+def _message_break_logic(
+    reverse_order:_ReverseOrder, seen_break:_PerBound[bool], 
+    msg_neighbors:_PerBound[list[int]], side_order:_PerBound[_Side]
+)->_ReverseOrder:
+    ## Decide if switch direction or not by checking how has neighbors from both messages:
+    for first_last in _Bound:
+        if seen_break[first_last]:
+            next_first_side = side_order[first_last]
+            break
+    else: 
+        raise ValueError("Not seen break! Bug.")
+    # Force side order to start from `next_first_side`:
+    if next_first_side is Left:
+        reverse_order.set_false()
+    elif next_first_side is Right:
+        reverse_order.set_true()
+    else:
+        raise ValueError("Not an expected option!")
+    #
+    return reverse_order
+
 
 def _add_all_side_neighbors( 
     tn:KagomeTensorNetwork, first_last:_Bound,
@@ -252,6 +273,9 @@ def _derive_message_neighbors(
     else:
         side_order = _PerBound[_Side](first=Left, last=Right)
 
+    ## Look for breaks between MPS messages:
+    seen_break = _PerBound[bool](first=False, last=False)
+
     ## Add neighbors if they exist:
     for first_last in _Bound:
         last_edge = _add_all_side_neighbors(tn, first_last, nodes, side_order, side_edges, msg_neighbors)
@@ -260,33 +284,17 @@ def _derive_message_neighbors(
         if last_edge == 'Break':
             side = side_order[first_last]
             side_edges.next(side)  # move iterator
+            seen_break[first_last] = True
 
     ## At a break, decide if switch direction or not:
     # and collect the 'lost' neighbor of the first/last node
-    if last_edge == 'Break': 
-
-        ## Decide if switch direction or not by checking how has neighbors from both messages:
-        if len(msg_neighbors[First])==1:
-            next_first_side = side_order[First]
-        elif len(msg_neighbors[Last])==1:
-            next_first_side = side_order[Last]
-        else: 
-            raise ValueError("Not an expected option!")
-        # Force side order to start from `next_first_side`:
-        if next_first_side is Left:
-            reverse_order.set_false()
-        elif next_first_side is Right:
-            reverse_order.set_true()
-        else:
-            raise ValueError("Not an expected option!")
+    if seen_break.first or seen_break.last: 
+        reverse_order = _message_break_logic(reverse_order, seen_break, msg_neighbors, side_order)
 
         # Collect lost neighnors
         for first_last in _Bound:
             _add_all_side_neighbors(tn, first_last, nodes, side_order, side_edges, msg_neighbors, force_assigning_at_end=True)
 
-        ## Assert that now both have 2 neighbours:
-        # assert len(msg_neighbors[First])==len(msg_neighbors[Last])==2
-        #TODO Check
 
     return msg_neighbors
 
@@ -338,10 +346,11 @@ def derive_contraction_order(
     if plot_:
         # For plotting contraction order, if needed:
         import matplotlib.pyplot as plt
-        from tensor_networks.visualizations import plot_contraction_order
+        from tensor_networks.visualizations import plot_contraction_order, draw_now
         tn.plot(detailed=False)
         plot_contraction_order(tn.positions, con_order)
         plt.title(f"Contraction in Direction {str(direction)}" )
+        draw_now()
 
     ## Check:
     if DEBUG_MODE:

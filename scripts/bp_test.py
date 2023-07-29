@@ -16,7 +16,7 @@ from lattices.directions import block, lattice, BlockSide
 def bp_test(
     d = 2,
     D = 3,
-    N = 3
+    N = 2
 ):
 
     ## Config:

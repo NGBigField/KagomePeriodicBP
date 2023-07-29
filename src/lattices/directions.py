@@ -67,11 +67,11 @@ class Direction():
         # Fast instance check:
         if self is other:
             return True
-        # Slower values check:
-        if (self.__class__.__name__==other.__class__.__name__ 
-            and  self.name==other.name 
-            and _angle_dist(self.angle, other.angle)<EPSILON):
-            return True
+        # # Slower values check:
+        # if (self.__class__.__name__==other.__class__.__name__ 
+        #     and  self.name==other.name 
+        #     and _angle_dist(self.angle, other.angle)<EPSILON):
+        #     return True
         return False
     
     def __hash__(self) -> int:
