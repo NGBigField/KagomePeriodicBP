@@ -158,22 +158,22 @@ block_D  : Final[BlockSide] = BlockSide("D", 3*pi/2)
 block_DL : Final[BlockSide] = BlockSide("DL", 3*pi/2-pi/3)
 block_DR : Final[BlockSide] = BlockSide("DR", 3*pi/2+pi/3)
 
+## Assignments into class for better accessability:
+LatticeDirection.R  = R
+LatticeDirection.UR = UR
+LatticeDirection.UL = UL
+LatticeDirection.L  = L
+LatticeDirection.DL = DL
+LatticeDirection.DR = DR
 
-class lattice:
-    R   = R
-    UR  = UR
-    UL  = UL
-    L   = L
-    DL  = DL
-    DR  = DR    
-    
-class block:
-    U   = block_U
-    D   = block_D
-    UL  = block_UL
-    DL  = block_DL
-    UR  = block_UR
-    DR  = block_DR    
+BlockSide.U  = block_U
+BlockSide.UR = block_UR
+BlockSide.UL = block_UL
+BlockSide.D  = block_D
+BlockSide.DL = block_DL
+BlockSide.DR = block_DR
+
+
 
 # ============================================================================ #
 #|                        Relations between Directions                        |#

@@ -43,10 +43,6 @@ from typing import Any, NamedTuple
 from libs.ITE import rho_ij
 
 
-def _derive_angle(p1:tuple[int,int], p2:tuple[int,int])->float:
-    dx = p2[0] - p1[0]
-    dy = p2[1] - p1[1]
-    return np.arctan2(dx, dy)
 
 def _fix_angle(a:float)->float:
     while a < 0:
@@ -445,7 +441,7 @@ def connect_corner_messages(
         
     ## Derive new angles:
     new_a = [0.0, 0.0]
-    new_a[0] = _derive_angle(pos[0], pos[1])
+    new_a[0] = tuples.angle(pos[0], pos[1])
     new_a[1] = _fix_angle(new_a[0]+np.pi)
     new_angle = [old_angles[i]+[new_a[i]] for i in [0, 1]]
 
@@ -473,37 +469,28 @@ def contract_tensor_network(
     LatticeDirection,
 ]:
 
-    #TODO Test:
-    for direction in BlockSide.all_in_counter_clockwise_order():
+    ## Derive Contraction Order:
+    # get or derive full con-oder:
+    full_contraction_order, last_direction = derive_contraction_order(tn, direction)
+    # Cut con order according to `depth`:
+    contraction_order = contraction_order_at_depth(full_contraction_order, depth, tn.lattice.N)
 
-        ## Derive Contraction Order:
-        # get or derive full con-oder:
-        full_contraction_order, last_direction = derive_contraction_order(tn, direction)
-        # Cut con order according to `depth`:
-        contraction_order = contraction_order_at_depth(full_contraction_order, depth, tn.lattice.N)
+    ## Connect first MPS message to a side tensor, to allow efficient contraction:
+    tensors, edges_list, angles = connect_corner_messages(tn, direction)
 
-        ## Connect first MPS message to a side tensor, to allow efficient contraction:
-        tensors, edges_list, angles = connect_corner_messages(tn, direction)
-
-        try:
-            ## Call main function:
-            mp = bubblecon(
-                tensors, 
-                edges_list, 
-                angles, 
-                bubble_angle=direction.angle,
-                swallow_order=contraction_order, 
-                D_trunc=bubblecon_trunc_dim,
-                opt='high',
-                progress_bar=BubbleConConfig.progress_bar and print_progress,
-                separate_exp=BubbleConConfig.separate_exp,
-                ket_tensors=tn.kets
-            )
-        except Exception as e:
-            print("")
-            print(direction)
-            print(e)
-
+    ## Call main function:
+    mp = bubblecon(
+        tensors, 
+        edges_list, 
+        angles, 
+        bubble_angle=direction.angle,
+        swallow_order=contraction_order, 
+        D_trunc=bubblecon_trunc_dim,
+        opt='high',
+        progress_bar=BubbleConConfig.progress_bar and print_progress,
+        separate_exp=BubbleConConfig.separate_exp,
+        ket_tensors=tn.kets
+    )
 
     ## Derive outgoing mps direction
     mps_direction = direction.orthogonal_clockwise_lattice_direction()

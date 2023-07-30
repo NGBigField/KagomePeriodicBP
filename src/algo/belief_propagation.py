@@ -3,6 +3,9 @@ if __name__ == "__main__":
 	sys.path.append(
 		pathlib.Path(__file__).parent.parent.__str__()
 	)
+	sys.path.append(
+		pathlib.Path(__file__).parent.parent.parent.__str__()
+	)
 
 # Get Global-Config:
 from _config_reader import DEBUG_MODE
@@ -57,7 +60,8 @@ def _out_going_message(
     t = mps.A[n-1]
     mps.set_site(t/np.linalg.norm(t), n-1)
 
-    return mps, mps_direction
+    ## Out message:
+    return Message(mps, mps_direction)
 
 
 def _bp_error_str(error:float|None):
@@ -65,9 +69,8 @@ def _bp_error_str(error:float|None):
 
 
 def _belief_propagation_step(
-    open_tn:KagomeTensorNetwork,
+    tn:KagomeTensorNetwork,
     prev_error:float|None,
-    prev_tn_with_messages:KagomeTensorNetwork,
     prev_messages:MessageDictType,
     prog_bar:prints.ProgressBar,
     bp_config:BPConfig
@@ -79,10 +82,10 @@ def _belief_propagation_step(
     
     ## Compute out-going message for all possible sizes:
     # prepare inputs:
-    fixed_arguments = dict(tn=prev_tn_with_messages, bubblecon_trunc_dim=bp_config.max_swallowing_dim, hermitize=bp_config.hermitize_messages_between_iterations)
+    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=bp_config.max_swallowing_dim, hermitize=bp_config.hermitize_messages_between_iterations)
     # The message going-out to the left returns from the right as the new incoming message:
     multi_processing = bp_config.parallel_computing and (
-        open_tn.tensor_dims.virtual>2 or bp_config.max_swallowing_dim>=16
+        tn.tensor_dims.virtual>2 or bp_config.max_swallowing_dim>=16
     )
     if multi_processing:
         prog_bar.append_extra_str(f" error={_bp_error_str(prev_error)}")
@@ -98,17 +101,17 @@ def _belief_propagation_step(
     next_messages = {direction.opposite() : mps_data for direction, mps_data in out_messages.items() }
     
     ## Connect new incoming massages to tensor-network:
-    next_tn_with_messages = connect_messages_with_tn(open_tn, next_messages)
+    tn.connect_messages(next_messages)
 
     ## Check error between messages:
     # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:
-    distances = [ MPS.l2_distance(prev_messages[dir][0], next_messages[dir][0]) for dir in Direction ]
+    distances = [ MPS.l2_distance(prev_messages[dir][0], next_messages[dir][0]) for dir in BlockSide.all_in_counter_clockwise_order() ]
     if bp_config.msg_diff_squared:
         next_error = sum(distances)/len(distances)
     else:
         next_error = np.sqrt( sum(distances) )/len(distances)
 
-    return next_tn_with_messages, next_messages, next_error
+    return tn, next_messages, next_error
 
 
 
@@ -209,7 +212,7 @@ def belief_propagation_pashtida(
 
 @decorators.add_stats()
 def belief_propagation(
-    open_tn:KagomeTensorNetwork, 
+    tn:KagomeTensorNetwork, 
     messages:MessageDictType|None, # initial messages
     bp_config:BPConfig,
     live_plots:bool=False
@@ -226,8 +229,8 @@ def belief_propagation(
 
     ## Derive first incoming messages:  
     if messages is None:
-        D = open_tn.dimensions.virtual_dim
-        message_length = open_tn.num_message_connections
+        D = tn.dimensions.virtual_dim
+        message_length = tn.num_message_connections
         messages = { 
             edge_side : Message(
                 mps=initial_message(D=D, N=message_length), 
@@ -241,9 +244,8 @@ def belief_propagation(
     else:                       prog_bar = prints.ProgressBar(max_iterations, "Performing BlockBP...  ")
 
     ## Start with the initial message:
-    tn_with_messages = open_tn.copy()
-    tn_with_messages.connect_messages(messages)
-    if DEBUG_MODE: tn_with_messages.validate()
+    tn.connect_messages(messages)
+    if DEBUG_MODE: tn.validate()
 
     ## Initial values (In case no iteration will perform, these are the default values)
     error = None  
@@ -261,9 +263,9 @@ def belief_propagation(
     for i in prog_bar:
                
         # Preform BP step:
-        tn_with_messages, messages, error = _belief_propagation_step(
-            open_tn=open_tn, prev_error=error, 
-            prev_tn_with_messages=tn_with_messages, prev_messages=messages,
+        tn, messages, error = _belief_propagation_step(
+            tn=tn, prev_error=error, 
+            prev_messages=messages,
             prog_bar=prog_bar, bp_config=bp_config
         )
         
@@ -296,12 +298,12 @@ def belief_propagation(
             if isinstance(bp_config.max_iterations, int):
                 bp_config.max_iterations += 10
             messages = None
-            tn_with_messages, messages, stats = belief_propagation(open_tn, messages, bp_config)  # Try again with initial messages
+            tn_with_messages, messages, stats = belief_propagation(tn, messages, bp_config)  # Try again with initial messages
             stats.attempts += 1
         
         else:
             messages = min_messages
-            tn_with_messages = connect_messages_with_tn(open_tn, messages)            
+            tn_with_messages = connect_messages_with_tn(tn, messages)            
 
     # Check result and finish:
     if DEBUG_MODE: tn_with_messages.validate()
@@ -336,10 +338,10 @@ def _test():
     up_open_tensors = [_physical_tensor_with_split_mid_leg(t) for t in up_message.A]
 
 
-def main_test():
-    from scripts.core_ite_test import main
-    main()
+
 
 if __name__ == "__main__":
-    # _test()
-    main_test()
+    from project_paths import add_scripts; 
+    add_scripts()
+    from scripts import bp_test
+    bp_test.main_test()

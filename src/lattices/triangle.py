@@ -1,5 +1,4 @@
 from lattices._common import Node
-from lattices.directions import lattice, block
 from lattices.directions import LatticeDirection, BlockSide, Direction
 from typing import Generator
 from _error_types import LatticeError, OutsideLatticeError
@@ -44,33 +43,33 @@ def row_width(i, N):
 
 def _get_neighbor_coordinates_in_direction_no_boundary_check(i:int, j:int, direction:LatticeDirection, N:int)->tuple[int, int]:
 	## Simple L or R:
-	if direction==lattice.L:  
+	if direction==LatticeDirection.L:  
 		return i, j-1
-	if direction==lattice.R:  
+	if direction==LatticeDirection.R:  
 		return i, j+1
 
 	## Row dependant:
 	middle_row_index = num_rows(N)//2   # above or below middle row
 
-	if direction==lattice.UR: 
+	if direction==LatticeDirection.UR: 
 		if i <= middle_row_index: 
 			return i-1, j
 		else: 
 			return i-1, j+1
 	
-	if direction==lattice.UL:
+	if direction==LatticeDirection.UL:
 		if i <= middle_row_index:
 			return i-1, j-1
 		else:
 			return i-1, j
 		
-	if direction==lattice.DL:
+	if direction==LatticeDirection.DL:
 		if i < middle_row_index:
 			return i+1, j
 		else:
 			return i+1, j-1
 		
-	if direction==lattice.DR:
+	if direction==LatticeDirection.DR:
 		if i < middle_row_index:
 			return i+1, j+1
 		else:
@@ -90,19 +89,19 @@ def check_boundary_vertex(index:int, N)->list[BlockSide]:
 
 	# Boundaries:
 	if i==0:
-		on_boundaries.append(block.U)
+		on_boundaries.append(BlockSide.U)
 	if i==height-1:
-		on_boundaries.append(block.D)
+		on_boundaries.append(BlockSide.D)
 	if j==0: 
 		if i<=middle_row_index:
-			on_boundaries.append(block.UL)
+			on_boundaries.append(BlockSide.UL)
 		if i>=middle_row_index:
-			on_boundaries.append(block.DL)
+			on_boundaries.append(BlockSide.DL)
 	if j == width-1:
 		if i<=middle_row_index:
-			on_boundaries.append(block.UR)
+			on_boundaries.append(BlockSide.UR)
 		if i>=middle_row_index:
-			on_boundaries.append(block.DR)
+			on_boundaries.append(BlockSide.DR)
 	
 	return on_boundaries
 
@@ -669,7 +668,7 @@ def create_triangle_lattice(N)->list[Node]:
 				index = index,
 				pos = get_node_position(i, j, N),
 				edges = edges_list[index],
-				directions=[lattice.L, lattice.R, lattice.UL, lattice.UR, lattice.DL, lattice.DR]
+				directions=[LatticeDirection.L, LatticeDirection.R, LatticeDirection.UL, LatticeDirection.UR, LatticeDirection.DL, LatticeDirection.DR]
 			)
 			nodes_list.append(n)
 			index += 1

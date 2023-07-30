@@ -14,7 +14,7 @@ from _config_reader import DEBUG_MODE
 
 # Directions:
 from lattices.directions import BlockSide, LatticeDirection, Direction
-from lattices.directions import block, lattice, check
+from lattices.directions import check
 
 from tensor_networks.node import TensorNode
 from lattices.edges import edges_dict_from_edges_list

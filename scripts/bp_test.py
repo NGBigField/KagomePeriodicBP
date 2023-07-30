@@ -10,12 +10,12 @@ from algo.belief_propagation import belief_propagation
 from containers import BPConfig
 
 # Directions defining the lattice and the block:
-from lattices.directions import block, lattice, BlockSide
+from lattices.directions import BlockSide
 
 
 def bp_test(
     d = 2,
-    D = 3,
+    D = 2,
     N = 2
 ):
 
