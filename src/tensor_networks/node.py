@@ -24,7 +24,7 @@ from dataclasses import dataclass, field, fields
 # For TN methods and types:
 from tensor_networks.operations import fuse_tensor_to_itself
 from lattices.directions import LatticeDirection, BlockSide, Direction
-from enums import NodeFunctionality, CoreCellType
+from enums import NodeFunctionality, UnitCellFlavor
 
 
 
@@ -38,7 +38,7 @@ class TensorNode():
     edges : list[EdgeIndicatorType]
     directions : list[LatticeDirection] 
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
-    core_cell_type : CoreCellType = field(default=CoreCellType.NoneLattice) 
+    core_cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
     boundaries : list[BlockSide] = field(default_factory=list) 
 
 
@@ -134,7 +134,7 @@ class TensorNode():
         from utils import visuals
                 
         plt.figure()
-        if self.functionality is NodeFunctionality.Core:
+        if self.functionality is NodeFunctionality.CenterUnitCell:
             node_color = 'blue'
         else:
             node_color = 'red'

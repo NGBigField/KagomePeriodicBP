@@ -67,11 +67,10 @@ class Direction():
         # Fast instance check:
         if self is other:
             return True
-        # # Slower values check:
-        # if (self.__class__.__name__==other.__class__.__name__ 
-        #     and  self.name==other.name 
-        #     and _angle_dist(self.angle, other.angle)<EPSILON):
-        #     return True
+        # Slower values check:
+        if (self.__class__.__name__==other.__class__.__name__ 
+            and  self.name==other.name ):
+            return True
         return False
     
     def __hash__(self) -> int:
@@ -143,35 +142,21 @@ class BlockSide(Direction):
 # ============================================================================ #    
 
 # Main direction in the Kagome lattice:
-R  : Final[LatticeDirection] = LatticeDirection("R" , 0)
-UR : Final[LatticeDirection] = LatticeDirection("UR", pi/3)
-UL : Final[LatticeDirection] = LatticeDirection("UL", 2*pi/3)
-L  : Final[LatticeDirection] = LatticeDirection("L" , pi)
-DL : Final[LatticeDirection] = LatticeDirection("DL", 4*pi/3)
-DR : Final[LatticeDirection] = LatticeDirection("DR", 5*pi/3)
+LatticeDirection.R  = LatticeDirection("R" , 0)
+LatticeDirection.UR = LatticeDirection("UR", pi/3)
+LatticeDirection.UL = LatticeDirection("UL", 2*pi/3)
+LatticeDirection.L  = LatticeDirection("L" , pi)
+LatticeDirection.DL = LatticeDirection("DL", 4*pi/3)
+LatticeDirection.DR = LatticeDirection("DR", 5*pi/3)
 
 # Directions that apear in the hexagonal cell:
-block_U  : Final[BlockSide] = BlockSide("U", pi/2)
-block_UR : Final[BlockSide] = BlockSide("UR", pi/2-pi/3)
-block_UL : Final[BlockSide] = BlockSide("UL", pi/2+pi/3)
-block_D  : Final[BlockSide] = BlockSide("D", 3*pi/2)
-block_DL : Final[BlockSide] = BlockSide("DL", 3*pi/2-pi/3)
-block_DR : Final[BlockSide] = BlockSide("DR", 3*pi/2+pi/3)
+BlockSide.U   = BlockSide("U", pi/2)
+BlockSide.UR  = BlockSide("UR", pi/2-pi/3)
+BlockSide.UL  = BlockSide("UL", pi/2+pi/3)
+BlockSide.D   = BlockSide("D", 3*pi/2)
+BlockSide.DL  = BlockSide("DL", 3*pi/2-pi/3)
+BlockSide.DR  = BlockSide("DR", 3*pi/2+pi/3)
 
-## Assignments into class for better accessability:
-LatticeDirection.R  = R
-LatticeDirection.UR = UR
-LatticeDirection.UL = UL
-LatticeDirection.L  = L
-LatticeDirection.DL = DL
-LatticeDirection.DR = DR
-
-BlockSide.U  = block_U
-BlockSide.UR = block_UR
-BlockSide.UL = block_UL
-BlockSide.D  = block_D
-BlockSide.DL = block_DL
-BlockSide.DR = block_DR
 
 
 
@@ -179,8 +164,13 @@ BlockSide.DR = block_DR
 #|                        Relations between Directions                        |#
 # ============================================================================ #    
 
-LATTICE_DIRECTIONS_COUNTER_CLOCKWISE : Final[list[Direction]] = [DL, DR, R, UR, UL, L]
-BLOCK_SIDES_COUNTER_CLOCKWISE : Final[list[Direction]] = [block_D, block_DR, block_UR, block_U, block_UL, block_DL]
+LATTICE_DIRECTIONS_COUNTER_CLOCKWISE : Final[list[Direction]] = [
+    LatticeDirection.DL, LatticeDirection.DR, LatticeDirection.R, LatticeDirection.UR, LatticeDirection.UL, LatticeDirection.L
+]
+
+BLOCK_SIDES_COUNTER_CLOCKWISE : Final[list[Direction]] = [
+    BlockSide.D, BlockSide.DR, BlockSide.UR, BlockSide.U, BlockSide.UL, BlockSide.DL
+]
 
 ORDERED_LISTS = {
     LatticeDirection : LATTICE_DIRECTIONS_COUNTER_CLOCKWISE,
@@ -189,37 +179,37 @@ ORDERED_LISTS = {
 
 OPPOSITE_DIRECTIONS : Final[dict[Direction, Direction]] = {
     # Lattice:
-    R  : L ,
-    UR : DL,
-    UL : DR, 
-    L  : R ,
-    DL : UR,
-    DR : UL,
+    LatticeDirection.R  : LatticeDirection.L ,
+    LatticeDirection.UR : LatticeDirection.DL,
+    LatticeDirection.UL : LatticeDirection.DR, 
+    LatticeDirection.L  : LatticeDirection.R ,
+    LatticeDirection.DL : LatticeDirection.UR,
+    LatticeDirection.DR : LatticeDirection.UL,
     # Block:
-    block_U  : block_D,
-    block_D  : block_U,
-    block_UR : block_DL,
-    block_DL : block_UR,
-    block_UL : block_DR,
-    block_DR : block_UL
+    BlockSide.U  : BlockSide.D,
+    BlockSide.D  : BlockSide.U,
+    BlockSide.UR : BlockSide.DL,
+    BlockSide.DL : BlockSide.UR,
+    BlockSide.UL : BlockSide.DR,
+    BlockSide.DR : BlockSide.UL
 }
 
 ORTHOGONAL_LATTICE_DIRECTIONS_TO_BLOCK_SIDES : Final[dict[BlockSide, LatticeDirection]] = {
-    block_D  : R,
-    block_U  : L,
-    block_DR : UR,
-    block_DL : DR,
-    block_UR : UL,
-    block_UL : DL
+    BlockSide.D  : LatticeDirection.R,
+    BlockSide.U  : LatticeDirection.L,
+    BlockSide.DR : LatticeDirection.UR,
+    BlockSide.DL : LatticeDirection.DR,
+    BlockSide.UR : LatticeDirection.UL,
+    BlockSide.UL : LatticeDirection.DL
 }
 
 MATCHING_LATTICE_DIRECTIONS_TO_BLOCK_SIDES : Final[dict[BlockSide, list[LatticeDirection]]] = {
-    block_D  : [DL, DR],
-    block_DR : [DR, R ],
-    block_UR : [R,  UR],
-    block_U  : [UR, UL],
-    block_UL : [UL, L ],
-    block_DL : [L , DL]
+    BlockSide.D  : [LatticeDirection.DL, LatticeDirection.DR],
+    BlockSide.DR : [LatticeDirection.DR, LatticeDirection.R ],
+    BlockSide.UR : [LatticeDirection.R,  LatticeDirection.UR],
+    BlockSide.U  : [LatticeDirection.UR, LatticeDirection.UL],
+    BlockSide.UL : [LatticeDirection.UL, LatticeDirection.L ],
+    BlockSide.DL : [LatticeDirection.L , LatticeDirection.DL]
 }
 
 

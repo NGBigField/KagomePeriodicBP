@@ -17,12 +17,12 @@ from typing import List, Tuple, Iterable, TypeVar
 # Common types in the code:
 from tensor_networks import KagomeTensorNetwork, TensorNode, MPS
 from lattices.directions import LatticeDirection, BlockSide
-from lattices import directions
 from _error_types import TensorNetworkError
-from enums import ContractionDepth, ReduceToEdgeMethod, ReduceToCoreMethod, NodeFunctionality
+from enums import ContractionDepth, ReduceToEdgeMethod, ReduceToCoreMethod, NodeFunctionality, UnitCellFlavor
 from containers import BubbleConConfig, MessageDictType
 from physics import pauli
 from _types import EdgeIndicatorType
+from tensor_networks.unit_cell import UnitCell
 
 # Our utilities:
 from utils import tuples, lists, assertions, parallel_exec
@@ -42,6 +42,8 @@ from typing import Any, NamedTuple
 # For energy estimation:
 from libs.ITE import rho_ij
 
+
+MULTIPROCESSING = False
 
 
 def _fix_angle(a:float)->float:
@@ -87,12 +89,10 @@ def _sandwich_fused_tensors_with_expectation_values(tn_in:KagomeTensorNetwork, m
         pos             = node.pos,
         index           = node.index,
         name            = node.name,
-        on_boundary     = node.boundaries,
+        boundaries      = node.boundaries,
         functionality   = node.functionality
     )
     if DEBUG_MODE: tn_out.validate()
-
-
 
     return tn_out
 
@@ -292,7 +292,7 @@ def swallow_corners(tn:KagomeTensorNetwork, _if_no_corners_error:bool=True)->Kag
 def rearange_tensors_legs_to_canonical_order(
     tn_env:KagomeTensorNetwork, side:None # Fix mode\side
 )->tuple[TensorNode, TensorNode, list[np.ndarray]]:
-    core_tensors = tn_env.get_core_nodes()
+    core_tensors = tn_env.get_nodes_by_functionality()
     core1 = _find_node_in_relative_direction(side.next_counterclockwise(), *core_tensors)
     core2 = _find_node_in_relative_direction(side.next_clockwise(), *core_tensors)
     environment_nodes = [
@@ -339,32 +339,46 @@ def calc_interaction_energies_in_core(tn:KagomeTensorNetwork, interaction_hamilt
 
 
 
-def calc_mean_values(
+def calc_unit_cell_expectation_values(
     tn:KagomeTensorNetwork, 
     operators:list[np.matrix], 
     bubblecon_trunc_dim:int, 
     direction:BlockSide=BlockSide.random(), 
     force_real:bool=False, 
     reduce:bool=True
-) -> list[float]:
+) -> list[UnitCell]:
+    """ Compute expectation values of unit cell nodes
+
+    For each operator (np.matrix) in `operators`, returns a UnitCell object (with A,B,C attributes) with the 
+    corrosponding expectation values of this specific tensor in the unit cell for the operator.
+
+    """
     ## Prepare output:
-    mean_values = []
+    results = []
 
     ## Perform all common actions:
     if reduce:
-        tn_reduced = reduce_tn_to_core_and_environment(tn, bubblecon_trunc_dim)
+        tn_reduced : KagomeTensorNetwork = reduce_tn_to_core_and_environment(tn, bubblecon_trunc_dim)
     else:
-        tn_reduced = tn.copy()
+        tn_reduced : KagomeTensorNetwork = tn
     denominator, _, _ = contract_tensor_network(tn_reduced, direction=direction, depth=ContractionDepth.Full, bubblecon_trunc_dim=bubblecon_trunc_dim)
     assert not isinstance(denominator, MPS), "Full contraction should result in a number, not an MPS"
-    center_nodes = tn_reduced.get_core_nodes()
-    center_indices = [n.index for n in center_nodes]
+    center_nodes = tn_reduced.get_center_unit_cell_nodes()
+    unit_cell_indices = UnitCell(
+        A = [n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.A ][0],
+        B = [n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.B ][0],
+        C = [n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.C ][0]
+    )
 
     ## Perform calculation per operator:
-    for operator in operators:
-        mean_value = calc_mean_value(tn_reduced, center_indices, operator, bubblecon_trunc_dim=bubblecon_trunc_dim, direction=direction, denominator=denominator, force_real=force_real)
-        mean_values.append(mean_value)
-    return mean_values
+    for operator in operators:     
+        res_unit_cell = UnitCell(A=0.0, B=0.0, C=0.0)   
+        for key in UnitCell.all_keys():
+            index = unit_cell_indices.__getattribute__(key)
+            value = calc_mean_value(tn_reduced, [index], operator, bubblecon_trunc_dim=bubblecon_trunc_dim, direction=direction, denominator=denominator, force_real=force_real)
+            res_unit_cell.__setattr__(key, value)
+        results.append(res_unit_cell)
+    return results
 
 
 def calc_mean_value(
@@ -542,7 +556,7 @@ def reduce_core_and_environment_to_edge_and_environment(
 )->KagomeTensorNetwork:
     tn_env = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[side], depth=2)
     ## Find and Swallow the two corner tensors:
-    remaining_core_tensors = [t for t in tn_env.nodes if t.functionality is NodeFunctionality.Core]
+    remaining_core_tensors = [t for t in tn_env.nodes if t.functionality is NodeFunctionality.CenterUnitCell]
     assert len(remaining_core_tensors)==2
     for t in tn_env.nodes:
         # pass on core nodes:
@@ -575,7 +589,7 @@ def _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn:KagomeTensorNetwork, 
     assert swallow_corners_ is True, f"Zipping methods always swallows the corners"
 
     ## General data:
-    core_indices = [n.index for n in tn.get_core_nodes()]
+    core_indices = [n.index for n in tn.get_nodes_by_functionality()]
     mpss : dict[Direction, MPS] = dict()
     N = tn.original_lattice_dims[0]-2
     n = len(core_indices)//2
@@ -640,7 +654,7 @@ def _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn:KagomeTensorNetwork, 
     #     tensors that surround it.
 
     # first create the small TN
-    peps = [n.physical_tensor for n in tn.get_core_nodes()]
+    peps = [n.physical_tensor for n in tn.get_nodes_by_functionality()]
     small_tn = create_kagome_tn(core_size=n, D=d_virtual, d=d_physical, padding=0, creation_mode=peps)
 
     ## Add the surrounding MPS tensors in the edge order D, R, U, L

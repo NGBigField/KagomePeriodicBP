@@ -9,7 +9,6 @@ from lattices import edges
 from lattices._common import Node
 from lattices import directions
 from lattices.directions import LatticeDirection, BlockSide
-from lattices.directions import L, R, UL, UR, DL, DR  # Lattice directions:
 
 from _error_types import LatticeError, DirectionError
 from _types import EdgeIndicatorType
@@ -22,6 +21,7 @@ from typing import Generator
 import itertools
 import functools
 
+## constants:
 
 _delta_xs = [0, -1,  1]
 _delta_ys = [1, -1, -1]
@@ -39,6 +39,14 @@ An Upper Triagle:
     /   \
 Left    Right
 """
+
+## Naming shortcuts:
+L  = LatticeDirection.L 
+R  = LatticeDirection.R 
+UL = LatticeDirection.UL 
+UR = LatticeDirection.UR 
+DL = LatticeDirection.DL 
+DR = LatticeDirection.DR
 
 
 class KagomeLatticeError(LatticeError):...
@@ -322,11 +330,11 @@ def create_kagome_lattice(
     bottom_left_corner_node = _sorted_boundary_nodes(kagome_lattice, BlockSide.D)[0]
     bottom_left_corner_node.set_edge_in_direction(DL, f"{BlockSide.D}-0")
 
-    
     ## Plot test:
-    # from lattices._common import plot
-    # plot(kagome_lattice)
-    # plot(original_triangular_lattice, node_color="black", edge_style="y--", node_size=5)
+    if False:
+        from lattices._common import plot
+        plot(kagome_lattice)
+        plot(original_triangular_lattice, node_color="black", edge_style="y--", node_size=5)
 
     return kagome_lattice, triangular_lattice_of_upper_triangles
 

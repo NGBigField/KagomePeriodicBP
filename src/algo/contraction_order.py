@@ -41,13 +41,16 @@ from dataclasses import dataclass, fields
 from copy import deepcopy
 
 
-# Types:
+## Types:
 _T = TypeVar("_T")
 _EnumType = TypeVar("_EnumType")
 _PosFuncType = Callable[[int, int], tuple[int, int] ]
 
-# Constants:
+## Constants:
 BREAK_MARKER = -100
+
+
+CONTRACTION_ORDERS_CACHE = {}
 
 
 class _Bound(Enum):
@@ -355,7 +358,7 @@ def _derive_row_message_neighbors(
 
     return msg_neighbors_at_bounds
 
-@functools.cache  #TODO:  Check cache
+
 def derive_contraction_order(
     tn:KagomeTensorNetwork,  
     direction:BlockSide,
@@ -365,6 +368,13 @@ def derive_contraction_order(
     Direction
 ]:
     
+    ## Check cached contractions:
+    global CONTRACTION_ORDERS_CACHE
+    cache_key = (tn.lattice.N, direction.name)
+    if cache_key in CONTRACTION_ORDERS_CACHE:
+        return CONTRACTION_ORDERS_CACHE[cache_key]
+
+
     ## Prepare output:
     con_order = []    
 
@@ -421,6 +431,10 @@ def derive_contraction_order(
         # Both list of messages are in `con_order`:
         assert side_edges.exhausted.left
         assert side_edges.exhausted.right
+
+        
+    ## Cached result:
+    CONTRACTION_ORDERS_CACHE[cache_key] = (con_order, last_minor_direction)
 
     return con_order, last_minor_direction
 

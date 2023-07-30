@@ -34,7 +34,7 @@ from typing import (
 from dataclasses import dataclass, field
 
 # Common types:
-from tensor_networks.node import TensorNode, NodeFunctionality, CoreCellType
+from tensor_networks.node import TensorNode, NodeFunctionality, UnitCellFlavor
 from lattices.directions import Direction
 from _error_types import DirectionError
 
@@ -235,8 +235,8 @@ def plot_network(
 
     def node_style(node:TensorNode):
         # Marker:
-        if node.functionality is NodeFunctionality.Core:
-            marker = f"${node.core_cell_type}$"
+        if node.functionality is NodeFunctionality.CenterUnitCell:
+            marker = f"${node.core_cell_flavor}$"
             size1 = 120
             size2 = 180
             name = " "
@@ -246,14 +246,14 @@ def plot_network(
             size2 = 30
             name = f"{node.name}"
         # Color:
-        match node.core_cell_type:
-            case CoreCellType.A:
+        match node.core_cell_flavor:
+            case UnitCellFlavor.A:
                 color = 'green'
-            case CoreCellType.B:
+            case UnitCellFlavor.B:
                 color = 'red'
-            case CoreCellType.C:
+            case UnitCellFlavor.C:
                 color = 'gold'
-            case CoreCellType.NoneLattice:
+            case UnitCellFlavor.NoneLattice:
                 if node.functionality is NodeFunctionality.Message:
                     color = "orange"
                 else:

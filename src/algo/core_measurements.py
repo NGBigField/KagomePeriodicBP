@@ -6,21 +6,21 @@ if __name__ == "__main__":
 
 
 ## Get config:
-from utils.config import DEBUG_MODE, ALLOW_VISUALS, VERBOSE_MODE
+from _config_reader import DEBUG_MODE
 
 import numpy as np
 
 from tensor_networks import KagomeTensorNetwork, TensorNode
 from tensor_networks.construction import repeat_core
-from algo.tensor_network import reduce_tn_to_core_and_environment, calc_edge_environment, calc_mean_values
-from lib.ITE import rho_ij
+from algo.tensor_network import reduce_tn_to_core_and_environment, calc_edge_environment, calc_unit_cell_expectation_values
+from libs.ITE import rho_ij
 from physics import pauli
+from lattices.directions import BlockSide
 
 from containers import Config
 from containers.results import Measurements, Expectations
 from copy import deepcopy
 
-from enums import Directions
 from _error_types import BPNotConvergedError
 
 from algo.belief_propagation import belief_propagation, belief_propagation_pashtida
@@ -51,7 +51,7 @@ def _get_z_projection(rho:np.ndarray)->complex:
 
 
 def measure_xyz_expectation_values_with_tn(tn_stable_around_core:KagomeTensorNetwork, reduce:bool=True, bubblecon_trunc_dim:int=18)->dict[str, float|complex]:
-    res = calc_mean_values(tn_stable_around_core, operators=all_paulis, bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=reduce)
+    res = calc_unit_cell_expectation_values(tn_stable_around_core, operators=all_paulis, bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=reduce)
     return dict(x=res[0], y=res[1], z=res[2])
 
 
@@ -115,9 +115,9 @@ def measure_core_energies(
     if DEBUG_MODE: tn_stable_around_core.validate()
     ## For each edge, reduce a bit more and calc energy:
     rdms = []
-    for edge_side in Directions.all_in_counterclockwise_order():
+    for side in BlockSide.all_in_counter_clockwise_order():
         # do the final needed contraction for this specific edge:
-        core1, core2, environment_tensors, tn_env = calc_edge_environment(tn_stable_around_core, edge_side, bubblecon_trunc_dim, already_reduced_to_core=True)
+        core1, core2, environment_tensors, tn_env = calc_edge_environment(tn_stable_around_core, side, bubblecon_trunc_dim, already_reduced_to_core=True)
         # Get physical core tensors:
         ti = core1.physical_tensor
         tj = core2.physical_tensor

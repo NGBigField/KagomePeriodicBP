@@ -16,14 +16,11 @@ import numpy as np
 # other used types in our code:
 from tensor_networks import KagomeTensorNetwork, MPS
 from lattices.directions import BlockSide, LatticeDirection
-from enums import ContractionDepth, MessageModel
+from enums import ContractionDepth
 from containers import BPStats, BPConfig, MessageDictType, Message
 
 # needed algo:
 from algo.tensor_network import contract_tensor_network
-
-# initial messages creation:
-from tensor_networks.mps import init_mps_quantum
 
 # for ite stuff:
 from libs import ITE as ite
@@ -71,7 +68,6 @@ def _bp_error_str(error:float|None):
 def _belief_propagation_step(
     tn:KagomeTensorNetwork,
     prev_error:float|None,
-    prev_messages:MessageDictType,
     prog_bar:prints.ProgressBar,
     bp_config:BPConfig
 )->tuple[
@@ -79,7 +75,10 @@ def _belief_propagation_step(
     MessageDictType,   # next_messages
     float           # next_eerror
 ]:
-    
+
+    ## Keep unique data for comparison:
+    prev_messages = deepcopy(tn.messages)
+
     ## Compute out-going message for all possible sizes:
     # prepare inputs:
     fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=bp_config.max_swallowing_dim, hermitize=bp_config.hermitize_messages_between_iterations)
@@ -98,57 +97,23 @@ def _belief_propagation_step(
         out_messages = parallel_exec.concurrent(func=_out_going_message, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
 
     ## Next incoming messages are the outgoing messages after applying periodic boundaries:
-    next_messages = {direction.opposite() : mps_data for direction, mps_data in out_messages.items() }
+    next_messages = {direction.opposite() : message for direction, message in out_messages.items() }
     
     ## Connect new incoming massages to tensor-network:
     tn.connect_messages(next_messages)
 
     ## Check error between messages:
     # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:
-    distances = [ MPS.l2_distance(prev_messages[dir][0], next_messages[dir][0]) for dir in BlockSide.all_in_counter_clockwise_order() ]
+    distances = [ 
+        MPS.l2_distance(prev_messages[dir].mps, next_messages[dir].mps) 
+        for dir in BlockSide.all_in_counter_clockwise_order() 
+    ]
     if bp_config.msg_diff_squared:
         next_error = sum(distances)/len(distances)
     else:
         next_error = np.sqrt( sum(distances) )/len(distances)
 
     return tn, next_messages, next_error
-
-
-
-
-
-def initial_message(
-	D : int,  # Physical-Lattice bond dimension
-    N : int,  # number of tensors in the edge of the lattice
-	message_model:MessageModel|str=MessageModel.RANDOM_QUANTUM
-) -> MPS:
-
-    dims : list[int] = [D]*N
-
-
-    # Convert message model:
-    if isinstance(message_model, MessageModel):
-       pass
-    elif isinstance(message_model, str):
-       message_model = MessageModel(message_model)
-    else:
-       raise TypeError(f"Expected `initial_m_mode` to be of type <str> or <MessageModel> enum. Got {type(message_model)}")
-    
-    # Initial messages are random |v><v| quantum states
-    if message_model==MessageModel.RANDOM_QUANTUM: return init_mps_quantum(dims, random=True)
-
-    # Initial messages are uniform quantum density matrices
-    elif message_model==MessageModel.UNIFORM_QUANTUM: return init_mps_quantum(dims, random=False)
-
-    # Initial messages are uniform probability dist'
-    elif message_model==MessageModel.UNIFORM_CLASSIC: raise NotADirectoryError("We do not support classical messages in this code")
-        
-    # Initial messages are random probability dist'
-    elif message_model==MessageModel.RANDOM_CLASSIC: raise NotADirectoryError("We do not support classical messages in this code")     
-
-    else:
-        raise ValueError("Not a valid option")
-
 
 
 @decorators.add_stats()
@@ -227,25 +192,17 @@ def belief_propagation(
     max_error = bp_config.target_msg_diff
     n_failure_check_len = bp_config.times_to_deem_failure_when_diff_increases
 
-    ## Derive first incoming messages:  
+    ## Connect or randomize messages:
     if messages is None:
-        D = tn.dimensions.virtual_dim
-        message_length = tn.num_message_connections
-        messages = { 
-            edge_side : Message(
-                mps=initial_message(D=D, N=message_length), 
-                order_direction=edge_side.orthogonal_counterclockwise_lattice_direction() 
-            ) 
-            for edge_side in BlockSide.all_in_counter_clockwise_order()  \
-        }
+        tn.connect_random_messages()
+        messages = tn.messages
+    else:
+        tn.connect_messages(messages)
+    if DEBUG_MODE: tn.validate()
 
     ## Visualizations:
     if max_iterations is None:  prog_bar = prints.ProgressBar.unlimited( "Performing BlockBP...  ")
     else:                       prog_bar = prints.ProgressBar(max_iterations, "Performing BlockBP...  ")
-
-    ## Start with the initial message:
-    tn.connect_messages(messages)
-    if DEBUG_MODE: tn.validate()
 
     ## Initial values (In case no iteration will perform, these are the default values)
     error = None  
@@ -265,7 +222,6 @@ def belief_propagation(
         # Preform BP step:
         tn, messages, error = _belief_propagation_step(
             tn=tn, prev_error=error, 
-            prev_messages=messages,
             prog_bar=prog_bar, bp_config=bp_config
         )
         
@@ -303,11 +259,11 @@ def belief_propagation(
         
         else:
             messages = min_messages
-            tn_with_messages = connect_messages_with_tn(tn, messages)            
+            tn.connect_messages(messages)
 
     # Check result and finish:
-    if DEBUG_MODE: tn_with_messages.validate()
-    return tn_with_messages, messages, stats
+    if DEBUG_MODE: tn.validate()
+    return tn, messages, stats
     
 
 

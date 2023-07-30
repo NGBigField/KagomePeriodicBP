@@ -25,7 +25,7 @@ import lattices.triangle as triangle_lattice
 from _types import EdgeIndicatorType, PosScalarType
 
 from enums import NodeFunctionality
-from utils import assertions, lists, tuples, numerics, indices
+from utils import assertions, lists, tuples, numerics, indices, decorators
 
 import numpy as np
 from typing import NamedTuple, Generator
@@ -36,6 +36,9 @@ import functools
 
 from _error_types import TensorNetworkError, LatticeError, DirectionError, NetworkConnectionError
 from containers import MessageDictType, Message, TNSizesAndDimensions
+
+# Other supporting algo:
+from algo.mps import initial_message
 
 from libs.bmpslib import mps as MPS
 
@@ -104,12 +107,27 @@ class KagomeTensorNetwork():
     # ================================================= #
     #|                   Add messages                  |#
     # ================================================= #
-
     def connect_messages(self, messages:MessageDictType) -> None:   
         # Fuse:
         for block_side, message in messages.items():
             self.messages[block_side] = message
+        # Clear cache so that nodes are derived again
         self.clear_cache()
+
+
+
+    # add sub method:
+    def connect_random_messages(self) -> None:
+        D = self.dimensions.virtual_dim
+        message_length = self.num_message_connections
+        messages = { 
+            edge_side : Message(
+                mps=initial_message(D=D, N=message_length), 
+                order_direction=edge_side.orthogonal_counterclockwise_lattice_direction() 
+            ) 
+            for edge_side in BlockSide.all_in_counter_clockwise_order()  \
+        }
+        self.connect_messages(messages)
 
 
     # ================================================= #
@@ -129,7 +147,7 @@ class KagomeTensorNetwork():
         nodes : list[TensorNode] = []
         for (lattice_node, triangle), (tensor, cell_type) in zip(self.lattice.nodes_and_triangles(), unit_cell_tensors):            
             # Which type of node:
-            functionality = NodeFunctionality.Core if triangle.index == center_triangle_index else NodeFunctionality.Padding
+            functionality = NodeFunctionality.CenterUnitCell if triangle.index == center_triangle_index else NodeFunctionality.Padding
 
             # Add:
             network_node = TensorNode(
@@ -140,20 +158,22 @@ class KagomeTensorNetwork():
                 edges=lattice_node.edges,
                 directions=lattice_node.directions,
                 functionality=functionality,
-                core_cell_type=cell_type,
+                core_cell_flavor=cell_type,
                 boundaries=lattice_node.boundaries,
                 name=f"{cell_type}"
             )
             nodes.append(network_node)
 
-            if functionality is NodeFunctionality.Core:
+            if functionality is NodeFunctionality.CenterUnitCell:
                 center_nodes.append(network_node)
 
-        # Nearest-neighbors of the center triangles are also part of the core:
+        # Nearest-neighbors of the center triangles are part of the core:
         for node in center_nodes:
             for edge in node.edges:
                 neighbor_index = self.lattice.get_neighbor(node, edge).index
                 neihgbor = nodes[neighbor_index]
+                if neihgbor in center_nodes:
+                    continue
                 neihgbor.functionality = NodeFunctionality.Core
 
         ## Add messages:
@@ -173,6 +193,9 @@ class KagomeTensorNetwork():
     def edges(self)->dict[str, tuple[int, int]]:
         ## Lattice edges:
         edges = self.lattice.edges
+
+        if 'M-D-0' in edges:  # Already added messages
+            return edges
 
         ## Message edges:
         if len(self.messages)>0:
@@ -246,14 +269,17 @@ class KagomeTensorNetwork():
     def validate(self)->None:
         # Generic error message:
         _error_message = f"Failed validation of tensor-network."
+        # Provoke cached properties:
+        all_nodes = self.nodes
+        all_edges = self.edges
         # Check each node individually:
-        for node in self.nodes:
+        for node in all_nodes:
             # Self validation:
             node.validate()
             # Validation with neighbors in lattice:
             for dir in node.directions:
                 edge_name = node.edge_in_dir(dir)
-                if _is_open_edge(self.edges[edge_name]):
+                if _is_open_edge(all_edges[edge_name]):
                     continue
                 neighbor = self.find_neighbor(node, dir)
                 # Is neighbors pointing back to us?
@@ -268,10 +294,10 @@ class KagomeTensorNetwork():
                     assert neighbor.edge_in_dir(opposite_dir) == edge_name
 
         # Check edges:
-        for edge_name, node_indices in self.edges.items():
+        for edge_name, node_indices in all_edges.items():
             if node_indices[0] == node_indices[1]:  # happens in outer legs (going outside of the lattice without any connection)
                 continue
-            nodes = [self.nodes[ind] for ind in node_indices ]
+            nodes = [all_nodes[ind] for ind in node_indices ]
             try:
                 indices_of_this_edge = [node.edges.index(edge_name) for node in nodes]
             except:
@@ -518,6 +544,15 @@ class KagomeTensorNetwork():
                 self.edges[new_edge] = (connected_nodes[0], new_node_index)
             else:
                 self.edges[new_edge] = (new_node_index, new_node_index)
+    
+    def normalize_tensors(self)->None:
+        #TODO do we use it?
+        raise ValueError("Do we use this?")
+        for node in self.nodes:
+            node.normalize()
+
+    # ========= #   Get Nodes  # ========== #                 
+    #=======================================#
 
     def get_node_in_pos(self, pos:tuple[PosScalarType, ...]) -> TensorNode:
         tensors_in_position = [node for node in self.nodes if node.pos == pos]
@@ -539,16 +574,14 @@ class KagomeTensorNetwork():
                 corner_nodes.append(node)
         return corner_nodes
     
+    def get_nodes_by_functionality(self, function:NodeFunctionality)->list[TensorNode]:
+        return [n for n in self.nodes if n.functionality is function]
+    
     def get_core_nodes(self)->list[TensorNode]:
-        return [n for n in self.nodes if n.functionality is NodeFunctionality.Core]
-
-    def normalize_tensors(self)->None:
-        #TODO do we use it?
-        raise ValueError("Do we use this?")
-        for node in self.nodes:
-            node.normalize()
-
-
+        return self.get_nodes_by_functionality(NodeFunctionality.Core)
+    
+    def get_center_unit_cell_nodes(self)->list[TensorNode]:
+        return self.get_nodes_by_functionality(NodeFunctionality.CenterUnitCell)
 
 
 def _derive_message_node_position(nodes_on_boundary:list[Node], edge:EdgeIndicatorType, boundary_delta:tuple[float,...]):
