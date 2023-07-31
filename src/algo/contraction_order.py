@@ -374,7 +374,6 @@ def derive_contraction_order(
     if cache_key in CONTRACTION_ORDERS_CACHE:
         return CONTRACTION_ORDERS_CACHE[cache_key]
 
-
     ## Prepare output:
     con_order = []    
 

@@ -1,11 +1,20 @@
+# Import types used in the code:
 from lattices._common import Node
 from lattices.directions import LatticeDirection, BlockSide, Direction
-from typing import Generator
 from _error_types import LatticeError, OutsideLatticeError
 
+# For type hinting:
+from typing import Generator
+
+# some of our utils:
 from utils import tuples
 
+# For caching results:
 import functools 
+
+# for math:
+import numpy as np
+
 
 class TriangularLatticeError(LatticeError): ...
 
@@ -683,8 +692,40 @@ def all_coordinates(N:int)->Generator[tuple[int, int], None, None]:
 			yield i, j
 
 
+def _unit_vector_rotated_by_angle(vec:tuple[int, int], angle:float)->tuple[float, float]:
+	x, y = vec
+	angle1 = np.angle(x+1j*y)
+	new_angle = angle1+angle
+	new_vec = np.cos(new_angle), np.sin(new_angle)
+	new_vec /= new_vec[0]
+	from utils import numerics
+	return new_vec
+
+
+def unit_vector_corrected_for_sorting_triangular_lattice(direction:Direction)->tuple[float, float]:
+	if isinstance(direction, LatticeDirection):
+		match direction:
+			case LatticeDirection.R :	return (+1,  0)
+			case LatticeDirection.L :	return (-1,  0)
+			case LatticeDirection.UL:	return (-1, +1)
+			case LatticeDirection.UR:	return (+1, +1)
+			case LatticeDirection.DL:	return (-1, -1)
+			case LatticeDirection.DR:	return (+1, -1)
+	elif isinstance(direction, BlockSide):
+		match direction:
+			case BlockSide.U :	return ( 0, +1)
+			case BlockSide.D :	return ( 0, -1)
+			case BlockSide.UR:	return (+1, +1)
+			case BlockSide.UL:	return (-1, +1)
+			case BlockSide.DL:	return (-1, -1)
+			case BlockSide.DR:	return (+1, -1)
+	else:
+		raise TypeError(f"Not a supported typee")
+
+
 def sort_coordinates_by_direction(items:list[tuple[int, int]], direction:Direction, N:int)->list[tuple[int, int]]:
-	unit_vector = direction.unit_vector
+	# unit_vector = direction.unit_vector  # This basic logic break at bigger lattices
+	unit_vector = unit_vector_corrected_for_sorting_triangular_lattice(direction)
 	def key(ij:tuple[int, int])->float:
 		i, j = ij[0], ij[1]
 		pos = get_node_position(i, j, N)
@@ -697,7 +738,7 @@ def verices_indices_rows_in_direction(N:int, major_direction:BlockSide, minor_di
 	""" arrange nodes by direction:
 	"""
 	## Arrange indices by position relative to direction, in reverse order
-	coordinates = sort_coordinates_by_direction(all_coordinates(N), major_direction.opposite(), N)
+	coordinates_in_reverse = sort_coordinates_by_direction(all_coordinates(N), major_direction.opposite(), N)
 
 	## Bunch vertices by the number of nodes at each possible row (doesn't matter from wich direction we look)
 	list_of_rows = []
@@ -705,9 +746,9 @@ def verices_indices_rows_in_direction(N:int, major_direction:BlockSide, minor_di
 
 		# collect vertices as much as the row has:
 		row = []
-		n = row_width(i, N)
-		for _ in range(n):
-			item = coordinates.pop()
+		w = row_width(i, N)
+		for _ in range(w):
+			item = coordinates_in_reverse.pop()
 			row.append(item)
 		
 		# sort row by minor axis:
@@ -716,5 +757,3 @@ def verices_indices_rows_in_direction(N:int, major_direction:BlockSide, minor_di
 		list_of_rows.append(indices)
 
 	return list_of_rows
-
-

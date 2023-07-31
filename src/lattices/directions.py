@@ -4,7 +4,7 @@
 
 import numpy as np
 from enum import Enum
-from typing import Generator, Callable, Any, Tuple, Final
+from typing import Generator, Callable, Any, Final
 from numpy import pi, random
 from utils import strings, lists, numerics
 from functools import cache, cached_property
@@ -35,7 +35,7 @@ def _angle_dist(x:float, y:float)->float:
     y = _modulo_pi(y)
     return abs(x-y)
 
-def unit_vector_from_angle(angle:float)->Tuple[int, int]:
+def unit_vector_from_angle(angle:float)->tuple[int, int]:
     x = numerics.force_integers_on_close_to_round(np.cos(angle))
     y = numerics.force_integers_on_close_to_round(np.sin(angle))
     return (x, y)
@@ -53,7 +53,7 @@ class Direction():
     def __init__(self, name:str, angle:float) -> None:
         self.name = name
         self.angle = angle
-        self.unit_vector = unit_vector_from_angle(angle)
+        self.unit_vector : tuple[int, int] = unit_vector_from_angle(angle)
 
     def __str__(self)->str:
         return self.name

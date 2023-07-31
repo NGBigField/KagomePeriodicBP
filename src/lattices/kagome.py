@@ -110,7 +110,7 @@ def _tag_boundary_nodes(triangle:UpperTriangle, boundary:BlockSide)->None:
     for node in touching_nodes:
         node.boundaries.add(boundary)
 
-@functools.cache
+
 def _upper_triangle_node_order(major_direction:BlockSide, minor_direction:LatticeDirection) -> list[list[str]]:
     match major_direction:
         case BlockSide.U:
@@ -468,6 +468,23 @@ class KagomeLattice():
                 node : Node = triangle.__getattribute__(key)
                 node_indices.append(node.index)
         return node_indices
+    
+    # ================================================= #
+    #|                    Visuals                      |#
+    # ================================================= #
+    def plot_triangles_lattice(self)->None:
+        # Visuals import:
+        from utils import visuals
+        from matplotlib import pyplot as plt
+        # basic data:
+        N = self.N
+        # Plot triangles:
+        for upper_triangle in self.triangles:
+            ind = upper_triangle.index
+            i, j = triangle_lattice.get_vertex_coordinates(ind, N)
+            x, y = triangle_lattice.get_node_position(i, j, N)
+            plt.scatter(x, y, marker="^")
+            plt.text(x, y, f" [{ind}]")
         
             
         

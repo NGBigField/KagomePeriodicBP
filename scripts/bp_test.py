@@ -24,7 +24,7 @@ def growing_tn_bp_test(
     d = 2,
     D = 2,
     min_N = 2,
-    max_N = 13
+    max_N = 6
 ):
     ## Config:
     bp_config = BPConfig(max_swallowing_dim=8)
