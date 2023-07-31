@@ -23,15 +23,19 @@ from matplotlib import pyplot as plt
 def growing_tn_bp_test(
     d = 2,
     D = 2,
+    bp_N = 2,
     min_N = 2,
-    max_N = 6
+    max_N = 13
 ):
     ## Config:
-    bp_config = BPConfig(max_swallowing_dim=8)
+    bp_config = BPConfig(
+        max_swallowing_dim=8,
+        target_msg_diff=1e-7
+    )
     unit_cell = UnitCell.random(d=d, D=D)
 
     ## small network:
-    small_tn = create_kagome_tn(d=d, D=D, N=min_N, unit_cell=unit_cell)
+    small_tn = create_kagome_tn(d=d, D=D, N=bp_N, unit_cell=unit_cell)
     small_tn, messages, stats = belief_propagation(small_tn, messages=None, bp_config=bp_config)
     small_res = measure_xyz_expectation_values_with_tn(small_tn, reduce=False)
     print(" ")
@@ -53,18 +57,23 @@ def growing_tn_bp_test(
             for key in UnitCell.all_keys():
                 r_small = small_res[op].__getattribute__(key)
                 r_big = big_res[op].__getattribute__(key) 
-                distance += abs(r_small - r_big)**2
-        distance = np.sqrt(distance)
+                distance += abs(r_small - r_big)
         print(f"    Distance={distance}")
         distances.append(distance)
         Ns.append(N)
 
-    ## Print:
+    ## Plot:
     visuals.draw_now()
-    plt.plot(N, distances)
-    plt.xlabel("N")
-    plt.ylabel("Error")
+    for linear_or_log in ["linear", "log"]:
+        plt.figure()
+        plt.plot(Ns, distances)
+        plt.xlabel("N")
+        plt.ylabel("L1 Error in expectation values")
+        plt.title(f"Error Convergence to BP on block of size N={bp_N}")
+        plt.yscale(linear_or_log)
+        plt.grid()
 
+    visuals.draw_now()
     print("Done")
                 
 
