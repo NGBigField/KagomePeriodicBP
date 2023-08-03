@@ -10,15 +10,65 @@ from algo.belief_propagation import belief_propagation
 from containers import BPConfig
 
 # Measure core data
-from algo.core_measurements import measure_xyz_expectation_values_with_tn
+from algo.core_measurements import measure_xyz_expectation_values_with_tn, calc_unit_cell_expectation_values, pauli
 
 # Numpy for math stuff:
 import numpy as np
 
 # usefull utils:
-from utils import visuals
+from utils import visuals, saveload
 from matplotlib import pyplot as plt
 
+
+def growing_tn_bp_test2(
+    d = 2,
+    D = 3,
+    min_N = 2,
+    max_N = 14,
+):
+    ## Config:
+    bubblecon_trunc_dim = 2*D**2
+    bp_config = BPConfig(
+        max_swallowing_dim=D**2,
+        max_iterations=50,
+        target_msg_diff=1e-5
+    )
+    
+    ## Load or randomize unit_cell
+    unit_cell= UnitCell.load(f"random_{D}")
+    if unit_cell is None:
+        unit_cell = UnitCell.random(d=d, D=D)
+        unit_cell.save(f"random_{D}")
+
+    ## Figure:
+    visuals.draw_now()
+    plots = visuals.AppendablePlot()
+    plots.axis.set_title("<Z> on sites")
+    plots.axis.set_xlabel("N")
+    plots.axis.set_ylabel("<Z>")
+
+    ## Growing N networks:
+    all_results = []
+    for N in range(min_N, max_N+1, 2):
+        print(" ")
+        print(f"N={N:2}: ")
+        tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
+        tn.validate()
+        tn, messages, stats = belief_propagation(tn, messages=None, bp_config=bp_config)
+        results = calc_unit_cell_expectation_values(tn, operators=[pauli.x, pauli.y, pauli.z], bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=False)
+        zs = results[2]
+        print(zs)
+        a = zs.__getattribute__('A')
+        b = zs.__getattribute__('B')
+        c = zs.__getattribute__('C')
+        
+        plots.append(A=(N, a), B=(N, b), C=(N, c))
+        all_results.append((N, results))
+        saveload.save(all_results, f"all_results_D={D}", sub_folder="results")
+
+    ## End:
+    print("Done")
+                
 
 def growing_tn_bp_test(
     d = 2,
@@ -104,7 +154,8 @@ def single_bp_test(
 
 def main_test():
     # single_bp_test()
-    growing_tn_bp_test()
+    # growing_tn_bp_test()
+    growing_tn_bp_test2()
 
 
 if __name__ == "__main__":

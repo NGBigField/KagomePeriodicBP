@@ -5,6 +5,7 @@ from pathlib import Path
 src = Path(__file__).parent
 base = src.parent
 scripts = base/"scripts"
+data = base/"data"
 
 
 def _unique_paths()->None:

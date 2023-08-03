@@ -15,18 +15,8 @@ from typing import (
 from numpy import isin
 
 # Other utilities:
-try:
-    from utils import (
-        strings,
-        errors,
-        arguments,
-        assertions,
-    )
-except ImportError:
-    import strings
-    import errors
-    import arguments
-    import assertions
+from utils import arguments, strings, errors
+import project_paths
 
 # Operating System and files:
 from pathlib import Path
@@ -40,7 +30,7 @@ import csv
 #|                                  Constants                                         |#
 # ==================================================================================== #
 PATH_SEP = os.sep
-DATA_FOLDER = os.getcwd()+PATH_SEP+"data"
+DATA_FOLDER = project_paths.data.__str__()
 DATA_EXTENSION = "dat"
 LOG_EXTENSION = "log"
 

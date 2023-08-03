@@ -4,6 +4,11 @@ from numpy import ndarray as np_ndarray
 from enums import UnitCellFlavor
 import numpy as np
 
+from utils import saveload, strings
+
+UNIT_CELL_SUBFOLDER = "unit_cells"
+
+
 @dataclass
 class UnitCell: 
     A : np_ndarray
@@ -33,6 +38,13 @@ class UnitCell:
              B = _random_tensor(d, D),
              C = _random_tensor(d, D)
         )
+
+    def save(self, file_name:str=strings.time_stamp())->None:
+        saveload.save(self, name=file_name, sub_folder=UNIT_CELL_SUBFOLDER)
+
+    @staticmethod
+    def load(file_name:str, if_exist:bool=True)->"UnitCell":
+        return saveload.load(file_name, sub_folder=UNIT_CELL_SUBFOLDER, if_exist=if_exist)
 
 
 
