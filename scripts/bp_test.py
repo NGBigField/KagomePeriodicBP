@@ -35,10 +35,10 @@ def growing_tn_bp_test2(
     )
     
     ## Load or randomize unit_cell
-    unit_cell= UnitCell.load(f"random_{D}")
+    unit_cell= UnitCell.load(f"random_D={D}")
     if unit_cell is None:
         unit_cell = UnitCell.random(d=d, D=D)
-        unit_cell.save(f"random_{D}")
+        unit_cell.save(f"random_D={D}")
 
     ## Figure:
     visuals.draw_now()
