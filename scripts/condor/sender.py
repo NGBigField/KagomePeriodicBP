@@ -8,6 +8,9 @@ from csv import DictWriter
 if __name__ == "__main__":
     sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
 
+# for smart iterations:
+from itertools import product
+
 from src import project_paths
 
 results_dir = project_paths.data/"condor"
@@ -17,6 +20,13 @@ if not os.path.exists(results_dir):
 
 # result_keys = ["seed", "method", "D", "h", "x", "y", "z", "e", "exec_time"]
 result_keys = ["with_bp", 'D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z']
+
+## all values:
+vals = {}
+vals['N'] = range(2, 20, 2)
+vals['D'] = [2, 3, 4]
+vals['method'] = [0, 1]
+vals['seed'] = [0]
 
 def main(
     num_seeds:int=1, 
@@ -39,24 +49,21 @@ def main(
 
     ## Define job params:
     job_params : list[dict] = []
-
-    for N in range(2, 20, 2):
+    for N, D, method, seed in product(vals['N'], vals['D'], vals['method'], vals['seed']):
+        # To strings:
         N = f"{N}"
+        D = f"{D}"
+        method = f"{method}"
+        seed = f"{seed}"
 
-        for method in range(2):
-            method = f"{method}"
-
-            for seed in range(num_seeds):
-                seed = f"{seed}"
-
-                job_params.append( dict(
-                    outfile=results_fullpath,
-                    N=N,
-                    seed=seed,
-                    method=method,
-                    job_type=job_type,
-                    result_keys=_encode_list_as_str(result_keys)
-                ))
+        job_params.append( dict(
+            outfile=results_fullpath,
+            N=N,
+            seed=seed,
+            method=method,
+            job_type=job_type,
+            result_keys=_encode_list_as_str(result_keys)
+        ))
 
     for params in job_params:
         params2print = deepcopy(params)

@@ -4,11 +4,15 @@ if __name__ == "__main__":
 
 from sys import argv
 
+# Import scripts to use
+import _import_scripts
+
 # Import DictWriter class from CSV module
 from time import perf_counter
 from csv import DictWriter
 from typing import Any
 
+# Import the possible job types:
 from scripts.condor.job_bp import main as run_job_bp
 
 
@@ -39,13 +43,9 @@ def main():
     i += 1  # 3
     method = int(argv[i])
     print(f"{i}: method={method}")
-    
-    i += 1
-    h = float(argv[i])
-    print(f"{i}: h={h}")
 
     i += 1
-    N = float(argv[i])
+    N = int(argv[i])
     print(f"{i}: N={N}")
 
     i += 1  # 5
