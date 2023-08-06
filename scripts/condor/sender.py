@@ -87,7 +87,7 @@ def main(
         job_params,
         request_cpus=f"{request_cpus}",
         requestMemory='4gb',
-        Arguments='$(outfile) $(seed) $(method) $(h) $(N) $(job_type) $(result_keys)'
+        Arguments='$(outfile) $(seed) $(method) $(D) $(N) $(job_type) $(result_keys)'
     )
 
     print("Called condor successfully")
