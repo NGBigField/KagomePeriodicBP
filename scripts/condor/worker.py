@@ -83,19 +83,23 @@ def main():
     results["seed"]=seed
 
     ## Prepare result for printing:
-    row_to_print = dict()
+    row_to_write = dict()
     for result_key in result_keys:
         try:
             res = results[result_key]
         except KeyError:
             res = None
-        row_to_print[result_key] = res
+        row_to_write[result_key] = res
 
     ## Write result:
     with open( output_file ,'a') as f:
         dict_writer = DictWriter(f, fieldnames=result_keys )
-        dict_writer.writerow(row_to_print)
+        dict_writer.writerow(row_to_write)
         f.close()
+
+    ## End
+    print("Resulsts are written into:")
+    print(f"{output_file!r}")
 
 
 
