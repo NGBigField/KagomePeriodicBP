@@ -375,7 +375,7 @@ def calc_unit_cell_expectation_values(
 
     ## Prepare progress-bar:
     if print_progress:
-        prog_bar = prints.ProgressBar(len(operators)*unit_cell_indices.size(), f"Calculating expectation-values: ")
+        prog_bar = prints.ProgressBar(len(operators)*unit_cell_indices.size(), f"Calculating expectation-values: ", print_length=51)
     else:
         prog_bar = prints.ProgressBar.inactive()
 

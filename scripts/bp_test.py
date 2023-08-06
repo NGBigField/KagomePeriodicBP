@@ -23,9 +23,9 @@ from matplotlib import pyplot as plt
 def _standard_row_from_results(D:int, N:int, results:list[UnitCell])->None:
     row = [D, N]
     for tensor_key in ['A', 'B', 'C']:
-        for pre_expectation, observable_name in zip( results, ['x', 'y', 'z'], strict=True):
-            pre_expectation_per_tensor = pre_expectation[tensor_key]
-            row.append(pre_expectation_per_tensor)
+        for per_expectation, observable_name in zip( results, ['x', 'y', 'z'], strict=True):
+            per_expectation_per_tensor = per_expectation[tensor_key]
+            row.append(per_expectation_per_tensor)
     return row
 
 def load_results(
@@ -39,13 +39,39 @@ def load_results(
         csv.append(row)
     print("Done")
 
+def bp_single_call(
+    d : int = 2,
+    D : int = 3,
+    N : int = 2,
+    with_bp : bool = True        
+):
+    ## Config:
+    bubblecon_trunc_dim = 2*D**2
+    bp_config = BPConfig(
+        max_swallowing_dim=D**2,
+        max_iterations=50,
+        target_msg_diff=1e-5
+    )
+
+    ## Tensor-Network
+    unit_cell= UnitCell.load(f"random_D={D}")
+    tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
+    tn.validate()
+
+    ## Find or guess messages:
+    if with_bp:
+        tn, messages, stats = belief_propagation(tn, messages=None, bp_config=bp_config)
+    else:
+        tn.connect_random_messages()
+    
+    return calc_unit_cell_expectation_values(tn, operators=[pauli.x, pauli.y, pauli.z], bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=False)
 
 
 def growing_tn_bp_test2(
     d = 2,
     D = 3,
-    min_N = 16,
-    max_N = 16,
+    min_N = 2,
+    max_N = 10,
     live_plot = False,
     with_bp = True
 ):
@@ -72,7 +98,7 @@ def growing_tn_bp_test2(
         plots.axis.set_ylabel("<Z>")
 
     if with_bp:
-        csv_name =  f"Results_D={D}"
+        csv_name =  f"Results_D={D}_with-BP"
     else:
         csv_name =  f"Results_D={D}_random-messages"
     csv = csvs.CSVManager(['D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'], name=csv_name)
