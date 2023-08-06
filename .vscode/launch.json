@@ -22,7 +22,8 @@
             "args": [
                 "results_test.csv",  //output-file
                 "1",  //seed
-                "2",  //method
+                "0",  //method
+                "2",  //D
                 "3",  //N
                 "bp",  //job_type
                 "[with_bp,D,N,A_X,A_Y,A_Z,B_X,B_Y,B_Z,C_X,C_Y,C_Z]",  //result_keys

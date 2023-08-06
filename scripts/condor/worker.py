@@ -16,7 +16,7 @@ from typing import Any
 from scripts.condor.job_bp import main as run_job_bp
 
 
-NUM_EXPECTED_ARGS = 7
+NUM_EXPECTED_ARGS = 8
 
 
 # A main function to parse inputs:
@@ -44,15 +44,19 @@ def main():
     method = int(argv[i])
     print(f"{i}: method={method}")
 
+    i += 1  # 4
+    D = int(argv[i])
+    print(f"{i}: D={D}")
+
     i += 1
     N = int(argv[i])
     print(f"{i}: N={N}")
 
-    i += 1  # 5
+    i += 1  # 6
     job_type = argv[i]
     print(f"{i}: job_type={job_type}")
 
-    i += 1  # 6
+    i += 1  # 7
     result_keys = _parse_list_of_strings(argv[i])
     print(f"{i}: result_keys={result_keys}")
 
@@ -67,8 +71,7 @@ def main():
             raise ValueError(f"Not an expected job_type={job_type!r}")
     except Exception as e:
         results = dict(
-            e=e,
-            h=h
+            e=e
         )
     t2 = perf_counter()
 

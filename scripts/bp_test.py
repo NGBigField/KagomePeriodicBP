@@ -46,7 +46,7 @@ def bp_single_call(
     with_bp : bool = True        
 ):
     ## Config:
-    bubblecon_trunc_dim = 2*D**2
+    bubblecon_trunc_dim = 4*D**2
     bp_config = BPConfig(
         max_swallowing_dim=D**2,
         max_iterations=50,

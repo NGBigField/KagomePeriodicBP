@@ -28,6 +28,8 @@ vals['D'] = [2, 3, 4]
 vals['method'] = [0, 1]
 vals['seed'] = [0]
 
+_max_str_per_key = {key:max((len(str(val)) for val in lis)) for key, lis in vals.items()}
+
 def main(
     num_seeds:int=1, 
     job_type="bp",  # "ite_it" / ite_it_all_h / "bp"
@@ -58,9 +60,10 @@ def main(
 
         job_params.append( dict(
             outfile=results_fullpath,
+            D=D,
             N=N,
-            seed=seed,
             method=method,
+            seed=seed,
             job_type=job_type,
             result_keys=_encode_list_as_str(result_keys)
         ))
@@ -68,7 +71,7 @@ def main(
     for params in job_params:
         params2print = deepcopy(params)
         params2print.pop("outfile")
-        print(params2print)
+        _print_inputs(params2print)
 
     ## Prepare output file:    
     with open( results_fullpath ,'a') as f:        
@@ -98,6 +101,20 @@ def _encode_list_as_str(lis:list)->str:
     s = s[:-1]+']'
     return s
 
+def _print_inputs(inputs:dict[str, str])->None:
+    total_string = ""
+    for key, value in inputs.items():
+        s = f"{value}"
+        if key in _max_str_per_key:
+            max_length = _max_str_per_key[key]
+            crnt_length = len(f"{value}")
+            pad_length = max_length-crnt_length
+            if pad_length>0:
+                s = " "*pad_length + s
+        total_string += " " + f"{key!r}: " + s + ","
+    total_string = total_string.removesuffix(",")
+    print(total_string)
+        
 
 
 if __name__=="__main__":
