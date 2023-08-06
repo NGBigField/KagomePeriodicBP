@@ -25,7 +25,7 @@ from _types import EdgeIndicatorType
 from tensor_networks.unit_cell import UnitCell
 
 # Our utilities:
-from utils import tuples, lists, assertions, parallel_exec
+from utils import tuples, lists, assertions, parallel_exec, prints
 
 # Our needed algos:
 from tensor_networks.tensor_network import get_common_edge_legs
@@ -147,7 +147,8 @@ def _sandwich_with_operator_and_contract_fully(
     tn:KagomeTensorNetwork, 
     operator:np.matrix,
     max_con_dim:int, 
-    direction:BlockSide
+    direction:BlockSide,
+    print_progress:bool=False
 ) -> complex|tuple:
     # Replace fused-tensor <psi|psi> in `node_ind` with  <psi|Z|psi>:
     tn_with_observable = _sandwich_fused_tensors_with_expectation_values(tn, operator, node_ind)
@@ -157,7 +158,8 @@ def _sandwich_with_operator_and_contract_fully(
         direction=direction, 
         depth=ContractionDepth.Full, 
         bubblecon_trunc_dim=max_con_dim, 
-        print_progress=False )
+        print_progress=print_progress 
+    )
     # complete contraction so must be a number:
     assert isinstance(numerator, complex|tuple)
     return numerator
@@ -345,7 +347,8 @@ def calc_unit_cell_expectation_values(
     bubblecon_trunc_dim:int, 
     direction:BlockSide=BlockSide.random(), 
     force_real:bool=False, 
-    reduce:bool=True
+    reduce:bool=True,
+    print_progress:bool=True
 ) -> list[UnitCell]:
     """ Compute expectation values of unit cell nodes
 
@@ -365,19 +368,31 @@ def calc_unit_cell_expectation_values(
     assert not isinstance(denominator, MPS), "Full contraction should result in a number, not an MPS"
     center_nodes = tn_reduced.get_center_unit_cell_nodes()
     unit_cell_indices = UnitCell(
-        A = [n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.A ][0],
-        B = [n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.B ][0],
-        C = [n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.C ][0]
+        A = next(n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.A),
+        B = next(n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.B),
+        C = next(n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.C)
     )
+
+    ## Prepare progress-bar:
+    if print_progress:
+        prog_bar = prints.ProgressBar(len(operators)*unit_cell_indices.size(), f"Calculating expectation-values: ")
+    else:
+        prog_bar = prints.ProgressBar.inactive()
 
     ## Perform calculation per operator:
     for operator in operators:     
         res_unit_cell = UnitCell(A=0.0, B=0.0, C=0.0)   
         for key in UnitCell.all_keys():
-            index = unit_cell_indices.__getattribute__(key)
-            value = calc_mean_value(tn_reduced, [index], operator, bubblecon_trunc_dim=bubblecon_trunc_dim, direction=direction, denominator=denominator, force_real=force_real)
+            prog_bar.next()
+            index = unit_cell_indices[key]
+            value = calc_mean_value(
+                tn_reduced, [index], operator, bubblecon_trunc_dim=bubblecon_trunc_dim, 
+                direction=direction, denominator=denominator, force_real=force_real,
+                print_progress=print_progress
+            )
             res_unit_cell.__setattr__(key, value)
         results.append(res_unit_cell)
+    prog_bar.clear()
     return results
 
 
@@ -387,7 +402,8 @@ def calc_mean_value(
     operator:np.matrix,
     bubblecon_trunc_dim:int, 
     direction:BlockSide = BlockSide.random(), 
-    print_:bool = False,
+    print_progress:bool = False,
+    print_results:bool = False,
     force_real:bool = False,
     denominator:complex|tuple|None=None
 ) -> float:
@@ -401,9 +417,15 @@ def calc_mean_value(
     else:
         raise TypeError(f"Not an expected type {type(denominator)!r} for denominator")
 
-    ## Get numerators in parallel or one-by-one:    
+    ## Decide parallel or not:    
     fixed_arguments = dict(tn=tn, max_con_dim=bubblecon_trunc_dim, direction=direction, operator=operator)
     in_parallel = MULTIPROCESSING and len(node_indices)>1 and tn.tensor_dims.virtual>2
+    if in_parallel:
+        fixed_arguments["print_progress"] = False
+    else:
+        fixed_arguments["print_progress"] = print_progress
+
+    ## Calculate Numerators:
     numerators = parallel_exec.concurrent_or_parallel(
         func=_sandwich_with_operator_and_contract_fully, 
         values=node_indices, value_name="node_ind", 
@@ -417,7 +439,7 @@ def calc_mean_value(
         for numerator in numerators.values()
     ]    
 
-    if print_:
+    if print_results:
         for expectation_value, numerator in zip(expectation_values, numerators.values(), strict=True):
             print(f"\texpectation_value = {expectation_value}  =  {numerator} / {denominator}  ")
 

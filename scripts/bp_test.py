@@ -16,15 +16,38 @@ from algo.core_measurements import measure_xyz_expectation_values_with_tn, calc_
 import numpy as np
 
 # usefull utils:
-from utils import visuals, saveload
+from utils import visuals, saveload, csvs
 from matplotlib import pyplot as plt
+
+
+def _standard_row_from_results(D:int, N:int, results:list[UnitCell])->None:
+    row = [D, N]
+    for tensor_key in ['A', 'B', 'C']:
+        for pre_expectation, observable_name in zip( results, ['x', 'y', 'z'], strict=True):
+            pre_expectation_per_tensor = pre_expectation[tensor_key]
+            row.append(pre_expectation_per_tensor)
+    return row
+
+def load_results(
+    D = 3
+):
+    all_results = saveload.load(f"all_results_D={D}", sub_folder="results")
+    csv = csvs.CSVManager(['D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'], name=f"Results_D={D}")
+    # ['N', 'D', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z']
+    for N, results in all_results:
+        row = _standard_row_from_results(D, N, results)
+        csv.append(row)
+    print("Done")
+
 
 
 def growing_tn_bp_test2(
     d = 2,
     D = 3,
-    min_N = 2,
-    max_N = 14,
+    min_N = 16,
+    max_N = 16,
+    live_plot = False,
+    with_bp = True
 ):
     ## Config:
     bubblecon_trunc_dim = 2*D**2
@@ -41,11 +64,18 @@ def growing_tn_bp_test2(
         unit_cell.save(f"random_D={D}")
 
     ## Figure:
-    visuals.draw_now()
-    plots = visuals.AppendablePlot()
-    plots.axis.set_title("<Z> on sites")
-    plots.axis.set_xlabel("N")
-    plots.axis.set_ylabel("<Z>")
+    if live_plot:
+        visuals.draw_now()
+        plots = visuals.AppendablePlot()
+        plots.axis.set_title("<Z> on sites")
+        plots.axis.set_xlabel("N")
+        plots.axis.set_ylabel("<Z>")
+
+    if with_bp:
+        csv_name =  f"Results_D={D}"
+    else:
+        csv_name =  f"Results_D={D}_random-messages"
+    csv = csvs.CSVManager(['D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'], name=csv_name)
 
     ## Growing N networks:
     all_results = []
@@ -54,17 +84,28 @@ def growing_tn_bp_test2(
         print(f"N={N:2}: ")
         tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
         tn.validate()
-        tn, messages, stats = belief_propagation(tn, messages=None, bp_config=bp_config)
+
+        ## Find or guess messages:
+        if with_bp:
+            tn, messages, stats = belief_propagation(tn, messages=None, bp_config=bp_config)
+        else:
+            tn.connect_random_messages()
+        
         results = calc_unit_cell_expectation_values(tn, operators=[pauli.x, pauli.y, pauli.z], bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=False)
         zs = results[2]
         print(zs)
-        a = zs.__getattribute__('A')
-        b = zs.__getattribute__('B')
-        c = zs.__getattribute__('C')
+        a = zs['A']
+        b = zs['B']
+        c = zs['C']
         
-        plots.append(A=(N, a), B=(N, b), C=(N, c))
+        if live_plot:
+            plots.append(A=(N, a), B=(N, b), C=(N, c))
         all_results.append((N, results))
         saveload.save(all_results, f"all_results_D={D}", sub_folder="results")
+
+        row = _standard_row_from_results(D, N, results)
+        csv.append(row)
+        
 
     ## End:
     print("Done")
@@ -156,6 +197,7 @@ def main_test():
     # single_bp_test()
     # growing_tn_bp_test()
     growing_tn_bp_test2()
+    # load_results()
 
 
 if __name__ == "__main__":

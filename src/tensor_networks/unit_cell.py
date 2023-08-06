@@ -14,6 +14,14 @@ class UnitCell:
     A : np_ndarray
     B : np_ndarray
     C : np_ndarray
+
+    def __getitem__(self, key:str)->np_ndarray:
+        match key:
+            case 'A': return self.A
+            case 'B': return self.B
+            case 'C': return self.C
+            case _: 
+                raise KeyError("No an option")
        
     def all(self)->Generator[tuple[np_ndarray, UnitCellFlavor], None, None]:
         yield self.A, UnitCellFlavor.A
@@ -23,6 +31,10 @@ class UnitCell:
     @staticmethod
     def all_keys()->list[str]:
         return ["A", "B", "C"]
+    
+    @staticmethod
+    def size()->int:
+        return 3
 
     def copy(self)->"UnitCell":
         return UnitCell(
