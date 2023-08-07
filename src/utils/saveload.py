@@ -15,18 +15,8 @@ from typing import (
 from numpy import isin
 
 # Other utilities:
-try:
-    from utils import (
-        strings,
-        errors,
-        arguments,
-        assertions,
-    )
-except ImportError:
-    import strings
-    import errors
-    import arguments
-    import assertions
+from utils import arguments, strings, errors
+import project_paths
 
 # Operating System and files:
 from pathlib import Path
@@ -40,7 +30,7 @@ import csv
 #|                                  Constants                                         |#
 # ==================================================================================== #
 PATH_SEP = os.sep
-DATA_FOLDER = os.getcwd()+PATH_SEP+"data"
+DATA_FOLDER = project_paths.data.__str__()
 DATA_EXTENSION = "dat"
 LOG_EXTENSION = "log"
 
@@ -108,9 +98,11 @@ def append_text(text:str, name:str, sub_folder:Optional[str]=None, in_new_line:b
     flog.write(text)
     flog.close()
 
+
 def exist(name:str, sub_folder:Optional[str]=None) -> bool:
     fullpath = _fullpath(name, sub_folder)
     return os.path.exists(fullpath)
+
 
 def all_saved_data() -> Generator[Tuple[str, Any], None, None]:
     for path, subdirs, files in os.walk(DATA_FOLDER):
@@ -119,6 +111,7 @@ def all_saved_data() -> Generator[Tuple[str, Any], None, None]:
             file = _open(fullpath, Mode.Read.str())
             data = pickle.load(file)
             yield name, data
+
 
 def save(var:Any, name:Optional[str]=None, sub_folder:Optional[str]=None, if_not_exist:bool=False, print_:bool=False) -> None:
     if if_not_exist and exist(name=name, sub_folder=sub_folder):
@@ -136,6 +129,7 @@ def save(var:Any, name:Optional[str]=None, sub_folder:Optional[str]=None, if_not
     if print_:
         print(f"Saved file of type {type(var)!r} in path {fullpath!r}")
 
+
 def load(name:str, sub_folder:Optional[str]=None, if_exist:bool=False) -> Any:
     if if_exist and not exist(name=name, sub_folder=sub_folder):
         return None
@@ -147,23 +141,11 @@ def load(name:str, sub_folder:Optional[str]=None, if_exist:bool=False) -> Any:
     # Load:
     return pickle.load(file)
 
-def save_table(table:List[List[str]], filename:Optional[str]=None) -> None :
-    # Complete missing inputs:
-    if filename is None:
-        filename = strings.time_stamp()
-
-    try:
-        with open(filename+".csv", 'w') as f:        
-            write = csv.writer(f)        
-            write.writerows(table)
-    except Exception as e:
-        errors.print_traceback(e)
-    finally:
-        save(table, name=filename)
 
 def force_subfolder_exists(folder_name:str) -> None:
     folderpath = DATA_FOLDER + PATH_SEP + folder_name
     force_folder_exists(folderpath)
+
 
 def force_folder_exists(folderpath:str) -> None:
     if not os.path.exists(folderpath):

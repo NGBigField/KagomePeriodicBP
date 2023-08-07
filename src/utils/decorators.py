@@ -1,4 +1,4 @@
-from typing import Callable, Any, ParamSpec, TypeVar, List, Tuple
+from typing import Callable, Any, ParamSpec, TypeVar, List, Tuple, Generic
 from utils import tuples, strings, errors
 from utils.arguments import Stats
 import time
@@ -10,6 +10,8 @@ from functools import wraps
 # ============================================================================ #
 _In = ParamSpec("_In")
 _Out = TypeVar("_Out")
+_In2 = ParamSpec("_In2")
+_Out2 = TypeVar("_Out2")
 _T = TypeVar("_T")
 
 
@@ -67,31 +69,6 @@ def add_stats(
     return decorator
 
 
-def copy_tensors(func:Callable[_In, _Out]) -> Callable[_In, _Out]:  # decorator that return a wrapper to `func`
-    def _copy_only_tensors(val:_T)->_T:
-        if isinstance(val, np_ndarray):
-            return val.copy()
-        elif isinstance(val, list):
-            new_list = list()
-            for item in val:
-                new_list.append(_copy_only_tensors(item))
-            return new_list
-        return val
-    def wrapper(*args:_In.args, **kwargs:_In.kwargs) -> _Out:  # wrapper that calls `func`
-        ## Copy tensors
-        new_args = list()
-        new_kwargs = dict()
-        for value in args:
-            new_args.append(_copy_only_tensors(value))
-        for key, value in kwargs.items():
-            new_kwargs[key] = _copy_only_tensors(value)
-        ## Call function:
-        results = func(*new_args, **new_kwargs)  #type: ignore
-        ## Return
-        return results
-    return wrapper
-
-
 def ignore_first_method_call(func:Callable)->Callable: # decorator that returns a wrapper:
     objects_that_already_called : List[Tuple[object, Callable]] = []
 
@@ -104,6 +81,7 @@ def ignore_first_method_call(func:Callable)->Callable: # decorator that returns 
             results = None
         return results
     return wrapper
+
 
 def multiple_tries(num:int)->Callable[[Callable[_In, _Out]], Callable[_In, _Out]]: # function that returns a decorator
     # Return decorator:
@@ -127,6 +105,7 @@ def multiple_tries(num:int)->Callable[[Callable[_In, _Out]], Callable[_In, _Out]
 def list_tries(list_:list)->Callable[[Callable], Callable]: # function that returns a decorator
     # Return decorator:
     def decorator(func:Callable)->Callable: # decorator that returns a wrapper:
+        @wraps(func)
         def wrapper(*args, **kwargs)->Any: # wrapeer that cals the function            
             last_error = Exception("Temp Exception")
             for val in list_:

@@ -2,9 +2,10 @@ import sys
 from pathlib import Path
 
 
-src = Path(__file__).parent
-base = src.parent
-scripts = base/"scripts"
+src : Path = Path(__file__).parent
+base : Path = src.parent
+scripts : Path = base/"scripts"
+data : Path = base/"data"
 
 
 def _unique_paths()->None:

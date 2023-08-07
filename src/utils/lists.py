@@ -280,6 +280,14 @@ def prev_item_cyclic(lis:list[_T], item:_T)->_T:
         return lis[i-1]
 
 
+def reversed(lis:list[_T])->_T:
+    """ Like native `reversed()` but returns list instead of an iterator
+    """
+    res = lis.copy()
+    res.reverse()
+    return res
+
+
 ## Test:
 if __name__ == "__main__":
     l = 10*[1] + 20*[2] + 30*[3] + 2*[4] 

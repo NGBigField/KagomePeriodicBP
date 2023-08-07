@@ -3,7 +3,6 @@ from enums import MessageModel, ReduceToEdgeMethod, ReduceToCoreMethod
 from containers.beliefe_propagation import BPConfig
 from containers.sizes_and_dimensions import TNSizesAndDimensions
 from containers.imaginary_time_evolution import ITEConfig
-from containers.contractions import ContractionConfig
 from utils import strings
 
 # Control flags:

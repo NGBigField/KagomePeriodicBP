@@ -15,6 +15,7 @@ from utils import lists
 
 # for type namings:
 from _types import EdgeIndicatorType, PosScalarType
+from _error_types import NetworkConnectionError
 
 # For OOP Style:
 from copy import deepcopy
@@ -22,8 +23,8 @@ from dataclasses import dataclass, field, fields
 
 # For TN methods and types:
 from tensor_networks.operations import fuse_tensor_to_itself
-from lattices.directions import LatticeDirection, BlockSide
-from enums import NodeFunctionality, CoreCellType
+from lattices.directions import LatticeDirection, BlockSide, Direction
+from enums import NodeFunctionality, UnitCellFlavor
 
 
 
@@ -37,7 +38,7 @@ class TensorNode():
     edges : list[EdgeIndicatorType]
     directions : list[LatticeDirection] 
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
-    core_cell_type : CoreCellType = field(default=CoreCellType.NoneLattice) 
+    core_cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
     boundaries : list[BlockSide] = field(default_factory=list) 
 
 
@@ -95,9 +96,12 @@ class TensorNode():
         return new
 
 
-    def edge_in_dir(self, dir:LatticeDirection)->EdgeIndicatorType:
-        assert isinstance(dir, LatticeDirection), f"Not an expected type '{type(dir)}'"
-        index = self.directions.index(dir)
+    def edge_in_dir(self, dir:Direction)->EdgeIndicatorType:
+        assert isinstance(dir, Direction), f"Not an expected type '{type(dir)}'"
+        try:
+            index = self.directions.index(dir)
+        except Exception as e:
+            raise NetworkConnectionError(f"Direction {dir!r} is not in directions of nodes: {[dir.name for dir in self.directions]}")
         return self.edges[index]
     
     
@@ -130,7 +134,7 @@ class TensorNode():
         from utils import visuals
                 
         plt.figure()
-        if self.functionality is NodeFunctionality.Core:
+        if self.functionality is NodeFunctionality.CenterUnitCell:
             node_color = 'blue'
         else:
             node_color = 'red'

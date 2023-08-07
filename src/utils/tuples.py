@@ -10,6 +10,7 @@ from typing import (
 import operator
 from typing import overload
 
+_T1 = TypeVar("_T1")
 _NumericType = TypeVar("_NumericType", float, complex, int)
 
 def angle(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->float:
@@ -28,7 +29,6 @@ def sub(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->Tuple[_NumericT
 def add(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->Tuple[_NumericType,...]:
     return _apply_pairwise(operator.add, t1, t2)
 
-
 def multiply(t:Tuple[_NumericType,...], scalar_or_t2:_NumericType|tuple[_NumericType,...])->Tuple[_NumericType,...]:
     if isinstance(scalar_or_t2, tuple):
         t2 = scalar_or_t2
@@ -36,6 +36,9 @@ def multiply(t:Tuple[_NumericType,...], scalar_or_t2:_NumericType|tuple[_Numeric
         t2 = tuple([scalar_or_t2 for _ in t])   # tuple with same length
     return _apply_pairwise(operator.mul, t, t2)
 
+def dot_product(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->_NumericType:
+    times_vector = multiply(t1, t2)
+    return sum(times_vector)
 
 def copy_with_replaced_val_at_index(t:tuple, i:int, val:Any) -> tuple:
     temp = [x for x in t]
@@ -51,3 +54,8 @@ def equal(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->bool:
 def mean_itemwise(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->Tuple[_NumericType,...]:
     l = [(v1+v2)/2 for v1, v2 in zip(t1, t2, strict=True)]
     return tuple(l)
+
+def add_element(t:Tuple[_T1,...], element:_T1)->Tuple[_T1,...]:
+    lis = list(t)
+    lis.append(element)
+    return tuple(lis)

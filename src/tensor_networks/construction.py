@@ -27,8 +27,7 @@ from numpy import matlib
 # For common lattice function and classes:
 from tensor_networks.node import TensorNode, NodeFunctionality
 from tensor_networks.tensor_network import KagomeTensorNetwork, TensorDims
-from lattices import directions
-from lattices.directions import Direction
+from lattices.directions import Direction, LatticeDirection
 from lattices.edges import edges_dict_from_edges_list
 from tensor_networks.unit_cell import UnitCell
 
@@ -42,12 +41,12 @@ from lattices.kagome import KagomeLattice
 
 RANDOM_CORE_IS_ABBA_LATTICE = True
 
-L  = directions.L
-R  = directions.R
-UL = directions.UL
-UR = directions.UR
-DL = directions.DL
-DR = directions.DR
+L  = LatticeDirection.L
+R  = LatticeDirection.R
+UL = LatticeDirection.UL
+UR = LatticeDirection.UR
+DL = LatticeDirection.DL
+DR = LatticeDirection.DR
 
 
 # ============================================================================ #
@@ -66,17 +65,8 @@ def _derive_core_functionality(index:int, core_size:int, padding:int)->NodeFunct
     if i+p>=N or j+p>=N:
         return NodeFunctionality.Padding
     else: 
-        return NodeFunctionality.Core
+        return NodeFunctionality.CenterUnitCell
     
-
-def _random_tensor(d:int, D:int)->np.ndarray:
-    rs = np.random.RandomState()
-    t = rs.uniform(size=[d]+[D]*4) \
-        + 1j*rs.normal(size=[d]+[D]*4)
-    t = t/np.linalg.norm(t)
-    return t
-
-
 
 def _all_possible_couples(N:int) -> Generator[Tuple[int, int], None, None]:
 	for i, j  in itertools.product(range(N), repeat=2):
@@ -250,11 +240,7 @@ def create_kagome_tn(
 
     ## Unit cell:
     if unit_cell is None:
-        unit_cell = UnitCell(
-             A = _random_tensor(d, D),
-             B = _random_tensor(d, D),
-             C = _random_tensor(d, D)
-        )
+        unit_cell = UnitCell.random()
     else:
         assert isinstance(unit_cell, UnitCell)
 

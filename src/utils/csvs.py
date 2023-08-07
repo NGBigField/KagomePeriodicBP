@@ -1,10 +1,11 @@
 import csv
-DEFAULT_RESULTS_CSV_FILE_NAME = "Results.csv" 
 from typing import Any
 import inspect
 import os
 from pathlib import Path
 from utils import strings
+
+DEFAULT_RESULTS_CSV_FILE_NAME = "Results.csv" 
 
 
 def _standard_filename(file_name:str)->str:

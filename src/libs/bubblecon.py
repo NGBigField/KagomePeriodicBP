@@ -73,6 +73,8 @@ from libs import bmpslib
 
 from utils.prints import ProgressBar
 
+from _error_types import BubbleConError
+
 #
 # --------------------------- fuse_tensor  -----------------------------
 #
@@ -1354,10 +1356,9 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 			print("in-legs: ", in_legs)
 			
 		if len(in_legs) != i1-i0+1:
-			print("Error while trying to swallow vertex {}: the [i0,i1] range in the MPS (i0={}, i1={}), does" \
+			raise BubbleConError("Error while trying to swallow vertex {}: the [i0,i1] range in the MPS (i0={}, i1={}), does" \
 			" not match the number in-legs={}. Perhaps it is not contiguous".format(\
 			v,i0,i1,len(in_legs)))
-			exit(1)
 			
 			
 		

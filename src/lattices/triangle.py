@@ -1,13 +1,25 @@
+# Import types used in the code:
 from lattices._common import Node
-from lattices.directions import lattice, block
-from lattices.directions import LatticeDirection, BlockSide
-from typing import Generator
+from lattices.directions import LatticeDirection, BlockSide, Direction
 from _error_types import LatticeError, OutsideLatticeError
+
+# For type hinting:
+from typing import Generator
+
+# some of our utils:
+from utils import tuples
+
+# For caching results:
+import functools 
+
+# for math:
+import numpy as np
 
 
 class TriangularLatticeError(LatticeError): ...
 
 
+@functools.cache
 def total_vertices(N):
 	"""
 	Returns the total number of vertices in the *bulk* of a hex 
@@ -16,12 +28,14 @@ def total_vertices(N):
 	return 3*N*N - 3*N + 1
 
 
+@functools.cache
 def center_vertex_index(N):
     i = num_rows(N)//2
     j = i
     return get_vertex_index(i, j, N)
 
 
+@functools.cache
 def num_rows(N):
 	return 2*N-1
 
@@ -38,33 +52,33 @@ def row_width(i, N):
 
 def _get_neighbor_coordinates_in_direction_no_boundary_check(i:int, j:int, direction:LatticeDirection, N:int)->tuple[int, int]:
 	## Simple L or R:
-	if direction==lattice.L:  
+	if direction==LatticeDirection.L:  
 		return i, j-1
-	if direction==lattice.R:  
+	if direction==LatticeDirection.R:  
 		return i, j+1
 
 	## Row dependant:
 	middle_row_index = num_rows(N)//2   # above or below middle row
 
-	if direction==lattice.UR: 
+	if direction==LatticeDirection.UR: 
 		if i <= middle_row_index: 
 			return i-1, j
 		else: 
 			return i-1, j+1
 	
-	if direction==lattice.UL:
+	if direction==LatticeDirection.UL:
 		if i <= middle_row_index:
 			return i-1, j-1
 		else:
 			return i-1, j
 		
-	if direction==lattice.DL:
+	if direction==LatticeDirection.DL:
 		if i < middle_row_index:
 			return i+1, j
 		else:
 			return i+1, j-1
 		
-	if direction==lattice.DR:
+	if direction==LatticeDirection.DR:
 		if i < middle_row_index:
 			return i+1, j+1
 		else:
@@ -84,19 +98,19 @@ def check_boundary_vertex(index:int, N)->list[BlockSide]:
 
 	# Boundaries:
 	if i==0:
-		on_boundaries.append(block.U)
+		on_boundaries.append(BlockSide.U)
 	if i==height-1:
-		on_boundaries.append(block.D)
+		on_boundaries.append(BlockSide.D)
 	if j==0: 
 		if i<=middle_row_index:
-			on_boundaries.append(block.UL)
+			on_boundaries.append(BlockSide.UL)
 		if i>=middle_row_index:
-			on_boundaries.append(block.DL)
+			on_boundaries.append(BlockSide.DL)
 	if j == width-1:
 		if i<=middle_row_index:
-			on_boundaries.append(block.UR)
+			on_boundaries.append(BlockSide.UR)
 		if i>=middle_row_index:
-			on_boundaries.append(block.DR)
+			on_boundaries.append(BlockSide.DR)
 	
 	return on_boundaries
 
@@ -663,7 +677,7 @@ def create_triangle_lattice(N)->list[Node]:
 				index = index,
 				pos = get_node_position(i, j, N),
 				edges = edges_list[index],
-				directions=[lattice.L, lattice.R, lattice.UL, lattice.UR, lattice.DL, lattice.DR]
+				directions=[LatticeDirection.L, LatticeDirection.R, LatticeDirection.UL, LatticeDirection.UR, LatticeDirection.DL, LatticeDirection.DR]
 			)
 			nodes_list.append(n)
 			index += 1
@@ -672,4 +686,74 @@ def create_triangle_lattice(N)->list[Node]:
 	return nodes_list
 
 
+def all_coordinates(N:int)->Generator[tuple[int, int], None, None]:
+	for i in range(num_rows(N)):
+		for j in range(row_width(i, N)):
+			yield i, j
 
+
+def _unit_vector_rotated_by_angle(vec:tuple[int, int], angle:float)->tuple[float, float]:
+	x, y = vec
+	angle1 = np.angle(x+1j*y)
+	new_angle = angle1+angle
+	new_vec = np.cos(new_angle), np.sin(new_angle)
+	new_vec /= new_vec[0]
+	from utils import numerics
+	return new_vec
+
+
+def unit_vector_corrected_for_sorting_triangular_lattice(direction:Direction)->tuple[float, float]:
+	if isinstance(direction, LatticeDirection):
+		match direction:
+			case LatticeDirection.R :	return (+1,  0)
+			case LatticeDirection.L :	return (-1,  0)
+			case LatticeDirection.UL:	return (-1, +1)
+			case LatticeDirection.UR:	return (+1, +1)
+			case LatticeDirection.DL:	return (-1, -1)
+			case LatticeDirection.DR:	return (+1, -1)
+	elif isinstance(direction, BlockSide):
+		match direction:
+			case BlockSide.U :	return ( 0, +1)
+			case BlockSide.D :	return ( 0, -1)
+			case BlockSide.UR:	return (+1, +1)
+			case BlockSide.UL:	return (-1, +1)
+			case BlockSide.DL:	return (-1, -1)
+			case BlockSide.DR:	return (+1, -1)
+	else:
+		raise TypeError(f"Not a supported typee")
+
+
+def sort_coordinates_by_direction(items:list[tuple[int, int]], direction:Direction, N:int)->list[tuple[int, int]]:
+	# unit_vector = direction.unit_vector  # This basic logic break at bigger lattices
+	unit_vector = unit_vector_corrected_for_sorting_triangular_lattice(direction)
+	def key(ij:tuple[int, int])->float:
+		i, j = ij[0], ij[1]
+		pos = get_node_position(i, j, N)
+		return tuples.dot_product(pos, unit_vector)  # vector dot product
+	return sorted(items, key=key)
+	
+
+@functools.cache
+def verices_indices_rows_in_direction(N:int, major_direction:BlockSide, minor_direction:LatticeDirection)->list[list[int]]:
+	""" arrange nodes by direction:
+	"""
+	## Arrange indices by position relative to direction, in reverse order
+	coordinates_in_reverse = sort_coordinates_by_direction(all_coordinates(N), major_direction.opposite(), N)
+
+	## Bunch vertices by the number of nodes at each possible row (doesn't matter from wich direction we look)
+	list_of_rows = []
+	for i in range(num_rows(N)):
+
+		# collect vertices as much as the row has:
+		row = []
+		w = row_width(i, N)
+		for _ in range(w):
+			item = coordinates_in_reverse.pop()
+			row.append(item)
+		
+		# sort row by minor axis:
+		sorted_row = sort_coordinates_by_direction(row, minor_direction, N)
+		indices = [get_vertex_index(i, j, N) for i,j in sorted_row]
+		list_of_rows.append(indices)
+
+	return list_of_rows

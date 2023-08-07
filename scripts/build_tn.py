@@ -54,7 +54,7 @@ def add_messages():
 
     messages = { 
         edge_side : Message(
-            mps=initial_message(D=D, num_edge_tensors=tn.num_message_connections), 
+            mps=initial_message(D=D, N=tn.num_message_connections), 
             order_direction=edge_side.orthogonal_counterclockwise_lattice_direction() 
         ) 
         for edge_side in BlockSide.all_in_counter_clockwise_order()  \

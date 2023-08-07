@@ -3,18 +3,26 @@ if __name__ == "__main__":
 	sys.path.append(
 		pathlib.Path(__file__).parent.parent.__str__()
 	)
+	sys.path.append(
+		pathlib.Path(__file__).parent.parent.parent.__str__()
+	)
 
 
 
 # Get Global-Config:
 from _config_reader import DEBUG_MODE
 
-from typing import Callable
-from tensor_networks import KagomeTensorNetwork
-from lattices.directions import Direction
+# Import our types and calsses:
+from tensor_networks import KagomeTensorNetwork, TensorNode
+from lattices.directions import Direction, BlockSide, LatticeDirection
 from enums import ContractionDepth, NodeFunctionality
-from containers import ContractionConfig
 
+## For common types:
+from _error_types import NetworkConnectionError
+from _types import EdgeIndicatorType
+
+# For lattice logic:
+from lattices import kagome
 
 # Everyone needs numpy:
 import numpy as np
@@ -22,63 +30,147 @@ import numpy as np
 # Use our common utilities:
 from utils import lists
 
-# For smart iterations:
+# For smart iterations and function caching:
 import itertools
+import functools
+
+# For oop:
+from enum import Enum, auto
+from typing import Generic, TypeVar, Final, Callable
+from dataclasses import dataclass, fields
+from copy import deepcopy
 
 
+## Types:
+_T = TypeVar("_T")
+_EnumType = TypeVar("_EnumType")
 _PosFuncType = Callable[[int, int], tuple[int, int] ]
 
+## Constants:
+BREAK_MARKER = -100
 
-def _derive_axes(
-    tn:KagomeTensorNetwork,
-    direction:Direction,
-)->tuple[
-    list[int],   # axis1
-    tuple[list[int], list[int]],   # axis2_variations
-    tuple[Direction, Direction], # axis2_directions
-    _PosFuncType,   # pos_func
-    bool  # has corners
-]:
-    ## Derive size of tensor:
-    min_x, max_x, min_y, max_y = tn.boundaries()
-    xs_l2r = np.linspace(min_x, max_x, tn.original_lattice_dims[1]).tolist()
-    xs_r2l = np.linspace(max_x, min_x, tn.original_lattice_dims[1]).tolist()
-    ys_d2u = np.linspace(min_y, max_y, tn.original_lattice_dims[0]).tolist()
-    ys_u2d = np.linspace(max_y, min_y, tn.original_lattice_dims[0]).tolist()
 
-    ## Direction dictates the axis:
-    if direction in [Direction.Left, Direction.Right]:
-        axis2_variations = (ys_u2d, ys_d2u)
-        axis2_directions = (D, U)
-        _pos_func : Callable[ [int, int], tuple[int, int] ] = lambda p1, p2: (p1, p2)  # Define which is the x value, and which is the y value
-        if   direction is Direction.Left:   axis1 = xs_r2l
-        elif direction is Direction.Right:  axis1 = xs_l2r  
-        else: raise ValueError(f"Not an option")
+CONTRACTION_ORDERS_CACHE = {}
+
+
+class _Bound(Enum):
+    first = auto()
+    last  = auto()
+
+    def opposite(self)->"_Bound":
+        if   self is First: return Last            
+        elif self is Last: return First
+        else:
+            raise ValueError("Not possible")                
     
-    elif direction in [Direction.Up, Direction.Down]:
-        axis2_variations = (xs_l2r, xs_r2l)
-        axis2_directions = (R, L)
-        _pos_func : Callable[ [int, int], tuple[int, int] ] = lambda p1, p2: (p2, p1)  # Define which is the x value, and which is the y value
-        if   direction is Direction.Down:   axis1 = ys_u2d            
-        elif direction is Direction.Up:     axis1 = ys_d2u
-        else: raise ValueError(f"Not an option")
+First = _Bound.first 
+Last  = _Bound.last
 
-    else:
-        raise ValueError(f"Not an option")
+class _Side(Enum):
+    left  = auto() 
+    right = auto() 
+Left = _Side.left
+Right = _Side.right
+
+
+class _EnumContainer(Generic[_EnumType, _T]):
+    def __getitem__(self, key:_EnumType)->_T:
+        for field in fields(self):
+            if field.name == key.name:
+                return getattr(self, field.name)
+        raise KeyError(f"No a valid option {key!r}")
     
-    ## Check if tn has its corners 
-    # (usually corners are missing when a square lattice is connected by messages from each side)
-    # try all 4 corners:
-    corners = tn.get_corner_nodes()
-    # Case where only some corners are missing, is not yet implemented
-    if len(corners)==4:
-        has_corners = True
-    elif len(corners)==0:
-        has_corners = False
-    else:
-        raise NotImplementedError("Case where only some corners are missing, is not yet implemented")
-                 
-    return axis1, axis2_variations, axis2_directions, _pos_func, has_corners
+    def __setitem__(self, key:_EnumType, value:_T)->None:
+        for field in fields(self):
+            if field.name == key.name:
+                return setattr(self, field.name, value)
+        raise KeyError(f"No a valid option {key!r}")
+            
+
+@dataclass
+class _PerBound(_EnumContainer[_Bound, _T]):
+    first : _T 
+    last  : _T   
+
+
+@dataclass
+class _PerSide(_EnumContainer[_Side, _T]):
+    left  : _T 
+    right : _T   
+
+
+class _SideEdges:
+    def __init__(self, left_sorted_outer_edges:list[str], right_sorted_outer_edges:list[str]) -> None:
+        self.lists : _PerSide[list[str]] = _PerSide(
+            left = left_sorted_outer_edges,
+            right = right_sorted_outer_edges
+        )
+        self.crnt_index : _PerSide[int] = _PerSide(
+            left = 0,
+            right = 0 
+        )
+        self.exhausted : _PerSide[bool] = _PerSide(
+            left = False,
+            right = False,
+        )
+
+    def crnt(self, side:_Side)->str:
+        if self.exhausted[side]:
+            return "End"
+        index = self.crnt_index[side] 
+        item = self.lists[side][index]
+        return item
+
+    def next(self, side:_Side)->str:
+        self.crnt_index[side] += 1
+        try:
+            next_item = self.crnt(side)
+        except IndexError as e:
+            next_item = None
+            self.exhausted[side] = True
+        return next_item
+    
+    def __getitem__(self, key:_Side)->_T:
+        return self.crnt(key)
+
+
+class _ReverseOrder:
+    __slots__ = ["state", "counter"]
+    _num_repeats : Final[int] = 2
+    
+    def __init__(self) -> None:
+        self.counter = 0
+        self.state = True
+    
+    def __bool__(self)->bool:
+        return self.check_state_and_update()
+    
+    def __invert__(self)->None:
+        self.state = not self.state
+        self.counter = 0
+
+    def prev_state(self)->bool:
+        if self.counter - 1 < 0:
+            return not self.state
+        else:
+            return self.state
+
+    def check_state_and_update(self)->bool:
+        res = self.state
+        self.counter += 1
+        if self.counter > _ReverseOrder._num_repeats-1:
+            ~self   # call invert
+        return res
+
+    def set_true(self)->None:
+        self.counter = 0
+        self.state = True 
+
+    def set_false(self)->None:
+        self.counter = 0
+        self.state = False 
+
+    
 
 
 def _determine_direction(axis2:list[int], _pos_func:_PosFuncType) -> Direction:
@@ -110,96 +202,260 @@ def _determine_direction(axis2:list[int], _pos_func:_PosFuncType) -> Direction:
     raise ValueError("The lists are not ordered at all! ): ")
 
 
+def _sorted_side_outer_edges(
+    tn:KagomeTensorNetwork, direction:BlockSide, with_break:bool=False
+)->tuple[
+    list[str],
+    list[str]
+]:
+    ## Get all boundary edges. They are sorted to "the right"
+    sorted_right_boundary_edges : dict[BlockSide, list[str]] = {
+        side: tn.lattice.sorted_boundary_edges(side) for side in BlockSide.all_in_counter_clockwise_order()
+    }
+    right_last = direction.next_clockwise()
+    right_first = right_last.next_clockwise()
+    left_last = direction.next_counterclockwise()
+    left_first = left_last.next_counterclockwise()
 
-def derive_contraction_orders(
+    ## Right edge orders:
+    if with_break:
+        right_edges = sorted_right_boundary_edges[right_first] + ['Break'] + sorted_right_boundary_edges[right_last] 
+        left_edges = sorted_right_boundary_edges[left_last] + ['Break'] + sorted_right_boundary_edges[left_first] 
+    else:
+        right_edges = sorted_right_boundary_edges[right_first] + sorted_right_boundary_edges[right_last] 
+        left_edges = sorted_right_boundary_edges[left_last] + sorted_right_boundary_edges[left_first] 
+    left_edges.reverse()
+
+    return left_edges, right_edges
+
+def _decide_by_future_neighbors(
+    side_order:_PerBound[_Side], 
+    num_neighbors_per_side_before:_PerBound[list[int]], 
+    num_neighbors_per_side_after:_PerBound[list[int]]
+)->_Side|None:
+    ## Decide which side should continue the break:
+    for first_last in _Bound:            
+        side = side_order[first_last]
+        ## How many MPS messages are and were connected:
+        num_bfore = num_neighbors_per_side_before[side]
+        num_after = num_neighbors_per_side_after[side]
+        if num_bfore==0 or num_after==0:
+            raise ValueError("Not an expected case")
+        elif num_bfore==1: 
+            if num_after==2:
+                return side
+            else:
+                continue
+        elif num_bfore==2:
+            assert num_after==2, "if before we had 2 neighbors, we must still have 2 after."
+        else:
+            raise ValueError("Not an expected case")
+    return None
+
+
+def _message_break_next_order_logic(
+    reverse_order:_ReverseOrder, seen_break:_PerBound[bool], side_order:_PerBound[_Side],
+    num_neighbors_per_side_before:_PerBound[list[int]],
+    num_neighbors_per_side_after:_PerBound[list[int]],
+)->_ReverseOrder:
+    
+    ## If only one of the sides seen the break:
+    if seen_break.first and not seen_break.last:
+        next_side = side_order[Last]
+    elif seen_break.last and not seen_break.first:
+        next_side = side_order[First]
+    elif not seen_break.first and not seen_break.last:
+        raise ValueError("Bug. We shouldn't be here.")
+    else:
+        next_side = _decide_by_future_neighbors(side_order, num_neighbors_per_side_before, num_neighbors_per_side_after)
+    
+    ## Decide on new order::
+    if next_side is Left:
+        reverse_order.set_false()
+    elif next_side is Right:
+        reverse_order.set_true()
+    elif next_side is None:
+        pass   # Keep it as it is
+    else:
+        raise ValueError("Not an expected option!")
+    #
+    return reverse_order
+
+
+def _find_all_side_neighbors( 
+    tn:KagomeTensorNetwork, first_last:_Bound,
+    nodes:_PerSide[TensorNode], side_order:_PerBound[_Side], 
+    side_edges:_SideEdges
+)->tuple[
+    EdgeIndicatorType,  # last_edge
+    list[int]  # neighbor indices
+]:
+    # prepare results:
+    res = []
+    # unpack respective values:
+    side = side_order[first_last]            
+    node = nodes[side]
+    edge = side_edges[side]           
+    while edge in node.edges:     
+        # get neighbor:
+        neighbor = tn.find_neighbor(node, edge)
+        # add neighbor:
+        res.append(neighbor.index)  # Add to end 
+        # move iterator and get next edge
+        edge = side_edges.next(side)  
+    return edge, res  # return last edge
+
+
+def _derive_row_message_neighbors(
+    tn:KagomeTensorNetwork, row:list[int], reverse_order:_ReverseOrder,
+    side_edges:_SideEdges
+) -> _PerBound[list[int]]:
+    # Node at each side
+    nodes = _PerSide[TensorNode](
+        left  = tn.nodes[row[0]],
+        right = tn.nodes[row[-1]]
+    )
+    msg_neighbors_at_bounds = _PerBound[list[int]](first=[], last=[])
+
+    # which side is first?       
+    if reverse_order:
+        row.reverse()
+        side_order = _PerBound[_Side](first=Right, last=Left)
+    else:
+        side_order = _PerBound[_Side](first=Left, last=Right)
+
+    ## Look for breaks between MPS messages:
+    seen_break = _PerBound[bool](first=False, last=False)
+
+    ## Add neighbors if they exist:
+    for first_last in _Bound:
+        last_edge, neighbors = _find_all_side_neighbors(tn, first_last, nodes, side_order, side_edges )
+        msg_neighbors_at_bounds[first_last] += neighbors
+            
+        ## Special case when MPS messages change from one to another:
+        if last_edge == 'Break':
+            side = side_order[first_last]
+            side_edges.next(side)  # move iterator
+            seen_break[first_last] = True
+
+    ## At a break in the side MPS messages:
+    if seen_break.first or seen_break.last: 
+
+        # Keep data about beighbors per side:
+        num_neighbors_per_side_before = _PerSide[int](left=0, right=0)
+        num_neighbors_per_side_before[side_order[First]] = len(msg_neighbors_at_bounds[First])
+        num_neighbors_per_side_before[side_order[Last]] = len(msg_neighbors_at_bounds[Last])
+        num_neighbors_per_side_after = deepcopy(num_neighbors_per_side_before)
+
+        # Collect lost neighnors
+        for first_last in _Bound:
+            _, neighbors = _find_all_side_neighbors(tn, first_last, nodes, side_order, side_edges )
+            msg_neighbors_at_bounds[Last] += neighbors # force_assigning_at_end
+            num_neighbors_per_side_after[side_order[first_last]] += len(neighbors)
+
+        # Next order logic
+        reverse_order = _message_break_next_order_logic(reverse_order, seen_break, side_order, num_neighbors_per_side_before, num_neighbors_per_side_after)
+
+    return msg_neighbors_at_bounds
+
+
+def derive_contraction_order(
     tn:KagomeTensorNetwork,  
-    direction:Direction,
-    depth:ContractionDepth|int,
+    direction:BlockSide,
     plot_:bool=False
 )->tuple[
     list[int],
     Direction
 ]:
-
-    ## Derive iterations info:
-    axis1, axis2_variations, axis2_directions, _pos_func, has_corners = _derive_axes(tn, direction)
     
-    # Prepare output:
+    ## Check cached contractions:
+    global CONTRACTION_ORDERS_CACHE
+    cache_key = (tn.lattice.N, direction.name)
+    if cache_key in CONTRACTION_ORDERS_CACHE:
+        return CONTRACTION_ORDERS_CACHE[cache_key]
+
+    ## Prepare output:
     con_order = []    
 
-    ## Various iteration indicators:
-    # for snake-like motion
-    if ContractionConfig.random_snake_pattern:
-        is_reversed_order = lists.random_item([False, True])  # The initial direction is random, from it go like snake as usual
-    else:
-        is_reversed_order = False  
-    # for depth untill core mode:
-    has_seen_core = False
-    # the second axis - alternating:
-    axis2 : list[int] = []
-    dir2 : Direction = None  #type: ignore
+    # Define Directions:
+    major_direction = direction
+    minor_right = direction.orthogonal_clockwise_lattice_direction()
+
+    ## Start by fetching the lattice-nodes in order and the messages:
+    lattice_rows_ordered_right = tn.lattice.nodes_indices_rows_in_direction(major_direction, minor_right)
+    # Side edges:
+    left_sorted_outer_edges, right_sorted_outer_edges = _sorted_side_outer_edges(tn, major_direction, with_break=True)
+    side_edges = _SideEdges(left_sorted_outer_edges, right_sorted_outer_edges)
     
-    # Firstly, go over all values of the first axis:
-    for i1, (first1, last1, p1) in enumerate(lists.iterate_with_edge_indicators(axis1)):
+    ## Helper objects: 
+    # # Iterator to switch contraction direction every two rows:
+    reverse_order = _ReverseOrder()
 
-        # the last row\column is reserved for the outgoing message
-        if isinstance(depth, int) and depth==i1:
-            break
-        if depth is ContractionDepth.ToMessage and last1:  
-            break
-        if DEBUG_MODE and last1:
-            assert depth is ContractionDepth.Full, f"Only full-contraction should arrive at the final row|column. depth is {depth!r}"
+    ## First message:
+    con_order += tn.message_indices(major_direction.opposite()) 
 
-        # snake-like motion:
-        axis2 = axis2_variations[0] if is_reversed_order else axis2_variations[1]
-        dir2 = axis2_directions[0] if is_reversed_order else axis2_directions[1]
-        is_reversed_order = not is_reversed_order                        
-        
-        # Because this is not a perfect square, we need to contract the almost edge tensor before continuing:
-        if i1 == 1 and not has_corners:
-            axis2 = lists.swap_items(axis2, 0, 1)
-        
-        # Secondly, go over all values of the second axis:
-        this_row_or_column = []
-        for first2, last2, p2 in lists.iterate_with_edge_indicators(axis2): 
-            # ignore the corners:
-            if not has_corners and (first2 or last2) and (first1 or last1):  
-                continue
+    ## Lattice and its connected nodes:
+    for row in lattice_rows_ordered_right:
+        msg_neighbors = _derive_row_message_neighbors(tn, row, reverse_order, side_edges)
+        ## add row to con_order:
+        con_order.extend( msg_neighbors.first + row + msg_neighbors.last )
 
-            # Add to contraction order
-            node = tn.get_tensor_in_pos(_pos_func(p1, p2))
-            this_row_or_column.append(node.index)
-            if node.functionality is NodeFunctionality.Core: 
-                has_seen_core = True
-        
-        ## Check if we need to get only up to the core:
-        if has_seen_core and depth is ContractionDepth.ToCore:
-            break
-        
-        # Add entire row or column to the contraction list    
-        con_order.extend(this_row_or_column)
+    ## Last minor-direction of contraction:
+    # make opposite than last direction
+    last_order_was_reversed = reverse_order.prev_state()
+    final_order_is_reversed = not last_order_was_reversed
+    if final_order_is_reversed:
+        last_minor_direction = minor_right.opposite()
+    else:
+        last_minor_direction = minor_right
 
-        ## Determine the direction of the last contracted tensors:
+    ## Last msg:
+    last_msg = tn.message_indices(major_direction)
+    if not final_order_is_reversed:
+        last_msg.reverse()
+    con_order += last_msg
 
-    try:
-        last_direction = _determine_direction(axis2, _pos_func)
-    except:
-        last_direction = dir2
-
-
+    ## Plot result:
     if plot_:
         # For plotting contraction order, if needed:
         import matplotlib.pyplot as plt
-        from tensor_networks.visualizations import plot_contraction_order
+        from tensor_networks.visualizations import plot_contraction_order, draw_now
         tn.plot(detailed=False)
         plot_contraction_order(tn.positions, con_order)
         plt.title(f"Contraction in Direction {str(direction)}" )
+        draw_now()
 
-    return con_order, last_direction
+    ## Check:
+    if DEBUG_MODE:
+        # Both list of messages are in `con_order`:
+        assert side_edges.exhausted.left
+        assert side_edges.exhausted.right
+
+        
+    ## Cached result:
+    CONTRACTION_ORDERS_CACHE[cache_key] = (con_order, last_minor_direction)
+
+    return con_order, last_minor_direction
+
+
+def contraction_order_at_depth(
+    full_contraction_order:list[int], depth:ContractionDepth, N:int
+)->list[int]:
+    match depth:
+        case ContractionDepth.Full:
+            return full_contraction_order
+        case ContractionDepth.ToMessage:
+            m = kagome.num_message_connections(N)
+            return full_contraction_order[:-m]
+        case ContractionDepth.ToCore:
+            raise NotImplementedError(" ")
+        
 
 
 
 if __name__ == "__main__":
-    from scripts.core_ite_test import main
-    main()
+    from project_paths import add_scripts; 
+    add_scripts()
+    from scripts import bp_test
+    bp_test.main_test()
 

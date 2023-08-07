@@ -34,7 +34,7 @@ from typing import (
 from dataclasses import dataclass, field
 
 # Common types:
-from tensor_networks.node import TensorNode, NodeFunctionality, CoreCellType
+from tensor_networks.node import TensorNode, NodeFunctionality, UnitCellFlavor
 from lattices.directions import Direction
 from _error_types import DirectionError
 
@@ -200,14 +200,17 @@ def _derive_boundary(pos_list:List[Tuple[int, int]])->List[Tuple[int, ...]]:
 
 
 def plot_contraction_order(positions:List[Tuple[int,...]], con_order:List[int])->None:
-    not_all_the_way = 0.80
+    not_all_the_way = 0.85
     for (from_, to_), color in zip(itertools.pairwise(con_order), visuals.color_gradient(len(positions)) ):
+        if from_<0 or to_<0:
+            continue  # just a marker for something
         x1, y1 = positions[from_]
         x2, y2 = positions[to_]
         plt.arrow(
             x1, y1, (x2-x1)*not_all_the_way, (y2-y1)*not_all_the_way, 
-            width=0.04,
-            color=color
+            width=0.20,
+            color=color,
+            zorder=0
         )
 
 
@@ -219,7 +222,7 @@ def plot_network(
 )-> None:
     
     ## Constants:
-    edge_color ,alpha ,linewidth = 'gray', 0.5, 3
+    edge_color ,alpha ,linewidth = 'dimgray', 0.5, 3
     angle_color, angle_linewidth, angle_dis = 'green', 2, 0.5
     
     ## Complete data:
@@ -232,8 +235,8 @@ def plot_network(
 
     def node_style(node:TensorNode):
         # Marker:
-        if node.functionality is NodeFunctionality.Core:
-            marker = f"${node.core_cell_type}$"
+        if node.functionality is NodeFunctionality.CenterUnitCell:
+            marker = f"${node.core_cell_flavor}$"
             size1 = 120
             size2 = 180
             name = " "
@@ -243,14 +246,14 @@ def plot_network(
             size2 = 30
             name = f"{node.name}"
         # Color:
-        match node.core_cell_type:
-            case CoreCellType.A:
+        match node.core_cell_flavor:
+            case UnitCellFlavor.A:
                 color = 'green'
-            case CoreCellType.B:
+            case UnitCellFlavor.B:
                 color = 'red'
-            case CoreCellType.C:
+            case UnitCellFlavor.C:
                 color = 'gold'
-            case CoreCellType.NoneLattice:
+            case UnitCellFlavor.NoneLattice:
                 if node.functionality is NodeFunctionality.Message:
                     color = "orange"
                 else:
@@ -316,10 +319,9 @@ def plot_network(
         color, marker, size1, size2, name = node_style(node)
         plt.scatter(x, y, c="black", s=size2, marker=marker, zorder=3)
         plt.scatter(x, y, c=color, s=size1, marker=marker, zorder=4)
-        text = f"{name}"
         if detailed:
-            text += f" [{node.index}]"
-        plt.text(x, y, text)
+            text = f"{name}" + f" [{node.index}]"
+            plt.text(x, y, text)
 
     ## Collect basic data:
     network_bounds = _derive_boundary(pos_list)
