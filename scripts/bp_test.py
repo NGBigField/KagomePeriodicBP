@@ -69,9 +69,9 @@ def bp_single_call(
 
 def growing_tn_bp_test2(
     d = 2,
-    D = 3,
+    D = 2,
     min_N = 2,
-    max_N = 10,
+    max_N = 20,
     live_plot = False,
     with_bp = True
 ):
@@ -105,7 +105,7 @@ def growing_tn_bp_test2(
 
     ## Growing N networks:
     all_results = []
-    for N in range(min_N, max_N+1, 2):
+    for N in range(min_N, max_N+1, 1):
         print(" ")
         print(f"N={N:2}: ")
         tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
