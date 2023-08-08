@@ -30,7 +30,7 @@ from utils import tuples, lists, assertions, parallel_exec, prints
 # Our needed algos:
 from tensor_networks.tensor_network import get_common_edge_legs
 from tensor_networks.construction import create_kagome_tn, _get_edge_from_tensor_coordinates
-from algo.contraction_order import derive_contraction_order, contraction_order_at_depth
+from algo.contraction_order import derive_full_contraction_order, get_contraction_order
 from algo.mps import physical_tensor_with_split_mid_leg
 from libs.bubblecon import bubblecon
 from libs import bmpslib
@@ -491,7 +491,7 @@ def connect_corner_messages(
     ## Return:
     return tensors, edges_list, angles
     
-
+    
 
 def contract_tensor_network(
     tn:KagomeTensorNetwork, 
@@ -505,11 +505,8 @@ def contract_tensor_network(
     LatticeDirection,
 ]:
 
-    ## Derive Contraction Order:
-    # get or derive full con-oder:
-    full_contraction_order, last_direction = derive_contraction_order(tn, direction)
-    # Cut con order according to `depth`:
-    contraction_order = contraction_order_at_depth(full_contraction_order, depth, tn.lattice.N)
+    ## Derive or load Contraction Order:
+    contraction_order = get_contraction_order(tn, direction, depth)
 
     ## Connect first MPS message to a side tensor, to allow efficient contraction:
     tensors, edges_list, angles = connect_corner_messages(tn, direction)
@@ -605,22 +602,28 @@ def _reduce_tn_to_core_and_environment_EachDirectionToCore(small_tn:KagomeTensor
 
     return small_tn
 
-def _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn:KagomeTensorNetwork, bubblecon_trunc_dim:int, swallow_corners_:bool, parallel:bool) -> KagomeTensorNetwork:
+def _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn:KagomeTensorNetwork, bubblecon_trunc_dim:int, parallel:bool) -> KagomeTensorNetwork:
     
-    ## Check inputs:
-    assert swallow_corners_ is True, f"Zipping methods always swallows the corners"
+    ## Decide control vars:
+    print_progress = not parallel
+
+    ## Contract untill core:
+    for direction in [BlockSide.D, BlockSide.U]:
+        mps, contraction_order, mps_direction = contract_tensor_network(
+            tn, direction, depth=ContractionDepth.ToCore, bubblecon_trunc_dim=bubblecon_trunc_dim, print_progress=print_progress
+        )
 
     ## General data:
-    core_indices = [n.index for n in tn.get_nodes_by_functionality()]
-    mpss : dict[Direction, MPS] = dict()
+    core_indices = [n.index for n in tn.get_core_nodes()]
+    mpss : dict[BlockSide, MPS] = dict()
     N = tn.original_lattice_dims[0]-2
     n = len(core_indices)//2
     d_virtual = tn.tensor_dims.virtual
     d_physical = tn.tensor_dims.physical
 
     ## Prepare two MPSs:
-    for direction in [Direction.Down, Direction.Up]:
-        con_order, _ = derive_contraction_order(tn, direction, depth=ContractionDepth.Full)
+    for direction in [BlockSide.D, BlockSide.U]:
+        con_order, _ = derive_full_contraction_order(tn, direction, depth=ContractionDepth.Full)
         con_order = con_order[0:len(con_order)//2]
         for core_index in core_indices:
             if core_index in con_order:
@@ -756,12 +759,13 @@ def reduce_tn_to_core_and_environment(tn:KagomeTensorNetwork, bubblecon_trunc_di
     ## Decide if parallel contraction benefit us in this case:   #TODO  needs verification
     parallel = MULTIPROCESSING and ( tn.size>300 or bubblecon_trunc_dim>10 ) and tn.tensor_dims.virtual>3
 
-    ## Perform reduction up to a perfect square arround the core:
-    if method is ReduceToCoreMethod.EachDirectionToCore:
+    ## Perform reduction up to a small hexagon arround the core:
+    if method is ReduceToCoreMethod.DoubleMPSZipping:
+        small_tn = _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn_copy, bubblecon_trunc_dim, parallel)
+    
+    elif method is ReduceToCoreMethod.EachDirectionToCore:
+        raise NotImplementedError()
         small_tn = _reduce_tn_to_core_and_environment_EachDirectionToCore(tn_copy, bubblecon_trunc_dim, swallow_corners_, parallel)
-
-    elif method is ReduceToCoreMethod.DoubleMPSZipping:
-        small_tn = _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn_copy, bubblecon_trunc_dim, swallow_corners_, parallel)
 
     else:
         raise ValueError(f"No such option {method!r}")

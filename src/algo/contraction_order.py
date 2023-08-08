@@ -30,13 +30,9 @@ import numpy as np
 # Use our common utilities:
 from utils import lists
 
-# For smart iterations and function caching:
-import itertools
-import functools
-
 # For oop:
 from enum import Enum, auto
-from typing import Generic, TypeVar, Final, Callable
+from typing import Generic, TypeVar, Final, Callable, TypeAlias
 from dataclasses import dataclass, fields
 from copy import deepcopy
 
@@ -45,12 +41,16 @@ from copy import deepcopy
 _T = TypeVar("_T")
 _EnumType = TypeVar("_EnumType")
 _PosFuncType = Callable[[int, int], tuple[int, int] ]
+_FULL_CONTRACTION_ORDERS_CACHE_KEY_TYPE : TypeAlias = tuple[int, BlockSide, ContractionDepth]
 
 ## Constants:
 BREAK_MARKER = -100
+Full = ContractionDepth.Full
+ToCore = ContractionDepth.ToCore
+ToMessage = ContractionDepth.ToMessage
 
-
-CONTRACTION_ORDERS_CACHE = {}
+## For Caching results:
+FULL_CONTRACTION_ORDERS_CACHE : dict[_FULL_CONTRACTION_ORDERS_CACHE_KEY_TYPE, list[int]] = {}
 
 
 class _Bound(Enum):
@@ -359,20 +359,11 @@ def _derive_row_message_neighbors(
     return msg_neighbors_at_bounds
 
 
-def derive_contraction_order(
+def derive_full_contraction_order(
     tn:KagomeTensorNetwork,  
     direction:BlockSide,
-    plot_:bool=False
-)->tuple[
-    list[int],
-    Direction
-]:
-    
-    ## Check cached contractions:
-    global CONTRACTION_ORDERS_CACHE
-    cache_key = (tn.lattice.N, direction.name)
-    if cache_key in CONTRACTION_ORDERS_CACHE:
-        return CONTRACTION_ORDERS_CACHE[cache_key]
+    depth:BlockSide
+)->list[int]:
 
     ## Prepare output:
     con_order = []    
@@ -396,7 +387,10 @@ def derive_contraction_order(
 
     ## Lattice and its connected nodes:
     for row in lattice_rows_ordered_right:
+        ## Stop at core if needed:
         msg_neighbors = _derive_row_message_neighbors(tn, row, reverse_order, side_edges)
+        if depth is ToCore:
+            pass
         ## add row to con_order:
         con_order.extend( msg_neighbors.first + row + msg_neighbors.last )
 
@@ -410,10 +404,35 @@ def derive_contraction_order(
         last_minor_direction = minor_right
 
     ## Last msg:
-    last_msg = tn.message_indices(major_direction)
-    if not final_order_is_reversed:
-        last_msg.reverse()
-    con_order += last_msg
+    if depth is Full:
+        last_msg = tn.message_indices(major_direction)
+        if not final_order_is_reversed:
+            last_msg.reverse()
+        con_order += last_msg
+
+    ## Validate:
+    if DEBUG_MODE :
+        # Both list of messages are in `con_order`:
+        assert side_edges.exhausted.left
+        assert side_edges.exhausted.right    
+
+    ## we can return `last_minor_direction` if this is important. It is usually NOT.
+    return con_order
+
+
+def get_contraction_order(tn:KagomeTensorNetwork, direction:BlockSide, depth:ContractionDepth, plot_:bool=False)->list[int]:
+
+    ## Get cached contractions or derive them:
+    global FULL_CONTRACTION_ORDERS_CACHE
+    cache_key = (tn.lattice.N, direction, depth)
+    if cache_key in FULL_CONTRACTION_ORDERS_CACHE:
+        contraction_order = FULL_CONTRACTION_ORDERS_CACHE[cache_key]
+    else:
+        # Derive:
+        contraction_order = derive_full_contraction_order(tn, direction, depth)
+        # Save for next time:
+        FULL_CONTRACTION_ORDERS_CACHE[cache_key] = contraction_order
+    
 
     ## Plot result:
     if plot_:
@@ -421,35 +440,12 @@ def derive_contraction_order(
         import matplotlib.pyplot as plt
         from tensor_networks.visualizations import plot_contraction_order, draw_now
         tn.plot(detailed=False)
-        plot_contraction_order(tn.positions, con_order)
+        plot_contraction_order(tn.positions, contraction_order)
         plt.title(f"Contraction in Direction {str(direction)}" )
         draw_now()
 
-    ## Check:
-    if DEBUG_MODE:
-        # Both list of messages are in `con_order`:
-        assert side_edges.exhausted.left
-        assert side_edges.exhausted.right
-
-        
-    ## Cached result:
-    CONTRACTION_ORDERS_CACHE[cache_key] = (con_order, last_minor_direction)
-
-    return con_order, last_minor_direction
-
-
-def contraction_order_at_depth(
-    full_contraction_order:list[int], depth:ContractionDepth, N:int
-)->list[int]:
-    match depth:
-        case ContractionDepth.Full:
-            return full_contraction_order
-        case ContractionDepth.ToMessage:
-            m = kagome.num_message_connections(N)
-            return full_contraction_order[:-m]
-        case ContractionDepth.ToCore:
-            raise NotImplementedError(" ")
-        
+    ## Return:
+    return contraction_order
 
 
 

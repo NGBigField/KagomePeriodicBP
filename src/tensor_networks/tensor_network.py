@@ -562,26 +562,14 @@ class KagomeTensorNetwork():
             raise TensorNetworkError(f"Found more than 1 tensor in position {pos}")
         return tensors_in_position[0]
     
-    def get_corner_nodes(self)->list[TensorNode]:
-        min_x, max_x, min_y, max_y = self.positions_min_max()
-        corner_nodes = []
-        for x, y in itertools.product([min_x, max_x], [min_y, max_y]):
-            try:
-                node = self.get_node_in_pos((x,y))
-            except TensorNetworkError:
-                continue
-            else:
-                corner_nodes.append(node)
-        return corner_nodes
-    
-    def get_nodes_by_functionality(self, function:NodeFunctionality)->list[TensorNode]:
-        return [n for n in self.nodes if n.functionality is function]
+    def get_nodes_by_functionality(self, functions:list[NodeFunctionality])->list[TensorNode]:
+        return [n for n in self.nodes if n.functionality in functions]
     
     def get_core_nodes(self)->list[TensorNode]:
-        return self.get_nodes_by_functionality(NodeFunctionality.Core)
+        return self.get_nodes_by_functionality([NodeFunctionality.Core, NodeFunctionality.CenterUnitCell])
     
     def get_center_unit_cell_nodes(self)->list[TensorNode]:
-        return self.get_nodes_by_functionality(NodeFunctionality.CenterUnitCell)
+        return self.get_nodes_by_functionality([NodeFunctionality.CenterUnitCell])
 
 
 def _derive_message_node_position(nodes_on_boundary:list[Node], edge:EdgeIndicatorType, boundary_delta:tuple[float,...]):

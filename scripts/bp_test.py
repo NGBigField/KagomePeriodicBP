@@ -185,6 +185,39 @@ def growing_tn_bp_test(
     print("Done")
                 
 
+def contract_to_core_test(
+    d = 2,
+    D = 2,
+    N = 2
+):
+    ## Config:
+    bubblecon_trunc_dim = D**2
+    bp_config = BPConfig(
+        max_swallowing_dim=D,
+        max_iterations=50,
+        target_msg_diff=1e-5
+    )
+    
+    ## Load or randomize unit_cell
+    unit_cell= UnitCell.load(f"random_D={D}")
+    if unit_cell is None:
+        unit_cell = UnitCell.random(d=d, D=D)
+        unit_cell.save(f"random_D={D}")
+
+
+    ## contract network:
+    tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
+    # tn, messages, stats = belief_propagation(tn, None, bp_config)
+    tn.connect_random_messages()
+    res_reduced = measure_xyz_expectation_values_with_tn(tn, reduce=True)
+    res_full_tn = measure_xyz_expectation_values_with_tn(tn, reduce=False)
+    print(" ")
+    print(res_reduced)
+    print(res_full_tn)
+
+    print("Done")
+
+    
 
 
 
@@ -213,8 +246,9 @@ def single_bp_test(
 def main_test():
     # single_bp_test()
     # growing_tn_bp_test()
-    growing_tn_bp_test2()
+    # growing_tn_bp_test2()
     # load_results()
+    contract_to_core_test()
 
 
 if __name__ == "__main__":

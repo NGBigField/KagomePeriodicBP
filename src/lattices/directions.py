@@ -120,9 +120,23 @@ class Direction():
 
     
 
-class LatticeDirection(Direction): ...    
+class LatticeDirection(Direction): 
+    R  : "LatticeDirection"
+    UR : "LatticeDirection"
+    UL : "LatticeDirection"
+    L  : "LatticeDirection"
+    DL : "LatticeDirection"
+    DR : "LatticeDirection" 
+
 
 class BlockSide(Direction):
+    U  : "BlockSide"
+    UR : "BlockSide"
+    UL : "BlockSide"
+    D  : "BlockSide"
+    DL : "BlockSide"
+    DR : "BlockSide" 
+
     def orthogonal_counterclockwise_lattice_direction(self)->LatticeDirection:
         return ORTHOGONAL_LATTICE_DIRECTIONS_TO_BLOCK_SIDES[self]
     

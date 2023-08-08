@@ -239,25 +239,29 @@ def plot_network(
             marker = f"${node.core_cell_flavor}$"
             size1 = 120
             size2 = 180
-            name = " "
+        elif node.functionality is NodeFunctionality.Core:
+            marker = "H"
+            size1 = 60
+            size2 = 80
         else:
             marker = "o"
             size1 = 15
             size2 = 30
-            name = f"{node.name}"
+        name = ""
         # Color:
         match node.core_cell_flavor:
             case UnitCellFlavor.A:
-                color = 'green'
-            case UnitCellFlavor.B:
                 color = 'red'
+            case UnitCellFlavor.B:
+                color = 'green'
             case UnitCellFlavor.C:
-                color = 'gold'
+                color = 'blue'
             case UnitCellFlavor.NoneLattice:
+                name = f"{node.name}"
                 if node.functionality is NodeFunctionality.Message:
                     color = "orange"
                 else:
-                    color = "blue"
+                    color = "yellow"
         return color, marker, size1, size2, name
 
     def _tensor_indices(edge_name:str, assert_connections:bool=False) -> List[int]:
@@ -320,7 +324,7 @@ def plot_network(
         plt.scatter(x, y, c="black", s=size2, marker=marker, zorder=3)
         plt.scatter(x, y, c=color, s=size1, marker=marker, zorder=4)
         if detailed:
-            text = f"{name}" + f" [{node.index}]"
+            text = f" [{node.index}]" + f" {name}" 
             plt.text(x, y, text)
 
     ## Collect basic data:
