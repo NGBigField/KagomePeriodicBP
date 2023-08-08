@@ -71,7 +71,7 @@ def growing_tn_bp_test2(
     d = 2,
     D = 2,
     min_N = 2,
-    max_N = 20,
+    max_N = 4,
     live_plot = False,
     with_bp = True
 ):
@@ -89,19 +89,12 @@ def growing_tn_bp_test2(
         unit_cell = UnitCell.random(d=d, D=D)
         unit_cell.save(f"random_D={D}")
 
-    ## Figure:
-    if live_plot:
-        visuals.draw_now()
-        plots = visuals.AppendablePlot()
-        plots.axis.set_title("<Z> on sites")
-        plots.axis.set_xlabel("N")
-        plots.axis.set_ylabel("<Z>")
 
-    if with_bp:
-        csv_name =  f"Results_D={D}_with-BP"
-    else:
-        csv_name =  f"Results_D={D}_random-messages"
-    csv = csvs.CSVManager(['D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'], name=csv_name)
+    # if with_bp:
+    #     csv_name =  f"bp_res_D={D}_with-BP"
+    # else:
+    #     csv_name =  f"bp_res_D={D}_random-messages"
+    # csv = csvs.CSVManager(['D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'], name=csv_name)
 
     ## Growing N networks:
     all_results = []
@@ -123,14 +116,12 @@ def growing_tn_bp_test2(
         a = zs['A']
         b = zs['B']
         c = zs['C']
-        
-        if live_plot:
-            plots.append(A=(N, a), B=(N, b), C=(N, c))
+
         all_results.append((N, results))
         saveload.save(all_results, f"all_results_D={D}", sub_folder="results")
 
         row = _standard_row_from_results(D, N, results)
-        csv.append(row)
+        # csv.append(row)
         
 
     ## End:
