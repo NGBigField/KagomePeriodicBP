@@ -12,7 +12,6 @@ class Node():
     directions : list[Direction]
     boundaries : set[Direction] = field(default_factory=set)
 
-
     def get_edge_in_direction(self, direction:Direction) -> EdgeIndicatorType:
         edge_index = self.directions.index(direction)
         return self.edges[edge_index]

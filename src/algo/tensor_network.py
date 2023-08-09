@@ -512,7 +512,7 @@ def contract_tensor_network(
     tensors, edges_list, angles = connect_corner_messages(tn, direction)
 
     ## Call main function:
-    mp = bubblecon(
+    mps = bubblecon(
         tensors, 
         edges_list, 
         angles, 
@@ -529,9 +529,9 @@ def contract_tensor_network(
     mps_direction = direction.orthogonal_clockwise_lattice_direction()
 
     ## Check outputs:
-    assert not isinstance(mp, list)  # This is not an expected output
+    assert not isinstance(mps, list)  # This is not an expected output
 
-    return mp, contraction_order, mps_direction
+    return mps, contraction_order, mps_direction
 
 
 def reduce_tn_using_bubblecon(tn:KagomeTensorNetwork, bubblecon_trunc_dim:int, directions:Iterable[BlockSide], depth:ContractionDepth|int, parallel:bool=False)->KagomeTensorNetwork:

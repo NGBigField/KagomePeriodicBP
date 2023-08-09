@@ -20,7 +20,7 @@ from tensor_networks.node import TensorNode
 from lattices.edges import edges_dict_from_edges_list
 from tensor_networks.unit_cell import UnitCell
 
-from lattices.kagome import KagomeLattice, Node
+from lattices.kagome import KagomeLattice, Node, UpperTriangle
 import lattices.triangle as triangle_lattice
 from _types import EdgeIndicatorType, PosScalarType
 
@@ -141,9 +141,6 @@ class AbstractTensorNetwork(ABC):
     # ================================================= #
     #|                   Get Nodes                     |#
     # ================================================= #
-    def get_nodes_on_boundary(self, side:BlockSide)->list[TensorNode]: 
-        return [t for t in self.nodes if side in t.boundaries ] 
-
     def get_node_in_pos(self, pos:tuple[PosScalarType, ...]) -> TensorNode:
         tensors_in_position = [node for node in self.nodes if node.pos == pos]
         if len(tensors_in_position)==0:
@@ -155,11 +152,12 @@ class AbstractTensorNetwork(ABC):
     def get_nodes_by_functionality(self, functions:list[NodeFunctionality])->list[TensorNode]:
         return [n for n in self.nodes if n.functionality in functions]
     
-    @functools.cache
+    def get_nodes_on_boundary(self, side:BlockSide)->list[TensorNode]: 
+        return [t for t in self.nodes if side in t.boundaries ] 
+
     def get_core_nodes(self)->list[TensorNode]:
         return self.get_nodes_by_functionality([NodeFunctionality.Core, NodeFunctionality.CenterUnitCell])
     
-    @functools.cache
     def get_center_unit_cell_nodes(self)->list[TensorNode]:
         return self.get_nodes_by_functionality([NodeFunctionality.CenterUnitCell])
     
@@ -295,10 +293,6 @@ class KagomeTensorNetwork(AbstractTensorNetwork):
         return _derive_message_indices(self.lattice.N, direction)
 
     # ================================================= #
-    #|                Network Structure                |#
-    # ================================================= #
-
-    # ================================================= #
     #|              Geometry Functions                 |#
     # ================================================= #
     @property
@@ -312,6 +306,15 @@ class KagomeTensorNetwork(AbstractTensorNetwork):
         min_x, max_x = lists.min_max([node.pos[0] for node in self.nodes])
         min_y, max_y = lists.min_max([node.pos[1] for node in self.nodes])
         return min_x, max_x, min_y, max_y
+    
+    def get_center_triangle(self)->UpperTriangle:
+        triangle = self.lattice.get_center_triangle()
+        if DEBUG_MODE:
+            unit_cell_indices = [node.index for node in self.get_center_unit_cell_nodes()]
+            assert len(unit_cell_indices)==3
+            for node in triangle.all_nodes():
+                assert node.index in unit_cell_indices
+        return triangle
 
 
 class ArbitraryTensorNetwork(AbstractTensorNetwork):

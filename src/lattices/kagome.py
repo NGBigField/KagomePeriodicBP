@@ -60,6 +60,14 @@ class UpperTriangle:
     #
     index : int = -1
 
+    def __getitem__(self, key:str)->Node:
+        match key:
+            case 'up': return self.up
+            case 'left': return self.left
+            case 'right': return self.right
+            case _:
+                raise KeyError(f"Not a valid key {key!r}")
+
     def all_nodes(self)->Generator[Node, None, None]:
         yield self.up
         yield self.left
@@ -397,7 +405,11 @@ class KagomeLattice():
         min_x, max_x = lists.min_max([node.pos[0] for node in self.nodes])
         min_y, max_y = lists.min_max([node.pos[1] for node in self.nodes])
         return min_x, max_x, min_y, max_y
-    
+
+    def get_center_triangle(self)->UpperTriangle:
+        index = triangle_lattice.get_center_vertex_index(self.N)
+        return self.triangles[index]
+
     # ================================================= #
     #|            Retrieve Inner Objects               |#
     # ================================================= #
