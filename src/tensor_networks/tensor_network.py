@@ -28,9 +28,10 @@ from enums import NodeFunctionality
 from utils import assertions, lists, tuples, numerics, indices, decorators
 
 import numpy as np
-from typing import NamedTuple, Generator
+from typing import NamedTuple
 from copy import deepcopy
 
+# For efficient functions:
 import itertools
 import functools
 
@@ -40,7 +41,9 @@ from containers import MessageDictType, Message, TNSizesAndDimensions
 # Other supporting algo:
 from algo.mps import initial_message
 
-from libs.bmpslib import mps as MPS
+# For OOP:
+from abc import ABC, abstractmethod, abstractproperty
+from typing import Self, Any
 
 
 class _ReplaceHere(): ... 
@@ -65,159 +68,17 @@ def _derive_message_indices(N:int, direction:BlockSide)->list[int]:
     res = np.arange(message_size) + num_lattice_nodes + message_size*direction_index_in_order
     return res.tolist()
 
-class KagomeTensorNetwork():
 
+class AbstractTensorNetwork(ABC):
     # ================================================= #
-    #|                Basic Attributes                 |#
+    #|   Implementation Specific Methods\Properties    |#
     # ================================================= #
-    def __init__(
-        self, 
-        lattice : KagomeLattice,
-        unit_cell : UnitCell,
-        d : int,
-        D : int
-    ) -> None:
-        # Save data:
-        self.lattice : KagomeLattice = lattice
-        self.messages : MessageDictType = {}
-        self.unit_cell : UnitCell = unit_cell
-        self.dimensions : TNSizesAndDimensions = TNSizesAndDimensions(
-            virtual_dim=D,
-            physical_dim=d,
-            core_size=2,
-            big_lattice_size=lattice.N
-        )
-
-    # ================================================= #
-    #|                Begaviour Control                |#
-    # ================================================= #
-    def clear_cache(self)->None:
-        # nodes
-        try:    
-            del self.nodes
-        except AttributeError:  
-            pass
-
-        # edges:
-        try:
-            del self.edges
-        except AttributeError:  
-            pass
-
-    # ================================================= #
-    #|                   Add messages                  |#
-    # ================================================= #
-    def connect_messages(self, messages:MessageDictType) -> None:   
-        # Fuse:
-        for block_side, message in messages.items():
-            self.messages[block_side] = message
-        # Clear cache so that nodes are derived again
-        self.clear_cache()
-
-
-
-    # add sub method:
-    def connect_random_messages(self) -> None:
-        D = self.dimensions.virtual_dim
-        message_length = self.num_message_connections
-        messages = { 
-            edge_side : Message(
-                mps=initial_message(D=D, N=message_length), 
-                order_direction=edge_side.orthogonal_counterclockwise_lattice_direction() 
-            ) 
-            for edge_side in BlockSide.all_in_counter_clockwise_order()  \
-        }
-        self.connect_messages(messages)
-
-
-    # ================================================= #
-    #|                Network Structure                |#
-    # ================================================= #
-    @functools.cached_property
-    def nodes(self)->list[TensorNode]:
-        
-        # init lists and iterators:
-        unit_cell_tensors = itertools.cycle(self.unit_cell.all())
-        
-        # Prepare info:
-        center_triangle_index = triangle_lattice.center_vertex_index(self.lattice.N)
-        center_nodes : list[TensorNode] = []
-        
-        # Create all nodes:
-        nodes : list[TensorNode] = []
-        for (lattice_node, triangle), (tensor, cell_type) in zip(self.lattice.nodes_and_triangles(), unit_cell_tensors):            
-            # Which type of node:
-            functionality = NodeFunctionality.CenterUnitCell if triangle.index == center_triangle_index else NodeFunctionality.Padding
-
-            # Add:
-            network_node = TensorNode(
-                index=lattice_node.index,
-                tensor=tensor,
-                is_ket=True,
-                pos=lattice_node.pos,
-                edges=lattice_node.edges,
-                directions=lattice_node.directions,
-                functionality=functionality,
-                core_cell_flavor=cell_type,
-                boundaries=lattice_node.boundaries,
-                name=f"{cell_type}"
-            )
-            nodes.append(network_node)
-
-            if functionality is NodeFunctionality.CenterUnitCell:
-                center_nodes.append(network_node)
-
-        # Nearest-neighbors of the center triangles are part of the core:
-        for node in center_nodes:
-            for edge in node.edges:
-                neighbor_index = self.lattice.get_neighbor(node, edge).index
-                neihgbor = nodes[neighbor_index]
-                if neihgbor in center_nodes:
-                    continue
-                neihgbor.functionality = NodeFunctionality.Core
-
-        ## Add messages:
-        if len(self.messages)>0:
-            crnt_node_index = self.lattice.size
-            for side in BlockSide.all_in_counter_clockwise_order():
-                if side in self.messages:
-                    message = self.messages[side]
-                    message_nodes = _message_nodes(self, message, side, crnt_node_index)
-                    nodes.extend(message_nodes)
-                    crnt_node_index += len(message_nodes)
-
-        return nodes
-
-
-    @functools.cached_property
-    def edges(self)->dict[str, tuple[int, int]]:
-        ## Lattice edges:
-        edges = self.lattice.edges
-
-        if 'M-D-0' in edges:  # Already added messages
-            return edges
-
-        ## Message edges:
-        if len(self.messages)>0:
-            crnt_index = self.lattice.size
-            for side, message in self.messages.items():
-                side_edges = self.lattice.sorted_boundary_edges(side)
-                for edge in side_edges:
-                    connected_nodes = edges[edge]
-                    assert connected_nodes[0]==connected_nodes[1], f"Outer edge should have been with only 1 node"
-                    edges[edge] = (connected_nodes[0], crnt_index) 
-                    crnt_index+=1
-
-            num_message_inner_edges = self.lattice.num_message_connections - 1
-            crnt_index = self.lattice.size
-            for side in self.messages.keys():
-                for i in range(num_message_inner_edges):
-                    edge = f"M-{side}-{i}"
-                    edges[edge] = (crnt_index, crnt_index+1)
-                    crnt_index += 1
-                crnt_index += 1
-
-        return edges
+    @abstractproperty
+    def nodes(self): ...
+    @abstractproperty
+    def edges(self): ...
+    @abstractmethod
+    def copy(self)->Self: ...
 
     # ================================================= #
     #|              Basic Derived Properties           |#
@@ -245,155 +106,66 @@ class KagomeTensorNetwork():
     @property
     def angles(self)->list[list[float]]:
         return [v.angles for v in self.nodes]
-    
-    @property
-    def num_message_connections(self)->int:
-        return self.lattice.num_message_connections
 
     # ================================================= #
-    #|              Geometry Functions                 |#
+    #|            Instance Copy\Creation               |#
     # ================================================= #
-    def num_boundary_nodes(self, boundary:BlockSide)->int:
-        return self.lattice.num_boundary_nodes(boundary)
-
-    
-    def positions_min_max(self)->tuple[int, ...]:
-        min_x, max_x = lists.min_max([node.pos[0] for node in self.nodes])
-        min_y, max_y = lists.min_max([node.pos[1] for node in self.nodes])
-        return min_x, max_x, min_y, max_y
+    def sub_tn(self, indices:list[int])->"AbstractTensorNetwork":
+        return _derive_sub_tn(self, indices)
 
     # ================================================= #
-    #|               instance methods                  |#
+    #|                Basic Structure                  |#
     # ================================================= #
-   
     def validate(self)->None:
-        # Generic error message:
-        _error_message = f"Failed validation of tensor-network."
-        # Provoke cached properties:
-        all_nodes = self.nodes
-        all_edges = self.edges
-        # Check each node individually:
-        for node in all_nodes:
-            # Self validation:
-            node.validate()
-            # Validation with neighbors in lattice:
-            for dir in node.directions:
-                edge_name = node.edge_in_dir(dir)
-                if _is_open_edge(all_edges[edge_name]):
-                    continue
-                neighbor = self.find_neighbor(node, dir)
-                # Is neighbors pointing back to us?
-                _neigbor_error_message = _error_message+f"\nnode '{node.name}' is not the neighbor of '{neighbor.name}' on edge '{edge_name}'"
-                opposite_dir = dir.opposite()
-                neighnors_dir = neighbor.directions[neighbor.edges.index(edge_name)]
-                assert check.is_opposite(neighnors_dir, dir)
-                assert self._find_neighbor_by_edge(neighbor, edge_name) is node, _neigbor_error_message
-                assert self.find_neighbor(neighbor, neighnors_dir) is node, _neigbor_error_message
-                # Messages struggle with this check:
-                if not isinstance(dir, LatticeDirection) and isinstance(neighnors_dir, BlockSide):
-                    assert neighbor.edge_in_dir(opposite_dir) == edge_name
+        _validate_tn(self)
 
-        # Check edges:
-        for edge_name, node_indices in all_edges.items():
-            if node_indices[0] == node_indices[1]:  # happens in outer legs (going outside of the lattice without any connection)
-                continue
-            nodes = [all_nodes[ind] for ind in node_indices ]
-            try:
-                indices_of_this_edge = [node.edges.index(edge_name) for node in nodes]
-            except:
-                raise KeyError(_error_message)
-            assert nodes[0].dims[indices_of_this_edge[0]] == nodes[1].dims[indices_of_this_edge[1]] , _error_message
-            dir1 = nodes[0].directions[indices_of_this_edge[0]]
-            dir2 = nodes[1].directions[indices_of_this_edge[1]]
-            assert check.is_opposite(dir1, dir2)
-            for node, node_index in zip(nodes, node_indices, strict=True):
-                assert node.index == node_index , _error_message
-        # Check lattice dimensions:
-        min_x, max_x, min_y, max_y = self.positions_min_max()
-        #TODO Size check
-
-    def to_dict(self)->dict:
+    def to_dict(self)->dict[str, Any]:
         d = dict()
-        d["tensors"], d["is_ket"] = self.tensors
+        d["tensors"] = self.tensors
+        d["is_ket"] = self.kets
         d["edgs"] = self.edges_list
         d["edgs_dict"] = self.edges
         d["angles"] = self.angles
         d["positions"] = self.positions
         return d
 
-    def nodes_on_boundary(self, side:BlockSide)->list[TensorNode]: 
-        return [t for t in self.nodes if side in t.boundaries ] 
-
+    # ================================================= #
+    #|                    Visuals                      |#
+    # ================================================= #
     def plot(self, detailed:bool=True)->None:
         from tensor_networks.visualizations import plot_network
         nodes = self.nodes
         edges = self.edges
         plot_network(nodes=nodes, edges=edges, detailed=detailed)
-        
-    def copy(self, with_messages:bool=True)->"KagomeTensorNetwork":
-        new = KagomeTensorNetwork(
-            lattice=self.lattice,
-            unit_cell=self.unit_cell.copy(),
-            d=self.dimensions.physical_dim,
-            D=self.dimensions.virtual_dim,
-        )
-        if with_messages:
-            new.messages = self.messages
 
-        if DEBUG_MODE: 
-            new.validate()
-        return new
+    # ================================================= #
+    #|                   Get Nodes                     |#
+    # ================================================= #
+    def get_nodes_on_boundary(self, side:BlockSide)->list[TensorNode]: 
+        return [t for t in self.nodes if side in t.boundaries ] 
+
+    def get_node_in_pos(self, pos:tuple[PosScalarType, ...]) -> TensorNode:
+        tensors_in_position = [node for node in self.nodes if node.pos == pos]
+        if len(tensors_in_position)==0:
+            raise TensorNetworkError(f"Couldn't find any tensor in position {pos}")
+        elif len(tensors_in_position)>1:
+            raise TensorNetworkError(f"Found more than 1 tensor in position {pos}")
+        return tensors_in_position[0]
     
-    def sub_tn(self, indices)->"KagomeTensorNetwork":
-        cls = type(self)
-        
-        ## the nodes in the sub-system must be indexed again:
-        nodes : list[TensorNode] = []
-        for new_index, old_index in enumerate(indices):
-            # Basic info:
-            old_node = self.nodes[old_index]
-            # Create new node:
-            new_node = TensorNode(
-                is_ket=old_node.is_ket,   
-                tensor=old_node.tensor.copy(),
-                functionality=old_node.functionality,
-                edges=deepcopy(old_node.edges),  # These are the old edges names
-                pos=deepcopy(old_node.pos),
-                directions=deepcopy(old_node.directions),
-                index=new_index,
-                name=old_node.name, 
-                boundaries=deepcopy(old_node.on_boundary)
-            )
-            # add to list:
-            nodes.append(new_node)
-        
-        ## The edges of the sub-system are the same, but the node indices must change:
-        edges_list = [node.edges for node in nodes ]
-        edges = edges_dict_from_edges_list(edges_list)
-        
-        ## Fill in boundary information:
-        for node in nodes:
-            for edge in node.edges:
-                pair = edges[edge]
-                if pair[0]==pair[1]:
-                    side = node.directions[node.edges.index(edge)]
-                    assert isinstance(side, LatticeDirection)
-                    node.boundaries.append(side)
-        
-        ## Copy additional straight-forward info:
-        t_dims = self.tensor_dims
-        new = cls(nodes=nodes, edges=edges, _copied=True, tensor_dims=t_dims)
-        min_x, max_x, min_y, max_y = new.positions_min_max()
-        new.original_lattice_dims = ( int(max_y-min_y+1), int(max_x-min_x+1) )
-        return new
-        
-    # ========== # Messages # ============= #                 
-    #=======================================#
-    def message_indices(self, direction:BlockSide)->list[int]:
-        return _derive_message_indices(self.lattice.N, direction)
-
-    # ========== # Neigbours # ============ #                 
-    #=======================================#
+    def get_nodes_by_functionality(self, functions:list[NodeFunctionality])->list[TensorNode]:
+        return [n for n in self.nodes if n.functionality in functions]
+    
+    @functools.cache
+    def get_core_nodes(self)->list[TensorNode]:
+        return self.get_nodes_by_functionality([NodeFunctionality.Core, NodeFunctionality.CenterUnitCell])
+    
+    @functools.cache
+    def get_center_unit_cell_nodes(self)->list[TensorNode]:
+        return self.get_nodes_by_functionality([NodeFunctionality.CenterUnitCell])
+    
+    # ================================================= #
+    #|                   Neighbors                     |#
+    # ================================================= #
     
     def nodes_connected_to_edge(self, edge:str)->list[TensorNode]:
         indices = self.edges[edge]
@@ -430,9 +202,123 @@ class KagomeTensorNetwork():
             if edge in n2.edges:
                 return True
         return False    
+
+
+class KagomeTensorNetwork(AbstractTensorNetwork):
+
+    # ================================================= #
+    #|                Basic Attributes                 |#
+    # ================================================= #
+    def __init__(
+        self, 
+        lattice : KagomeLattice,
+        unit_cell : UnitCell,
+        d : int,
+        D : int
+    ) -> None:
+        # Save data:
+        self.lattice : KagomeLattice = lattice
+        self.messages : MessageDictType = {}
+        self.unit_cell : UnitCell = unit_cell
+        self.dimensions : TNSizesAndDimensions = TNSizesAndDimensions(
+            virtual_dim=D,
+            physical_dim=d,
+            core_size=2,
+            big_lattice_size=lattice.N
+        )
+
+    # ================================================= #
+    #|                Behaviour Control                |#
+    # ================================================= #
+    def clear_cache(self)->None:
+        # nodes
+        try:    
+            del self.nodes
+        except AttributeError:  
+            pass
+
+        # edges:
+        try:
+            del self.edges
+        except AttributeError:  
+            pass
+
+    # ================================================= #
+    #|                   Add messages                  |#
+    # ================================================= #
+    def connect_messages(self, messages:MessageDictType) -> None:   
+        # Fuse:
+        for block_side, message in messages.items():
+            self.messages[block_side] = message
+        # Clear cache so that nodes are derived again
+        self.clear_cache()
+
+    # add sub method:
+    def connect_random_messages(self) -> None:
+        D = self.dimensions.virtual_dim
+        message_length = self.num_message_connections
+        messages = { 
+            edge_side : Message(
+                mps=initial_message(D=D, N=message_length), 
+                order_direction=edge_side.orthogonal_counterclockwise_lattice_direction() 
+            ) 
+            for edge_side in BlockSide.all_in_counter_clockwise_order()  \
+        }
+        self.connect_messages(messages)
+
+    # ================================================= #
+    #|                Network Structure                |#
+    # ================================================= #
+    @functools.cached_property
+    def nodes(self)->list[TensorNode]:
+        return _derive_nodes_kagome_tn(self)
+
+    @functools.cached_property
+    def edges(self)->dict[str, tuple[int, int]]:
+        return _derive_edges_kagome_tn(self)
     
-    # ========= # Node control # ========== #                 
+    @property
+    def num_message_connections(self)->int:
+        return self.lattice.num_message_connections
+
+    # ================================================= #
+    #|              Geometry Functions                 |#
+    # ================================================= #
+    def num_boundary_nodes(self, boundary:BlockSide)->int:
+        return self.lattice.num_boundary_nodes(boundary)
+    
+    def positions_min_max(self)->tuple[int, ...]:
+        min_x, max_x = lists.min_max([node.pos[0] for node in self.nodes])
+        min_y, max_y = lists.min_max([node.pos[1] for node in self.nodes])
+        return min_x, max_x, min_y, max_y
+
+    # ================================================= #
+    #|               instance methods                  |#
+    # ================================================= #
+        
+    def copy(self, with_messages:bool=True)->"KagomeTensorNetwork":
+        new = KagomeTensorNetwork(
+            lattice=self.lattice,
+            unit_cell=self.unit_cell.copy(),
+            d=self.dimensions.physical_dim,
+            D=self.dimensions.virtual_dim,
+        )
+        if with_messages:
+            new.messages = self.messages
+
+        if DEBUG_MODE: 
+            new.validate()
+        return new
+
+    # ========== # Messages # ============= #                 
     #=======================================#
+    def message_indices(self, direction:BlockSide)->list[int]:
+        return _derive_message_indices(self.lattice.N, direction)
+
+
+
+class ArbitraryTensorNetwork(AbstractTensorNetwork):
+
     def _pop_node(self, ind:int)->TensorNode:
         #TODO should be here?
 
@@ -545,31 +431,6 @@ class KagomeTensorNetwork():
             else:
                 self.edges[new_edge] = (new_node_index, new_node_index)
     
-    def normalize_tensors(self)->None:
-        #TODO do we use it?
-        raise ValueError("Do we use this?")
-        for node in self.nodes:
-            node.normalize()
-
-    # ========= #   Get Nodes  # ========== #                 
-    #=======================================#
-
-    def get_node_in_pos(self, pos:tuple[PosScalarType, ...]) -> TensorNode:
-        tensors_in_position = [node for node in self.nodes if node.pos == pos]
-        if len(tensors_in_position)==0:
-            raise TensorNetworkError(f"Couldn't find any tensor in position {pos}")
-        elif len(tensors_in_position)>1:
-            raise TensorNetworkError(f"Found more than 1 tensor in position {pos}")
-        return tensors_in_position[0]
-    
-    def get_nodes_by_functionality(self, functions:list[NodeFunctionality])->list[TensorNode]:
-        return [n for n in self.nodes if n.functionality in functions]
-    
-    def get_core_nodes(self)->list[TensorNode]:
-        return self.get_nodes_by_functionality([NodeFunctionality.Core, NodeFunctionality.CenterUnitCell])
-    
-    def get_center_unit_cell_nodes(self)->list[TensorNode]:
-        return self.get_nodes_by_functionality([NodeFunctionality.CenterUnitCell])
 
 
 def _derive_message_node_position(nodes_on_boundary:list[Node], edge:EdgeIndicatorType, boundary_delta:tuple[float,...]):
@@ -656,6 +517,176 @@ def _message_nodes(
         index += 1
 
     return res
+
+
+def  _derive_nodes_kagome_tn(tn:KagomeTensorNetwork)->list[TensorNode]:
+    # init lists and iterators:
+    unit_cell_tensors = itertools.cycle(tn.unit_cell.all())
+    
+    # Prepare info:
+    center_triangle_index = triangle_lattice.center_vertex_index(tn.lattice.N)
+    center_nodes : list[TensorNode] = []
+    
+    # Create all nodes:
+    nodes : list[TensorNode] = []
+    for (lattice_node, triangle), (tensor, cell_type) in zip(tn.lattice.nodes_and_triangles(), unit_cell_tensors):            
+        # Which type of node:
+        functionality = NodeFunctionality.CenterUnitCell if triangle.index == center_triangle_index else NodeFunctionality.Padding
+
+        # Add:
+        network_node = TensorNode(
+            index=lattice_node.index,
+            tensor=tensor,
+            is_ket=True,
+            pos=lattice_node.pos,
+            edges=lattice_node.edges,
+            directions=lattice_node.directions,
+            functionality=functionality,
+            core_cell_flavor=cell_type,
+            boundaries=lattice_node.boundaries,
+            name=f"{cell_type}"
+        )
+        nodes.append(network_node)
+
+        if functionality is NodeFunctionality.CenterUnitCell:
+            center_nodes.append(network_node)
+
+    # Nearest-neighbors of the center triangles are part of the core:
+    for node in center_nodes:
+        for edge in node.edges:
+            neighbor_index = tn.lattice.get_neighbor(node, edge).index
+            neihgbor = nodes[neighbor_index]
+            if neihgbor in center_nodes:
+                continue
+            neihgbor.functionality = NodeFunctionality.Core
+
+    ## Add messages:
+    if len(tn.messages)>0:
+        crnt_node_index = tn.lattice.size
+        for side in BlockSide.all_in_counter_clockwise_order():
+            if side in tn.messages:
+                message = tn.messages[side]
+                message_nodes = _message_nodes(tn, message, side, crnt_node_index)
+                nodes.extend(message_nodes)
+                crnt_node_index += len(message_nodes)
+                
+    return nodes
+
+
+def _derive_sub_tn(tn:AbstractTensorNetwork, indices:list[int])->ArbitraryTensorNetwork:
+    
+    ## the nodes in the sub-system must be indexed again:
+    nodes : list[TensorNode] = []
+    for new_index, old_index in enumerate(indices):
+        # Basic info:
+        old_node = tn.nodes[old_index]
+        # Create new node:
+        new_node = TensorNode(
+            is_ket=old_node.is_ket,   
+            tensor=old_node.tensor.copy(),
+            functionality=old_node.functionality,
+            edges=deepcopy(old_node.edges),  # These are the old edges names
+            pos=deepcopy(old_node.pos),
+            directions=deepcopy(old_node.directions),
+            index=new_index,
+            name=old_node.name, 
+            boundaries=deepcopy(old_node.on_boundary)
+        )
+        # add to list:
+        nodes.append(new_node)
+    
+    ## The edges of the sub-system are the same, but the node indices must change:
+    edges_list = [node.edges for node in nodes ]
+    edges = edges_dict_from_edges_list(edges_list)
+    
+    ## Fill in boundary information:
+    for node in nodes:
+        for edge in node.edges:
+            pair = edges[edge]
+            if pair[0]==pair[1]:
+                side = node.directions[node.edges.index(edge)]
+                assert isinstance(side, LatticeDirection)
+                node.boundaries.append(side)
+    
+    ## Copy additional straight-forward info:
+    t_dims = tn.tensor_dims
+    new = ArbitraryTensorNetwork(nodes=nodes, edges=edges, _copied=True, tensor_dims=t_dims)
+    min_x, max_x, min_y, max_y = new.positions_min_max()
+    new.original_lattice_dims = ( int(max_y-min_y+1), int(max_x-min_x+1) )
+    return new
+
+def _derive_edges_kagome_tn(self:KagomeTensorNetwork)->dict[str, tuple[int, int]]:
+    ## Lattice edges:
+    edges = self.lattice.edges
+
+    if 'M-D-0' in edges:  # Already added messages
+        return edges
+
+    ## Message edges:
+    if len(self.messages)>0:
+        crnt_index = self.lattice.size
+        for side, message in self.messages.items():
+            side_edges = self.lattice.sorted_boundary_edges(side)
+            for edge in side_edges:
+                connected_nodes = edges[edge]
+                assert connected_nodes[0]==connected_nodes[1], f"Outer edge should have been with only 1 node"
+                edges[edge] = (connected_nodes[0], crnt_index) 
+                crnt_index+=1
+
+        num_message_inner_edges = self.lattice.num_message_connections - 1
+        crnt_index = self.lattice.size
+        for side in self.messages.keys():
+            for i in range(num_message_inner_edges):
+                edge = f"M-{side}-{i}"
+                edges[edge] = (crnt_index, crnt_index+1)
+                crnt_index += 1
+            crnt_index += 1
+
+    return edges
+
+
+def _validate_tn(tn:AbstractTensorNetwork):
+    # Generic error message:
+    _error_message = f"Failed validation of tensor-network."
+    # Provoke cached properties:
+    all_nodes = tn.nodes
+    all_edges = tn.edges
+    # Check each node individually:
+    for node in all_nodes:
+        # Self validation:
+        node.validate()
+        # Validation with neighbors in lattice:
+        for dir in node.directions:
+            edge_name = node.edge_in_dir(dir)
+            if _is_open_edge(all_edges[edge_name]):
+                continue
+            neighbor = tn.find_neighbor(node, dir)
+            # Is neighbors pointing back to us?
+            _neigbor_error_message = _error_message+f"\nnode '{node.name}' is not the neighbor of '{neighbor.name}' on edge '{edge_name}'"
+            opposite_dir = dir.opposite()
+            neighnors_dir = neighbor.directions[neighbor.edges.index(edge_name)]
+            assert check.is_opposite(neighnors_dir, dir)
+            assert tn._find_neighbor_by_edge(neighbor, edge_name) is node, _neigbor_error_message
+            assert tn.find_neighbor(neighbor, neighnors_dir) is node, _neigbor_error_message
+            # Messages struggle with this check:
+            if not isinstance(dir, LatticeDirection) and isinstance(neighnors_dir, BlockSide):
+                assert neighbor.edge_in_dir(opposite_dir) == edge_name
+
+    # Check edges:
+    for edge_name, node_indices in all_edges.items():
+        if node_indices[0] == node_indices[1]:  # happens in outer legs (going outside of the lattice without any connection)
+            continue
+        nodes = [all_nodes[ind] for ind in node_indices ]
+        try:
+            indices_of_this_edge = [node.edges.index(edge_name) for node in nodes]
+        except:
+            raise KeyError(_error_message)
+        assert nodes[0].dims[indices_of_this_edge[0]] == nodes[1].dims[indices_of_this_edge[1]] , _error_message
+        dir1 = nodes[0].directions[indices_of_this_edge[0]]
+        dir2 = nodes[1].directions[indices_of_this_edge[1]]
+        assert check.is_opposite(dir1, dir2)
+        for node, node_index in zip(nodes, node_indices, strict=True):
+            assert node.index == node_index , _error_message
 
 
 def get_common_edge_legs(

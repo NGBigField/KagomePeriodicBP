@@ -92,11 +92,24 @@ class _PerBound(_EnumContainer[_Bound, _T]):
     first : _T 
     last  : _T   
 
+    def to_per_side(self, is_reverse_order:bool)->"_PerSide":
+        if is_reverse_order:
+            return _PerSide(right=self.first, left=self.last)
+        else:
+            return _PerSide(left=self.first, right=self.last)
+
 
 @dataclass
 class _PerSide(_EnumContainer[_Side, _T]):
     left  : _T 
     right : _T   
+
+    def to_per_order(self, is_reverse_order:bool)->_PerBound[_T]:
+        if is_reverse_order:
+            return _PerBound(last=self.left, first=self.right)
+        else:
+            return _PerBound(first=self.left, last=self.right)
+
 
 
 class _SideEdges:
@@ -143,7 +156,7 @@ class _ReverseOrder:
         self.state = True
     
     def __bool__(self)->bool:
-        return self.check_state_and_update()
+        return self.state
     
     def __invert__(self)->None:
         self.state = not self.state
@@ -254,7 +267,7 @@ def _decide_by_future_neighbors(
 
 
 def _message_break_next_order_logic(
-    reverse_order:_ReverseOrder, seen_break:_PerBound[bool], side_order:_PerBound[_Side],
+    reverse_order_tracker:_ReverseOrder, seen_break:_PerBound[bool], side_order:_PerBound[_Side],
     num_neighbors_per_side_before:_PerBound[list[int]],
     num_neighbors_per_side_after:_PerBound[list[int]],
 )->_ReverseOrder:
@@ -271,15 +284,15 @@ def _message_break_next_order_logic(
     
     ## Decide on new order::
     if next_side is Left:
-        reverse_order.set_false()
+        reverse_order_tracker.set_false()
     elif next_side is Right:
-        reverse_order.set_true()
+        reverse_order_tracker.set_true()
     elif next_side is None:
         pass   # Keep it as it is
     else:
         raise ValueError("Not an expected option!")
     #
-    return reverse_order
+    return reverse_order_tracker
 
 
 def _find_all_side_neighbors( 
@@ -306,10 +319,13 @@ def _find_all_side_neighbors(
     return edge, res  # return last edge
 
 
-def _derive_row_message_neighbors(
-    tn:KagomeTensorNetwork, row:list[int], reverse_order:_ReverseOrder,
+def _derive_message_neighbors(
+    tn:KagomeTensorNetwork, row:list[int], reverse_order_tracker:_ReverseOrder,
     side_edges:_SideEdges
-) -> _PerBound[list[int]]:
+) -> tuple[
+    _PerBound[list[int]],
+    _PerBound[bool]
+]:
     # Node at each side
     nodes = _PerSide[TensorNode](
         left  = tn.nodes[row[0]],
@@ -318,8 +334,7 @@ def _derive_row_message_neighbors(
     msg_neighbors_at_bounds = _PerBound[list[int]](first=[], last=[])
 
     # which side is first?       
-    if reverse_order:
-        row.reverse()
+    if reverse_order_tracker.check_state_and_update():
         side_order = _PerBound[_Side](first=Right, last=Left)
     else:
         side_order = _PerBound[_Side](first=Left, last=Right)
@@ -354,9 +369,65 @@ def _derive_row_message_neighbors(
             num_neighbors_per_side_after[side_order[first_last]] += len(neighbors)
 
         # Next order logic
-        reverse_order = _message_break_next_order_logic(reverse_order, seen_break, side_order, num_neighbors_per_side_before, num_neighbors_per_side_after)
+        reverse_order_tracker = _message_break_next_order_logic(reverse_order_tracker, seen_break, side_order, num_neighbors_per_side_before, num_neighbors_per_side_after)
 
-    return msg_neighbors_at_bounds
+    ## Seen break per side:
+    return msg_neighbors_at_bounds, seen_break
+
+
+
+def _split_row(row:list[int], row_and_core:set[int])->_PerSide[list[int]]:
+    splitted_row = _PerSide(left=[], right=[])
+    seen_core = False
+    for i in row:
+        if i in row_and_core:
+            seen_core = True
+            continue
+
+        if seen_core:
+            splitted_row.right.append(i)
+        else:
+            splitted_row.left.append(i)
+
+    return splitted_row
+
+
+def  _derive_row_to_contract(
+    tn:KagomeTensorNetwork,
+    row:list[int], 
+    depth:ContractionDepth, 
+    reverse_order_now:bool, 
+    msg_neighbors:_PerBound[list[int]], 
+    seen_break_per_order:_PerBound[bool]
+)->list[int]:
+
+    ## Prepare simple `full_row` solution:
+    if reverse_order_now:
+        row.reverse()
+    full_row_solution = msg_neighbors.first + row + msg_neighbors.last
+
+    ## simple case:
+    if depth is not ToCore: 
+        return full_row_solution
+
+    ## Derive intersection between core indices and current row
+    core_indices = {node.index for node in tn.get_core_nodes()}
+    row_and_core = set(row).intersection(core_indices)
+    if len(row_and_core)==0:
+        return full_row_solution
+
+    ## check if we need to stop:
+    row_per_side = _split_row(row, row_and_core)
+    if reverse_order_now:
+        pass
+
+    seen_break_per_side = seen_break_per_order.to_per_side(reverse_order_now)
+    if seen_break_per_side.left:
+        pass
+
+
+    return msg_neighbors.first + row + msg_neighbors.last
+
 
 
 def derive_full_contraction_order(
@@ -366,7 +437,7 @@ def derive_full_contraction_order(
 )->list[int]:
 
     ## Prepare output:
-    con_order = []    
+    contraction_order = []    
 
     # Define Directions:
     major_direction = direction
@@ -380,23 +451,24 @@ def derive_full_contraction_order(
     
     ## Helper objects: 
     # # Iterator to switch contraction direction every two rows:
-    reverse_order = _ReverseOrder()
+    reverse_order_tracker = _ReverseOrder()
 
     ## First message:
-    con_order += tn.message_indices(major_direction.opposite()) 
+    contraction_order += tn.message_indices(major_direction.opposite()) 
 
     ## Lattice and its connected nodes:
     for row in lattice_rows_ordered_right:
-        ## Stop at core if needed:
-        msg_neighbors = _derive_row_message_neighbors(tn, row, reverse_order, side_edges)
-        if depth is ToCore:
-            pass
+
+        reverse_order_now = reverse_order_tracker.state
+        msg_neighbors, seen_break_per_order = _derive_message_neighbors(tn, row, reverse_order_tracker, side_edges)
+        row_to_contract = _derive_row_to_contract(tn, row, depth, reverse_order_now, msg_neighbors, seen_break_per_order)
+
         ## add row to con_order:
-        con_order.extend( msg_neighbors.first + row + msg_neighbors.last )
+        contraction_order.extend( row_to_contract )
 
     ## Last minor-direction of contraction:
     # make opposite than last direction
-    last_order_was_reversed = reverse_order.prev_state()
+    last_order_was_reversed = reverse_order_tracker.prev_state()
     final_order_is_reversed = not last_order_was_reversed
     if final_order_is_reversed:
         last_minor_direction = minor_right.opposite()
@@ -408,7 +480,7 @@ def derive_full_contraction_order(
         last_msg = tn.message_indices(major_direction)
         if not final_order_is_reversed:
             last_msg.reverse()
-        con_order += last_msg
+        contraction_order += last_msg
 
     ## Validate:
     if DEBUG_MODE :
@@ -417,7 +489,7 @@ def derive_full_contraction_order(
         assert side_edges.exhausted.right    
 
     ## we can return `last_minor_direction` if this is important. It is usually NOT.
-    return con_order
+    return contraction_order
 
 
 def get_contraction_order(tn:KagomeTensorNetwork, direction:BlockSide, depth:ContractionDepth, plot_:bool=False)->list[int]:
@@ -436,17 +508,20 @@ def get_contraction_order(tn:KagomeTensorNetwork, direction:BlockSide, depth:Con
 
     ## Plot result:
     if plot_:
-        # For plotting contraction order, if needed:
-        import matplotlib.pyplot as plt
-        from tensor_networks.visualizations import plot_contraction_order, draw_now
-        tn.plot(detailed=False)
-        plot_contraction_order(tn.positions, contraction_order)
-        plt.title(f"Contraction in Direction {str(direction)}" )
-        draw_now()
+        _plot_con_order(tn, contraction_order)
 
     ## Return:
     return contraction_order
 
+
+def _plot_con_order(tn, con_order)->None:
+    # For plotting contraction order, if needed:
+    import matplotlib.pyplot as plt
+    from tensor_networks.visualizations import plot_contraction_order, draw_now
+    tn.plot(detailed=False)
+    plot_contraction_order(tn.positions, con_order)
+    plt.title(f"Contraction Order")
+    draw_now()
 
 
 if __name__ == "__main__":
