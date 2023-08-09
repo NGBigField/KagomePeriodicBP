@@ -43,7 +43,7 @@ from algo.mps import initial_message
 
 # For OOP:
 from abc import ABC, abstractmethod, abstractproperty
-from typing import Self, Any
+from typing import Any
 
 
 class _ReplaceHere(): ... 
@@ -78,7 +78,7 @@ class AbstractTensorNetwork(ABC):
     @abstractproperty
     def edges(self): ...
     @abstractmethod
-    def copy(self)->Self: ...
+    def copy(self)->"AbstractTensorNetwork": ...
 
     # ================================================= #
     #|              Basic Derived Properties           |#
@@ -228,7 +228,32 @@ class KagomeTensorNetwork(AbstractTensorNetwork):
         )
 
     # ================================================= #
-    #|                Behaviour Control                |#
+    #|       Mandatory Implementations of ABC          |#
+    # ================================================= #
+    @functools.cached_property
+    def nodes(self)->list[TensorNode]:
+        return _derive_nodes_kagome_tn(self)
+
+    @functools.cached_property
+    def edges(self)->dict[str, tuple[int, int]]:
+        return _derive_edges_kagome_tn(self)
+
+    def copy(self, with_messages:bool=True)->"KagomeTensorNetwork":
+        new = KagomeTensorNetwork(
+            lattice=self.lattice,
+            unit_cell=self.unit_cell.copy(),
+            d=self.dimensions.physical_dim,
+            D=self.dimensions.virtual_dim,
+        )
+        if with_messages:
+            new.messages = self.messages
+
+        if DEBUG_MODE: 
+            new.validate()
+        return new
+
+    # ================================================= #
+    #|                 Cache Control                   |#
     # ================================================= #
     def clear_cache(self)->None:
         # nodes
@@ -244,7 +269,7 @@ class KagomeTensorNetwork(AbstractTensorNetwork):
             pass
 
     # ================================================= #
-    #|                   Add messages                  |#
+    #|                    messages                     |#
     # ================================================= #
     def connect_messages(self, messages:MessageDictType) -> None:   
         # Fuse:
@@ -266,24 +291,20 @@ class KagomeTensorNetwork(AbstractTensorNetwork):
         }
         self.connect_messages(messages)
 
+    def message_indices(self, direction:BlockSide)->list[int]:
+        return _derive_message_indices(self.lattice.N, direction)
+
     # ================================================= #
     #|                Network Structure                |#
     # ================================================= #
-    @functools.cached_property
-    def nodes(self)->list[TensorNode]:
-        return _derive_nodes_kagome_tn(self)
-
-    @functools.cached_property
-    def edges(self)->dict[str, tuple[int, int]]:
-        return _derive_edges_kagome_tn(self)
-    
-    @property
-    def num_message_connections(self)->int:
-        return self.lattice.num_message_connections
 
     # ================================================= #
     #|              Geometry Functions                 |#
     # ================================================= #
+    @property
+    def num_message_connections(self)->int:
+        return self.lattice.num_message_connections
+    
     def num_boundary_nodes(self, boundary:BlockSide)->int:
         return self.lattice.num_boundary_nodes(boundary)
     
@@ -291,30 +312,6 @@ class KagomeTensorNetwork(AbstractTensorNetwork):
         min_x, max_x = lists.min_max([node.pos[0] for node in self.nodes])
         min_y, max_y = lists.min_max([node.pos[1] for node in self.nodes])
         return min_x, max_x, min_y, max_y
-
-    # ================================================= #
-    #|               instance methods                  |#
-    # ================================================= #
-        
-    def copy(self, with_messages:bool=True)->"KagomeTensorNetwork":
-        new = KagomeTensorNetwork(
-            lattice=self.lattice,
-            unit_cell=self.unit_cell.copy(),
-            d=self.dimensions.physical_dim,
-            D=self.dimensions.virtual_dim,
-        )
-        if with_messages:
-            new.messages = self.messages
-
-        if DEBUG_MODE: 
-            new.validate()
-        return new
-
-    # ========== # Messages # ============= #                 
-    #=======================================#
-    def message_indices(self, direction:BlockSide)->list[int]:
-        return _derive_message_indices(self.lattice.N, direction)
-
 
 
 class ArbitraryTensorNetwork(AbstractTensorNetwork):
@@ -569,7 +566,7 @@ def  _derive_nodes_kagome_tn(tn:KagomeTensorNetwork)->list[TensorNode]:
                 message_nodes = _message_nodes(tn, message, side, crnt_node_index)
                 nodes.extend(message_nodes)
                 crnt_node_index += len(message_nodes)
-                
+
     return nodes
 
 

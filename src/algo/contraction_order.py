@@ -392,7 +392,7 @@ def _split_row(row:list[int], row_and_core:set[int])->_PerSide[list[int]]:
     return splitted_row
 
 
-def  _derive_row_to_contract(
+def _derive_row_to_contract(
     tn:KagomeTensorNetwork,
     row:list[int], 
     depth:ContractionDepth, 
@@ -416,17 +416,17 @@ def  _derive_row_to_contract(
     if len(row_and_core)==0:
         return full_row_solution
 
-    ## check if we need to stop:
+    ## Split row, ignore core indices:
     row_per_side = _split_row(row, row_and_core)
-    if reverse_order_now:
-        pass
+    row_per_bound : _PerBound[list[int]] = row_per_side.to_per_order(reverse_order_now)
 
+    ## check if we need to stop:
     seen_break_per_side = seen_break_per_order.to_per_side(reverse_order_now)
     if seen_break_per_side.left:
         pass
 
+    return msg_neighbors.first + row_per_bound.first + row_per_bound.last + msg_neighbors.last
 
-    return msg_neighbors.first + row + msg_neighbors.last
 
 
 

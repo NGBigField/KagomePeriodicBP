@@ -72,9 +72,7 @@ class UpperTriangle:
 class _UnassignedEdgeName():
     def __repr__(self) -> str:
         return "_UnassignedEdgeName"
-
-
-
+    
 
 
 def num_message_connections(N:int)->int:
@@ -111,7 +109,7 @@ def _tag_boundary_nodes(triangle:UpperTriangle, boundary:BlockSide)->None:
         node.boundaries.add(boundary)
 
 
-def _upper_triangle_node_order(major_direction:BlockSide, minor_direction:LatticeDirection) -> list[list[str]]:
+def get_upper_triangle_vertices_order(major_direction:BlockSide, minor_direction:LatticeDirection) -> list[list[str]]:
     match major_direction:
         case BlockSide.U:
             if   minor_direction is LatticeDirection.R:    return [['left', 'right'], ['up']]
@@ -126,11 +124,11 @@ def _upper_triangle_node_order(major_direction:BlockSide, minor_direction:Lattic
             elif minor_direction is LatticeDirection.DL:    return [['right'], ['up', 'left']]
             else: raise DirectionError("Impossible")
         case BlockSide.D:
-            return lists.reversed(_upper_triangle_node_order(BlockSide.U, minor_direction))
+            return lists.reversed(get_upper_triangle_vertices_order(BlockSide.U, minor_direction))
         case BlockSide.DL:
-            return lists.reversed(_upper_triangle_node_order(BlockSide.UR, minor_direction))
+            return lists.reversed(get_upper_triangle_vertices_order(BlockSide.UR, minor_direction))
         case BlockSide.DR:
-            return lists.reversed(_upper_triangle_node_order(BlockSide.UL, minor_direction))
+            return lists.reversed(get_upper_triangle_vertices_order(BlockSide.UL, minor_direction))
 
 def _create_upper_triangle(triangular_node:Node, indices:list[int])->UpperTriangle:
     upper_triangle = UpperTriangle()
@@ -148,6 +146,7 @@ def _create_upper_triangle(triangular_node:Node, indices:list[int])->UpperTriang
         )
         upper_triangle.__setattr__(field, node)
     return upper_triangle
+    
     
 def _connect_kagome_nodes_inside_triangle(upper_triangle:UpperTriangle)->None:
         up, left, right = upper_triangle.up, upper_triangle.left, upper_triangle.right 
@@ -379,7 +378,7 @@ class KagomeLattice():
         N = self.N
         min_x, max_x, min_y, max_y = self.position_min_max()
         assert directions.check.is_orthogonal(major_direction, minor_direction)
-        upper_triangle_node_orders = _upper_triangle_node_order(major_direction, minor_direction)
+        crnt_vertices_order = get_upper_triangle_vertices_order(major_direction, minor_direction)
 
         ## Get Upper-Triangles sorted in wanted direction:
         triangle_indices_in_order = triangle_lattice.verices_indices_rows_in_direction(N, major_direction, minor_direction)
@@ -387,8 +386,8 @@ class KagomeLattice():
         ## The resuts, are each row of upper-triangles, twice, taking the relevant node from the upper-triangle:
         list_of_rows = []
         for row in triangle_indices_in_order:    # Upper-Triangle order:
-            for upper_triangle_node_order in upper_triangle_node_orders:
-                row_indices = self._row_in_direction(row, upper_triangle_node_order)
+            for vertices_names in crnt_vertices_order:
+                row_indices = self._row_in_direction(row, vertices_names)
                 list_of_rows.append(row_indices)
         return list_of_rows
 
