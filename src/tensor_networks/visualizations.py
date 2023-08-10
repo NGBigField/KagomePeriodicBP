@@ -202,8 +202,8 @@ def _derive_boundary(pos_list:List[Tuple[int, int]])->List[Tuple[int, ...]]:
 def plot_contraction_order(positions:List[Tuple[int,...]], con_order:List[int])->None:
     not_all_the_way = 0.85
     for (from_, to_), color in zip(itertools.pairwise(con_order), visuals.color_gradient(len(positions)) ):
-        if from_<0 or to_<0:
-            continue  # just a marker for something
+        # if from_<0 or to_<0:
+        #     continue  # just a marker for something
         x1, y1 = positions[from_]
         x2, y2 = positions[to_]
         plt.arrow(
@@ -212,6 +212,12 @@ def plot_contraction_order(positions:List[Tuple[int,...]], con_order:List[int])-
             color=color,
             zorder=0
         )
+
+def plot_contraction_nodes(positions:List[Tuple[int,...]], con_order:List[int])->None:
+    area = 2
+    for ind in con_order:
+        x, y = positions[ind]
+        plt.scatter(x, y, s=area, c="cyan", alpha=0.5)
 
 
 @visuals.matplotlib_wrapper()
