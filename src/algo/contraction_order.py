@@ -569,10 +569,11 @@ def _plot_con_order(tn, con_order, detailed:bool=False, with_arrows:bool=True)->
     tn.plot(detailed=detailed)
     if with_arrows:
         plot_contraction_order(tn.positions, con_order)
+        plt.title(f"Contraction Order")
     else:
         plot_contraction_nodes(tn.positions, con_order)
+        plt.title(f"Contracted Nodes")
 
-    plt.title(f"Contraction Order")
     draw_now()
 
 

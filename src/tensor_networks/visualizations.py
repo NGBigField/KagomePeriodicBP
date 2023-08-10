@@ -214,10 +214,10 @@ def plot_contraction_order(positions:List[Tuple[int,...]], con_order:List[int])-
         )
 
 def plot_contraction_nodes(positions:List[Tuple[int,...]], con_order:List[int])->None:
-    area = 2
+    area = 20
     for ind in con_order:
-        x, y = positions[ind]
-        plt.scatter(x, y, s=area, c="cyan", alpha=0.5)
+        x, y = positions[ind]        
+        plt.scatter(x, y, s=400, c="cyan", zorder=4, alpha=0.5)
 
 
 @visuals.matplotlib_wrapper()
