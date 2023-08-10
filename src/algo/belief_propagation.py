@@ -20,7 +20,7 @@ from enums import ContractionDepth
 from containers import BPStats, BPConfig, MessageDictType, Message
 
 # needed algo:
-from algo.tensor_network import contract_tensor_network
+from algo.tensor_network import contract_kagome_tensor_network
 
 # for ite stuff:
 from libs import ITE as ite
@@ -37,7 +37,7 @@ def _out_going_message(
 ) -> Message:
     
     ## use bubble con to compute outgoing message:
-    mps, _, mps_direction = contract_tensor_network(
+    mps, _, mps_direction = contract_kagome_tensor_network(
         tn, 
         direction, 
         bubblecon_trunc_dim=bubblecon_trunc_dim,

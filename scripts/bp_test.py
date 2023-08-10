@@ -188,7 +188,7 @@ def growing_tn_bp_test(
 def contract_to_core_test(
     d = 2,
     D = 2,
-    N = 3
+    N = 2
 ):
     ## Config:
     bubblecon_trunc_dim = D**2

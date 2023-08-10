@@ -17,15 +17,15 @@ from lattices.directions import BlockSide, LatticeDirection, Direction
 from lattices.directions import check
 
 from tensor_networks.node import TensorNode
-from lattices.edges import edges_dict_from_edges_list
+from lattices.edges import edges_dict_from_edges_list, same_dicts
 from tensor_networks.unit_cell import UnitCell
 
 from lattices.kagome import KagomeLattice, Node, UpperTriangle
 import lattices.triangle as triangle_lattice
-from _types import EdgeIndicatorType, PosScalarType
+from _types import EdgeIndicatorType, PosScalarType, EdgesDictType
 
 from enums import NodeFunctionality
-from utils import assertions, lists, tuples, numerics, indices, decorators
+from utils import assertions, lists, tuples, numerics, indices, decorators, dicts
 
 import numpy as np
 from typing import NamedTuple
@@ -43,7 +43,9 @@ from algo.mps import initial_message
 
 # For OOP:
 from abc import ABC, abstractmethod, abstractproperty
-from typing import Any
+from typing import Any, TypeAlias
+
+
 
 
 class _ReplaceHere(): ... 
@@ -69,16 +71,14 @@ def _derive_message_indices(N:int, direction:BlockSide)->list[int]:
     return res.tolist()
 
 
-class AbstractTensorNetwork(ABC):
+class _AbstractTensorNetwork(ABC):
     # ================================================= #
     #|   Implementation Specific Methods\Properties    |#
     # ================================================= #
-    @abstractproperty
-    def nodes(self): ...
-    @abstractproperty
-    def edges(self): ...
+    nodes : list[TensorNode] = None
+
     @abstractmethod
-    def copy(self)->"AbstractTensorNetwork": ...
+    def copy(self)->"_AbstractTensorNetwork": ...
 
     # ================================================= #
     #|              Basic Derived Properties           |#
@@ -98,6 +98,10 @@ class AbstractTensorNetwork(ABC):
     @property
     def edges_list(self)->list[list[EdgeIndicatorType]]:
         return [v.edges for v in self.nodes]
+    
+    @property
+    def edges_dict(self)->EdgesDictType:
+        return edges_dict_from_edges_list(self.edges_list)
 
     @property
     def positions(self)->list[tuple[PosScalarType,...]]:
@@ -110,7 +114,7 @@ class AbstractTensorNetwork(ABC):
     # ================================================= #
     #|            Instance Copy\Creation               |#
     # ================================================= #
-    def sub_tn(self, indices:list[int])->"AbstractTensorNetwork":
+    def sub_tn(self, indices:list[int])->"_AbstractTensorNetwork":
         return _derive_sub_tn(self, indices)
 
     # ================================================= #
@@ -124,7 +128,7 @@ class AbstractTensorNetwork(ABC):
         d["tensors"] = self.tensors
         d["is_ket"] = self.kets
         d["edgs"] = self.edges_list
-        d["edgs_dict"] = self.edges
+        d["edgs_dict"] = self.edges_dict
         d["angles"] = self.angles
         d["positions"] = self.positions
         return d
@@ -135,7 +139,7 @@ class AbstractTensorNetwork(ABC):
     def plot(self, detailed:bool=True)->None:
         from tensor_networks.visualizations import plot_network
         nodes = self.nodes
-        edges = self.edges
+        edges = self.edges_dict
         plot_network(nodes=nodes, edges=edges, detailed=detailed)
 
     # ================================================= #
@@ -166,7 +170,7 @@ class AbstractTensorNetwork(ABC):
     # ================================================= #
     
     def nodes_connected_to_edge(self, edge:str)->list[TensorNode]:
-        indices = self.edges[edge]
+        indices = self.edges_dict[edge]
         indices = list(set(indices))  # If the tensor apears twice, get only 1 copy of its index.
         return [ self.nodes[node_ind] for node_ind in indices ]
 
@@ -202,7 +206,7 @@ class AbstractTensorNetwork(ABC):
         return False    
 
 
-class KagomeTensorNetwork(AbstractTensorNetwork):
+class KagomeTensorNetwork(_AbstractTensorNetwork):
 
     # ================================================= #
     #|                Basic Attributes                 |#
@@ -232,10 +236,6 @@ class KagomeTensorNetwork(AbstractTensorNetwork):
     def nodes(self)->list[TensorNode]:
         return _derive_nodes_kagome_tn(self)
 
-    @functools.cached_property
-    def edges(self)->dict[str, tuple[int, int]]:
-        return _derive_edges_kagome_tn(self)
-
     def copy(self, with_messages:bool=True)->"KagomeTensorNetwork":
         new = KagomeTensorNetwork(
             lattice=self.lattice,
@@ -257,12 +257,6 @@ class KagomeTensorNetwork(AbstractTensorNetwork):
         # nodes
         try:    
             del self.nodes
-        except AttributeError:  
-            pass
-
-        # edges:
-        try:
-            del self.edges
         except AttributeError:  
             pass
 
@@ -317,8 +311,21 @@ class KagomeTensorNetwork(AbstractTensorNetwork):
         return triangle
 
 
-class ArbitraryTensorNetwork(AbstractTensorNetwork):
 
+class ArbitraryTensorNetwork(_AbstractTensorNetwork):
+    def __init__(self, nodes:list[TensorNode]) -> None:
+        self.nodes : list[TensorNode] = nodes
+        
+    # ================================================= #
+    #|       Mandatory Implementations of ABC          |#
+    # ================================================= #
+    def copy(self)->"ArbitraryTensorNetwork":
+        return ArbitraryTensorNetwork(nodes=self.nodes)
+
+
+    # ================================================= #
+    #|                Instance method                  |#
+    # ================================================= #
     def _pop_node(self, ind:int)->TensorNode:
         #TODO should be here?
 
@@ -326,10 +333,10 @@ class ArbitraryTensorNetwork(AbstractTensorNetwork):
         for i in range(ind+1, len(self.nodes)):
             self.nodes[i].index -= 1
         # Update edges dict:
-        for edge, (i1, i2) in self.edges.items():
+        for edge, (i1, i2) in self.edges_dict.items():
             if i1 is not _ReplaceHere and i1>ind:  i1-=1
             if i2 is not _ReplaceHere and i2>ind:  i2-=1
-            self.edges[edge] = (i1, i2)  # type: ignore
+            self.edges_dict[edge] = (i1, i2)  # type: ignore
         # pop from list:
         return self.nodes.pop(ind)
 
@@ -349,14 +356,14 @@ class ArbitraryTensorNetwork(AbstractTensorNetwork):
         ## Get contracted tensor data:
         contraction_edge, edges, directions, functionality, pos, name, on_boundary = _derive_node_data_from_contracted_nodes_and_fix_neighbors(self, n1, n2)
         ## Remove edge from dict and mark edges that point to these nodes:
-        ia, ib = self.edges.pop(contraction_edge)
+        ia, ib = self.edges_dict.pop(contraction_edge)
         if DEBUG_MODE:
             assert ia != ib
             assert ( ia == i1 and ib == i2 ) or ( ia == i2 and ib == i1 )
-        for edge, (ia, ib) in self.edges.items():
+        for edge, (ia, ib) in self.edges_dict.items():
             if ia in [i1, i2]: ia=_ReplaceHere
             if ib in [i1, i2]: ib=_ReplaceHere
-            self.edges[edge] = (ia, ib)  # type: ignore  # a temporary place-holder
+            self.edges_dict[edge] = (ia, ib)  # type: ignore  # a temporary place-holder
         ## Remove nodes from list while updating indices in both self.edges and self.nodes:
         n1_ = self._pop_node(n1.index)    
         n2_ = self._pop_node(n2.index)            
@@ -390,10 +397,10 @@ class ArbitraryTensorNetwork(AbstractTensorNetwork):
         )
         self.nodes.append(new_node)
         ## Fix edges in edges-dict that point to either n1 or n2:
-        for edge, (ia, ib) in self.edges.items():
+        for edge, (ia, ib) in self.edges_dict.items():
             if ia is _ReplaceHere: ia = new_node.index
             if ib is _ReplaceHere: ib = new_node.index
-            self.edges[edge] = (ia, ib)
+            self.edges_dict[edge] = (ia, ib)
         ## Check:
         if DEBUG_MODE: self.validate()
 
@@ -424,12 +431,12 @@ class ArbitraryTensorNetwork(AbstractTensorNetwork):
 
         # Add edges:
         for new_edge in node.edges:   # type: ignore            
-            if new_edge in self.edges:
-                connected_nodes = self.edges[new_edge]
+            if new_edge in self.edges_dict:
+                connected_nodes = self.edges_dict[new_edge]
                 assert connected_nodes[0]==connected_nodes[1], f"The edge must be an open edge, otherwise a new connection is impossible."
-                self.edges[new_edge] = (connected_nodes[0], new_node_index)
+                self.edges_dict[new_edge] = (connected_nodes[0], new_node_index)
             else:
-                self.edges[new_edge] = (new_node_index, new_node_index)
+                self.edges_dict[new_edge] = (new_node_index, new_node_index)
     
 
 
@@ -573,7 +580,7 @@ def  _derive_nodes_kagome_tn(tn:KagomeTensorNetwork)->list[TensorNode]:
     return nodes
 
 
-def _derive_sub_tn(tn:AbstractTensorNetwork, indices:list[int])->ArbitraryTensorNetwork:
+def _derive_sub_tn(tn:_AbstractTensorNetwork, indices:list[int])->ArbitraryTensorNetwork:
     
     ## the nodes in the sub-system must be indexed again:
     nodes : list[TensorNode] = []
@@ -645,12 +652,12 @@ def _derive_edges_kagome_tn(self:KagomeTensorNetwork)->dict[str, tuple[int, int]
     return edges
 
 
-def _validate_tn(tn:AbstractTensorNetwork):
+def _validate_tn(tn:_AbstractTensorNetwork):
     # Generic error message:
     _error_message = f"Failed validation of tensor-network."
     # Provoke cached properties:
     all_nodes = tn.nodes
-    all_edges = tn.edges
+    all_edges = tn.edges_dict
     # Check each node individually:
     for node in all_nodes:
         # Self validation:

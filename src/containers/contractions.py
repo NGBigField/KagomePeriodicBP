@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from containers._meta import container_repr
+from lattices.directions import BlockSide, LatticeDirection
 
 @dataclass
 class BubbleConConfig: 
@@ -7,4 +8,17 @@ class BubbleConConfig:
     # eps=None
     progress_bar=True
     separate_exp=True
+
+
+@dataclass
+class MPSOrientation: 
+    open_towards : BlockSide
+    ordered : LatticeDirection
+
+    @staticmethod
+    def standard(main_direction:BlockSide)->"MPSOrientation":
+        return MPSOrientation(
+            open_towards = main_direction,
+            ordered = main_direction.orthogonal_clockwise_lattice_direction() 
+        )
 

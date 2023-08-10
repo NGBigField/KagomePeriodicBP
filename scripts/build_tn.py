@@ -62,7 +62,7 @@ def add_messages():
 
     tn.connect_messages(messages)
     nodes = tn.nodes
-    edges = tn.edges
+    edges = tn.edges_dict
     tn.plot()
 
 

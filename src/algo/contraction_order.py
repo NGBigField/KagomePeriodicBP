@@ -555,8 +555,8 @@ def get_contraction_order(tn:KagomeTensorNetwork, direction:BlockSide, depth:Con
     
 
     ## Plot result:
-    # if plot_:
-    _plot_con_order(tn, contraction_order, detailed=False, with_arrows=False)
+    if plot_:
+        _plot_con_order(tn, contraction_order, detailed=False, with_arrows=True)
 
     ## Return:
     return contraction_order
