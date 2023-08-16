@@ -288,6 +288,27 @@ def reversed(lis:list[_T])->_T:
     return res
 
 
+def cycle_items(lis:list[_T], k:int)->list[_T]:
+    """Push items from the end to the beginning of the list in a cyclic manner
+
+    ## Example:
+    >>> l1 = [1, 2, 3, 4]
+    >>> l2 = cyclic_items(l1, 2)
+    >>> print(l2)   # [3, 4, 1, 2]
+
+    Args:
+        lis (list[_T]): list of items
+        k (int): num of items to push
+
+    Returns:
+        list[_T]: list of items with rotated items.
+    """
+    l = lis.copy()
+    for _ in range(k):
+        item = l.pop()
+        l.insert(0, item)
+    return l
+
 ## Test:
 if __name__ == "__main__":
     l = 10*[1] + 20*[2] + 30*[3] + 2*[4] 

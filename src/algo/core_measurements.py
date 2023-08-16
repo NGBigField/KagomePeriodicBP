@@ -10,9 +10,10 @@ from _config_reader import DEBUG_MODE
 
 import numpy as np
 
-from tensor_networks import KagomeTensorNetwork, TensorNode
+from tensor_networks import KagomeTN, TensorNode
 from tensor_networks.construction import repeat_core
-from algo.tensor_network import reduce_tn_to_core_and_environment, calc_edge_environment, calc_unit_cell_expectation_values
+from algo.tensor_network import calc_edge_environment, calc_unit_cell_expectation_values
+from algo.reduce_to_core import reduce_tn_to_core
 from libs.ITE import rho_ij
 from physics import pauli
 from lattices.directions import BlockSide
@@ -50,7 +51,7 @@ def _get_z_projection(rho:np.ndarray)->complex:
     return rho[0,0] - rho[1,1] 
 
 
-def measure_xyz_expectation_values_with_tn(tn_stable_around_core:KagomeTensorNetwork, reduce:bool=True, bubblecon_trunc_dim:int=18)->dict[str, float|complex]:
+def measure_xyz_expectation_values_with_tn(tn_stable_around_core:KagomeTN, reduce:bool=True, bubblecon_trunc_dim:int=18)->dict[str, float|complex]:
     res = calc_unit_cell_expectation_values(tn_stable_around_core, operators=all_paulis, bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=reduce)
     return dict(x=res[0], y=res[1], z=res[2])
 
@@ -105,7 +106,7 @@ def measure_xyz_expectation_values_with_rdms(rdms:list[np.ndarray])->dict[str, f
         
 
 def measure_core_energies(
-    tn_stable_around_core:KagomeTensorNetwork, hamiltonian:np.ndarray, bubblecon_trunc_dim:int
+    tn_stable_around_core:KagomeTN, hamiltonian:np.ndarray, bubblecon_trunc_dim:int
 )->tuple[
     list[complex],
     list[np.ndarray]
@@ -133,7 +134,7 @@ def measure_core_energies(
 
 
 def _measurements_everything_on_duplicated_core_specific_size(
-    core:KagomeTensorNetwork, 
+    core:KagomeTN, 
     repeats:int,
     config:Config,
     logger:logs.Logger,
@@ -149,7 +150,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
     tn_stable, _, bp_stats = belief_propagation(tn_open, messages=None, bp_config=config.bp)
     if bp_stats.final_error>config.bp.target_msg_diff:
         raise BPNotConvergedError("")
-    tn_stable_around_core = reduce_tn_to_core_and_environment(tn_stable, chi, method=config.reduce2core_method)
+    tn_stable_around_core = reduce_tn_to_core(tn_stable, chi, method=config.reduce2core_method)
 
     ## Calc 
     # Energies:
@@ -181,7 +182,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
 
 
 def measurements_everything_on_duplicated_core(
-    core:KagomeTensorNetwork, 
+    core:KagomeTN, 
     repeats:int,
     config:Config,
     logger:logs.Logger|None = None

@@ -13,7 +13,7 @@ if __name__ == "__main__":
 from _config_reader import DEBUG_MODE
 
 # Import our types and calsses:
-from tensor_networks import KagomeTensorNetwork, TensorNode
+from tensor_networks import KagomeTN, TensorNode, CoreTN
 from lattices.directions import Direction, BlockSide, LatticeDirection
 from enums import ContractionDepth, NodeFunctionality
 
@@ -51,6 +51,22 @@ ToMessage = ContractionDepth.ToMessage
 
 ## For Caching results:
 FULL_CONTRACTION_ORDERS_CACHE : dict[_FULL_CONTRACTION_ORDERS_CACHE_KEY_TYPE, list[int]] = {}
+
+
+CORE_CONTRATION_ORDERS : dict[BlockSide, list[int]] = {
+    BlockSide.UR : [19, 20, 9, 7, 3, 18, 10, 4, 17, 16, 0, 2, 5, 8, 11, 1, 6, 12, 13, 14, 15],
+    BlockSide.DR : [16, 17, 18, 19, 3, 0, 15, 1, 2, 4, 7, 20, 9, 5, 14, 13, 6, 8, 10, 11, 12],
+    BlockSide.D  : [16, 15, 14, 1, 0, 17, 13, 2, 18, 19, 3, 4, 5, 6, 12, 7, 8, 11, 10, 9, 20],
+}
+for side in [BlockSide.UR, BlockSide.DR, BlockSide.D]:
+    opposite_list = lists.reversed( CORE_CONTRATION_ORDERS[side] )
+    CORE_CONTRATION_ORDERS[side.opposite()] = opposite_list
+
+
+def _validate_core_con_order(contraction_order:list[int])->None:
+    given = set(contraction_order)
+    needed = set(range(21))
+    assert given==needed
 
 
 class _Bound(Enum):
@@ -192,7 +208,7 @@ class _UpToCoreControl:
         "core_indices", "terminal_indices", "stop_next_iterations", "seen_break"
     )
     
-    def __init__(self, tn:KagomeTensorNetwork, major_direction:BlockSide) -> None:        
+    def __init__(self, tn:KagomeTN, major_direction:BlockSide) -> None:        
         self.core_indices : set[int] = {node.index for node in tn.get_core_nodes()}
         self.terminal_indices : set[int] = _derive_terminal_indices(tn, major_direction)
         self.stop_next_iterations : bool = False
@@ -205,7 +221,7 @@ class _UpToCoreControl:
             self.seen_break.right = True
         
 
-def _derive_terminal_indices(tn:KagomeTensorNetwork, major_direction:BlockSide)->set[int]:
+def _derive_terminal_indices(tn:KagomeTN, major_direction:BlockSide)->set[int]:
     """derive_terminal_indices
     The convention is that the base of the center upper triangle defines the terminal row for the contraction up to core
     """
@@ -231,7 +247,7 @@ def _derive_terminal_indices(tn:KagomeTensorNetwork, major_direction:BlockSide)-
         
 
 def _sorted_side_outer_edges(
-    tn:KagomeTensorNetwork, direction:BlockSide, with_break:bool=False
+    tn:KagomeTN, direction:BlockSide, with_break:bool=False
 )->tuple[
     list[str],
     list[str]
@@ -311,7 +327,7 @@ def _message_break_next_order_logic(
 
 
 def _find_all_side_neighbors( 
-    tn:KagomeTensorNetwork, first_last:_Bound,
+    tn:KagomeTN, first_last:_Bound,
     nodes:_PerSide[TensorNode], side_order:_PerBound[_Side], 
     side_edges:_SideEdges
 )->tuple[
@@ -335,7 +351,7 @@ def _find_all_side_neighbors(
 
 
 def _derive_message_neighbors(
-    tn:KagomeTensorNetwork, row:list[int], depth:ContractionDepth,
+    tn:KagomeTN, row:list[int], depth:ContractionDepth,
     reverse_order_tracker:_ReverseOrder,
     side_edges:_SideEdges
 ) -> tuple[
@@ -473,7 +489,7 @@ def _derive_row_to_contract(
 
 
 def derive_full_contraction_order(
-    tn:KagomeTensorNetwork,  
+    tn:KagomeTN,  
     direction:BlockSide,
     depth:BlockSide
 )->list[int]:
@@ -540,7 +556,16 @@ def derive_full_contraction_order(
     return contraction_order
 
 
-def get_contraction_order(tn:KagomeTensorNetwork, direction:BlockSide, depth:ContractionDepth, plot_:bool=False)->list[int]:
+
+def get_contraction_order(tn:KagomeTN|CoreTN, direction:BlockSide, depth:ContractionDepth, plot_:bool=False)->list[int]:
+
+    ## In the case where it's a CoreTN (which has an expected canonical structure)
+    if isinstance(tn, CoreTN):
+        assert depth is ContractionDepth.Full
+        contraction_order = CORE_CONTRATION_ORDERS[direction]
+        if DEBUG_MODE:
+            _validate_core_con_order(contraction_order)
+        return contraction_order
 
     ## Get cached contractions or derive them:
     global FULL_CONTRACTION_ORDERS_CACHE

@@ -206,7 +206,7 @@ class _AbstractTensorNetwork(ABC):
         return False    
 
 
-class KagomeTensorNetwork(_AbstractTensorNetwork):
+class KagomeTN(_AbstractTensorNetwork):
 
     # ================================================= #
     #|                Basic Attributes                 |#
@@ -236,8 +236,8 @@ class KagomeTensorNetwork(_AbstractTensorNetwork):
     def nodes(self)->list[TensorNode]:
         return _derive_nodes_kagome_tn(self)
 
-    def copy(self, with_messages:bool=True)->"KagomeTensorNetwork":
-        new = KagomeTensorNetwork(
+    def copy(self, with_messages:bool=True)->"KagomeTN":
+        new = KagomeTN(
             lattice=self.lattice,
             unit_cell=self.unit_cell.copy(),
             d=self.dimensions.physical_dim,
@@ -312,15 +312,15 @@ class KagomeTensorNetwork(_AbstractTensorNetwork):
 
 
 
-class ArbitraryTensorNetwork(_AbstractTensorNetwork):
+class ArbitraryTN(_AbstractTensorNetwork):
     def __init__(self, nodes:list[TensorNode]) -> None:
-        self.nodes : list[TensorNode] = nodes
+        self.nodes = _copy_nodes_and_fix_indices(nodes)
         
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
     # ================================================= #
-    def copy(self)->"ArbitraryTensorNetwork":
-        return ArbitraryTensorNetwork(nodes=self.nodes)
+    def copy(self)->"ArbitraryTN":
+        return ArbitraryTN(nodes=self.nodes)
 
 
     # ================================================= #
@@ -427,17 +427,34 @@ class ArbitraryTensorNetwork(_AbstractTensorNetwork):
         # Add node:
         assert node.index == len(self.nodes)
         self.nodes.append(node)
-        new_node_index = node.index
+        new_node_index = node.index 
 
-        # Add edges:
-        for new_edge in node.edges:   # type: ignore            
-            if new_edge in self.edges_dict:
-                connected_nodes = self.edges_dict[new_edge]
-                assert connected_nodes[0]==connected_nodes[1], f"The edge must be an open edge, otherwise a new connection is impossible."
-                self.edges_dict[new_edge] = (connected_nodes[0], new_node_index)
-            else:
-                self.edges_dict[new_edge] = (new_node_index, new_node_index)
+
+class CoreTN(_AbstractTensorNetwork):
+
+    def __init__(self, nodes:list[TensorNode]) -> None:
+        self.nodes = _copy_nodes_and_fix_indices(nodes)
+
+    @staticmethod
+    def from_arbitrary_tn(tn:ArbitraryTN) -> "CoreTN":        
+        return CoreTN(tn.nodes)
     
+    # ================================================= #
+    #|       Mandatory Implementations of ABC          |#
+    # ================================================= #
+    def copy(self)->"ArbitraryTN":
+        return CoreTN(nodes=self.nodes)
+
+
+
+
+def _copy_nodes_and_fix_indices(nodes:list[TensorNode])->list[TensorNode]:
+    new_nodes = []
+    for i, node in enumerate(nodes):
+        new_node = node.copy()
+        new_node.index = i
+        new_nodes.append(new_node)
+    return new_nodes
 
 
 def _derive_message_node_position(nodes_on_boundary:list[Node], edge:EdgeIndicatorType, boundary_delta:tuple[float,...]):
@@ -449,7 +466,7 @@ def _derive_message_node_position(nodes_on_boundary:list[Node], edge:EdgeIndicat
 
 
 def _message_nodes(
-    tn : KagomeTensorNetwork,
+    tn : KagomeTN,
     message : Message,
     boundary_side : BlockSide,
     first_node_index : int
@@ -526,7 +543,7 @@ def _message_nodes(
     return res
 
 
-def  _derive_nodes_kagome_tn(tn:KagomeTensorNetwork)->list[TensorNode]:
+def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
     # init lists and iterators:
     unit_cell_tensors = itertools.cycle(tn.unit_cell.all())
     
@@ -580,7 +597,7 @@ def  _derive_nodes_kagome_tn(tn:KagomeTensorNetwork)->list[TensorNode]:
     return nodes
 
 
-def _derive_sub_tn(tn:_AbstractTensorNetwork, indices:list[int])->ArbitraryTensorNetwork:
+def _derive_sub_tn(tn:_AbstractTensorNetwork, indices:list[int])->ArbitraryTN:
     
     ## the nodes in the sub-system must be indexed again:
     nodes : list[TensorNode] = []
@@ -617,12 +634,12 @@ def _derive_sub_tn(tn:_AbstractTensorNetwork, indices:list[int])->ArbitraryTenso
     
     ## Copy additional straight-forward info:
     t_dims = tn.tensor_dims
-    new = ArbitraryTensorNetwork(nodes=nodes, edges=edges, _copied=True, tensor_dims=t_dims)
+    new = ArbitraryTN(nodes=nodes, edges=edges, _copied=True, tensor_dims=t_dims)
     min_x, max_x, min_y, max_y = new.positions_min_max()
     new.original_lattice_dims = ( int(max_y-min_y+1), int(max_x-min_x+1) )
     return new
 
-def _derive_edges_kagome_tn(self:KagomeTensorNetwork)->dict[str, tuple[int, int]]:
+def _derive_edges_kagome_tn(self:KagomeTN)->dict[str, tuple[int, int]]:
     ## Lattice edges:
     edges = self.lattice.edges
 
@@ -716,7 +733,7 @@ def get_common_edge(n1:TensorNode, n2:TensorNode)->EdgeIndicatorType:
     raise ValueError(f"Nodes '{n1}' and '{n2}' don't have a common edge.")
 
 
-def _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn:KagomeTensorNetwork, n1:TensorNode, n2:TensorNode):
+def _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn:KagomeTN, n1:TensorNode, n2:TensorNode):
     contraction_edge = get_common_edge(n1, n2)
     if n1.functionality is n2.functionality:
         functionality = n1.functionality
