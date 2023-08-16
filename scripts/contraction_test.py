@@ -18,7 +18,7 @@ from time import perf_counter
 def contract_to_core_test(
     d = 2,
     D = 2,
-    max_N = 12
+    max_N = 8
 ):
 
     ## Graphs:

@@ -178,9 +178,7 @@ def _basic_data(
     num_side_overlap_connections = 2*N - 3  # length of overlap between sides of the zipping algorithm
 
     # Choose a random contraction direction that meets the base of the center triangle, first, and goes "up":
-    # from_buttom_up_direction = lists.random_item([BlockSide.U, BlockSide.DL, BlockSide.DR])   #TODO Random
-    prints.print_warning("Not random yet")
-    from_buttom_up_direction = BlockSide.U
+    from_buttom_up_direction = lists.random_item([BlockSide.U, BlockSide.DL, BlockSide.DR])  
 
     directions = _PerSide[BlockSide](
         buttom_up=from_buttom_up_direction,
