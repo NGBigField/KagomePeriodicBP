@@ -1,5 +1,5 @@
 from dataclasses import dataclass, fields
-from enums import MessageModel, ReduceToEdgeMethod, ReduceToCoreMethod
+from enums import MessageModel
 from containers.beliefe_propagation import BPConfig
 from containers.sizes_and_dimensions import TNSizesAndDimensions
 from containers.imaginary_time_evolution import ITEConfig
@@ -15,13 +15,6 @@ class Config:
     tn : TNSizesAndDimensions
     bubblecon_trunc_dim : int
     live_plots : bool = False
-    reduce2edge_method : ReduceToEdgeMethod = ReduceToEdgeMethod.default()
-
-
-    @property
-    def reduce2core_method(self)->ReduceToCoreMethod:
-        return self.reduce2edge_method.derived_reduction2core()
-
 
     @staticmethod
     def from_D(D:int)->"Config":

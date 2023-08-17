@@ -33,7 +33,7 @@ from algo.contract_tensor_network import contract_kagome_tensor_network
 from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS
 from tensor_networks.node import TensorNode
 from lattices.directions import LatticeDirection, BlockSide, check
-from enums import ContractionDepth, NodeFunctionality
+from enums import ContractionDepth, NodeFunctionality, UpdateModes
 from containers import MPSOrientation
 
 # Our utilities:
@@ -294,7 +294,7 @@ def _add_env_tensors_to_small_tn(small_tn:ArbitraryTN, env_tensors:list[TensorNo
     return CoreTN.from_arbitrary_tn(small_tn)
 
 
-def reduce_tn_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool) -> CoreTN:
+def reduce_tn_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool=False) -> CoreTN:
 
     ## I. Parse and derive data
     core_nodes, num_core_connections, num_side_overlap_connections, directions = _basic_data(tn, parallel)
@@ -328,6 +328,59 @@ def reduce_tn_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool) -> Co
     return core_tn 
 
 
+def reduce_core_to_mode(
+    tn:CoreTN, 
+    bubblecon_trunc_dim:int,
+    mode:UpdateModes
+)->ArbitraryTN:
+    pass
+
+
+def calc_reduced_tn_around_edge(
+    tn_stable:KagomeTN, mode:None,  #TODO fix mode
+    bubblecon_trunc_dim:int, allready_reduced_to_core:bool=False, swallow_corners_:bool=True
+)->KagomeTN:
+    """
+        Get reduced tensor_network using bubblecon.
+        mode: should be fixed
+    """
+
+    # Common options:
+    parallel = MULTIPROCESSING and ( tn_stable.size>300 or bubblecon_trunc_dim>15 ) 
+
+    # Control:
+    reduced_to_core : bool = allready_reduced_to_core
+    reduced_to_edge : bool = False
+
+    
+    if reduced_to_core:
+        tn_core = tn_stable  # just one more simple contraction is needed:
+    else:
+        match method:
+            case ReduceToEdgeMethod.EachDirectionToEdge:
+                ## Leave a rectangle of tensors around the edge:
+                orthogonal_directions = [mode.next_clockwise(), mode.next_counterclockwise()]
+                half_depth = (tn_stable.original_lattice_dims[0]) // 2
+                tn_small = reduce_tn_using_bubblecon(tn_stable, directions=orthogonal_directions, bubblecon_trunc_dim=bubblecon_trunc_dim, depth=ContractionDepth.ToCore)
+                tn_small = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[mode.opposite()], depth=half_depth-1)
+                tn_small = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[mode], depth=half_depth)
+                tn_edge = swallow_corners(tn_small)
+                #
+                reduced_to_edge = True
+            case ReduceToEdgeMethod.EachDirectionToCore:
+                tn_core  = _reduce_tn_to_core_and_environment_EachDirectionToCore(tn_stable, bubblecon_trunc_dim, swallow_corners_, parallel)
+
+            case ReduceToEdgeMethod.DoubleMPSZipping:
+                tn_core  = reduce_tn_to_core(tn_stable, bubblecon_trunc_dim, swallow_corners_, parallel)
+
+
+    if not reduced_to_edge:
+        tn_edge = reduce_core_and_environment_to_edge_and_environment(tn_core, mode, bubblecon_trunc_dim)  #type: ignore
+
+
+    ## final clean-ups and validation
+    if DEBUG_MODE: tn_edge.validate()  #type: ignore
+    return tn_edge   #type: ignore
 
 
 if __name__ == "__main__":

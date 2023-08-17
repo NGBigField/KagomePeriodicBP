@@ -22,7 +22,7 @@ from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS
 from lattices.directions import LatticeDirection, BlockSide, check
 from lattices.edges import edges_dict_from_edges_list
 from _error_types import TensorNetworkError
-from enums import ContractionDepth, ReduceToEdgeMethod, ReduceToCoreMethod, NodeFunctionality, UnitCellFlavor
+from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor
 from containers import BubbleConConfig
 from physics import pauli
 from _types import EdgeIndicatorType
@@ -35,7 +35,7 @@ from utils import tuples, lists, assertions, parallel_exec, prints
 from tensor_networks.tensor_network import get_common_edge_legs
 from algo.mps import physical_tensor_with_split_mid_leg
 from algo.contract_tensor_network import contract_kagome_tensor_network
-from algo.reduce_to_core import reduce_tn_to_core
+from algo.tn_reduction import reduce_tn_to_core
 
 
 
@@ -216,52 +216,6 @@ def _find_node_in_relative_direction(dir:LatticeDirection, n1:TensorNode, n2:Ten
         raise ValueError(f"None of nodes [{n1.name!r}, {n2.name!r}] are in correct relation with direction {dir.name!r}.")
 
 
-def calc_reduced_tn_around_edge(
-    tn_stable:KagomeTN, mode:None,  #TODO fix mode
-    bubblecon_trunc_dim:int, method:ReduceToEdgeMethod, allready_reduced_to_core:bool=False, swallow_corners_:bool=True
-)->KagomeTN:
-    """
-        Get reduced tensor_network using bubblecon.
-        mode: should be fixed
-    """
-
-    # Common options:
-    parallel = MULTIPROCESSING and ( tn_stable.size>300 or bubblecon_trunc_dim>15 ) 
-
-    # Control:
-    reduced_to_core : bool = allready_reduced_to_core
-    reduced_to_edge : bool = False
-
-    
-    if reduced_to_core:
-        tn_core = tn_stable  # just one more simple contraction is needed:
-    else:
-        match method:
-            case ReduceToEdgeMethod.EachDirectionToEdge:
-                ## Leave a rectangle of tensors around the edge:
-                orthogonal_directions = [mode.next_clockwise(), mode.next_counterclockwise()]
-                half_depth = (tn_stable.original_lattice_dims[0]) // 2
-                tn_small = reduce_tn_using_bubblecon(tn_stable, directions=orthogonal_directions, bubblecon_trunc_dim=bubblecon_trunc_dim, depth=ContractionDepth.ToCore)
-                tn_small = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[mode.opposite()], depth=half_depth-1)
-                tn_small = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[mode], depth=half_depth)
-                tn_edge = swallow_corners(tn_small)
-                #
-                reduced_to_edge = True
-            case ReduceToEdgeMethod.EachDirectionToCore:
-                tn_core  = _reduce_tn_to_core_and_environment_EachDirectionToCore(tn_stable, bubblecon_trunc_dim, swallow_corners_, parallel)
-
-            case ReduceToEdgeMethod.DoubleMPSZipping:
-                tn_core  = reduce_tn_to_core(tn_stable, bubblecon_trunc_dim, swallow_corners_, parallel)
-
-
-    if not reduced_to_edge:
-        tn_edge = reduce_core_and_environment_to_edge_and_environment(tn_core, mode, bubblecon_trunc_dim)  #type: ignore
-
-
-    ## final clean-ups and validation
-    if DEBUG_MODE: tn_edge.validate()  #type: ignore
-    return tn_edge   #type: ignore
-
 
 def swallow_corners(tn:KagomeTN, _if_no_corners_error:bool=True)->KagomeTN:
     # Find corner tensors:
@@ -308,7 +262,7 @@ def rearange_tensors_legs_to_canonical_order(
 
 def calc_edge_environment(
     tn:KagomeTN, mode:None,  #TODO fix mode type
-    bubblecon_trunc_dim:int, method:ReduceToEdgeMethod=ReduceToEdgeMethod.default(), already_reduced_to_core:bool=False
+    bubblecon_trunc_dim:int, already_reduced_to_core:bool=False
 )->tuple[
     TensorNode, TensorNode,         # core1/2
     list[np.ndarray],         # environment

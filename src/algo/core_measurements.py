@@ -13,7 +13,7 @@ import numpy as np
 from tensor_networks import KagomeTN, TensorNode
 from tensor_networks.construction import repeat_core
 from algo.tensor_network import calc_edge_environment, calc_unit_cell_expectation_values
-from algo.reduce_to_core import reduce_tn_to_core
+from algo.tn_reduction import reduce_tn_to_core
 from libs.ITE import rho_ij
 from physics import pauli
 from lattices.directions import BlockSide

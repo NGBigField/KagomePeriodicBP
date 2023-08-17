@@ -3,9 +3,12 @@ import _import_src  ## Needed to import src folders when scripts are called from
 # Tensor-Networks creation:
 from tensor_networks.construction import create_kagome_tn, UnitCell
 
-# Measure core data
-from algo.core_measurements import measure_xyz_expectation_values_with_tn
+# Types in the code:
+from enums import UpdateModes
 
+# Algos we test here:
+from algo.core_measurements import measure_xyz_expectation_values_with_tn
+from algo.tn_reduction import reduce_tn_to_core, reduce_core_to_mode
 
 # usefull utils:
 from utils import visuals, saveload, csvs
@@ -64,10 +67,36 @@ def contract_to_core_test(
 
     print("Done")
 
-    
 
+def contract_to_mode_test(
+    d = 2,
+    D = 2,
+    chi = 8,
+    N = 2,
+):
+    
+    ## Config:
+    mode = UpdateModes.A
+    
+    ## Load or randomize unit_cell
+    unit_cell= UnitCell.load(f"random_D={D}")
+    if unit_cell is None:
+        unit_cell = UnitCell.random(d=d, D=D)
+        unit_cell.save(f"random_D={D}")
+
+    ## contract network:
+    full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
+    full_tn.connect_random_messages()
+    core_tn = reduce_tn_to_core(full_tn, bubblecon_trunc_dim=chi)
+    mode_tn = reduce_core_to_mode(core_tn, bubblecon_trunc_dim=chi, mode=mode)
+
+
+    print("Done")
+
+    
 def main_test():
-    contract_to_core_test()
+    # contract_to_core_test()
+    contract_to_mode_test()
 
 
 if __name__ == "__main__":

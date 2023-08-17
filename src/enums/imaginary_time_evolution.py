@@ -3,6 +3,7 @@
 from enum import Enum, auto
 
 class UpdateModes(Enum):
-    a = auto()
-    b = auto()
+    A = auto()
+    B = auto()
+    C = auto()
 
