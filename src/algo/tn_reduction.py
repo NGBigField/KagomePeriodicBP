@@ -13,7 +13,7 @@ if __name__ == "__main__":
 from _config_reader import DEBUG_MODE
 
 # For a little bit of OOP:
-from typing import Any, NamedTuple, Generic, TypeVar, Generator
+from typing import Any, NamedTuple, Generic, TypeVar, Generator, Iterable
 from dataclasses import dataclass, field
 _T = TypeVar("_T")
 
@@ -37,7 +37,7 @@ from enums import ContractionDepth, NodeFunctionality, UpdateModes
 from containers import MPSOrientation
 
 # Our utilities:
-from utils import tuples, lists, assertions, prints
+from utils import tuples, lists, assertions, prints, parallel_exec
 
 
 L  = LatticeDirection.L
@@ -66,6 +66,7 @@ CORE_CONNECTION_NODES = {
 }
 
 NUM_CONNECTIONS_PER_SIDE = 2  # number of connections per side
+
 
 
 
@@ -329,63 +330,95 @@ def reduce_tn_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool=False)
 
 
 def reduce_core_to_mode(
-    tn:CoreTN, 
+    core_tn:CoreTN, 
     bubblecon_trunc_dim:int,
     mode:UpdateModes
 )->ArbitraryTN:
+    
+    ## Create a copy which is an arbitrary tn which can be contracted:
+    tn = core_tn.to_arbitrary_tn()
+
+    ## Get basic info:
+    mode_side = mode.side_in_core  # Decide which side corrosponds to the mode:
+
+    ## Find the nodes that should be contracted:
+    for side in CoreTN.all_mode_sides:
+        if side is mode_side:
+            continue
+            
+        boundary_nodes_indices = [node.index for node in tn.get_nodes_on_boundary(side)]
+        for boundary_node_index in boundary_nodes_indices:
+            boundary_node = tn.nodes[boundary_node_index]
+            for neigbor in tn.all_neighbors(boundary_node):
+                if neigbor.functionality is NodeFunctionality.Environment:
+                    tn.contract_nodes(neigbor, boundary_node)
+                    print("?")
+    print("?")
     pass
 
 
-def calc_reduced_tn_around_edge(
-    tn_stable:KagomeTN, mode:None,  #TODO fix mode
-    bubblecon_trunc_dim:int, allready_reduced_to_core:bool=False, swallow_corners_:bool=True
+
+def reduce_core_and_environment_to_edge_and_environment(
+    tn_small:KagomeTN, side:None, # fix side\mode 
+    bubblecon_trunc_dim:int
 )->KagomeTN:
-    """
-        Get reduced tensor_network using bubblecon.
-        mode: should be fixed
-    """
+    tn_env = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[side], depth=2)
+    ## Find and Swallow the two corner tensors:
+    remaining_core_tensors = [t for t in tn_env.nodes if t.functionality is NodeFunctionality.CenterUnitCell]
+    assert len(remaining_core_tensors)==2
+    for t in tn_env.nodes:
+        # pass on core nodes:
+        if t is remaining_core_tensors[0] or t is remaining_core_tensors[1]:
+            continue
+        # pass on environment of core nodes:
+        if tn_env.are_neigbors(t, remaining_core_tensors[0]) or tn_env.are_neigbors(t, remaining_core_tensors[1]):
+            continue
+        neighbor_in_direction = tn_env.find_neighbor(t, side)
 
-    # Common options:
-    parallel = MULTIPROCESSING and ( tn_stable.size>300 or bubblecon_trunc_dim>15 ) 
+        tn_env.contract_nodes(t, neighbor_in_direction)
+    return tn_env
 
-    # Control:
-    reduced_to_core : bool = allready_reduced_to_core
-    reduced_to_edge : bool = False
 
+#TODO check if needed
+def reduce_tn_using_bubblecon(tn:KagomeTN, bubblecon_trunc_dim:int, directions:Iterable[BlockSide], depth:ContractionDepth|int, parallel:bool=False)->KagomeTN:
+
+    # prepare inputs:
+    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=bubblecon_trunc_dim, depth=depth)
+    directions = lists.shuffle(list(directions))
     
-    if reduced_to_core:
-        tn_core = tn_stable  # just one more simple contraction is needed:
+    # Sandwich Tensor-Network from both sides at once if parallel:
+    if parallel:
+        fixed_arguments["print_progress"]=False
+        con_results = parallel_exec.parallel(func=contract_kagome_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
     else:
-        match method:
-            case ReduceToEdgeMethod.EachDirectionToEdge:
-                ## Leave a rectangle of tensors around the edge:
-                orthogonal_directions = [mode.next_clockwise(), mode.next_counterclockwise()]
-                half_depth = (tn_stable.original_lattice_dims[0]) // 2
-                tn_small = reduce_tn_using_bubblecon(tn_stable, directions=orthogonal_directions, bubblecon_trunc_dim=bubblecon_trunc_dim, depth=ContractionDepth.ToCore)
-                tn_small = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[mode.opposite()], depth=half_depth-1)
-                tn_small = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[mode], depth=half_depth)
-                tn_edge = swallow_corners(tn_small)
-                #
-                reduced_to_edge = True
-            case ReduceToEdgeMethod.EachDirectionToCore:
-                tn_core  = _reduce_tn_to_core_and_environment_EachDirectionToCore(tn_stable, bubblecon_trunc_dim, swallow_corners_, parallel)
-
-            case ReduceToEdgeMethod.DoubleMPSZipping:
-                tn_core  = reduce_tn_to_core(tn_stable, bubblecon_trunc_dim, swallow_corners_, parallel)
+        fixed_arguments["print_progress"] = True
+        con_results = parallel_exec.concurrent(func=contract_kagome_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
+    
+    # Rearrange outputs:
+    mpss        = {direction:tupl[0] for direction, tupl in con_results.items()}
+    con_indices = lists.join_sub_lists([tupl[1] for tupl in con_results.values()])
+    mps_orientations =                  [tupl[2] for tupl in con_results.values()]
 
 
-    if not reduced_to_edge:
-        tn_edge = reduce_core_and_environment_to_edge_and_environment(tn_core, mode, bubblecon_trunc_dim)  #type: ignore
+    ## Ignore tensors that are accounted-for by the messages:
+    remaining_indices = [node.index for node in tn.nodes if node.index not in con_indices]
+    reduced_tn = tn.sub_tn(remaining_indices)
+    if DEBUG_MODE: reduced_tn.validate()
+    
+    ## Connect messages directly to the remaining tensors:
+    for (direction, mps), orientation in zip(mpss.items(), mps_orientations, strict=True):
+        assert isinstance(mps, MPS)
+        reduced_tn = _fuse_mps_with_tn( reduced_tn, mps, orientation, direction.opposite() )
+    if DEBUG_MODE: reduced_tn.validate()
 
+    ## Return:
+    return reduced_tn
 
-    ## final clean-ups and validation
-    if DEBUG_MODE: tn_edge.validate()  #type: ignore
-    return tn_edge   #type: ignore
 
 
 if __name__ == "__main__":
     from project_paths import add_scripts; 
     add_scripts()
-    from scripts import bp_test
-    bp_test.main_test()
+    from scripts import contraction_test
+    contraction_test.main_test()
 

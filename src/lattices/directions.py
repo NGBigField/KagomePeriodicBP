@@ -23,16 +23,10 @@ NUM_MAIN_DIRECTIONS : Final = 6
 #|                            Helper Functions                                |#
 # ============================================================================ #
 
-def _modulo_pi(a:float)->float:
-    while a<0:
-        a += 2*pi
-    while a>=2*pi:
-        a -= 2*pi
-    return a
 
 def _angle_dist(x:float, y:float)->float:
-    x = _modulo_pi(x)
-    y = _modulo_pi(y)
+    x = numerics.force_between_0_and_2pi(x)
+    y = numerics.force_between_0_and_2pi(y)
     return abs(x-y)
 
 def unit_vector_from_angle(angle:float)->tuple[int, int]:
@@ -89,7 +83,10 @@ class Direction():
     ## Creation method:
     @classmethod
     def from_angle(cls, angle:float)->"Direction":
-        for dir in ORDERED_LISTS[cls]:
+        ## Where to look
+        possible_directions = ORDERED_LISTS[cls]
+        # look:
+        for dir in possible_directions:
             if _angle_dist(dir.angle, angle)<EPSILON:
                 return dir
         raise DirectionError(f"Given angle does not match with any known side")

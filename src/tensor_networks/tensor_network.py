@@ -24,7 +24,7 @@ from lattices.kagome import KagomeLattice, Node, UpperTriangle
 import lattices.triangle as triangle_lattice
 from _types import EdgeIndicatorType, PosScalarType, EdgesDictType
 
-from enums import NodeFunctionality
+from enums import NodeFunctionality, UpdateModes
 from utils import assertions, lists, tuples, numerics, indices, decorators, dicts
 
 import numpy as np
@@ -184,6 +184,16 @@ class _AbstractTensorNetwork(ABC):
         else:
             raise TensorNetworkError(f"Couldn't find a neighbor due to a bug with the tensors connected to the same edge '{edge}'")
         
+    def all_neighbors(self, node:TensorNode)->list[TensorNode]:
+        res = []
+        for edge in node.edges:
+            try:
+                res.append(self.find_neighbor(node, edge))
+            except TensorNetworkError:
+                pass
+        return res
+
+
     def find_neighbor(self, node:TensorNode, dir_or_edge:Direction|EdgeIndicatorType|None)->TensorNode:
         # Get edge of this node:
         if isinstance(dir_or_edge, Direction):
@@ -332,16 +342,10 @@ class ArbitraryTN(_AbstractTensorNetwork):
         # Update indices of all nodes places above this index:
         for i in range(ind+1, len(self.nodes)):
             self.nodes[i].index -= 1
-        # Update edges dict:
-        for edge, (i1, i2) in self.edges_dict.items():
-            if i1 is not _ReplaceHere and i1>ind:  i1-=1
-            if i2 is not _ReplaceHere and i2>ind:  i2-=1
-            self.edges_dict[edge] = (i1, i2)  # type: ignore
         # pop from list:
         return self.nodes.pop(ind)
 
     def contract_nodes(self, n1:TensorNode|int, n2:TensorNode|int)->None:
-        #TODO should be here?
 
         ## Also accept indices as inputs:
         if isinstance(n1, int) and isinstance(n2, int):
@@ -374,6 +378,11 @@ class ArbitraryTN(_AbstractTensorNetwork):
         ie1 = n1.edges.index(contraction_edge)
         ie2 = n2.edges.index(contraction_edge)
 
+        ## Decide how to perform contraction:
+        is_ket = False
+        if n1.is_ket:
+            raise NotImplementedError(" Continue here ")
+            axes1
         ## Compute contracted tensor:
         if n1.is_ket and n2.is_ket:
             tensor = np.tensordot(n1.physical_tensor, n2.physical_tensor, axes=(ie1+1, ie2+1))
@@ -431,6 +440,7 @@ class ArbitraryTN(_AbstractTensorNetwork):
 
 
 class CoreTN(_AbstractTensorNetwork):
+    all_mode_sides = [BlockSide.U, BlockSide.DL, BlockSide.DR]
 
     def __init__(self, nodes:list[TensorNode]) -> None:
         self.nodes = _copy_nodes_and_fix_indices(nodes)
@@ -439,13 +449,44 @@ class CoreTN(_AbstractTensorNetwork):
     def from_arbitrary_tn(tn:ArbitraryTN) -> "CoreTN":        
         return CoreTN(tn.nodes)
     
+    def to_arbitrary_tn(self)->ArbitraryTN:
+        return ArbitraryTN(self.nodes)
+    
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
     # ================================================= #
     def copy(self)->"ArbitraryTN":
         return CoreTN(nodes=self.nodes)
 
+    # ================================================= #
+    #|        Core nodes and their relations           |#
+    # ================================================= #
+    def mode_core_nodes(self, mode:UpdateModes)->list[TensorNode]:
+        ## find center nodes of the 
+        center_node = next((node for node in self.center_nodes if mode.is_matches_flavor(node.core_cell_flavor)))
+        first_neighbors = self.all_neighbors(center_node)
+        return first_neighbors + [center_node]
+        
+    @property
+    def center_nodes(self)->list[TensorNode]:
+        return [self.nodes[i] for i in [2, 4, 5]]
+    
+    @property
+    def env_nodes(self)->list[TensorNode]:
+        return [self.nodes[i] for i in range(9, self.size)]
+    
+    def env_nodes_on_side(self, side:BlockSide)->list[TensorNode]:
+        res = []
+        for node in self.get_nodes_on_boundary(side):
+            for neighbor in self.all_neighbors(node):
+                if neighbor.functionality is NodeFunctionality.Environment:
+                    res.append(neighbor)
+        return res
 
+    # ================================================= #
+    #|             Structure and Geometry              |#
+    # ================================================= #
+    pass
 
 
 def _copy_nodes_and_fix_indices(nodes:list[TensorNode])->list[TensorNode]:
@@ -748,17 +789,18 @@ def _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn:KagomeTN, n1:Te
                 neigbor = tn._find_neighbor_by_edge(n, e)
                 angle = tuples.angle(pos, neigbor.pos) 
                 try:                        
-                    dir = Direction.from_angle(angle)
-                except ValueError:
-                    dir = angle
-                    # Also fix neighbours direction:
-                    neighbor_dir = Directions.opposite_direction(dir)                    
-                    edge_ind = neigbor.edges.index(e)
-                    tn.nodes[neigbor.index].directions[edge_ind] = neighbor_dir
+                    dir = LatticeDirection.from_angle(angle)
+                    neighbor_dir = LatticeDirection.opposite(dir)                    
+                except DirectionError:
+                    dir = Direction("adhoc", angle=angle)
+                    neighbor_dir = Direction("adhoc", angle=numerics.force_between_0_and_2pi(angle+np.pi))
+                # Also fix neighbors direction:                
+                edge_ind = neigbor.edges.index(e)
+                tn.nodes[neigbor.index].directions[edge_ind] = neighbor_dir
                 edges.append(e)        
                 directions.append(dir)        
     name = n1.name+"+"+n2.name
-    on_boundary = list(set(n1.boundaries+n2.boundaries))
+    on_boundary = n1.boundaries.union(n2.boundaries) 
 
     return contraction_edge, edges, directions, functionality, pos, name, on_boundary
 

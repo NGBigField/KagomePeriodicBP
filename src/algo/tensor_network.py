@@ -216,29 +216,6 @@ def _find_node_in_relative_direction(dir:LatticeDirection, n1:TensorNode, n2:Ten
         raise ValueError(f"None of nodes [{n1.name!r}, {n2.name!r}] are in correct relation with direction {dir.name!r}.")
 
 
-
-def swallow_corners(tn:KagomeTN, _if_no_corners_error:bool=True)->KagomeTN:
-    # Find corner tensors:
-    corner_tensors = tn.get_corner_nodes()
-    ## contract corners to a nehigboring tensor in the wide direction
-    if _if_no_corners_error and len(corner_tensors)==0: 
-        raise TensorNetworkError("No corners to swallow")
-    for t in corner_tensors:
-        # Find another tensor to swallow this corner-tensor into:
-        for direction in Direction.all_in_random_order():
-            try:
-                neighbor_in_direction = tn.find_neighbor(t, dir_or_edge=direction)
-            except ValueError:
-                continue
-            else:
-                break
-        else:
-            raise ValueError("Not neighbours were found")
-        # Full contraction:
-        tn.contract_nodes(t, neighbor_in_direction)    
-    return tn
-
-
 def rearange_tensors_legs_to_canonical_order(
     tn_env:KagomeTN, side:None # Fix mode\side
 )->tuple[TensorNode, TensorNode, list[np.ndarray]]:
@@ -259,7 +236,7 @@ def rearange_tensors_legs_to_canonical_order(
     environment_tensors = [physical_tensor_with_split_mid_leg(n) for n in environment_nodes]    # Open environment mps legs:
     return core1, core2, environment_tensors
 
-
+#TODO assert used
 def calc_edge_environment(
     tn:KagomeTN, mode:None,  #TODO fix mode type
     bubblecon_trunc_dim:int, already_reduced_to_core:bool=False
@@ -276,7 +253,7 @@ def calc_edge_environment(
 
     return core1, core2, environment_tensors, tn_env
 
-
+#TODO assert used
 def calc_interaction_energies_in_core(tn:KagomeTN, interaction_hamiltonain:np.ndarray, bubblecon_trunc_dim:int) -> list[float]:
     energies = []
     reduced_tn = reduce_tn_to_core_and_environment(tn, bubblecon_trunc_dim, swallow_corners_=False)
@@ -286,7 +263,6 @@ def calc_interaction_energies_in_core(tn:KagomeTN, interaction_hamiltonain:np.nd
         energy  = np.dot(rdm.flatten(),  interaction_hamiltonain.flatten())
         energies.append(energy)
     return energies
-
 
 
 def calc_unit_cell_expectation_values(
@@ -394,62 +370,6 @@ def calc_mean_value(
 
     return lists.average(expectation_values)
 
-
-
-def reduce_tn_using_bubblecon(tn:KagomeTN, bubblecon_trunc_dim:int, directions:Iterable[BlockSide], depth:ContractionDepth|int, parallel:bool=False)->KagomeTN:
-
-    # prepare inputs:
-    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=bubblecon_trunc_dim, depth=depth)
-    directions = lists.shuffle(list(directions))
-    
-    # Sandwich Tensor-Network from both sides at once if parallel:
-    if parallel:
-        fixed_arguments["print_progress"]=False
-        con_results = parallel_exec.parallel(func=contract_kagome_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
-    else:
-        fixed_arguments["print_progress"] = True
-        con_results = parallel_exec.concurrent(func=contract_kagome_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
-    
-    # Rearrange outputs:
-    mpss        = {direction:tupl[0] for direction, tupl in con_results.items()}
-    con_indices = lists.join_sub_lists([tupl[1] for tupl in con_results.values()])
-    mps_orientations =                  [tupl[2] for tupl in con_results.values()]
-
-
-    ## Ignore tensors that are accounted-for by the messages:
-    remaining_indices = [node.index for node in tn.nodes if node.index not in con_indices]
-    reduced_tn = tn.sub_tn(remaining_indices)
-    if DEBUG_MODE: reduced_tn.validate()
-    
-    ## Connect messages directly to the remaining tensors:
-    for (direction, mps), orientation in zip(mpss.items(), mps_orientations, strict=True):
-        assert isinstance(mps, MPS)
-        reduced_tn = _fuse_mps_with_tn( reduced_tn, mps, orientation, direction.opposite() )
-    if DEBUG_MODE: reduced_tn.validate()
-
-    ## Return:
-    return reduced_tn
-
-
-def reduce_core_and_environment_to_edge_and_environment(
-    tn_small:KagomeTN, side:None, # fix side\mode 
-    bubblecon_trunc_dim:int
-)->KagomeTN:
-    tn_env = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[side], depth=2)
-    ## Find and Swallow the two corner tensors:
-    remaining_core_tensors = [t for t in tn_env.nodes if t.functionality is NodeFunctionality.CenterUnitCell]
-    assert len(remaining_core_tensors)==2
-    for t in tn_env.nodes:
-        # pass on core nodes:
-        if t is remaining_core_tensors[0] or t is remaining_core_tensors[1]:
-            continue
-        # pass on environment of core nodes:
-        if tn_env.are_neigbors(t, remaining_core_tensors[0]) or tn_env.are_neigbors(t, remaining_core_tensors[1]):
-            continue
-        neighbor_in_direction = tn_env.find_neighbor(t, side)
-
-        tn_env.contract_nodes(t, neighbor_in_direction)
-    return tn_env
 
 
 if __name__ == "__main__":
