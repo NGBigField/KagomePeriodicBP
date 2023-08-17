@@ -39,7 +39,7 @@ class TensorNode():
     directions : list[LatticeDirection] 
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
     core_cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
-    boundaries : list[BlockSide] = field(default_factory=list) 
+    boundaries : set[BlockSide] = field(default_factory=set) 
 
 
     @property
@@ -166,7 +166,7 @@ class TensorNode():
         )
         
         
-    def __eq__(self, other)->bool:
+    def is_data_equal(self, other)->bool:
         assert isinstance(other, TensorNode), "Must be same Node type for comparison"
         if self.physical_tensor is None and other.physical_tensor is not None:
             return False

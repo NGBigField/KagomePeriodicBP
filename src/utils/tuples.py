@@ -9,6 +9,7 @@ from typing import (
 
 import operator
 from typing import overload
+from copy import deepcopy
 
 _T1 = TypeVar("_T1")
 _NumericType = TypeVar("_NumericType", float, complex, int)
@@ -45,11 +46,17 @@ def copy_with_replaced_val_at_index(t:tuple, i:int, val:Any) -> tuple:
     temp[i] = val
     return tuple(temp)
 
-def equal(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->bool:
-    for v1, v2 in zip(t1, t2, strict=True):
-        if v1!=v2:
-            return False
-    return True
+def equal(t1:Tuple[_T1,...], t2:Tuple[_T1,...], allow_permutation:bool=False)->bool:
+    if len(t1)!=len(t2):
+        return False
+    
+    if allow_permutation:
+        return _are_equal_allow_permutation(t1, t2)
+    else:
+        for v1, v2 in zip(t1, t2, strict=True):
+            if v1!=v2:
+                return False
+        return True
 
 def mean_itemwise(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->Tuple[_NumericType,...]:
     l = [(v1+v2)/2 for v1, v2 in zip(t1, t2, strict=True)]
@@ -59,3 +66,19 @@ def add_element(t:Tuple[_T1,...], element:_T1)->Tuple[_T1,...]:
     lis = list(t)
     lis.append(element)
     return tuple(lis)
+
+
+
+
+
+def _are_equal_allow_permutation(t1:Tuple[_T1,...], t2:Tuple[_T1,...])->bool:
+    l1 : list[_T1] = list(t1)
+    l2 : list[_T1] = list(t2)
+    while len(l1)>0:
+        value = l1[0]
+        if value not in l2:
+            return False
+        l1.remove(value)
+        l2.remove(value)
+    return True
+
