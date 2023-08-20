@@ -46,7 +46,7 @@ class Direction():
 
     def __init__(self, name:str, angle:float) -> None:
         self.name = name
-        self.angle = angle
+        self.angle = numerics.force_between_0_and_2pi(angle)
         self.unit_vector : tuple[int, int] = unit_vector_from_angle(angle)
 
     def __str__(self)->str:
@@ -72,7 +72,13 @@ class Direction():
 
     ## Get other by relation:
     def opposite(self)->"Direction":
-        return OPPOSITE_DIRECTIONS[self]
+        try:
+            res = OPPOSITE_DIRECTIONS[self]
+        except KeyError:
+            cls = type(self)
+            res = cls(name=self.name, angle=self.angle+np.pi)
+        return res
+
     
     def next_clockwise(self)->"Direction":
         return lists.prev_item_cyclic(ORDERED_LISTS[type(self)], self)
@@ -82,12 +88,12 @@ class Direction():
     
     ## Creation method:
     @classmethod
-    def from_angle(cls, angle:float)->"Direction":
+    def from_angle(cls, angle:float, eps:float=EPSILON)->"Direction":
         ## Where to look
         possible_directions = ORDERED_LISTS[cls]
         # look:
         for dir in possible_directions:
-            if _angle_dist(dir.angle, angle)<EPSILON:
+            if _angle_dist(dir.angle, angle)<eps:
                 return dir
         raise DirectionError(f"Given angle does not match with any known side")
     
@@ -115,6 +121,31 @@ class Direction():
             output_func(s)
             yield side
 
+    def plot(self)->None:
+        ## Some special imports:
+        from matplotlib import pyplot as plt
+        from utils import visuals
+                                
+        vector = self.unit_vector
+        space = "    "
+        x, y = vector[0], vector[1]
+        l = 1.1
+        plt.figure()
+        plt.scatter(0, 0, c="blue", s=100)
+        plt.arrow(
+            0, 0, x, y, 
+            color='black', length_includes_head=True, width=0.01, 
+            head_length=0.15, head_width=0.06
+        )  
+        plt.text(x, y, f"\n\n{space}{self.angle} rad\n{space}{self.unit_vector}", color="blue")
+        plt.title(f"Direction {self.name!r}")
+        plt.xlim(-l, +l)
+        plt.ylim(-l, +l)
+        visuals.draw_now()
+        # plt.axis('off')
+        plt.grid(color='gray', linestyle=':')
+
+        print(f"Plotted direction {self.name!r}")
     
 
 class LatticeDirection(Direction): 
@@ -236,6 +267,14 @@ MAX_DIRECTIONS_STR_LENGTH = 2
 #|                           Declared Function                                |#
 # ============================================================================ #
 
+def is_non_specific_direction(dir:Direction)->bool:
+    if isinstance(dir, LatticeDirection) or isinstance(dir, BlockSide):
+        return False
+    if isinstance(dir, Direction):
+        return True
+    return False
+
+
 class check:
     def is_orthogonal(dir1:Direction, dir2:Direction)->bool:
         dir1_ortho_options = [dir1.angle+pi/2, dir1.angle-pi/2]
@@ -253,6 +292,10 @@ class check:
             lattice_options = dir2.opposite_lattice_directions()
             lattice_dir = dir1
             mixed_cased = True
+        elif is_non_specific_direction(dir1) and is_non_specific_direction(dir2):  # Not a standard direction
+            a1 = dir1.angle
+            a2 = numerics.force_between_0_and_2pi(dir2.angle + np.pi)
+            return abs(a1-a2)<EPSILON
         else:
             mixed_cased = False
 

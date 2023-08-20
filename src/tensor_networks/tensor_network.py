@@ -34,6 +34,7 @@ from copy import deepcopy
 # For efficient functions:
 import itertools
 import functools
+import operator
 
 from _error_types import TensorNetworkError, LatticeError, DirectionError, NetworkConnectionError
 from containers import MessageDictType, Message, TNSizesAndDimensions
@@ -45,10 +46,6 @@ from algo.mps import initial_message
 from abc import ABC, abstractmethod, abstractproperty
 from typing import Any, TypeAlias
 
-
-
-
-class _ReplaceHere(): ... 
 
 
 class TensorDims(NamedTuple):
@@ -359,15 +356,6 @@ class ArbitraryTN(_AbstractTensorNetwork):
             assert self.nodes[i2] is n2
         ## Get contracted tensor data:
         contraction_edge, edges, directions, functionality, pos, name, on_boundary = _derive_node_data_from_contracted_nodes_and_fix_neighbors(self, n1, n2)
-        ## Remove edge from dict and mark edges that point to these nodes:
-        ia, ib = self.edges_dict.pop(contraction_edge)
-        if DEBUG_MODE:
-            assert ia != ib
-            assert ( ia == i1 and ib == i2 ) or ( ia == i2 and ib == i1 )
-        for edge, (ia, ib) in self.edges_dict.items():
-            if ia in [i1, i2]: ia=_ReplaceHere
-            if ib in [i1, i2]: ib=_ReplaceHere
-            self.edges_dict[edge] = (ia, ib)  # type: ignore  # a temporary place-holder
         ## Remove nodes from list while updating indices in both self.edges and self.nodes:
         n1_ = self._pop_node(n1.index)    
         n2_ = self._pop_node(n2.index)            
@@ -378,20 +366,11 @@ class ArbitraryTN(_AbstractTensorNetwork):
         ie1 = n1.edges.index(contraction_edge)
         ie2 = n2.edges.index(contraction_edge)
 
-        ## Decide how to perform contraction:
+        ## Open tensors (with physical legs) behave differently than fused tensors.
+        # Always use fused-tensors. If not already fuse, cause them to be fused.
         is_ket = False
-        if n1.is_ket:
-            raise NotImplementedError(" Continue here ")
-            axes1
-        ## Compute contracted tensor:
-        if n1.is_ket and n2.is_ket:
-            tensor = np.tensordot(n1.physical_tensor, n2.physical_tensor, axes=(ie1+1, ie2+1))
-            is_ket = True
-        elif not n1.is_ket and not n2.is_ket:
-            tensor = np.tensordot(n1.fused_tensor, n2.fused_tensor, axes=(ie1, ie2))
-            is_ket = False
-        else:
-            raise TensorNetworkError("Not an implemented option yet.")
+        tensor = np.tensordot(n1.fused_tensor, n2.fused_tensor, axes=(ie1, ie2))
+            
         ## Add node:
         new_node = TensorNode(
             tensor=tensor,
@@ -405,11 +384,16 @@ class ArbitraryTN(_AbstractTensorNetwork):
             boundaries=on_boundary
         )
         self.nodes.append(new_node)
-        ## Fix edges in edges-dict that point to either n1 or n2:
-        for edge, (ia, ib) in self.edges_dict.items():
-            if ia is _ReplaceHere: ia = new_node.index
-            if ib is _ReplaceHere: ib = new_node.index
-            self.edges_dict[edge] = (ia, ib)
+
+        ## Fusde double edges:
+        seen_neighbors : set[int] = set()
+        for edge in new_node.edges:
+            neighbor = self._find_neighbor_by_edge(new_node, edge)
+            ## if we've already seen this neighbor, then this is a double edge
+            if neighbor.index in seen_neighbors:
+                _fuse_double_edge(new_node, neighbor)
+            seen_neighbors.add(neighbor.index)
+
         ## Check:
         if DEBUG_MODE: self.validate()
 
@@ -436,7 +420,6 @@ class ArbitraryTN(_AbstractTensorNetwork):
         # Add node:
         assert node.index == len(self.nodes)
         self.nodes.append(node)
-        new_node_index = node.index 
 
 
 class CoreTN(_AbstractTensorNetwork):
@@ -638,6 +621,16 @@ def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
     return nodes
 
 
+
+def _fuse_double_edge(n1:TensorNode, n2:TensorNode)->None:
+        """Fuse the common edges of nodes n1 and n2 which indices 
+        """
+        ## derive data for algo:
+        common_edges : list[str] = [edge for edge in n1.edges if edge in n2.edges]
+        *_, new_edge_name = itertools.accumulate(common_edges, lambda x, y: x+"+"+y)
+        indices1 = [n1.edges.index(edge) for edge in common_edges]
+        indices2 = [n2.edges.index(edge) for edge in common_edges]
+
 def _derive_sub_tn(tn:_AbstractTensorNetwork, indices:list[int])->ArbitraryTN:
     
     ## the nodes in the sub-system must be indexed again:
@@ -783,22 +776,23 @@ def _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn:KagomeTN, n1:Te
     pos = n2.pos # pos = tuples.mean_itemwise(n1.pos, n2.pos)  # A more sensefull option, but unneeded in our case
     edges = []
     directions = []      #TODO: Directions are sometimes wrong in this case!
-    for n in [n1, n2]:
-        for e in n.edges:
-            if e!=contraction_edge:
-                neigbor = tn._find_neighbor_by_edge(n, e)
-                angle = tuples.angle(pos, neigbor.pos) 
-                try:                        
-                    dir = LatticeDirection.from_angle(angle)
-                    neighbor_dir = LatticeDirection.opposite(dir)                    
-                except DirectionError:
-                    dir = Direction("adhoc", angle=angle)
-                    neighbor_dir = Direction("adhoc", angle=numerics.force_between_0_and_2pi(angle+np.pi))
-                # Also fix neighbors direction:                
-                edge_ind = neigbor.edges.index(e)
-                tn.nodes[neigbor.index].directions[edge_ind] = neighbor_dir
-                edges.append(e)        
-                directions.append(dir)        
+    for node in [n1, n2]:
+        for edge in node.edges:
+            if edge==contraction_edge:
+                continue
+            neigbor = tn._find_neighbor_by_edge(node, edge)
+            angle = tuples.angle(pos, neigbor.pos) 
+            try:                        
+                dir = LatticeDirection.from_angle(angle, eps=0.2)
+                neighbor_dir = LatticeDirection.opposite(dir)                    
+            except DirectionError:
+                dir = Direction("adhoc", angle=angle)
+                neighbor_dir = Direction("adhoc", angle=numerics.force_between_0_and_2pi(angle+np.pi))
+            # Also fix neighbors direction:                
+            edge_ind = neigbor.edges.index(edge)
+            tn.nodes[neigbor.index].directions[edge_ind] = neighbor_dir
+            edges.append(edge)        
+            directions.append(dir)        
     name = n1.name+"+"+n2.name
     on_boundary = n1.boundaries.union(n2.boundaries) 
 
@@ -807,5 +801,5 @@ def _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn:KagomeTN, n1:Te
 
 
 if __name__ == "__main__":
-    from scripts.build_tn import main_test
+    from scripts.contraction_test import main_test
     main_test()

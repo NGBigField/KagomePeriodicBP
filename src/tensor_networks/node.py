@@ -41,14 +41,12 @@ class TensorNode():
     core_cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
     boundaries : set[BlockSide] = field(default_factory=set) 
 
-
     @property
     def physical_tensor(self) -> np_ndarray:
         if not self.is_ket:
             raise ValueError("Not a ket tensor")
         return self.tensor
 
-    
     @property
     def fused_tensor(self) -> np_ndarray:
         if self.is_ket:
@@ -56,30 +54,24 @@ class TensorNode():
         else:
             return self.tensor
 
-
     @property
     def angles(self) -> list[float]:
         return [direction.angle for direction in self.directions ]
-
 
     @property
     def dims(self) -> Tuple[int]:
         return self.fused_tensor.shape
     
-    
     @property
     def norm(self) -> np.float64:
         return np.linalg.norm(self.tensor)
-    
     
     def legs(self) -> Generator[tuple[LatticeDirection, EdgeIndicatorType, int], None, None]:
         for direction, edge, dim in zip(self.directions, self.edges, self.dims, strict=True):
             yield direction, edge, dim
 
-
     def normalize(self) -> None:
         self.tensor = self.tensor / self.norm
-    
     
     def copy(self) -> "TensorNode":
         new = TensorNode.empty()
@@ -95,7 +87,6 @@ class TensorNode():
             setattr(new, f.name, val)
         return new
 
-
     def edge_in_dir(self, dir:Direction)->EdgeIndicatorType:
         assert isinstance(dir, Direction), f"Not an expected type '{type(dir)}'"
         try:
@@ -103,7 +94,6 @@ class TensorNode():
         except Exception as e:
             raise NetworkConnectionError(f"Direction {dir!r} is not in directions of nodes: {[dir.name for dir in self.directions]}")
         return self.edges[index]
-    
     
     def permute(self, axes:list[int]):
         """Like numpy.transpose but permutes "physical_tensor", "fused_tensor", "edges" & "direction" all together
@@ -116,7 +106,6 @@ class TensorNode():
         self.edges = lists.rearrange(self.edges, axes)
         self.directions = lists.rearrange(self.directions, axes)      
 
-
     def validate(self)->None:
         # Generic validation error message:
         _failed_validation_error_msg = f"Node at index {self.index} failed its validation."
@@ -124,13 +113,11 @@ class TensorNode():
         assert self.fused_tensor.shape==self.dims , _failed_validation_error_msg
         assert len(self.fused_tensor.shape)==len(self.edges)==len(self.directions)==len(self.dims)==len(self.angles) , _failed_validation_error_msg
         # check all directions are different:
-        assert len(self.directions)==len(set(self.directions)), _failed_validation_error_msg+f"\nNot all directions are different: {self.directions}"
-         
+        assert len(self.directions)==len(set(self.directions)), _failed_validation_error_msg+f"\nNot all directions are different: {self.directions}" 
          
     def plot(self)->None:
         ## Some special imports:
         from matplotlib import pyplot as plt
-        from lattices.directions import unit_vector_from_angle
         from utils import visuals
                 
         plt.figure()
@@ -143,13 +130,12 @@ class TensorNode():
         plt.text(0, 0, text)
                 
         for edge_index, (edge_direction, edge_name, edge_dim)  in enumerate(self.legs()):
-            vector = edge_direction.unit_vector()
+            vector = edge_direction.unit_vector
             x, y = vector[0], vector[1]
             plt.plot([0, x], [0, y], color="black", alpha=0.8, linewidth=1.5 )
             plt.text(x/2, y/2, f"{edge_name}:\n{edge_dim} [{edge_index}]")
         
         visuals.draw_now()
-
 
     @classmethod
     def empty(cls)->"TensorNode":
@@ -163,8 +149,7 @@ class TensorNode():
             index=-1,
             name="",
             boundaries=[]
-        )
-        
+        )  
         
     def is_data_equal(self, other)->bool:
         assert isinstance(other, TensorNode), "Must be same Node type for comparison"
@@ -181,7 +166,6 @@ class TensorNode():
             if dir1 != dir2:
                 return False
         return True
-
 
     def __repr__(self) -> str:
         positions = lists.convert_whole_numbers_to_int(list(self.pos))
