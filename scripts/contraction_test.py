@@ -76,7 +76,7 @@ def contract_to_mode_test(
 ):
     
     ## Config:
-    mode = UpdateModes.A
+    mode = UpdateModes.C
     
     ## Load or randomize unit_cell
     unit_cell= UnitCell.load(f"random_D={D}")

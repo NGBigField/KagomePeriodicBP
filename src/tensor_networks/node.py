@@ -8,10 +8,8 @@ if __name__ == "__main__":
 import numpy as np
 from numpy import ndarray as np_ndarray
 
-from typing import Tuple, Generator
-
 # Use some of our utilities:
-from utils import lists
+from utils import lists, strings, tuples
 
 # for type namings:
 from _types import EdgeIndicatorType, PosScalarType
@@ -20,13 +18,16 @@ from _error_types import NetworkConnectionError
 # For OOP Style:
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
+from typing import Tuple, Generator
 
 # For TN methods and types:
 from tensor_networks.operations import fuse_tensor_to_itself
 from lattices.directions import LatticeDirection, BlockSide, Direction
 from enums import NodeFunctionality, UnitCellFlavor
 
-
+# For smart iterations:
+import itertools
+import operator
 
 @dataclass
 class TensorNode():
@@ -60,7 +61,10 @@ class TensorNode():
 
     @property
     def dims(self) -> Tuple[int]:
-        return self.fused_tensor.shape
+        if not self.is_ket:
+            return self.tensor.shape
+        connectable_dims = self.tensor.shape[1:]        
+        return tuples.multiply(connectable_dims, 2)
     
     @property
     def norm(self) -> np.float64:
@@ -166,6 +170,33 @@ class TensorNode():
             if dir1 != dir2:
                 return False
         return True
+    
+    def fuse_legs(self, indices_to_fuse:list[int], new_edge_name:str=strings.random(10))->None:
+        ## Check:
+        directions = [self.directions[i] for i in indices_to_fuse]
+        assert lists.all_same(directions), f"Only supports leg fusion when legs are in the same direction"
+
+        ## Collect some data:
+        old_dimes = self.dims
+        indices_to_keep = [i for i, _ in enumerate(old_dimes) if i not in indices_to_fuse]
+        num_fused_legs = len(indices_to_fuse)
+
+        ## Derive the new size of the tensor after fusion:
+        *_, fused_dim = itertools.accumulate([old_dimes[i] for i in indices_to_fuse], operator.mul)
+        new_dims = [old_dimes[i] for i in indices_to_keep] + [fused_dim]
+
+        ## Change indices of tensor object so that the dimensions to fuse are last:
+        self.permute(indices_to_keep+indices_to_fuse)
+
+        ## Fuse legs:
+        # fuse tensor with numpy.reshape():
+        self.tensor = self.tensor.reshape(new_dims)
+        # Deal with the rest of the data:
+        for _ in range(num_fused_legs-1):
+            self.directions.pop()
+            self.edges.pop()
+        self.edges[-1] = new_edge_name
+
 
     def __repr__(self) -> str:
         positions = lists.convert_whole_numbers_to_int(list(self.pos))

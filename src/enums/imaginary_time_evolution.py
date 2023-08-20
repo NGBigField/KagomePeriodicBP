@@ -14,6 +14,7 @@ class UpdateModes(Enum):
     def side_in_core(self)->BlockSide:
         return MODES_SIDES[self]
     
+    
 
 MODES_SIDES : dict[UpdateModes, BlockSide] = {
     UpdateModes.A : BlockSide.U,

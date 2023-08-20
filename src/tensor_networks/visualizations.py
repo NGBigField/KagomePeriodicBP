@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 
 # Common types:
 from tensor_networks.node import TensorNode, NodeFunctionality, UnitCellFlavor
-from lattices.directions import Direction
+from lattices.directions import Direction, check
 from _error_types import DirectionError
 
 # for smart iterations:
@@ -317,7 +317,7 @@ def plot_network(
         if NodeFunctionality.Message in [node1.functionality, node2.functionality]:
             pass
         else:
-            assert dir1==dir2.opposite(), f"Legs of connection in a lattice must be of opposite directions"
+            assert check.is_equal(dir1, dir2.opposite()), f"Legs of connection in a lattice must be of opposite directions"
         return dim1
 
         

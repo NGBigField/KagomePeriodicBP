@@ -342,7 +342,7 @@ class ArbitraryTN(_AbstractTensorNetwork):
         # pop from list:
         return self.nodes.pop(ind)
 
-    def contract_nodes(self, n1:TensorNode|int, n2:TensorNode|int)->None:
+    def contract_nodes(self, n1:TensorNode|int, n2:TensorNode|int)->TensorNode:
 
         ## Also accept indices as inputs:
         if isinstance(n1, int) and isinstance(n2, int):
@@ -391,11 +391,12 @@ class ArbitraryTN(_AbstractTensorNetwork):
             neighbor = self._find_neighbor_by_edge(new_node, edge)
             ## if we've already seen this neighbor, then this is a double edge
             if neighbor.index in seen_neighbors:
-                _fuse_double_edge(new_node, neighbor)
+                _fuse_double_legs(new_node, neighbor)
             seen_neighbors.add(neighbor.index)
 
         ## Check:
         if DEBUG_MODE: self.validate()
+        return new_node
 
     def replace(self, node:TensorNode):
         # validate:
@@ -622,14 +623,21 @@ def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
 
 
 
-def _fuse_double_edge(n1:TensorNode, n2:TensorNode)->None:
-        """Fuse the common edges of nodes n1 and n2 which indices 
-        """
-        ## derive data for algo:
-        common_edges : list[str] = [edge for edge in n1.edges if edge in n2.edges]
-        *_, new_edge_name = itertools.accumulate(common_edges, lambda x, y: x+"+"+y)
-        indices1 = [n1.edges.index(edge) for edge in common_edges]
-        indices2 = [n2.edges.index(edge) for edge in common_edges]
+def _fuse_double_legs(n1:TensorNode, n2:TensorNode)->None:
+    """Fuse the common edges of nodes n1 and n2 which indices 
+    """
+    ## derive basic data for algo:
+    common_edges : list[str] = [edge for edge in n1.edges if edge in n2.edges]
+    new_edge_name = "+".join(common_edges)
+
+    ## Fuse legs:
+    for node in [n1, n2]:
+        # Find double legs:
+        indices_to_fuse = [node.edges.index(edge) for edge in common_edges]
+        # Fuse:
+        node.fuse_legs(indices_to_fuse, new_edge_name)
+    
+
 
 def _derive_sub_tn(tn:_AbstractTensorNetwork, indices:list[int])->ArbitraryTN:
     

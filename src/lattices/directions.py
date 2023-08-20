@@ -4,7 +4,7 @@
 
 import numpy as np
 from enum import Enum
-from typing import Generator, Callable, Any, Final
+from typing import Generator, Callable, Any, Final, TypeGuard
 from numpy import pi, random
 from utils import strings, lists, numerics
 from functools import cache, cached_property
@@ -22,7 +22,6 @@ NUM_MAIN_DIRECTIONS : Final = 6
 # ============================================================================ #
 #|                            Helper Functions                                |#
 # ============================================================================ #
-
 
 def _angle_dist(x:float, y:float)->float:
     x = numerics.force_between_0_and_2pi(x)
@@ -55,17 +54,6 @@ class Direction():
     def __repr__(self) -> str:
         return f"{self.__class__.__name__} {self.name!r} {self.angle}"
     
-    def __eq__(self, other: object) -> bool:
-        # Type check:
-        assert issubclass(type(other), Direction)
-        # Fast instance check:
-        if self is other:
-            return True
-        # Slower values check:
-        if (self.__class__.__name__==other.__class__.__name__ 
-            and  self.name==other.name ):
-            return True
-        return False
     
     def __hash__(self) -> int:
         return hash((self.__class__.__name__, self.name))
@@ -78,7 +66,6 @@ class Direction():
             cls = type(self)
             res = cls(name=self.name, angle=self.angle+np.pi)
         return res
-
     
     def next_clockwise(self)->"Direction":
         return lists.prev_item_cyclic(ORDERED_LISTS[type(self)], self)
@@ -267,7 +254,7 @@ MAX_DIRECTIONS_STR_LENGTH = 2
 #|                           Declared Function                                |#
 # ============================================================================ #
 
-def is_non_specific_direction(dir:Direction)->bool:
+def is_non_specific_direction(dir:Direction) -> TypeGuard[Direction]:
     if isinstance(dir, LatticeDirection) or isinstance(dir, BlockSide):
         return False
     if isinstance(dir, Direction):
@@ -304,4 +291,16 @@ class check:
         else:
             return dir1.opposite() is dir2
 
-            
+    def is_equal(dir1:Direction, dir2:Direction) -> bool:
+        # Type check:
+        assert issubclass(type(dir2), Direction)
+        # Fast instance check:
+        if dir1 is dir2:
+            return True
+        # Slower values check:
+        if (dir1.__class__.__name__==dir2.__class__.__name__ 
+            and  dir1.name==dir2.name ):
+            if is_non_specific_direction(dir1) or is_non_specific_direction(dir2):
+                return _angle_dist(dir1.angle, dir2.angle)<EPSILON
+            return True
+        return False

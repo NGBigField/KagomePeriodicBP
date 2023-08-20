@@ -341,21 +341,29 @@ def reduce_core_to_mode(
     ## Get basic info:
     mode_side = mode.side_in_core  # Decide which side corrosponds to the mode:
 
+    from utils import visuals
+    i = 0
+    def plot_():
+        nonlocal i
+        tn.plot()
+        visuals.save_figure(file_name=f"{i}")
+        i += 1
+    plot_()
+
     ## Find the nodes that should be contracted:
     for side in CoreTN.all_mode_sides:
         if side is mode_side:
             continue
             
-        boundary_nodes_indices = [node.index for node in tn.get_nodes_on_boundary(side)]
-        for boundary_node_index in boundary_nodes_indices:
-            boundary_node = tn.nodes[boundary_node_index]
-            for neigbor in tn.all_neighbors(boundary_node):
+        boundary_nodes = [node for node in tn.get_nodes_on_boundary(side)]
+        for boundary_node in boundary_nodes:
+            neigbors = tn.all_neighbors(boundary_node)
+            for neigbor in neigbors:
                 if neigbor.functionality is NodeFunctionality.Environment:
-                    tn.contract_nodes(neigbor, boundary_node)
-                    print("?")
-    print("?")
-    pass
-
+                    boundary_node = tn.contract_nodes(neigbor, boundary_node)
+                    plot_()
+    
+    return tn
 
 
 def reduce_core_and_environment_to_edge_and_environment(
