@@ -27,7 +27,7 @@ import numpy as np
 from libs import bmpslib
 
 # Other algos we need here:
-from algo.contract_tensor_network import contract_kagome_tensor_network
+from algo.contract_tensor_network import contract_tensor_network
 
 # Types we need in our module:
 from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS
@@ -147,7 +147,7 @@ def _contract_tn_from_sides_and_create_mpss(
     orientations : _PerSide[MPSOrientation] = _PerSide()
     # Contract:
     for side, direction in directions.items():
-        mps, con_order, orientation = contract_kagome_tensor_network(
+        mps, con_order, orientation = contract_tensor_network(
             tn, direction, depth=ContractionDepth.ToCore, bubblecon_trunc_dim=bubblecon_trunc_dim, print_progress=print_progress
         )
         mpss[side] = mps
@@ -401,10 +401,10 @@ def reduce_tn_using_bubblecon(tn:KagomeTN, bubblecon_trunc_dim:int, directions:I
     # Sandwich Tensor-Network from both sides at once if parallel:
     if parallel:
         fixed_arguments["print_progress"]=False
-        con_results = parallel_exec.parallel(func=contract_kagome_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
+        con_results = parallel_exec.parallel(func=contract_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
     else:
         fixed_arguments["print_progress"] = True
-        con_results = parallel_exec.concurrent(func=contract_kagome_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
+        con_results = parallel_exec.concurrent(func=contract_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
     
     # Rearrange outputs:
     mpss        = {direction:tupl[0] for direction, tupl in con_results.items()}

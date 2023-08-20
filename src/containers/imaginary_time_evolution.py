@@ -8,7 +8,7 @@ from copy import deepcopy
 
 # Other containers and enums:
 from enums.imaginary_time_evolution import UpdateMode
-from containers.beliefe_propagation import BPStats
+from containers.belief_propagation import BPStats
 from containers.density_matrices import MatrixMetrics 
 from _error_types import ITEError
 

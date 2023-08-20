@@ -14,7 +14,7 @@ from tensor_networks.construction import create_kagome_tn
 # MPS Messages:
 from algo.belief_propagation import initial_message
 from algo.tensor_network import connect_messages_with_tn
-from containers.beliefe_propagation import Message
+from containers.belief_propagation import Message
 
 
 

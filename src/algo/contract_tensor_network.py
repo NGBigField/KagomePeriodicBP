@@ -78,8 +78,8 @@ def connect_corner_messages(
     
     
 
-def contract_kagome_tensor_network(
-    tn:KagomeTN|CoreTN, 
+def contract_tensor_network(
+    tn:KagomeTN|CoreTN|ModeTN, 
     direction:BlockSide,
     depth:ContractionDepth,
     bubblecon_trunc_dim:int,
@@ -89,6 +89,18 @@ def contract_kagome_tensor_network(
     list[int],
     MPSOrientation,
 ]:
+    """Automatically derive/get the contraction order from a known network structure, and compute the contraction using bubblecon
+
+    Args:
+        tn (KagomeTN | CoreTN | ModeTN)
+        direction (BlockSide): direction of contraction
+        depth (ContractionDepth): how deep to contract
+        bubblecon_trunc_dim (int): 
+        print_progress (bool, optional): Defaults to True.
+
+    Returns:
+        tuple[ MPS|complex|tuple, list[int], MPSOrientation, ]
+    """
 
     ## Derive or load Contraction Order:
     contraction_order = get_contraction_order(tn, direction, depth)

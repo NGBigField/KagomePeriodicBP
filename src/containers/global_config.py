@@ -1,6 +1,6 @@
 from dataclasses import dataclass, fields
 from enums import MessageModel
-from containers.beliefe_propagation import BPConfig
+from containers.belief_propagation import BPConfig
 from containers.sizes_and_dimensions import TNSizesAndDimensions
 from containers.imaginary_time_evolution import ITEConfig
 from utils import strings

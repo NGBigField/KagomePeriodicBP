@@ -240,7 +240,7 @@ def create_kagome_tn(
 
     ## Unit cell:
     if unit_cell is None:
-        unit_cell = UnitCell.random()
+        unit_cell = UnitCell.random(d=d, D=D)
     else:
         assert isinstance(unit_cell, UnitCell)
 

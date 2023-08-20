@@ -34,7 +34,7 @@ from utils import tuples, lists, assertions, parallel_exec, prints
 # Our needed algos:
 from tensor_networks.tensor_network import get_common_edge_legs
 from algo.mps import physical_tensor_with_split_mid_leg
-from algo.contract_tensor_network import contract_kagome_tensor_network
+from algo.contract_tensor_network import contract_tensor_network
 from algo.tn_reduction import reduce_tn_to_core
 
 # For energy estimation:
@@ -147,7 +147,7 @@ def _sandwich_with_operator_and_contract_fully(
     # Replace fused-tensor <psi|psi> in `node_ind` with  <psi|Z|psi>:
     tn_with_observable = _sandwich_fused_tensors_with_expectation_values(tn, operator, node_ind)
     ## Calculate Expectation Value:
-    numerator, _, _ = contract_kagome_tensor_network(
+    numerator, _, _ = contract_tensor_network(
         tn_with_observable, 
         direction=direction, 
         depth=ContractionDepth.Full, 
@@ -298,7 +298,7 @@ def calc_unit_cell_expectation_values(
         tn_reduced = reduce_tn_to_core(tn, bubblecon_trunc_dim, parallel)
     else:
         tn_reduced = tn
-    denominator, _, _ = contract_kagome_tensor_network(tn_reduced, direction=direction, depth=ContractionDepth.Full, bubblecon_trunc_dim=bubblecon_trunc_dim)
+    denominator, _, _ = contract_tensor_network(tn_reduced, direction=direction, depth=ContractionDepth.Full, bubblecon_trunc_dim=bubblecon_trunc_dim)
     assert not isinstance(denominator, MPS), "Full contraction should result in a number, not an MPS"
     center_nodes = tn_reduced.get_center_unit_cell_nodes()
     unit_cell_indices = UnitCell(
@@ -345,7 +345,7 @@ def calc_mean_value(
     if isinstance(denominator, complex|tuple):
         pass
     elif denominator is None:
-        res, _, _ = contract_kagome_tensor_network(tn, direction=direction, depth=ContractionDepth.Full, bubblecon_trunc_dim=bubblecon_trunc_dim)        
+        res, _, _ = contract_tensor_network(tn, direction=direction, depth=ContractionDepth.Full, bubblecon_trunc_dim=bubblecon_trunc_dim)        
         assert not isinstance(res, MPS), "Full contraction should result in a number, not an MPS"
         denominator = res
     else:

@@ -1,4 +1,4 @@
-from containers.beliefe_propagation import BPConfig
+from containers.belief_propagation import BPConfig
 from containers.contractions import BubbleConConfig
 from containers.global_config import Config
 from containers.imaginary_time_evolution import ITEConfig

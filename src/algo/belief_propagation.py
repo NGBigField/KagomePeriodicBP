@@ -20,7 +20,7 @@ from enums import ContractionDepth
 from containers import BPStats, BPConfig, MessageDictType, Message
 
 # needed algo:
-from algo.tensor_network import contract_kagome_tensor_network
+from algo.tensor_network import contract_tensor_network
 
 # for ite stuff:
 from libs import ITE as ite
@@ -37,7 +37,7 @@ def _out_going_message(
 ) -> Message:
     
     ## use bubble con to compute outgoing message:
-    mps, _, mps_direction = contract_kagome_tensor_network(
+    mps, _, mps_direction = contract_tensor_network(
         tn, 
         direction, 
         bubblecon_trunc_dim=bubblecon_trunc_dim,
@@ -76,8 +76,14 @@ def _belief_propagation_step(
     float           # next_eerror
 ]:
 
-    ## Keep unique data for comparison:
-    prev_messages = deepcopy(tn.messages)
+    ## Keep Old messages for comparison (error calculation):
+    prev_messages = { direction : message.copy() for direction, message in tn.messages.items() }
+    if DEBUG_MODE:
+        assert sum([ 
+            MPS.l2_distance(prev_messages[dir].mps, tn.messages[dir].mps) 
+            for dir in BlockSide.all_in_counter_clockwise_order() 
+        ]) < 1e-14, "Copying messages has a numeric bug!"
+    
 
     ## Compute out-going message for all possible sizes:
     # prepare inputs:

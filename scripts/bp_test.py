@@ -202,14 +202,14 @@ def single_bp_test(
 
     ## BP:
     tn, messages, stats = belief_propagation(tn, messages=None, bp_config=bp_config)
-    tn, messages, stats = belief_propagation(tn, messages=messages, bp_config=bp_config)
+    tn, messages, _ = belief_propagation(tn, messages=messages, bp_config=bp_config)
 
     print(stats)
 
 
 def main_test():
-    # single_bp_test()
-    growing_tn_bp_test()
+    single_bp_test()
+    # growing_tn_bp_test()
     # growing_tn_bp_test2()
     # load_results()
 

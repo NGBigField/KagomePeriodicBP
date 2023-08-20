@@ -16,12 +16,13 @@ from _config_reader import DEBUG_MODE
 from lattices.directions import BlockSide, LatticeDirection, Direction
 from lattices.directions import check
 
+# Other lattice structure:
 from tensor_networks.node import TensorNode
 from lattices.edges import edges_dict_from_edges_list, same_dicts
 from tensor_networks.unit_cell import UnitCell
-
 from lattices.kagome import KagomeLattice, Node, UpperTriangle
 import lattices.triangle as triangle_lattice
+
 from _types import EdgeIndicatorType, PosScalarType, EdgesDictType
 
 from enums import NodeFunctionality, UpdateMode
@@ -37,7 +38,7 @@ import functools
 import operator
 
 from _error_types import TensorNetworkError, LatticeError, DirectionError, NetworkConnectionError
-from containers import MessageDictType, Message, TNSizesAndDimensions
+from containers import MessageDictType, Message, TNSizesAndDimensions, MPSOrientation
 
 # Other supporting algo:
 from algo.mps import initial_message
@@ -284,7 +285,7 @@ class KagomeTN(BaseTensorNetwork):
         messages = { 
             edge_side : Message(
                 mps=initial_message(D=D, N=message_length), 
-                order_direction=edge_side.orthogonal_counterclockwise_lattice_direction() 
+                orientation=MPSOrientation.standard(edge_side.opposite())
             ) 
             for edge_side in BlockSide.all_in_counter_clockwise_order()  \
         }
@@ -555,8 +556,8 @@ def _message_nodes(
 ) -> list[TensorNode]:
 
     # Unpack Inputs:
-    mps = message.mps
-    mps_order_dir = message.order_direction
+    mps = message.mps    
+    mps_order_dir = message.orientation.ordered
 
     ## Check data:
     if DEBUG_MODE:
