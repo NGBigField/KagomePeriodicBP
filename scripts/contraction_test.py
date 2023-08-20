@@ -83,18 +83,20 @@ def contract_to_mode_test(
     # Full tn:
     full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     full_tn.connect_random_messages()
+    res = measure_xyz_expectation_values_with_tn(full_tn, reduce=False)
+    print(res['x'])
     # contract network:
     core_tn = reduce_tn_to_core(full_tn, bubblecon_trunc_dim=chi)
     # base results:
-    res1 = measure_xyz_expectation_values_with_tn(core_tn, reduce=False)
-    print(res1)
+    res = measure_xyz_expectation_values_with_tn(core_tn, reduce=False)
+    print(res['x'])
 
     for mode in UpdateMode:
     
         # contract to mode:
         mode_tn = reduce_core_to_mode(core_tn.copy(), bubblecon_trunc_dim=chi, mode=mode)
-        res2 = measure_xyz_expectation_values_with_tn(mode_tn, reduce=False)
-        print(res2)
+        res = measure_xyz_expectation_values_with_tn(mode_tn, reduce=False)
+        print(res['x'])
 
     print("Done")
 
