@@ -15,10 +15,10 @@ from _config_reader import DEBUG_MODE
 import numpy as np
 
 # For type anotation:
-from typing import Iterable
+from typing import TypeVar
 
 # Common types in the code:
-from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS
+from tensor_networks import KagomeTN, BaseTensorNetwork, ArbitraryTN, ModeTN, TensorNode, MPS
 from lattices.directions import LatticeDirection, BlockSide, check
 from lattices.edges import edges_dict_from_edges_list
 from _error_types import TensorNetworkError
@@ -37,14 +37,13 @@ from algo.mps import physical_tensor_with_split_mid_leg
 from algo.contract_tensor_network import contract_kagome_tensor_network
 from algo.tn_reduction import reduce_tn_to_core
 
-
-
 # For energy estimation:
 from libs.ITE import rho_ij
 
 
 MULTIPROCESSING = False
 
+TensorNetworkType = TypeVar("TensorNetworkType", bound=BaseTensorNetwork)
 
 
 def _get_corner_tensors(tn:KagomeTN) -> list[TensorNode]:
@@ -56,7 +55,7 @@ def _get_corner_tensors(tn:KagomeTN) -> list[TensorNode]:
             corner_tesnors.append(t)    
     return corner_tesnors
 
-def _sandwich_fused_tensors_with_expectation_values(tn_in:KagomeTN, mat:np.matrix, ind:int, plot_:bool=False)->KagomeTN:
+def _sandwich_fused_tensors_with_expectation_values(tn_in:TensorNetworkType, mat:np.matrix, ind:int)->TensorNetworkType:
 
     ## Get peps tensor and node data
     node = tn_in.nodes[ind]
@@ -84,7 +83,8 @@ def _sandwich_fused_tensors_with_expectation_values(tn_in:KagomeTN, mat:np.matri
         index           = node.index,
         name            = node.name,
         boundaries      = node.boundaries,
-        functionality   = node.functionality
+        functionality   = node.functionality,
+        unit_cell_flavor= node.unit_cell_flavor
     )
     if DEBUG_MODE: tn_out.validate()
 
@@ -138,7 +138,7 @@ def _calc_and_check_expectation_value(numerator, denominator, force_real:bool) -
 
 def _sandwich_with_operator_and_contract_fully(
     node_ind:int,
-    tn:KagomeTN, 
+    tn:BaseTensorNetwork, 
     operator:np.matrix,
     max_con_dim:int, 
     direction:BlockSide,
@@ -269,7 +269,7 @@ def calc_unit_cell_expectation_values(
     tn:KagomeTN, 
     operators:list[np.matrix], 
     bubblecon_trunc_dim:int, 
-    direction:BlockSide=BlockSide.random(), 
+    direction:BlockSide|None=None, 
     force_real:bool=False, 
     reduce:bool=True,
     print_progress:bool=True,
@@ -284,6 +284,15 @@ def calc_unit_cell_expectation_values(
     ## Prepare output:
     results = []
 
+    ## Check or choose direction:
+    if direction is None:
+        if isinstance(tn, ModeTN):
+            direction = lists.random_item(tn.major_directions)
+        else:
+            direction = BlockSide.random()
+    else:
+        assert isinstance(direction, BlockSide)
+
     ## Perform all common actions:
     if reduce:
         tn_reduced = reduce_tn_to_core(tn, bubblecon_trunc_dim, parallel)
@@ -293,9 +302,9 @@ def calc_unit_cell_expectation_values(
     assert not isinstance(denominator, MPS), "Full contraction should result in a number, not an MPS"
     center_nodes = tn_reduced.get_center_unit_cell_nodes()
     unit_cell_indices = UnitCell(
-        A = next(n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.A),
-        B = next(n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.B),
-        C = next(n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.C)
+        A = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.A),
+        B = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.B),
+        C = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.C)
     )
 
     ## Prepare progress-bar:

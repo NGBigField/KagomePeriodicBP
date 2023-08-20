@@ -39,7 +39,7 @@ class TensorNode():
     edges : list[EdgeIndicatorType]
     directions : list[LatticeDirection] 
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
-    core_cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
+    unit_cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
     boundaries : set[BlockSide] = field(default_factory=set) 
 
     @property

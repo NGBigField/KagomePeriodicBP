@@ -24,7 +24,7 @@ from lattices.kagome import KagomeLattice, Node, UpperTriangle
 import lattices.triangle as triangle_lattice
 from _types import EdgeIndicatorType, PosScalarType, EdgesDictType
 
-from enums import NodeFunctionality, UpdateModes
+from enums import NodeFunctionality, UpdateMode
 from utils import assertions, lists, tuples, numerics, indices, decorators, dicts
 
 import numpy as np
@@ -44,7 +44,7 @@ from algo.mps import initial_message
 
 # For OOP:
 from abc import ABC, abstractmethod, abstractproperty
-from typing import Any, TypeAlias
+from typing import Any, Self
 
 
 
@@ -68,14 +68,14 @@ def _derive_message_indices(N:int, direction:BlockSide)->list[int]:
     return res.tolist()
 
 
-class _AbstractTensorNetwork(ABC):
+class BaseTensorNetwork(ABC):
     # ================================================= #
     #|   Implementation Specific Methods\Properties    |#
     # ================================================= #
     nodes : list[TensorNode] = None
 
     @abstractmethod
-    def copy(self)->"_AbstractTensorNetwork": ...
+    def copy(self)->Self: ...
 
     # ================================================= #
     #|              Basic Derived Properties           |#
@@ -111,7 +111,7 @@ class _AbstractTensorNetwork(ABC):
     # ================================================= #
     #|            Instance Copy\Creation               |#
     # ================================================= #
-    def sub_tn(self, indices:list[int])->"_AbstractTensorNetwork":
+    def sub_tn(self, indices:list[int])->"BaseTensorNetwork":
         return _derive_sub_tn(self, indices)
 
     # ================================================= #
@@ -213,7 +213,7 @@ class _AbstractTensorNetwork(ABC):
         return False    
 
 
-class KagomeTN(_AbstractTensorNetwork):
+class KagomeTN(BaseTensorNetwork):
 
     # ================================================= #
     #|                Basic Attributes                 |#
@@ -243,7 +243,7 @@ class KagomeTN(_AbstractTensorNetwork):
     def nodes(self)->list[TensorNode]:
         return _derive_nodes_kagome_tn(self)
 
-    def copy(self, with_messages:bool=True)->"KagomeTN":
+    def copy(self, with_messages:bool=True)->Self:
         new = KagomeTN(
             lattice=self.lattice,
             unit_cell=self.unit_cell.copy(),
@@ -319,14 +319,16 @@ class KagomeTN(_AbstractTensorNetwork):
 
 
 
-class ArbitraryTN(_AbstractTensorNetwork):
-    def __init__(self, nodes:list[TensorNode]) -> None:
-        self.nodes = _copy_nodes_and_fix_indices(nodes)
+class ArbitraryTN(BaseTensorNetwork):
+    def __init__(self, nodes:list[TensorNode], copy=True) -> None:
+        if copy:
+            nodes = _copy_nodes_and_fix_indices(nodes)
+        self.nodes = nodes
         
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
     # ================================================= #
-    def copy(self)->"ArbitraryTN":
+    def copy(self)->Self:
         return ArbitraryTN(nodes=self.nodes)
 
 
@@ -423,31 +425,47 @@ class ArbitraryTN(_AbstractTensorNetwork):
         self.nodes.append(node)
 
 
-class CoreTN(_AbstractTensorNetwork):
-    all_mode_sides = [BlockSide.U, BlockSide.DL, BlockSide.DR]
+class _FrozenSpecificNetwork(BaseTensorNetwork):
+    def __init__(self, nodes:list[TensorNode], copy=True) -> None:
+        if copy:
+            nodes = _copy_nodes_and_fix_indices(nodes)
+        self._nodes = nodes
 
-    def __init__(self, nodes:list[TensorNode]) -> None:
-        self.nodes = _copy_nodes_and_fix_indices(nodes)
-
-    @staticmethod
-    def from_arbitrary_tn(tn:ArbitraryTN) -> "CoreTN":        
-        return CoreTN(tn.nodes)
+    @classmethod
+    def from_arbitrary_tn(cls, tn:ArbitraryTN, **kwargs) -> "_FrozenSpecificNetwork":        
+        new = cls(tn.nodes, copy=False, **kwargs)
+        del tn
+        return new
     
     def to_arbitrary_tn(self)->ArbitraryTN:
-        return ArbitraryTN(self.nodes)
+        return ArbitraryTN(self.nodes, copy=False)
     
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
     # ================================================= #
-    def copy(self)->"ArbitraryTN":
-        return CoreTN(nodes=self.nodes)
+    def copy(self, **kwargs)->Self:
+        return type(self)(nodes=self.nodes, copy=True, **kwargs)
+    
+    # ================================================= #
+    #|        Protecting nodes from change             |#
+    # ================================================= #
+    @property
+    def nodes(self)->list[TensorNode]:
+        return self._nodes
+    
+
+class CoreTN(_FrozenSpecificNetwork):
+    all_mode_sides = [BlockSide.U, BlockSide.DL, BlockSide.DR]
+
+    def __init__(self, nodes: list[TensorNode], copy=True) -> None:
+        super().__init__(nodes, copy)
 
     # ================================================= #
     #|        Core nodes and their relations           |#
     # ================================================= #
-    def mode_core_nodes(self, mode:UpdateModes)->list[TensorNode]:
+    def mode_core_nodes(self, mode:UpdateMode)->list[TensorNode]:
         ## find center nodes of the 
-        center_node = next((node for node in self.center_nodes if mode.is_matches_flavor(node.core_cell_flavor)))
+        center_node = next((node for node in self.center_nodes if mode.is_matches_flavor(node.unit_cell_flavor)))
         first_neighbors = self.all_neighbors(center_node)
         return first_neighbors + [center_node]
         
@@ -471,6 +489,45 @@ class CoreTN(_AbstractTensorNetwork):
     #|             Structure and Geometry              |#
     # ================================================= #
     pass
+
+
+class ModeTN(_FrozenSpecificNetwork):
+
+    def __init__(self, nodes: list[TensorNode], mode:UpdateMode, copy=True) -> None:
+        super().__init__(nodes, copy)
+        self.mode : UpdateMode = mode
+    
+    @classmethod 
+    def from_arbitrary_tn(cls, tn: ArbitraryTN, mode:UpdateMode) -> "ModeTN":
+        return super().from_arbitrary_tn(tn, mode=mode)
+    
+    def copy(self) -> Self:
+        return super().copy(mode=self.mode)
+        
+    # ================================================= #
+    #|        Core nodes and their relations           |#
+    # ================================================= #
+
+    @functools.cached_property
+    def center_node(self)->TensorNode:
+        return next((node for node in self.nodes if self.mode.is_matches_flavor(node.unit_cell_flavor)))
+
+    def nodes_on_side(self, side:BlockSide)->list[TensorNode]:
+        assert side in self.major_directions
+        return [self.find_neighbor(self.center_node, direction) for direction in side.matching_lattice_directions()]
+
+
+
+    # ================================================= #
+    #|             Structure and Geometry              |#
+    # ================================================= #
+    @property
+    def major_directions(self)->list[BlockSide]:
+        match self.mode:
+            case UpdateMode.A:  return [BlockSide.U , BlockSide.D ]
+            case UpdateMode.B:  return [BlockSide.UR, BlockSide.DL]
+            case UpdateMode.C:  return [BlockSide.UL, BlockSide.DR]
+
 
 
 def _copy_nodes_and_fix_indices(nodes:list[TensorNode])->list[TensorNode]:
@@ -591,7 +648,7 @@ def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
             edges=lattice_node.edges,
             directions=lattice_node.directions,
             functionality=functionality,
-            core_cell_flavor=cell_type,
+            unit_cell_flavor=cell_type,
             boundaries=lattice_node.boundaries,
             name=f"{cell_type}"
         )
@@ -639,7 +696,7 @@ def _fuse_double_legs(n1:TensorNode, n2:TensorNode)->None:
     
 
 
-def _derive_sub_tn(tn:_AbstractTensorNetwork, indices:list[int])->ArbitraryTN:
+def _derive_sub_tn(tn:BaseTensorNetwork, indices:list[int])->ArbitraryTN:
     
     ## the nodes in the sub-system must be indexed again:
     nodes : list[TensorNode] = []
@@ -711,7 +768,7 @@ def _derive_edges_kagome_tn(self:KagomeTN)->dict[str, tuple[int, int]]:
     return edges
 
 
-def _validate_tn(tn:_AbstractTensorNetwork):
+def _validate_tn(tn:BaseTensorNetwork):
     # Generic error message:
     _error_message = f"Failed validation of tensor-network."
     # Provoke cached properties:

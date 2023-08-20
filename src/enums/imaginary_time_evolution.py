@@ -2,7 +2,7 @@ from enum import Enum, auto
 from enums.tensor_networks import UnitCellFlavor
 from lattices.directions import BlockSide
 
-class UpdateModes(Enum):
+class UpdateMode(Enum):
     A = auto()
     B = auto()
     C = auto()
@@ -16,10 +16,10 @@ class UpdateModes(Enum):
     
     
 
-MODES_SIDES : dict[UpdateModes, BlockSide] = {
-    UpdateModes.A : BlockSide.U,
-    UpdateModes.B : BlockSide.DL,
-    UpdateModes.C : BlockSide.DR,
+MODES_SIDES : dict[UpdateMode, BlockSide] = {
+    UpdateMode.A : BlockSide.U,
+    UpdateMode.B : BlockSide.DL,
+    UpdateMode.C : BlockSide.DR,
 }
 
     

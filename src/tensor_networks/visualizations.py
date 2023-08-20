@@ -242,7 +242,7 @@ def plot_network(
     def node_style(node:TensorNode):
         # Marker:
         if node.functionality is NodeFunctionality.CenterUnitCell:
-            marker = f"${node.core_cell_flavor}$"
+            marker = f"${node.unit_cell_flavor}$"
             size1 = 120
             size2 = 180
         elif node.functionality is NodeFunctionality.Core:
@@ -255,7 +255,7 @@ def plot_network(
             size2 = 30
         name = ""
         # Color:
-        match node.core_cell_flavor:
+        match node.unit_cell_flavor:
             case UnitCellFlavor.A:
                 color = 'red'
             case UnitCellFlavor.B:

@@ -27,12 +27,11 @@ def _angle_dist(x:float, y:float)->float:
     x = numerics.force_between_0_and_2pi(x)
     y = numerics.force_between_0_and_2pi(y)
     return abs(x-y)
-
-def unit_vector_from_angle(angle:float)->tuple[int, int]:
+    
+def _unit_vector_from_angle(angle:float)->tuple[int, int]:
     x = numerics.force_integers_on_close_to_round(np.cos(angle))
     y = numerics.force_integers_on_close_to_round(np.sin(angle))
     return (x, y)
-    
 
 # ============================================================================ #
 #|                           Class Defimition                                 |#
@@ -46,7 +45,7 @@ class Direction():
     def __init__(self, name:str, angle:float) -> None:
         self.name = name
         self.angle = numerics.force_between_0_and_2pi(angle)
-        self.unit_vector : tuple[int, int] = unit_vector_from_angle(angle)
+        self.unit_vector : tuple[int, int] = _unit_vector_from_angle(angle)
 
     def __str__(self)->str:
         return self.name
@@ -253,6 +252,27 @@ MAX_DIRECTIONS_STR_LENGTH = 2
 # ============================================================================ #
 #|                           Declared Function                                |#
 # ============================================================================ #
+
+
+def next_clockwise_or_counterclockwise(dir:Direction, clockwise:bool=True)->Direction:
+    if clockwise:
+        return dir.next_clockwise()
+    else:
+        return dir.next_counterclockwise()
+
+
+def sort_by_clock_order(directions:list[Direction], clockwise:bool=True)->list[Direction]:
+    ## Try different first directions:
+    for dir_first in directions:
+        final_order = [dir_first]
+        dir_next = next_clockwise_or_counterclockwise(dir_first, clockwise)
+        while dir_next in directions:
+            final_order.append(dir_next)
+            dir_next = next_clockwise_or_counterclockwise(dir_next, clockwise)
+        if len(final_order)==len(directions):
+            return final_order
+    raise DirectionError("Directions are not related")
+
 
 def is_non_specific_direction(dir:Direction) -> TypeGuard[Direction]:
     if isinstance(dir, LatticeDirection) or isinstance(dir, BlockSide):

@@ -20,7 +20,7 @@ from containers.density_matrices import MatrixMetrics
 from containers import Config
 
 # Import need types:
-from enums import UpdateModes, Directions, InitialTNMode
+from enums import UpdateMode, Directions, InitialTNMode
 from tensor_networks import KagomeTN, NodeFunctionality, TensorNode
 
 # Common errors:
@@ -172,10 +172,10 @@ def _check_converged(energies_in:list[complex|None], delta_ts:list[float], crnt_
     return True
 
 
-def _mode_order_without_repetitions(prev_order:list[UpdateModes], ite_config:ITEConfig)->list[UpdateModes]:
+def _mode_order_without_repetitions(prev_order:list[UpdateMode], ite_config:ITEConfig)->list[UpdateMode]:
     if not ite_config.random_mode_order:
-        return list(UpdateModes)
-    new_order = list(UpdateModes.all_in_random_order())
+        return list(UpdateMode)
+    new_order = list(UpdateMode.all_in_random_order())
     # Don't allow two of the same in a row
     if prev_order is not None and prev_order[-1] is new_order[0]:
         new_ind = np.random.randint(low=1, high=4)
@@ -189,7 +189,7 @@ def get_imaginary_time_evolution_operator(h:np.ndarray, delta_t:float)->tuple[np
     return h, g
 
 
-def _duplicate_to_core(core1:TensorNode, core2:TensorNode, update_mode:UpdateModes, config:Config)->KagomeTN:
+def _duplicate_to_core(core1:TensorNode, core2:TensorNode, update_mode:UpdateMode, config:Config)->KagomeTN:
     """ Arrange 2 cell tensors into a 2x2 core.
 
     core tensor network is of basic cell
@@ -226,9 +226,9 @@ def _duplicate_to_core(core1:TensorNode, core2:TensorNode, update_mode:UpdateMod
     p2 = core2.physical_tensor
     assert p1 is not None and p2 is not None
     match update_mode:
-        case UpdateModes.Up | UpdateModes.Down:
+        case UpdateMode.Up | UpdateMode.Down:
             a, b = p1, p2
-        case UpdateModes.Right | UpdateModes.Left:
+        case UpdateMode.Right | UpdateMode.Left:
             a, b = p2, p1
         case _:
             raise ValueError(f"Not a legit case {update_mode!r}")
@@ -381,7 +381,7 @@ def ite_per_mode(
     delta_t:float,
     logger:logs.Logger,
     config:Config,
-    update_mode:UpdateModes
+    update_mode:UpdateMode
 )->tuple[
     KagomeTN,          # core
     _BPMessagesType,        # messages

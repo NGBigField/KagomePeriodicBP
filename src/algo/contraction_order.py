@@ -13,8 +13,8 @@ if __name__ == "__main__":
 from _config_reader import DEBUG_MODE
 
 # Import our types and calsses:
-from tensor_networks import KagomeTN, TensorNode, CoreTN
-from lattices.directions import Direction, BlockSide, LatticeDirection
+from tensor_networks import KagomeTN, TensorNode, CoreTN, ModeTN
+from lattices.directions import Direction, BlockSide, LatticeDirection, sort_by_clock_order
 from enums import ContractionDepth, NodeFunctionality
 
 ## For common types:
@@ -32,7 +32,7 @@ from utils import lists
 
 # For oop:
 from enum import Enum, auto
-from typing import Generic, TypeVar, Final, Callable, TypeAlias
+from typing import Generic, TypeVar, Final, Callable, TypeAlias, TypedDict, Any
 from dataclasses import dataclass, fields
 from copy import deepcopy
 
@@ -61,6 +61,7 @@ CORE_CONTRATION_ORDERS : dict[BlockSide, list[int]] = {
 for side in [BlockSide.UR, BlockSide.DR, BlockSide.D]:
     opposite_list = lists.reversed( CORE_CONTRATION_ORDERS[side] )
     CORE_CONTRATION_ORDERS[side.opposite()] = opposite_list
+
 
 
 def _validate_core_con_order(contraction_order:list[int])->None:
@@ -451,7 +452,7 @@ def _derive_row_to_contract(
     if depth is not ToCore: 
         return _derive_full_row(row, reverse_order_now, msg_neighbors, annex_neighbors)
     if control.stop_next_iterations:
-        return []  # don't append anthing from now on    
+        return []  # don't append anything from now on    
 
     ## Derive intersection between core indices and current row
     core_in_this_row = set(row).intersection(control.core_indices)
@@ -484,11 +485,48 @@ def _derive_row_to_contract(
     return msg_neighbors_per_side.left + row_per_side.left
 
 
+def _two_level_deep_sorted_clockwise_search(tn:ModeTN, node_level0:TensorNode, major_direction:BlockSide) -> list[int]:
+    ## Prepare data and output:
+    indices_level2 : list[int] = []
+    indices_level1 = []
+
+    # for all core nodes in clockwise order:
+    directions_level1 = major_direction.matching_lattice_directions()
+    directions_level1_in_clockwise_order = sort_by_clock_order(directions_level1, clockwise=True )
+    for direction_level1 in directions_level1_in_clockwise_order:
+        node_level1 = tn.find_neighbor(node_level0, direction_level1)
+        indices_level1.append(node_level1.index)
+
+        # for all env nodes in clockwise order:
+        directions_level2 = [dir for dir in node_level1.directions if tn.find_neighbor(node_level1, dir).functionality is NodeFunctionality.Environment  ]
+        directions_level2_in_clockwise_order = sort_by_clock_order(directions_level2, clockwise=True)
+        for direction_level2 in directions_level2_in_clockwise_order:
+            node_level2 = tn.find_neighbor(node_level1, direction_level2)
+            indices_level2.append(node_level2.index)
+
+    first2, *rest2, last2 = indices_level2
+    return [first2] + indices_level1 + [last2] + rest2
 
 
+def derive_mode_tn_full_contraction_order(
+    tn:ModeTN,  
+    direction:BlockSide
+)->list[int]:
+    # Check:
+    assert direction in tn.major_directions, "Not all direction are possible in the small mode-TN"
+
+    ## Use breadth-first algorithm to get con_order for each side:
+    up_to_core = _two_level_deep_sorted_clockwise_search(tn, tn.center_node, direction.opposite())
+    from_core = _two_level_deep_sorted_clockwise_search(tn, tn.center_node, direction)
+
+    ## When we start bubblecon, the order is reversed:
+    up_to_core.reverse()
+
+    con_order = up_to_core + [tn.center_node.index] + from_core
+    return con_order
 
 
-def derive_full_contraction_order(
+def derive_kagome_tn_contraction_order(
     tn:KagomeTN,  
     direction:BlockSide,
     depth:BlockSide
@@ -566,15 +604,21 @@ def get_contraction_order(tn:KagomeTN|CoreTN, direction:BlockSide, depth:Contrac
         if DEBUG_MODE:
             _validate_core_con_order(contraction_order)
         return contraction_order
+    
+    ## In the case where it's a Mode (which is small and simple but a bit different each time)
+    if isinstance(tn, ModeTN):
+        assert depth is ContractionDepth.Full
+        return derive_mode_tn_full_contraction_order(tn, direction) 
 
     ## Get cached contractions or derive them:
+    assert isinstance(tn, KagomeTN)
     global FULL_CONTRACTION_ORDERS_CACHE
     cache_key = (tn.lattice.N, direction, depth)
     if cache_key in FULL_CONTRACTION_ORDERS_CACHE:
         contraction_order = FULL_CONTRACTION_ORDERS_CACHE[cache_key]
     else:
         # Derive:
-        contraction_order = derive_full_contraction_order(tn, direction, depth)
+        contraction_order = derive_kagome_tn_contraction_order(tn, direction, depth)
         # Save for next time:
         FULL_CONTRACTION_ORDERS_CACHE[cache_key] = contraction_order
     
@@ -605,6 +649,7 @@ def _plot_con_order(tn, con_order, detailed:bool=False, with_arrows:bool=True)->
 if __name__ == "__main__":
     from project_paths import add_scripts; 
     add_scripts()
-    from scripts import bp_test
-    bp_test.main_test()
+    from scripts import bp_test, contraction_test
+    # bp_test.main_test()
+    contraction_test.main_test()
 

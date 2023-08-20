@@ -8,7 +8,7 @@ import numpy as np
 from libs import bmpslib
 
 # Types we need in our module:
-from tensor_networks import KagomeTN, MPS, CoreTN
+from tensor_networks import KagomeTN, CoreTN, ModeTN, MPS
 from lattices.directions import LatticeDirection, BlockSide, check
 from enums import ContractionDepth
 from _types import EdgeIndicatorType
@@ -96,7 +96,7 @@ def contract_kagome_tensor_network(
     ## Connect first MPS message to a side tensor, to allow efficient contraction:
     if isinstance(tn, KagomeTN):
         tensors, edges_list, angles = connect_corner_messages(tn, direction)
-    elif isinstance(tn, CoreTN):
+    elif isinstance(tn, CoreTN|ModeTN):
         tensors, edges_list, angles = tn.tensors, tn.edges_list, tn.angles
     else:
         raise TypeError(f"Not an expected type {type(tn)} of input 'tn'")

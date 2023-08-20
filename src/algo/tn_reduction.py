@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 _T = TypeVar("_T")
 
 # Common types in the code:
-from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS, CoreTN
+from tensor_networks import KagomeTN, ArbitraryTN, ModeTN, TensorNode, MPS, CoreTN
 
 # Everyone needs numpy:
 import numpy as np
@@ -33,7 +33,7 @@ from algo.contract_tensor_network import contract_kagome_tensor_network
 from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS
 from tensor_networks.node import TensorNode
 from lattices.directions import LatticeDirection, BlockSide, check
-from enums import ContractionDepth, NodeFunctionality, UpdateModes
+from enums import ContractionDepth, NodeFunctionality, UpdateMode
 from containers import MPSOrientation
 
 # Our utilities:
@@ -332,8 +332,8 @@ def reduce_tn_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool=False)
 def reduce_core_to_mode(
     core_tn:CoreTN, 
     bubblecon_trunc_dim:int,
-    mode:UpdateModes
-)->ArbitraryTN:
+    mode:UpdateMode
+)->ModeTN:
     
     ## Create a copy which is an arbitrary tn which can be contracted:
     tn = core_tn.to_arbitrary_tn()
@@ -341,29 +341,33 @@ def reduce_core_to_mode(
     ## Get basic info:
     mode_side = mode.side_in_core  # Decide which side corrosponds to the mode:
 
-    from utils import visuals
-    i = 0
-    def plot_():
-        nonlocal i
-        tn.plot()
-        visuals.save_figure(file_name=f"{i}")
-        i += 1
-    plot_()
+    ## Also keep a list of nodes that should be contracted:
+    new_nodes : list[TensorNode] = []
 
-    ## Find the nodes that should be contracted:
+    ## Contract:
+    # For each side not being the major core side
     for side in CoreTN.all_mode_sides:
         if side is mode_side:
             continue
             
+        # For each boundry node
         boundary_nodes = [node for node in tn.get_nodes_on_boundary(side)]
         for boundary_node in boundary_nodes:
+
+            # For each beighbor which is on thr environment:
             neigbors = tn.all_neighbors(boundary_node)
             for neigbor in neigbors:
                 if neigbor.functionality is NodeFunctionality.Environment:
-                    boundary_node = tn.contract_nodes(neigbor, boundary_node)
-                    plot_()
-    
-    return tn
+                    boundary_node = tn.contract_nodes(neigbor, boundary_node)  # output is the new boundary tensor
+            
+            # keep in list:
+            new_nodes.append(boundary_node)
+
+    ## Let those new tensors know they are part of the environemnt:
+    for node in new_nodes:
+        node.functionality = NodeFunctionality.Environment
+
+    return ModeTN.from_arbitrary_tn(tn, mode=mode)
 
 
 def reduce_core_and_environment_to_edge_and_environment(
