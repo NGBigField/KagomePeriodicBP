@@ -8,10 +8,8 @@ if __name__ == "__main__":
 import numpy as np
 from numpy import ndarray as np_ndarray
 
-from typing import Tuple, Generator
-
 # Use some of our utilities:
-from utils import lists
+from utils import lists, strings, tuples
 
 # for type namings:
 from _types import EdgeIndicatorType, PosScalarType
@@ -20,13 +18,16 @@ from _error_types import NetworkConnectionError
 # For OOP Style:
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
+from typing import Tuple, Generator
 
 # For TN methods and types:
 from tensor_networks.operations import fuse_tensor_to_itself
 from lattices.directions import LatticeDirection, BlockSide, Direction
 from enums import NodeFunctionality, UnitCellFlavor
 
-
+# For smart iterations:
+import itertools
+import operator
 
 @dataclass
 class TensorNode():
@@ -38,9 +39,8 @@ class TensorNode():
     edges : list[EdgeIndicatorType]
     directions : list[LatticeDirection] 
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
-    core_cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
-    boundaries : list[BlockSide] = field(default_factory=list) 
-
+    unit_cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
+    boundaries : set[BlockSide] = field(default_factory=set) 
 
     @property
     def physical_tensor(self) -> np_ndarray:
@@ -48,7 +48,6 @@ class TensorNode():
             raise ValueError("Not a ket tensor")
         return self.tensor
 
-    
     @property
     def fused_tensor(self) -> np_ndarray:
         if self.is_ket:
@@ -56,30 +55,27 @@ class TensorNode():
         else:
             return self.tensor
 
-
     @property
     def angles(self) -> list[float]:
         return [direction.angle for direction in self.directions ]
 
-
     @property
     def dims(self) -> Tuple[int]:
-        return self.fused_tensor.shape
-    
+        if not self.is_ket:
+            return self.tensor.shape
+        connectable_dims = self.tensor.shape[1:]        
+        return tuples.multiply(connectable_dims, 2)
     
     @property
     def norm(self) -> np.float64:
         return np.linalg.norm(self.tensor)
     
-    
     def legs(self) -> Generator[tuple[LatticeDirection, EdgeIndicatorType, int], None, None]:
         for direction, edge, dim in zip(self.directions, self.edges, self.dims, strict=True):
             yield direction, edge, dim
 
-
     def normalize(self) -> None:
         self.tensor = self.tensor / self.norm
-    
     
     def copy(self) -> "TensorNode":
         new = TensorNode.empty()
@@ -95,7 +91,6 @@ class TensorNode():
             setattr(new, f.name, val)
         return new
 
-
     def edge_in_dir(self, dir:Direction)->EdgeIndicatorType:
         assert isinstance(dir, Direction), f"Not an expected type '{type(dir)}'"
         try:
@@ -103,7 +98,6 @@ class TensorNode():
         except Exception as e:
             raise NetworkConnectionError(f"Direction {dir!r} is not in directions of nodes: {[dir.name for dir in self.directions]}")
         return self.edges[index]
-    
     
     def permute(self, axes:list[int]):
         """Like numpy.transpose but permutes "physical_tensor", "fused_tensor", "edges" & "direction" all together
@@ -116,7 +110,6 @@ class TensorNode():
         self.edges = lists.rearrange(self.edges, axes)
         self.directions = lists.rearrange(self.directions, axes)      
 
-
     def validate(self)->None:
         # Generic validation error message:
         _failed_validation_error_msg = f"Node at index {self.index} failed its validation."
@@ -124,13 +117,11 @@ class TensorNode():
         assert self.fused_tensor.shape==self.dims , _failed_validation_error_msg
         assert len(self.fused_tensor.shape)==len(self.edges)==len(self.directions)==len(self.dims)==len(self.angles) , _failed_validation_error_msg
         # check all directions are different:
-        assert len(self.directions)==len(set(self.directions)), _failed_validation_error_msg+f"\nNot all directions are different: {self.directions}"
-         
+        assert len(self.directions)==len(set(self.directions)), _failed_validation_error_msg+f"\nNot all directions are different: {self.directions}" 
          
     def plot(self)->None:
         ## Some special imports:
         from matplotlib import pyplot as plt
-        from lattices.directions import unit_vector_from_angle
         from utils import visuals
                 
         plt.figure()
@@ -143,13 +134,12 @@ class TensorNode():
         plt.text(0, 0, text)
                 
         for edge_index, (edge_direction, edge_name, edge_dim)  in enumerate(self.legs()):
-            vector = edge_direction.unit_vector()
+            vector = edge_direction.unit_vector
             x, y = vector[0], vector[1]
             plt.plot([0, x], [0, y], color="black", alpha=0.8, linewidth=1.5 )
             plt.text(x/2, y/2, f"{edge_name}:\n{edge_dim} [{edge_index}]")
         
         visuals.draw_now()
-
 
     @classmethod
     def empty(cls)->"TensorNode":
@@ -163,10 +153,9 @@ class TensorNode():
             index=-1,
             name="",
             boundaries=[]
-        )
+        )  
         
-        
-    def __eq__(self, other)->bool:
+    def is_data_equal(self, other)->bool:
         assert isinstance(other, TensorNode), "Must be same Node type for comparison"
         if self.physical_tensor is None and other.physical_tensor is not None:
             return False
@@ -181,6 +170,32 @@ class TensorNode():
             if dir1 != dir2:
                 return False
         return True
+    
+    def fuse_legs(self, indices_to_fuse:list[int], new_edge_name:str=strings.random(10))->None:
+        ## Check:
+        directions = [self.directions[i] for i in indices_to_fuse]
+        assert lists.all_same(directions), f"Only supports leg fusion when legs are in the same direction"
+
+        ## Collect some data:
+        old_dimes = self.dims
+        indices_to_keep = [i for i, _ in enumerate(old_dimes) if i not in indices_to_fuse]
+        num_fused_legs = len(indices_to_fuse)
+
+        ## Derive the new size of the tensor after fusion:
+        *_, fused_dim = itertools.accumulate([old_dimes[i] for i in indices_to_fuse], operator.mul)
+        new_dims = [old_dimes[i] for i in indices_to_keep] + [fused_dim]
+
+        ## Change indices of tensor object so that the dimensions to fuse are last:
+        self.permute(indices_to_keep+indices_to_fuse)
+
+        ## Fuse legs:
+        # fuse tensor with numpy.reshape():
+        self.tensor = self.tensor.reshape(new_dims)
+        # Deal with the rest of the data:
+        for _ in range(num_fused_legs-1):
+            self.directions.pop()
+            self.edges.pop()
+        self.edges[-1] = new_edge_name
 
 
     def __repr__(self) -> str:

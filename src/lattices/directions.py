@@ -4,7 +4,7 @@
 
 import numpy as np
 from enum import Enum
-from typing import Generator, Callable, Any, Final
+from typing import Generator, Callable, Any, Final, TypeGuard
 from numpy import pi, random
 from utils import strings, lists, numerics
 from functools import cache, cached_property
@@ -23,23 +23,15 @@ NUM_MAIN_DIRECTIONS : Final = 6
 #|                            Helper Functions                                |#
 # ============================================================================ #
 
-def _modulo_pi(a:float)->float:
-    while a<0:
-        a += 2*pi
-    while a>=2*pi:
-        a -= 2*pi
-    return a
-
 def _angle_dist(x:float, y:float)->float:
-    x = _modulo_pi(x)
-    y = _modulo_pi(y)
+    x = numerics.force_between_0_and_2pi(x)
+    y = numerics.force_between_0_and_2pi(y)
     return abs(x-y)
-
-def unit_vector_from_angle(angle:float)->tuple[int, int]:
+    
+def _unit_vector_from_angle(angle:float)->tuple[int, int]:
     x = numerics.force_integers_on_close_to_round(np.cos(angle))
     y = numerics.force_integers_on_close_to_round(np.sin(angle))
     return (x, y)
-    
 
 # ============================================================================ #
 #|                           Class Defimition                                 |#
@@ -52,8 +44,8 @@ class Direction():
 
     def __init__(self, name:str, angle:float) -> None:
         self.name = name
-        self.angle = angle
-        self.unit_vector : tuple[int, int] = unit_vector_from_angle(angle)
+        self.angle = numerics.force_between_0_and_2pi(angle)
+        self.unit_vector : tuple[int, int] = _unit_vector_from_angle(angle)
 
     def __str__(self)->str:
         return self.name
@@ -61,24 +53,18 @@ class Direction():
     def __repr__(self) -> str:
         return f"{self.__class__.__name__} {self.name!r} {self.angle}"
     
-    def __eq__(self, other: object) -> bool:
-        # Type check:
-        assert issubclass(type(other), Direction)
-        # Fast instance check:
-        if self is other:
-            return True
-        # Slower values check:
-        if (self.__class__.__name__==other.__class__.__name__ 
-            and  self.name==other.name ):
-            return True
-        return False
     
     def __hash__(self) -> int:
         return hash((self.__class__.__name__, self.name))
 
     ## Get other by relation:
     def opposite(self)->"Direction":
-        return OPPOSITE_DIRECTIONS[self]
+        try:
+            res = OPPOSITE_DIRECTIONS[self]
+        except KeyError:
+            cls = type(self)
+            res = cls(name=self.name, angle=self.angle+np.pi)
+        return res
     
     def next_clockwise(self)->"Direction":
         return lists.prev_item_cyclic(ORDERED_LISTS[type(self)], self)
@@ -88,9 +74,12 @@ class Direction():
     
     ## Creation method:
     @classmethod
-    def from_angle(cls, angle:float)->"Direction":
-        for dir in ORDERED_LISTS[cls]:
-            if _angle_dist(dir.angle, angle)<EPSILON:
+    def from_angle(cls, angle:float, eps:float=EPSILON)->"Direction":
+        ## Where to look
+        possible_directions = ORDERED_LISTS[cls]
+        # look:
+        for dir in possible_directions:
+            if _angle_dist(dir.angle, angle)<eps:
                 return dir
         raise DirectionError(f"Given angle does not match with any known side")
     
@@ -118,11 +107,50 @@ class Direction():
             output_func(s)
             yield side
 
+    def plot(self)->None:
+        ## Some special imports:
+        from matplotlib import pyplot as plt
+        from utils import visuals
+                                
+        vector = self.unit_vector
+        space = "    "
+        x, y = vector[0], vector[1]
+        l = 1.1
+        plt.figure()
+        plt.scatter(0, 0, c="blue", s=100)
+        plt.arrow(
+            0, 0, x, y, 
+            color='black', length_includes_head=True, width=0.01, 
+            head_length=0.15, head_width=0.06
+        )  
+        plt.text(x, y, f"\n\n{space}{self.angle} rad\n{space}{self.unit_vector}", color="blue")
+        plt.title(f"Direction {self.name!r}")
+        plt.xlim(-l, +l)
+        plt.ylim(-l, +l)
+        visuals.draw_now()
+        # plt.axis('off')
+        plt.grid(color='gray', linestyle=':')
+
+        print(f"Plotted direction {self.name!r}")
     
 
-class LatticeDirection(Direction): ...    
+class LatticeDirection(Direction): 
+    R  : "LatticeDirection"
+    UR : "LatticeDirection"
+    UL : "LatticeDirection"
+    L  : "LatticeDirection"
+    DL : "LatticeDirection"
+    DR : "LatticeDirection" 
+
 
 class BlockSide(Direction):
+    U  : "BlockSide"
+    UR : "BlockSide"
+    UL : "BlockSide"
+    D  : "BlockSide"
+    DL : "BlockSide"
+    DR : "BlockSide" 
+
     def orthogonal_counterclockwise_lattice_direction(self)->LatticeDirection:
         return ORTHOGONAL_LATTICE_DIRECTIONS_TO_BLOCK_SIDES[self]
     
@@ -225,6 +253,35 @@ MAX_DIRECTIONS_STR_LENGTH = 2
 #|                           Declared Function                                |#
 # ============================================================================ #
 
+
+def next_clockwise_or_counterclockwise(dir:Direction, clockwise:bool=True)->Direction:
+    if clockwise:
+        return dir.next_clockwise()
+    else:
+        return dir.next_counterclockwise()
+
+
+def sort_by_clock_order(directions:list[Direction], clockwise:bool=True)->list[Direction]:
+    ## Try different first directions:
+    for dir_first in directions:
+        final_order = [dir_first]
+        dir_next = next_clockwise_or_counterclockwise(dir_first, clockwise)
+        while dir_next in directions:
+            final_order.append(dir_next)
+            dir_next = next_clockwise_or_counterclockwise(dir_next, clockwise)
+        if len(final_order)==len(directions):
+            return final_order
+    raise DirectionError("Directions are not related")
+
+
+def is_non_specific_direction(dir:Direction) -> TypeGuard[Direction]:
+    if isinstance(dir, LatticeDirection) or isinstance(dir, BlockSide):
+        return False
+    if isinstance(dir, Direction):
+        return True
+    return False
+
+
 class check:
     def is_orthogonal(dir1:Direction, dir2:Direction)->bool:
         dir1_ortho_options = [dir1.angle+pi/2, dir1.angle-pi/2]
@@ -242,6 +299,10 @@ class check:
             lattice_options = dir2.opposite_lattice_directions()
             lattice_dir = dir1
             mixed_cased = True
+        elif is_non_specific_direction(dir1) and is_non_specific_direction(dir2):  # Not a standard direction
+            a1 = dir1.angle
+            a2 = numerics.force_between_0_and_2pi(dir2.angle + np.pi)
+            return abs(a1-a2)<EPSILON
         else:
             mixed_cased = False
 
@@ -250,4 +311,16 @@ class check:
         else:
             return dir1.opposite() is dir2
 
-            
+    def is_equal(dir1:Direction, dir2:Direction) -> bool:
+        # Type check:
+        assert issubclass(type(dir2), Direction)
+        # Fast instance check:
+        if dir1 is dir2:
+            return True
+        # Slower values check:
+        if (dir1.__class__.__name__==dir2.__class__.__name__ 
+            and  dir1.name==dir2.name ):
+            if is_non_specific_direction(dir1) or is_non_specific_direction(dir2):
+                return _angle_dist(dir1.angle, dir2.angle)<EPSILON
+            return True
+        return False

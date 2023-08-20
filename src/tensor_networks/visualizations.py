@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 
 # Common types:
 from tensor_networks.node import TensorNode, NodeFunctionality, UnitCellFlavor
-from lattices.directions import Direction
+from lattices.directions import Direction, check
 from _error_types import DirectionError
 
 # for smart iterations:
@@ -202,8 +202,8 @@ def _derive_boundary(pos_list:List[Tuple[int, int]])->List[Tuple[int, ...]]:
 def plot_contraction_order(positions:List[Tuple[int,...]], con_order:List[int])->None:
     not_all_the_way = 0.85
     for (from_, to_), color in zip(itertools.pairwise(con_order), visuals.color_gradient(len(positions)) ):
-        if from_<0 or to_<0:
-            continue  # just a marker for something
+        # if from_<0 or to_<0:
+        #     continue  # just a marker for something
         x1, y1 = positions[from_]
         x2, y2 = positions[to_]
         plt.arrow(
@@ -212,6 +212,12 @@ def plot_contraction_order(positions:List[Tuple[int,...]], con_order:List[int])-
             color=color,
             zorder=0
         )
+
+def plot_contraction_nodes(positions:List[Tuple[int,...]], con_order:List[int])->None:
+    area = 20
+    for ind in con_order:
+        x, y = positions[ind]        
+        plt.scatter(x, y, s=400, c="cyan", zorder=4, alpha=0.5)
 
 
 @visuals.matplotlib_wrapper()
@@ -236,28 +242,32 @@ def plot_network(
     def node_style(node:TensorNode):
         # Marker:
         if node.functionality is NodeFunctionality.CenterUnitCell:
-            marker = f"${node.core_cell_flavor}$"
+            marker = f"${node.unit_cell_flavor}$"
             size1 = 120
             size2 = 180
-            name = " "
+        elif node.functionality is NodeFunctionality.Core:
+            marker = "H"
+            size1 = 60
+            size2 = 80
         else:
             marker = "o"
             size1 = 15
             size2 = 30
-            name = f"{node.name}"
+        name = ""
         # Color:
-        match node.core_cell_flavor:
+        match node.unit_cell_flavor:
             case UnitCellFlavor.A:
-                color = 'green'
-            case UnitCellFlavor.B:
                 color = 'red'
+            case UnitCellFlavor.B:
+                color = 'green'
             case UnitCellFlavor.C:
-                color = 'gold'
+                color = 'blue'
             case UnitCellFlavor.NoneLattice:
+                name = f"{node.name}"
                 if node.functionality is NodeFunctionality.Message:
                     color = "orange"
                 else:
-                    color = "blue"
+                    color = "yellow"
         return color, marker, size1, size2, name
 
     def _tensor_indices(edge_name:str, assert_connections:bool=False) -> List[int]:
@@ -307,7 +317,7 @@ def plot_network(
         if NodeFunctionality.Message in [node1.functionality, node2.functionality]:
             pass
         else:
-            assert dir1==dir2.opposite(), f"Legs of connection in a lattice must be of opposite directions"
+            assert check.is_equal(dir1, dir2.opposite()), f"Legs of connection in a lattice must be of opposite directions"
         return dim1
 
         
@@ -320,7 +330,7 @@ def plot_network(
         plt.scatter(x, y, c="black", s=size2, marker=marker, zorder=3)
         plt.scatter(x, y, c=color, s=size1, marker=marker, zorder=4)
         if detailed:
-            text = f"{name}" + f" [{node.index}]"
+            text = f" [{node.index}]" + f" {name}" 
             plt.text(x, y, text)
 
     ## Collect basic data:

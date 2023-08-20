@@ -1,11 +1,14 @@
 import csv
 from typing import Any
-import inspect
-import os
+import os, sys
 from pathlib import Path
 from utils import strings
+from project_paths import data
+from utils.saveload import force_folder_exists
 
-DEFAULT_RESULTS_CSV_FILE_NAME = "Results.csv" 
+PATH_SEP = os.sep
+DEFAULT_RESULTS_CSV_FILE_NAME = "temp_results.csv" 
+DEFAULT_RESULTS_CSV_FOLDER = (data/"results").__str__()
 
 
 def _standard_filename(file_name:str)->str:
@@ -29,14 +32,6 @@ def append_row_to_csv(row:list, file_name:str=DEFAULT_RESULTS_CSV_FILE_NAME):
     
 def create_or_override_csv(row:list, file_name:str=DEFAULT_RESULTS_CSV_FILE_NAME):
     _write_or_append_to_csv(row=row, file_name=file_name, mode='w')      
-
-
-def _get_caller_path(i:int=1):
-    _stack = inspect.stack()[0]
-    _place = (_stack)[1]
-    abs_path = os.path.abspath(_place)
-    directory_of_1py = os.path.dirname(abs_path)
-    return directory_of_1py
 
 
 def read_csv_table(fullpath:str|Path)->dict[str, list[str]]:
@@ -91,13 +86,18 @@ def read_csv_table(fullpath:str|Path)->dict[str, list[str]]:
     
 
 class CSVManager():
+    __slots__ = "fullpath"
+
     def __init__(
         self, 
         columns:list,
-        name:str="Results "+strings.time_stamp()+" "+strings.random(3)
+        name:str=strings.time_stamp()+" "+strings.random(3),
+        folder:str|None=DEFAULT_RESULTS_CSV_FOLDER
     ) -> None:
-        self.file_name = _standard_filename(name)
-        create_or_override_csv(columns, file_name=self.file_name)
+        if folder is not None:
+            force_folder_exists(folder)
+        self.fullpath = folder +PATH_SEP+_standard_filename(name)
+        create_or_override_csv(columns, file_name=self.fullpath)
 
     def append(self, row:list)->None:
-        append_row_to_csv(row, file_name=self.file_name)
+        append_row_to_csv(row, file_name=self.fullpath)

@@ -7,8 +7,8 @@ from typing import Generator, Union, Any
 from copy import deepcopy
 
 # Other containers and enums:
-from enums.imaginary_time_evolution import UpdateModes
-from containers.beliefe_propagation import BPStats
+from enums.imaginary_time_evolution import UpdateMode
+from containers.belief_propagation import BPStats
 from containers.density_matrices import MatrixMetrics 
 from _error_types import ITEError
 
@@ -77,7 +77,7 @@ class ITEPerModeStats(Stats):
 
 class ITESegmentStats(Stats):
     ite_per_mode_stats : list[ITEPerModeStats] = None # type: ignore
-    modes_order : list[UpdateModes] = None  # type: ignore
+    modes_order : list[UpdateMode] = None  # type: ignore
     delta_t : float = None  # type: ignore
 
     def __post_init__(self):

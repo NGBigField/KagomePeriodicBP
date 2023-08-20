@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from enums import MessageModel
 from utils.arguments import Stats
 from containers._meta import container_repr
+from containers.contractions import MPSOrientation
 from typing import NamedTuple, TypeAlias
 from lattices.directions import LatticeDirection
 from libs.bmpslib import mps as MPS
@@ -33,6 +34,12 @@ class BPStats(Stats):
 
 class Message(NamedTuple):
     mps : MPS
-    order_direction : LatticeDirection
+    orientation : MPSOrientation
+
+    def copy(self)->"Message":
+        return Message(
+            mps=self.mps.copy(),
+            orientation=self.orientation
+        )
 
 MessageDictType : TypeAlias = dict[BlockSide, Message]

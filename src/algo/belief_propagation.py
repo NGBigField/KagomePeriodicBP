@@ -14,7 +14,7 @@ from _config_reader import DEBUG_MODE
 import numpy as np
 
 # other used types in our code:
-from tensor_networks import KagomeTensorNetwork, MPS
+from tensor_networks import KagomeTN, MPS
 from lattices.directions import BlockSide, LatticeDirection
 from enums import ContractionDepth
 from containers import BPStats, BPConfig, MessageDictType, Message
@@ -33,7 +33,7 @@ from copy import deepcopy
 
 
 def _out_going_message(
-    tn:KagomeTensorNetwork, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool, hermitize:bool
+    tn:KagomeTN, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool, hermitize:bool
 ) -> Message:
     
     ## use bubble con to compute outgoing message:
@@ -66,18 +66,24 @@ def _bp_error_str(error:float|None):
 
 
 def _belief_propagation_step(
-    tn:KagomeTensorNetwork,
+    tn:KagomeTN,
     prev_error:float|None,
     prog_bar:prints.ProgressBar,
     bp_config:BPConfig
 )->tuple[
-    KagomeTensorNetwork,  # next_tn_with_messages
+    KagomeTN,  # next_tn_with_messages
     MessageDictType,   # next_messages
     float           # next_eerror
 ]:
 
-    ## Keep unique data for comparison:
-    prev_messages = deepcopy(tn.messages)
+    ## Keep Old messages for comparison (error calculation):
+    prev_messages = { direction : message.copy() for direction, message in tn.messages.items() }
+    if DEBUG_MODE:
+        assert sum([ 
+            MPS.l2_distance(prev_messages[dir].mps, tn.messages[dir].mps) 
+            for dir in BlockSide.all_in_counter_clockwise_order() 
+        ]) < 1e-14, "Copying messages has a numeric bug!"
+    
 
     ## Compute out-going message for all possible sizes:
     # prepare inputs:
@@ -118,11 +124,11 @@ def _belief_propagation_step(
 
 @decorators.add_stats()
 def belief_propagation_pashtida(
-    open_tn:KagomeTensorNetwork, 
+    open_tn:KagomeTN, 
     messages:MessageDictType|None, # initial messages
     bp_config:BPConfig
 ) -> tuple[ 
-    KagomeTensorNetwork,
+    KagomeTN,
     MessageDictType, # final messages
     BPStats
 ]:
@@ -177,12 +183,12 @@ def belief_propagation_pashtida(
 
 @decorators.add_stats()
 def belief_propagation(
-    tn:KagomeTensorNetwork, 
+    tn:KagomeTN, 
     messages:MessageDictType|None, # initial messages
     bp_config:BPConfig,
     live_plots:bool=False
 ) -> tuple[ 
-    KagomeTensorNetwork,
+    KagomeTN,
     MessageDictType, # final messages
     BPStats
 ]:

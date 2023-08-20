@@ -5,6 +5,7 @@ class NodeFunctionality(Enum):
     Core = auto()
     Message = auto()
     Padding = auto()
+    Environment = auto()
     Undefined = auto()   # used when can't derive the true functioanlity of a node. Usually an error.
 
 

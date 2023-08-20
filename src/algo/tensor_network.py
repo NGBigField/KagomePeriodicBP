@@ -3,6 +3,9 @@ if __name__ == "__main__":
 	sys.path.append(
 		pathlib.Path(__file__).parent.parent.__str__()
 	)
+	sys.path.append(
+		pathlib.Path(__file__).parent.parent.parent.__str__()
+	)
 
 
 # Control flags:
@@ -12,14 +15,15 @@ from _config_reader import DEBUG_MODE
 import numpy as np
 
 # For type anotation:
-from typing import List, Tuple, Iterable, TypeVar
+from typing import TypeVar
 
 # Common types in the code:
-from tensor_networks import KagomeTensorNetwork, TensorNode, MPS
-from lattices.directions import LatticeDirection, BlockSide
+from tensor_networks import KagomeTN, BaseTensorNetwork, ArbitraryTN, ModeTN, TensorNode, MPS
+from lattices.directions import LatticeDirection, BlockSide, check
+from lattices.edges import edges_dict_from_edges_list
 from _error_types import TensorNetworkError
-from enums import ContractionDepth, ReduceToEdgeMethod, ReduceToCoreMethod, NodeFunctionality, UnitCellFlavor
-from containers import BubbleConConfig, MessageDictType
+from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor
+from containers import BubbleConConfig
 from physics import pauli
 from _types import EdgeIndicatorType
 from tensor_networks.unit_cell import UnitCell
@@ -29,15 +33,9 @@ from utils import tuples, lists, assertions, parallel_exec, prints
 
 # Our needed algos:
 from tensor_networks.tensor_network import get_common_edge_legs
-from tensor_networks.construction import create_kagome_tn, _get_edge_from_tensor_coordinates
-from algo.contraction_order import derive_contraction_order, contraction_order_at_depth
 from algo.mps import physical_tensor_with_split_mid_leg
-from libs.bubblecon import bubblecon
-from libs import bmpslib
-import itertools
-
-# For a little bit of OOP:
-from typing import Any, NamedTuple
+from algo.contract_tensor_network import contract_tensor_network
+from algo.tn_reduction import reduce_tn_to_core
 
 # For energy estimation:
 from libs.ITE import rho_ij
@@ -45,15 +43,10 @@ from libs.ITE import rho_ij
 
 MULTIPROCESSING = False
 
+TensorNetworkType = TypeVar("TensorNetworkType", bound=BaseTensorNetwork)
 
-def _fix_angle(a:float)->float:
-    while a < 0:
-        a += 2*np.pi
-    while a>2*np.pi:
-        a -= 2*np.pi
-    return a
 
-def _get_corner_tensors(tn:KagomeTensorNetwork) -> list[TensorNode]:
+def _get_corner_tensors(tn:KagomeTN) -> list[TensorNode]:
     min_x, max_x, min_y, max_y = tn.positions_min_max()
     corner_tesnors = [] 
     for x in [min_x, max_x]:
@@ -62,7 +55,7 @@ def _get_corner_tensors(tn:KagomeTensorNetwork) -> list[TensorNode]:
             corner_tesnors.append(t)    
     return corner_tesnors
 
-def _sandwich_fused_tensors_with_expectation_values(tn_in:KagomeTensorNetwork, mat:np.matrix, ind:int, plot_:bool=False)->KagomeTensorNetwork:
+def _sandwich_fused_tensors_with_expectation_values(tn_in:TensorNetworkType, mat:np.matrix, ind:int)->TensorNetworkType:
 
     ## Get peps tensor and node data
     node = tn_in.nodes[ind]
@@ -90,7 +83,8 @@ def _sandwich_fused_tensors_with_expectation_values(tn_in:KagomeTensorNetwork, m
         index           = node.index,
         name            = node.name,
         boundaries      = node.boundaries,
-        functionality   = node.functionality
+        functionality   = node.functionality,
+        unit_cell_flavor= node.unit_cell_flavor
     )
     if DEBUG_MODE: tn_out.validate()
 
@@ -144,7 +138,7 @@ def _calc_and_check_expectation_value(numerator, denominator, force_real:bool) -
 
 def _sandwich_with_operator_and_contract_fully(
     node_ind:int,
-    tn:KagomeTensorNetwork, 
+    tn:BaseTensorNetwork, 
     operator:np.matrix,
     max_con_dim:int, 
     direction:BlockSide,
@@ -222,77 +216,8 @@ def _find_node_in_relative_direction(dir:LatticeDirection, n1:TensorNode, n2:Ten
         raise ValueError(f"None of nodes [{n1.name!r}, {n2.name!r}] are in correct relation with direction {dir.name!r}.")
 
 
-def calc_reduced_tn_around_edge(
-    tn_stable:KagomeTensorNetwork, mode:None,  #TODO fix mode
-    bubblecon_trunc_dim:int, method:ReduceToEdgeMethod, allready_reduced_to_core:bool=False, swallow_corners_:bool=True
-)->KagomeTensorNetwork:
-    """
-        Get reduced tensor_network using bubblecon.
-        mode: should be fixed
-    """
-
-    # Common options:
-    parallel = MULTIPROCESSING and ( tn_stable.size>300 or bubblecon_trunc_dim>15 ) 
-
-    # Control:
-    reduced_to_core : bool = allready_reduced_to_core
-    reduced_to_edge : bool = False
-
-    
-    if reduced_to_core:
-        tn_core = tn_stable  # just one more simple contraction is needed:
-    else:
-        match method:
-            case ReduceToEdgeMethod.EachDirectionToEdge:
-                ## Leave a rectangle of tensors around the edge:
-                orthogonal_directions = [mode.next_clockwise(), mode.next_counterclockwise()]
-                half_depth = (tn_stable.original_lattice_dims[0]) // 2
-                tn_small = reduce_tn_using_bubblecon(tn_stable, directions=orthogonal_directions, bubblecon_trunc_dim=bubblecon_trunc_dim, depth=ContractionDepth.ToCore)
-                tn_small = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[mode.opposite()], depth=half_depth-1)
-                tn_small = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[mode], depth=half_depth)
-                tn_edge = swallow_corners(tn_small)
-                #
-                reduced_to_edge = True
-            case ReduceToEdgeMethod.EachDirectionToCore:
-                tn_core  = _reduce_tn_to_core_and_environment_EachDirectionToCore(tn_stable, bubblecon_trunc_dim, swallow_corners_, parallel)
-
-            case ReduceToEdgeMethod.DoubleMPSZipping:
-                tn_core  = _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn_stable, bubblecon_trunc_dim, swallow_corners_, parallel)
-
-
-    if not reduced_to_edge:
-        tn_edge = reduce_core_and_environment_to_edge_and_environment(tn_core, mode, bubblecon_trunc_dim)  #type: ignore
-
-
-    ## final clean-ups and validation
-    if DEBUG_MODE: tn_edge.validate()  #type: ignore
-    return tn_edge   #type: ignore
-
-
-def swallow_corners(tn:KagomeTensorNetwork, _if_no_corners_error:bool=True)->KagomeTensorNetwork:
-    # Find corner tensors:
-    corner_tensors = tn.get_corner_nodes()
-    ## contract corners to a nehigboring tensor in the wide direction
-    if _if_no_corners_error and len(corner_tensors)==0: 
-        raise TensorNetworkError("No corners to swallow")
-    for t in corner_tensors:
-        # Find another tensor to swallow this corner-tensor into:
-        for direction in Direction.all_in_random_order():
-            try:
-                neighbor_in_direction = tn.find_neighbor(t, dir_or_edge=direction)
-            except ValueError:
-                continue
-            else:
-                break
-        else:
-            raise ValueError("Not neighbours were found")
-        # Full contraction:
-        tn.contract_nodes(t, neighbor_in_direction)    
-    return tn
-
-
 def rearange_tensors_legs_to_canonical_order(
-    tn_env:KagomeTensorNetwork, side:None # Fix mode\side
+    tn_env:KagomeTN, side:None # Fix mode\side
 )->tuple[TensorNode, TensorNode, list[np.ndarray]]:
     core_tensors = tn_env.get_nodes_by_functionality()
     core1 = _find_node_in_relative_direction(side.next_counterclockwise(), *core_tensors)
@@ -311,14 +236,14 @@ def rearange_tensors_legs_to_canonical_order(
     environment_tensors = [physical_tensor_with_split_mid_leg(n) for n in environment_nodes]    # Open environment mps legs:
     return core1, core2, environment_tensors
 
-
+#TODO assert used
 def calc_edge_environment(
-    tn:KagomeTensorNetwork, mode:None,  #TODO fix mode type
-    bubblecon_trunc_dim:int, method:ReduceToEdgeMethod=ReduceToEdgeMethod.default(), already_reduced_to_core:bool=False
+    tn:KagomeTN, mode:None,  #TODO fix mode type
+    bubblecon_trunc_dim:int, already_reduced_to_core:bool=False
 )->tuple[
     TensorNode, TensorNode,         # core1/2
     list[np.ndarray],         # environment
-    KagomeTensorNetwork       # small_tn
+    KagomeTN       # small_tn
 ]:
     ## Get the smallest Tensor-Network around the mode (edge):
     tn_env = calc_reduced_tn_around_edge(tn, mode, bubblecon_trunc_dim, method, already_reduced_to_core)
@@ -328,8 +253,8 @@ def calc_edge_environment(
 
     return core1, core2, environment_tensors, tn_env
 
-
-def calc_interaction_energies_in_core(tn:KagomeTensorNetwork, interaction_hamiltonain:np.ndarray, bubblecon_trunc_dim:int) -> list[float]:
+#TODO assert used
+def calc_interaction_energies_in_core(tn:KagomeTN, interaction_hamiltonain:np.ndarray, bubblecon_trunc_dim:int) -> list[float]:
     energies = []
     reduced_tn = reduce_tn_to_core_and_environment(tn, bubblecon_trunc_dim, swallow_corners_=False)
     for side in Direction:
@@ -340,15 +265,15 @@ def calc_interaction_energies_in_core(tn:KagomeTensorNetwork, interaction_hamilt
     return energies
 
 
-
 def calc_unit_cell_expectation_values(
-    tn:KagomeTensorNetwork, 
+    tn:KagomeTN, 
     operators:list[np.matrix], 
     bubblecon_trunc_dim:int, 
-    direction:BlockSide=BlockSide.random(), 
+    direction:BlockSide|None=None, 
     force_real:bool=False, 
     reduce:bool=True,
-    print_progress:bool=True
+    print_progress:bool=True,
+    parallel:bool=False
 ) -> list[UnitCell]:
     """ Compute expectation values of unit cell nodes
 
@@ -359,18 +284,27 @@ def calc_unit_cell_expectation_values(
     ## Prepare output:
     results = []
 
+    ## Check or choose direction:
+    if direction is None:
+        if isinstance(tn, ModeTN):
+            direction = lists.random_item(tn.major_directions)
+        else:
+            direction = BlockSide.random()
+    else:
+        assert isinstance(direction, BlockSide)
+
     ## Perform all common actions:
     if reduce:
-        tn_reduced : KagomeTensorNetwork = reduce_tn_to_core_and_environment(tn, bubblecon_trunc_dim)
+        tn_reduced = reduce_tn_to_core(tn, bubblecon_trunc_dim, parallel)
     else:
-        tn_reduced : KagomeTensorNetwork = tn
+        tn_reduced = tn
     denominator, _, _ = contract_tensor_network(tn_reduced, direction=direction, depth=ContractionDepth.Full, bubblecon_trunc_dim=bubblecon_trunc_dim)
     assert not isinstance(denominator, MPS), "Full contraction should result in a number, not an MPS"
     center_nodes = tn_reduced.get_center_unit_cell_nodes()
     unit_cell_indices = UnitCell(
-        A = next(n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.A),
-        B = next(n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.B),
-        C = next(n.index for n in center_nodes if n.core_cell_flavor is UnitCellFlavor.C)
+        A = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.A),
+        B = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.B),
+        C = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.C)
     )
 
     ## Prepare progress-bar:
@@ -397,8 +331,8 @@ def calc_unit_cell_expectation_values(
 
 
 def calc_mean_value(
-    tn:KagomeTensorNetwork, 
-    node_indices:List[int], 
+    tn:KagomeTN, 
+    node_indices:list[int], 
     operator:np.matrix,
     bubblecon_trunc_dim:int, 
     direction:BlockSide = BlockSide.random(), 
@@ -431,7 +365,7 @@ def calc_mean_value(
         values=node_indices, value_name="node_ind", 
         fixed_arguments=fixed_arguments,
         in_parallel=in_parallel
-        ) 
+    ) 
 
     ## Calc numerator/denominator for each value
     expectation_values = [
@@ -446,367 +380,10 @@ def calc_mean_value(
     return lists.average(expectation_values)
 
 
-def connect_corner_messages(
-    tn:KagomeTensorNetwork, outgoing_dir:BlockSide
-)->tuple[
-    list[np.ndarray], list[list[EdgeIndicatorType]], list[list[float]]
-]:
-    
-    ## Get the output lists:
-    tensors = tn.tensors
-    edges_list = tn.edges_list
-    angles = tn.angles
 
-    ## Derive basic info:
-    first_msg_dir = outgoing_dir.opposite()
-    msg_indices1 = tn.message_indices(first_msg_dir)
-    msg_indices2 = tn.message_indices(first_msg_dir.next_counterclockwise())
-    index = [msg_indices1[-1], msg_indices2[0]]
-
-    ## Expand both tensors with a fake leg of dim 1:
-    new_tensor, new_edges, pos, old_angles = [], [], [], []
-    for i in [0, 1]:
-        grand_index = index[i]
-        pos.append( tn.positions[grand_index] )
-        tensor = tensors[grand_index]
-        new_shape = tuples.add_element(tensor.shape, 1) 
-        new_edges.append( edges_list[grand_index] + ['fake_leg']  )        
-        new_tensor.append( tensor.copy().reshape(new_shape) )
-        old_angles.append( angles[grand_index] )
-
-        
-    ## Derive new angles:
-    new_a = [0.0, 0.0]
-    new_a[0] = tuples.angle(pos[0], pos[1])
-    new_a[1] = _fix_angle(new_a[0]+np.pi)
-    new_angle = [old_angles[i]+[new_a[i]] for i in [0, 1]]
-
-    ## Assign results to list
-    for i in [0, 1]:
-        grand_index = index[i]
-        tensors[grand_index] = new_tensor[i]
-        edges_list[grand_index] = new_edges[i]
-        angles[grand_index] = new_angle[i]
-
-    ## Return:
-    return tensors, edges_list, angles
-    
-
-
-def contract_tensor_network(
-    tn:KagomeTensorNetwork, 
-    direction:BlockSide,
-    depth:ContractionDepth|int,
-    bubblecon_trunc_dim:int,
-    print_progress:bool=True
-)->Tuple[
-    MPS|complex|tuple,
-    List[int],
-    LatticeDirection,
-]:
-
-    ## Derive Contraction Order:
-    # get or derive full con-oder:
-    full_contraction_order, last_direction = derive_contraction_order(tn, direction)
-    # Cut con order according to `depth`:
-    contraction_order = contraction_order_at_depth(full_contraction_order, depth, tn.lattice.N)
-
-    ## Connect first MPS message to a side tensor, to allow efficient contraction:
-    tensors, edges_list, angles = connect_corner_messages(tn, direction)
-
-    ## Call main function:
-    mp = bubblecon(
-        tensors, 
-        edges_list, 
-        angles, 
-        bubble_angle=direction.angle,
-        swallow_order=contraction_order, 
-        D_trunc=bubblecon_trunc_dim,
-        opt='high',
-        progress_bar=BubbleConConfig.progress_bar and print_progress,
-        separate_exp=BubbleConConfig.separate_exp,
-        ket_tensors=tn.kets
-    )
-
-    ## Derive outgoing mps direction
-    mps_direction = direction.orthogonal_clockwise_lattice_direction()
-
-    ## Check outputs:
-    assert not isinstance(mp, list)  # This is not an expected output
-
-    return mp, contraction_order, mps_direction
-
-
-def reduce_tn_using_bubblecon(tn:KagomeTensorNetwork, bubblecon_trunc_dim:int, directions:Iterable[BlockSide], depth:ContractionDepth|int, parallel:bool=False)->KagomeTensorNetwork:
-
-    # prepare inputs:
-    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=bubblecon_trunc_dim, depth=depth)
-    directions = lists.shuffle(list(directions))
-    
-    # Sandwich Tensor-Network from both sides at once if parallel:
-    if parallel:
-        fixed_arguments["print_progress"]=False
-        con_results = parallel_exec.parallel(func=contract_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
-    else:
-        fixed_arguments["print_progress"] = True
-        con_results = parallel_exec.concurrent(func=contract_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
-    
-    # Rearrange outputs:
-    mpss        = {direction:tupl[0] for direction, tupl in con_results.items()}
-    con_indices = lists.join_sub_lists([tupl[1] for tupl in con_results.values()])
-    mps_directions =                   [tupl[2] for tupl in con_results.values()]
-
-
-    ## Ignore tensors that are accounted-for by the messages:
-    remaining_indices = [node.index for node in tn.nodes if node.index not in con_indices]
-    reduced_tn = tn.sub_tn(remaining_indices)
-    if DEBUG_MODE: reduced_tn.validate()
-    
-    ## Connect messages directly to the remaining tensors:
-    for (direction, mps), mps_dir in zip(mpss.items(), mps_directions, strict=True):
-        assert isinstance(mps, MPS)
-        reduced_tn = _fuse_mps_with_tn( reduced_tn, mps, mps_dir, direction.opposite() )
-    if DEBUG_MODE: reduced_tn.validate()
-
-    ## Return:
-    return reduced_tn
-
-
-def reduce_core_and_environment_to_edge_and_environment(
-    tn_small:KagomeTensorNetwork, side:None, # fix side\mode 
-    bubblecon_trunc_dim:int
-)->KagomeTensorNetwork:
-    tn_env = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[side], depth=2)
-    ## Find and Swallow the two corner tensors:
-    remaining_core_tensors = [t for t in tn_env.nodes if t.functionality is NodeFunctionality.CenterUnitCell]
-    assert len(remaining_core_tensors)==2
-    for t in tn_env.nodes:
-        # pass on core nodes:
-        if t is remaining_core_tensors[0] or t is remaining_core_tensors[1]:
-            continue
-        # pass on environment of core nodes:
-        if tn_env.are_neigbors(t, remaining_core_tensors[0]) or tn_env.are_neigbors(t, remaining_core_tensors[1]):
-            continue
-        neighbor_in_direction = tn_env.find_neighbor(t, side)
-
-        tn_env.contract_nodes(t, neighbor_in_direction)
-    return tn_env
-
-
-def _reduce_tn_to_core_and_environment_EachDirectionToCore(small_tn:KagomeTensorNetwork, bubblecon_trunc_dim:int, swallow_corners_:bool, parallel:bool) -> KagomeTensorNetwork:
-    for directions in Direction.all_opposite_pairs():
-        small_tn = reduce_tn_using_bubblecon(
-            tn=small_tn, directions=directions, bubblecon_trunc_dim=bubblecon_trunc_dim, depth=ContractionDepth.ToCore, 
-            parallel=parallel
-        )    
-    ## swallow corners:
-    if swallow_corners_:        
-        small_tn = swallow_corners(small_tn)
-
-    return small_tn
-
-def _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn:KagomeTensorNetwork, bubblecon_trunc_dim:int, swallow_corners_:bool, parallel:bool) -> KagomeTensorNetwork:
-    
-    ## Check inputs:
-    assert swallow_corners_ is True, f"Zipping methods always swallows the corners"
-
-    ## General data:
-    core_indices = [n.index for n in tn.get_nodes_by_functionality()]
-    mpss : dict[Direction, MPS] = dict()
-    N = tn.original_lattice_dims[0]-2
-    n = len(core_indices)//2
-    d_virtual = tn.tensor_dims.virtual
-    d_physical = tn.tensor_dims.physical
-
-    ## Prepare two MPSs:
-    for direction in [Direction.Down, Direction.Up]:
-        con_order, _ = derive_contraction_order(tn, direction, depth=ContractionDepth.Full)
-        con_order = con_order[0:len(con_order)//2]
-        for core_index in core_indices:
-            if core_index in con_order:
-                con_order.remove(core_index)
-
-        mps = bubblecon(
-            tn.tensors, 
-            tn.edges_list, 
-            tn.angles, 
-            bubble_angle=direction.angle,
-            swallow_order=con_order, 
-            D_trunc=bubblecon_trunc_dim,
-            opt='high',
-            progress_bar=BubbleConConfig.progress_bar,
-            separate_exp=BubbleConConfig.separate_exp,
-            ket_tensors=tn.kets
-        )
-        assert isinstance(mps, MPS)
-
-        # The contracition going down creates an upper mps
-        mpss[direction.opposite()] = mps  
-
-    upper_mps = mpss[Direction.Up]
-    lower_mps = mpss[Direction.Down]
-
-	# III. Contract the upper/lower MPS to create an edge tensor from the
-	#      left and from the right, creating LTensor, RTensor.
-    LTensor : np.ndarray = None  #type: ignore
-
-    jD = (N-n)//2 + 1
-    for j in range(0, jD):
-        LTensor = bmpslib.updateCLeft(LTensor,
-            upper_mps.A[-j-1].transpose([2,1,0]), \
-            lower_mps.A[j])
-
-    # LTensor legs are [i_up, i_down]. Absorb it in the first tensor of
-    # mps_D_half that going to appear in the small square TN
-    lower_mps.A[jD] = np.tensordot(LTensor, lower_mps.A[jD], axes=([1],[0]))
-
-    # Now create RTensor, which is the contraction of the right part
-    # of the up/down MPSs
-    RTensor : np.ndarray = None  #type: ignore
-    jU = (N-n)//2 + 1
-    for j in range(0, jU):
-        RTensor = bmpslib.updateCRight(RTensor,
-            upper_mps.A[j].transpose([2,1,0]), \
-            lower_mps.A[-1-j])
-    # Absorb the RTensor[i_up, i_down] in the first tensor of mps_up_half
-    upper_mps.A[jU] = np.tensordot(RTensor, upper_mps.A[jU], axes=([0],[0]))
-
-    # IV. We now have all tensors we need to define the small TN.
-    #     It consists of the original TN in the small square + the MPS
-    #     tensors that surround it.
-
-    # first create the small TN
-    peps = [n.physical_tensor for n in tn.get_nodes_by_functionality()]
-    small_tn = create_kagome_tn(core_size=n, D=d_virtual, d=d_physical, padding=0, creation_mode=peps)
-
-    ## Add the surrounding MPS tensors in the edge order D, R, U, L
-    env_tensors = lower_mps.A[(jD+n//2):(jD+2*n)] \
-        + upper_mps.A[jU:(jU+2*n)] + lower_mps.A[jD:(jD+n//2)]
-
-
-    env_nodes : list[TensorNode] = []
-    num_mps_tensors = len(Direction)*n
-    i_mps = 0
-    ## Add env:
-    for side in Direction.all_in_counterclockwise_order():
-        dir_to_lattice = side.opposite()
-        dir_mps_order = dir_to_lattice.next_clockwise()
-
-        for node in _ordered_nodes_on_boundary(small_tn, side, dir_mps_order):
-            
-            new_pos = tuples.add(node.pos, side.unit_vector())
-            bulk_edge_name = node.edge_in_dir(side)
-
-            i_mps_next = (i_mps + 1) % num_mps_tensors
-            edges = [f'env{i_mps}', bulk_edge_name, f'env{i_mps_next}']
-            dirs = [dir_to_lattice.next_counterclockwise(),  dir_to_lattice, dir_to_lattice.next_clockwise()]
-
-            new_node = TensorNode(
-                is_ket=False,
-                tensor=env_tensors[i_mps],
-                functionality=NodeFunctionality.Message,
-                edges=edges,
-                directions=dirs,
-                pos=new_pos,
-                index=small_tn.size,
-                name=f"m{i_mps}",
-                on_boundary=[]
-            )
-
-            small_tn.add(new_node)
-            env_nodes.append(new_node)
-
-            i_mps += 1
-
-    ## Fix corner legs:
-    i_mps = 0
-    for side in Direction.all_in_counterclockwise_order():
-        dir_to_lattice = side.opposite()
-        dir_mps_order = dir_to_lattice.next_clockwise()
-        for i_per_side, node in enumerate(_ordered_nodes_on_boundary(small_tn, side, dir_mps_order)):
-            if i_per_side==n-1:
-                # Get data
-                i_mps_next = (i_mps + 1) % num_mps_tensors
-                this_node = env_nodes[i_mps]
-                next_node = env_nodes[i_mps_next]
-                # get common edge:
-                i_this_wrong_leg = this_node.directions.index(dir_mps_order)
-                i_next_wrong_leg = next_node.directions.index(dir_to_lattice.opposite())
-                # Derive new directions:
-                this_angle = tuples.angle(this_node.pos, next_node.pos) 
-                try:                        
-                    this_dir = Direction.from_angle(this_angle)
-                except ValueError:
-                    this_dir = this_angle
-                next_dir = Direction.opposite_direction(this_dir)
-                # Update nodes:
-                this_node.directions[i_this_wrong_leg] = this_dir
-                next_node.directions[i_next_wrong_leg] = next_dir
-            i_mps += 1
-
-    ## Update small_tn size
-    small_tn.original_lattice_dims = tuples.add(small_tn.original_lattice_dims, (2, 2))
-
-    return small_tn
-
-
-def reduce_tn_to_core_and_environment(tn:KagomeTensorNetwork, bubblecon_trunc_dim:int, swallow_corners_:bool=True, method:ReduceToCoreMethod=ReduceToCoreMethod.default()) -> KagomeTensorNetwork:
-    tn_copy = tn.copy()
-    
-    ## Decide if parallel contraction benefit us in this case:   #TODO  needs verification
-    parallel = MULTIPROCESSING and ( tn.size>300 or bubblecon_trunc_dim>10 ) and tn.tensor_dims.virtual>3
-
-    ## Perform reduction up to a perfect square arround the core:
-    if method is ReduceToCoreMethod.EachDirectionToCore:
-        small_tn = _reduce_tn_to_core_and_environment_EachDirectionToCore(tn_copy, bubblecon_trunc_dim, swallow_corners_, parallel)
-
-    elif method is ReduceToCoreMethod.DoubleMPSZipping:
-        small_tn = _reduce_tn_to_core_and_environment_DoubleMPSZipping(tn_copy, bubblecon_trunc_dim, swallow_corners_, parallel)
-
-    else:
-        raise ValueError(f"No such option {method!r}")
-
-
-    if DEBUG_MODE: small_tn.validate()
-    return small_tn
-
-
-def full_contraction(tn:KagomeTensorNetwork, /,*, max_dim:int, direction:BlockSide=BlockSide.random()):
-    # Basic info:    
-    min_x, max_x, min_y, max_y = tn.positions_min_max()
-    min_x = int(min_x) 
-    max_x = int(max_x) 
-    min_y = int(min_y) 
-    max_y = int(max_y)
-    
-    ## Derive order:
-    con_order = []
-    y_range = list(range(min_y, max_y+1))
-    
-    for x in range(min_x, max_x+1):
-        
-        for y in y_range:
-            try:
-                node = tn.get_node_in_pos((x,y))
-            except ValueError:
-                continue
-            con_order.append(node.index)
-            
-        y_range.reverse()      
-    
-    ## contract:
-    mp = bubblecon(
-        tn.fused_tensors, 
-        tn.edges_list, 
-        tn.angles, 
-        bubble_angle=direction.angle,
-        swallow_order=con_order, 
-        D_trunc=max_dim,
-        D_trunc2=BubbleConConfig.trunc_dim_2, 
-        eps=BubbleConConfig.eps, 
-        opt='high',
-        progress_bar=BubbleConConfig.progress_bar,
-        separate_exp=BubbleConConfig.separate_exp
-    )
-    return mp
+if __name__ == "__main__":
+    from project_paths import add_scripts; 
+    add_scripts()
+    from scripts import bp_test
+    bp_test.main_test()
 

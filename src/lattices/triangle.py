@@ -176,7 +176,14 @@ def get_vertex_index(i,j,N):
 		Aw = (i*N + i*(i-1)//2 if i<N else 3*N*N -3*N +1 -(2*N-1-i)*(4*N-2-i)//2)
 		
 	return Aw + j
+
 		
+@functools.cache
+def get_center_vertex_index(N):
+	i = num_rows(N)//2
+	j = row_width(i, N)//2
+	return get_vertex_index(i, j, N)
+
 
 def get_node_position(i,j,N):
 	w = row_width(i, N)

@@ -1,7 +1,13 @@
-from numpy import ceil, floor
+from numpy import ceil, floor, pi
 
 EPSILON = 0.000001
 
+def force_between_0_and_2pi(a:float)->float:
+    while a<0:
+        a += 2*pi
+    while a>=2*pi:
+        a -= 2*pi
+    return a
 
 def force_zero_for_small_numbers(x:float|int)->float|int:
     if abs(x)<EPSILON:

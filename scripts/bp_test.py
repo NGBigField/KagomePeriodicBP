@@ -69,9 +69,9 @@ def bp_single_call(
 
 def growing_tn_bp_test2(
     d = 2,
-    D = 3,
+    D = 2,
     min_N = 2,
-    max_N = 10,
+    max_N = 4,
     live_plot = False,
     with_bp = True
 ):
@@ -89,23 +89,16 @@ def growing_tn_bp_test2(
         unit_cell = UnitCell.random(d=d, D=D)
         unit_cell.save(f"random_D={D}")
 
-    ## Figure:
-    if live_plot:
-        visuals.draw_now()
-        plots = visuals.AppendablePlot()
-        plots.axis.set_title("<Z> on sites")
-        plots.axis.set_xlabel("N")
-        plots.axis.set_ylabel("<Z>")
 
-    if with_bp:
-        csv_name =  f"Results_D={D}_with-BP"
-    else:
-        csv_name =  f"Results_D={D}_random-messages"
-    csv = csvs.CSVManager(['D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'], name=csv_name)
+    # if with_bp:
+    #     csv_name =  f"bp_res_D={D}_with-BP"
+    # else:
+    #     csv_name =  f"bp_res_D={D}_random-messages"
+    # csv = csvs.CSVManager(['D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'], name=csv_name)
 
     ## Growing N networks:
     all_results = []
-    for N in range(min_N, max_N+1, 2):
+    for N in range(min_N, max_N+1, 1):
         print(" ")
         print(f"N={N:2}: ")
         tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
@@ -123,14 +116,12 @@ def growing_tn_bp_test2(
         a = zs['A']
         b = zs['B']
         c = zs['C']
-        
-        if live_plot:
-            plots.append(A=(N, a), B=(N, b), C=(N, c))
+
         all_results.append((N, results))
         saveload.save(all_results, f"all_results_D={D}", sub_folder="results")
 
         row = _standard_row_from_results(D, N, results)
-        csv.append(row)
+        # csv.append(row)
         
 
     ## End:
@@ -195,9 +186,6 @@ def growing_tn_bp_test(
                 
 
 
-
-
-
 def single_bp_test(
     d = 2,
     D = 2,
@@ -214,15 +202,15 @@ def single_bp_test(
 
     ## BP:
     tn, messages, stats = belief_propagation(tn, messages=None, bp_config=bp_config)
-    tn, messages, stats = belief_propagation(tn, messages=messages, bp_config=bp_config)
+    tn, messages, _ = belief_propagation(tn, messages=messages, bp_config=bp_config)
 
     print(stats)
 
 
 def main_test():
-    # single_bp_test()
+    single_bp_test()
     # growing_tn_bp_test()
-    growing_tn_bp_test2()
+    # growing_tn_bp_test2()
     # load_results()
 
 

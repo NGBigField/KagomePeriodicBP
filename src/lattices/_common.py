@@ -1,4 +1,4 @@
-from lattices.directions import Direction
+from lattices.directions import Direction, BlockSide
 from _types import EdgeIndicatorType, PosScalarType
 from utils import tuples
 from dataclasses import dataclass, field
@@ -10,8 +10,7 @@ class Node():
     pos : tuple[PosScalarType, ...]
     edges : list[EdgeIndicatorType]
     directions : list[Direction]
-    boundaries : set[Direction] = field(default_factory=set)
-
+    boundaries : set[BlockSide] = field(default_factory=set)
 
     def get_edge_in_direction(self, direction:Direction) -> EdgeIndicatorType:
         edge_index = self.directions.index(direction)

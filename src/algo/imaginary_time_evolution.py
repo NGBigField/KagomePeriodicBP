@@ -20,8 +20,8 @@ from containers.density_matrices import MatrixMetrics
 from containers import Config
 
 # Import need types:
-from enums import UpdateModes, Directions, InitialTNMode
-from tensor_networks import KagomeTensorNetwork, NodeFunctionality, TensorNode
+from enums import UpdateMode, Directions, InitialTNMode
+from tensor_networks import KagomeTN, NodeFunctionality, TensorNode
 
 # Common errors:
 from lib.ITE import ITEError
@@ -131,7 +131,7 @@ def _print_or_log_bp_message(config:BPConfig, not_converged_causes_error:bool, s
             logger.warn(space+_msg)
 
 
-def _core_to_big_open_tn(core:KagomeTensorNetwork, tn_config:TNSizesAndDimensions) -> KagomeTensorNetwork:
+def _core_to_big_open_tn(core:KagomeTN, tn_config:TNSizesAndDimensions) -> KagomeTN:
     assert tn_config.core_size == core.original_lattice_dims[0] == core.original_lattice_dims[1]
     repeats = assertions.odd(tn_config.big_lattice_size/tn_config.core_size)
     return repeat_core(core, repeats=repeats)
@@ -172,10 +172,10 @@ def _check_converged(energies_in:list[complex|None], delta_ts:list[float], crnt_
     return True
 
 
-def _mode_order_without_repetitions(prev_order:list[UpdateModes], ite_config:ITEConfig)->list[UpdateModes]:
+def _mode_order_without_repetitions(prev_order:list[UpdateMode], ite_config:ITEConfig)->list[UpdateMode]:
     if not ite_config.random_mode_order:
-        return list(UpdateModes)
-    new_order = list(UpdateModes.all_in_random_order())
+        return list(UpdateMode)
+    new_order = list(UpdateMode.all_in_random_order())
     # Don't allow two of the same in a row
     if prev_order is not None and prev_order[-1] is new_order[0]:
         new_ind = np.random.randint(low=1, high=4)
@@ -189,7 +189,7 @@ def get_imaginary_time_evolution_operator(h:np.ndarray, delta_t:float)->tuple[np
     return h, g
 
 
-def _duplicate_to_core(core1:TensorNode, core2:TensorNode, update_mode:UpdateModes, config:Config)->KagomeTensorNetwork:
+def _duplicate_to_core(core1:TensorNode, core2:TensorNode, update_mode:UpdateMode, config:Config)->KagomeTN:
     """ Arrange 2 cell tensors into a 2x2 core.
 
     core tensor network is of basic cell
@@ -226,9 +226,9 @@ def _duplicate_to_core(core1:TensorNode, core2:TensorNode, update_mode:UpdateMod
     p2 = core2.physical_tensor
     assert p1 is not None and p2 is not None
     match update_mode:
-        case UpdateModes.Up | UpdateModes.Down:
+        case UpdateMode.Up | UpdateMode.Down:
             a, b = p1, p2
-        case UpdateModes.Right | UpdateModes.Left:
+        case UpdateMode.Right | UpdateMode.Left:
             a, b = p2, p1
         case _:
             raise ValueError(f"Not a legit case {update_mode!r}")
@@ -294,7 +294,7 @@ def _fix_config_if_bp_struggled(config:Config, bp_stats:BPStats, logger:logs.Log
 
 
 def update_core_tensors(
-    mode_tn:KagomeTensorNetwork,
+    mode_tn:KagomeTN,
     core1:TensorNode,
     core2:TensorNode,
     environment_tensors:list[np.ndarray],
@@ -376,14 +376,14 @@ def update_core_tensors(
 
 @decorators.add_stats()
 def ite_per_mode(
-    core:KagomeTensorNetwork,
+    core:KagomeTN,
     messages:_BPMessagesType|None,
     delta_t:float,
     logger:logs.Logger,
     config:Config,
-    update_mode:UpdateModes
+    update_mode:UpdateMode
 )->tuple[
-    KagomeTensorNetwork,          # core
+    KagomeTN,          # core
     _BPMessagesType,        # messages
     float,                  # edge_energy
     ITEPerModeStats         # Stats
@@ -421,16 +421,16 @@ def ite_per_mode(
 @decorators.add_stats()
 @decorators.multiple_tries(3)
 def ite_segment(
-    core:KagomeTensorNetwork,
+    core:KagomeTN,
     messages:_BPMessagesType|None,
     delta_t:float,
     logger:logs.Logger,
     config_in:Config,
     prev_stats:ITESegmentStats
 )->tuple[
-    KagomeTensorNetwork,          # core
+    KagomeTN,          # core
     _BPMessagesType,        # messages
-    KagomeTensorNetwork,          # tn_stable
+    KagomeTN,          # tn_stable
     ITESegmentStats         # stats
 ]:
 
@@ -472,10 +472,10 @@ def ite_segment(
 
 # @decorators.multiple_tries(3)
 def ite_per_delta_t(
-    core:KagomeTensorNetwork, messages:_BPMessagesType|None, delta_t:float, num_repeats:int, config:Config, 
+    core:KagomeTN, messages:_BPMessagesType|None, delta_t:float, num_repeats:int, config:Config, 
     plots:ITEPlots, logger:logs.Logger, tracker:ITEProgressTracker, step_stats:ITESegmentStats
 ) -> tuple[
-    KagomeTensorNetwork, _BPMessagesType|None, bool, ITESegmentStats
+    KagomeTN, _BPMessagesType|None, bool, ITESegmentStats
     # core, messages, at_least_one_succesful_run, step_stats
 ]:
 
@@ -528,11 +528,11 @@ def ite_per_delta_t(
 
 
 def full_ite(
-    initial_core:KagomeTensorNetwork|None=None,
+    initial_core:KagomeTN|None=None,
     config:Config|None=None,
     logger:logs.Logger|None=None
 )->tuple[
-    KagomeTensorNetwork,          # core
+    KagomeTN,          # core
     ITEProgressTracker,     # ITE-Tracker
     logs.Logger             # Logger
 ]:
@@ -542,7 +542,7 @@ def full_ite(
         config = Config.from_D(DEFAULT_D)
     if initial_core is None:
         core_in = create_core(config.tn, creation_mode=InitialTNMode.Random, _check_core=False)
-    elif isinstance(initial_core, KagomeTensorNetwork):
+    elif isinstance(initial_core, KagomeTN):
         core_in = initial_core.copy()
     else:
         raise TypeError(f"Not an expected type for input 'initial_core' of type {type(initial_core)!r}")
@@ -594,11 +594,11 @@ def full_ite(
 
 
 def robust_full_ite(
-    initial_core:KagomeTensorNetwork|None=None,
+    initial_core:KagomeTN|None=None,
     config:Config|None=None,
     logger:logs.Logger|None=None
 )->tuple[
-    KagomeTensorNetwork,          # core
+    KagomeTN,          # core
     ITEProgressTracker,     # ITE-Tracker
     logs.Logger             # Logger
 ]:
@@ -607,7 +607,7 @@ def robust_full_ite(
         assert isinstance(config, Config)
         config = deepcopy(config)
     if initial_core is not None:
-        assert isinstance(initial_core, KagomeTensorNetwork)
+        assert isinstance(initial_core, KagomeTN)
         initial_core = initial_core.copy()
         initial_core.normalize_tensors()
 
