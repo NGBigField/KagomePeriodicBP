@@ -9,7 +9,7 @@ import numpy as np
 from numpy import ndarray as np_ndarray
 
 # Use some of our utilities:
-from utils import lists, strings, tuples
+from utils import lists, strings, tuples, assertions
 
 # for type namings:
 from _types import EdgeIndicatorType, PosScalarType
@@ -64,7 +64,7 @@ class TensorNode():
         if not self.is_ket:
             return self.tensor.shape
         connectable_dims = self.tensor.shape[1:]        
-        return tuples.multiply(connectable_dims, 2)
+        return tuples.power(connectable_dims, 2)
     
     @property
     def norm(self) -> np.float64:
@@ -171,6 +171,10 @@ class TensorNode():
                 return False
         return True
     
+    def turn_into_bracket(self)->None:
+        self.tensor = self.fused_tensor
+        self.is_ket = True
+    
     def fuse_legs(self, indices_to_fuse:list[int], new_edge_name:str=strings.random(10))->None:
         ## Check:
         directions = [self.directions[i] for i in indices_to_fuse]
@@ -190,6 +194,9 @@ class TensorNode():
 
         ## Fuse legs:
         # fuse tensor with numpy.reshape():
+        if self.is_ket:
+            d = self.tensor.shape[0]
+            new_dims = [d]+[_validated_int_square_root(dim) for dim in new_dims]
         self.tensor = self.tensor.reshape(new_dims)
         # Deal with the rest of the data:
         for _ in range(num_fused_legs-1):
@@ -203,3 +210,5 @@ class TensorNode():
         return f"Node '{self.name}' at index [{self.index}] on site {tuple(positions)}"
 
     
+def _validated_int_square_root(a:int)->int:
+    return assertions.integer(np.sqrt(a))

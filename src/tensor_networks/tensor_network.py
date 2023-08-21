@@ -155,7 +155,9 @@ class BaseTensorNetwork(ABC):
             raise TensorNetworkError(f"Found more than 1 tensor in position {pos}")
         return tensors_in_position[0]
     
-    def get_nodes_by_functionality(self, functions:list[NodeFunctionality])->list[TensorNode]:
+    def get_nodes_by_functionality(self, functions:list[NodeFunctionality]|NodeFunctionality)->list[TensorNode]:
+        if not isinstance(functions, list):
+            functions = [functions]
         return [n for n in self.nodes if n.functionality in functions]
     
     def get_nodes_on_boundary(self, side:BlockSide)->list[TensorNode]: 
@@ -866,7 +868,6 @@ def _qr_decomposition(tn:ArbitraryTN, node:TensorNode, edges1:list[EdgeIndicator
         else:
             raise ValueError("Not an expected case")
 
-
     ## Turn tensor into a matrix:
     *_ , dim1 = itertools.accumulate(dims1, func=operator.mul)
     *_ , dim2 = itertools.accumulate(dims2, func=operator.mul)
@@ -883,8 +884,8 @@ def _qr_decomposition(tn:ArbitraryTN, node:TensorNode, edges1:list[EdgeIndicator
     t2 = r.reshape([k]+dims2)
 
     ## Derive the properties of the new nodes:
-    pos1 = tuples.add(node.pos, tuples.multiply(create.mean_direction(directions1).unit_vector, 0.5))
-    pos2 = tuples.add(node.pos, tuples.multiply(create.mean_direction(directions2).unit_vector, 0.5))
+    pos1 = tuples.add(node.pos, tuples.multiply(create.mean_direction(directions1).unit_vector, 0.6))
+    pos2 = tuples.add(node.pos, tuples.multiply(create.mean_direction(directions2).unit_vector, 0.6))
     qr_edge_name = tn.unique_edge_name("qr_edge")
     qr_direction1 = create.direction_from_positions(pos1, pos2)
 
@@ -915,6 +916,9 @@ def _qr_decomposition(tn:ArbitraryTN, node:TensorNode, edges1:list[EdgeIndicator
     tn.pop_node(node.index)
     tn.add_node(n1)
     tn.add_node(n2)
+
+    if DEBUG_MODE:
+        tn.validate()
 
     return n1, n2
 

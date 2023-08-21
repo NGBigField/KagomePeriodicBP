@@ -32,7 +32,7 @@ from algo.contract_tensor_network import contract_tensor_network
 # Types we need in our module:
 from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS
 from tensor_networks.node import TensorNode
-from lattices.directions import Direction, LatticeDirection, BlockSide, check, sort_by_clock_order
+from lattices.directions import Direction, LatticeDirection, BlockSide, check
 from enums import ContractionDepth, NodeFunctionality, UpdateMode
 from containers import MPSOrientation, UpdateEdge
 
@@ -377,9 +377,9 @@ def reduce_mode_tn_to_edge_and_env(
     edge_tuple:UpdateEdge
 )->ArbitraryTN:
     
-    if mode_tn.mode in edge_tuple:
-        return _reduce_mode_tn_to_edge_and_env_center_version(mode_tn, edge_tuple)
-
+    edge_tn_not_arranged = _reduce_mode_tn_to_edge_and_env_center_version(mode_tn, edge_tuple)
+    edge_tn_not_arranged.plot()
+    print("Done")
 
 
 def _reduce_mode_tn_to_edge_and_env_center_version(
@@ -387,13 +387,18 @@ def _reduce_mode_tn_to_edge_and_env_center_version(
     edge_tuple:UpdateEdge,
 )->ArbitraryTN:
 
-    ## Find edge:
-    node1 = mode_tn.center_node
-    if edge_tuple.is_in_core():
-        options = [node for node in mode_tn.nodes if node.functionality is NodeFunctionality.CenterUnitCell and node is not node1]
+    ## The correct edge nodes:
+    if mode_tn.mode in edge_tuple:
+        node1 = mode_tn.center_node
     else:
-        options = [node for node in mode_tn.nodes if node.functionality is NodeFunctionality.Core]
-    node2 = next((node for node in options if node.unit_cell_flavor in edge_tuple))
+        options = mode_tn.get_nodes_by_functionality(NodeFunctionality.Core)
+        node1 = next((node for node in options if node.unit_cell_flavor in edge_tuple))
+
+    if edge_tuple.is_in_core():
+        options = mode_tn.get_nodes_by_functionality(NodeFunctionality.CenterUnitCell)
+    else:
+        options = mode_tn.get_nodes_by_functionality(NodeFunctionality.Core)
+    node2 = next((node for node in options if node.unit_cell_flavor in edge_tuple and node is not node1))
     edge = get_common_edge(node1, node2)
 
     ## Create copy than can be contracted:
@@ -427,6 +432,7 @@ def _reduce_mode_tn_to_edge_and_env_center_version(
         nodes_to_keep.append(new_neighbor)
         if old_neighbor is common_neighbor:
             common_neighbor = new_neighbor
+        new_neighbor.functionality = NodeFunctionality.Environment
 
     ## Split common neighbor using QE-decomposition:
     center_directions, _, extrema_directions = _split_direction_by_type(common_neighbor.directions)
@@ -434,10 +440,10 @@ def _reduce_mode_tn_to_edge_and_env_center_version(
     assert len(directions_sorted)==4
     edge1 = [common_neighbor.edge_in_dir(directions_sorted[i]) for i in [0,1]]
     edge2 = [common_neighbor.edge_in_dir(directions_sorted[i]) for i in [2,3]]
+    # Perform qr-decomp on tn algo:
+    _, _ = tn.qr_decomp(common_neighbor, edge1, edge2)
 
-    q, r = tn.qr_decomp(common_neighbor, edge1, edge2)
-
-    print("Done")
+    return tn
 
 
 def _sort_direction_by_angle_keeping_extrema(center_directions:list[Direction], extrema_directions:list[Direction])->list[Direction]:

@@ -114,8 +114,12 @@ def contract_to_edge_test(
         unit_cell = UnitCell.random(d=d, D=D)
         unit_cell.save(f"random_D={D}")
 
+    A = UnitCellFlavor.A
+    B = UnitCellFlavor.B
+    C = UnitCellFlavor.C
+
     mode = UpdateMode.A
-    edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
+    edge = UpdateEdge(C, B)
     
     ##Contraction Sequence:
     full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
