@@ -24,7 +24,7 @@ from copy import deepcopy
 
 from _error_types import BPNotConvergedError
 
-from algo.belief_propagation import belief_propagation, belief_propagation_pashtida
+from algo.belief_propagation import belief_propagation
 
 from utils import assertions, logs, errors
 

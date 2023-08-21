@@ -5,7 +5,7 @@ from tensor_networks.construction import create_kagome_tn, UnitCell
 
 # Types in the code:
 from enums import UpdateMode, UnitCellFlavor
-from containers import UpdateEdgeType
+from containers import UpdateEdge
 
 # Algos we test here:
 from algo.core_measurements import measure_xyz_expectation_values_with_tn
@@ -115,14 +115,14 @@ def contract_to_edge_test(
         unit_cell.save(f"random_D={D}")
 
     mode = UpdateMode.A
-    edge = (UnitCellFlavor.A, UnitCellFlavor.B)
+    edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
     
     ##Contraction Sequence:
     full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     full_tn.connect_random_messages()
     core_tn = reduce_tn_to_core(full_tn, bubblecon_trunc_dim=chi)
     mode_tn = reduce_core_to_mode(core_tn, mode=mode)
-    edge_tn = reduce_mode_tn_to_edge_and_env(mode_tn, edge, bubblecon_trunc_dim=chi)
+    edge_tn = reduce_mode_tn_to_edge_and_env(mode_tn, edge)
     print("Done")
 
 

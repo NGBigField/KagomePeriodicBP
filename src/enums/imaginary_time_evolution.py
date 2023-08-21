@@ -14,6 +14,13 @@ class UpdateMode(Enum):
     def side_in_core(self)->BlockSide:
         return MODES_SIDES[self]
     
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, UpdateMode|UnitCellFlavor):
+            return False
+        return self.name == other.name
+    
+    def __hash__(self) -> int:
+        return hash((self.name, type(self)))
     
 
 MODES_SIDES : dict[UpdateMode, BlockSide] = {

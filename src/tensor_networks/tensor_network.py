@@ -191,7 +191,6 @@ class BaseTensorNetwork(ABC):
                 pass
         return res
 
-
     def find_neighbor(self, node:TensorNode, dir_or_edge:Direction|EdgeIndicatorType|None)->TensorNode:
         # Get edge of this node:
         if isinstance(dir_or_edge, Direction):
@@ -206,12 +205,13 @@ class BaseTensorNetwork(ABC):
         # Find neihbor connected with this edge
         return self._find_neighbor_by_edge(node, edge=edge)
     
-    def are_neigbors(self, n1:TensorNode, n2:TensorNode) -> bool:
+    def are_neighbors(self, n1:TensorNode, n2:TensorNode) -> bool:
         assert n1 is not n2, f"Nodes must be different"
         for edge in n1.edges:
             if edge in n2.edges:
                 return True
         return False    
+    
 
 
 class KagomeTN(BaseTensorNetwork):
@@ -355,8 +355,8 @@ class ArbitraryTN(BaseTensorNetwork):
         ## Collect basic data:
         i1, i2 = n1.index, n2.index
         if DEBUG_MODE:
-            assert self.nodes[i1] is n1
-            assert self.nodes[i2] is n2
+            assert self.nodes[i1] is n1, f"Node in index {i1} should match {n1.index}"
+            assert self.nodes[i2] is n2, f"Node in index {i2} should match {n2.index}"
         ## Get contracted tensor data:
         contraction_edge, edges, directions, functionality, pos, name, on_boundary = _derive_node_data_from_contracted_nodes_and_fix_neighbors(self, n1, n2)
         ## Remove nodes from list while updating indices in both self.edges and self.nodes:
@@ -388,7 +388,7 @@ class ArbitraryTN(BaseTensorNetwork):
         )
         self.nodes.append(new_node)
 
-        ## Fusde double edges:
+        ## Fuse double edges:
         seen_neighbors : set[int] = set()
         for edge in new_node.edges:
             neighbor = self._find_neighbor_by_edge(new_node, edge)
@@ -424,6 +424,9 @@ class ArbitraryTN(BaseTensorNetwork):
         # Add node:
         assert node.index == len(self.nodes)
         self.nodes.append(node)
+
+    def qr_decomp(self, node:TensorNode)->tuple[TensorNode, TensorNode]:
+        pass
 
 
 class _FrozenSpecificNetwork(BaseTensorNetwork):
@@ -826,11 +829,10 @@ def get_common_edge_legs(
 
 
 def get_common_edge(n1:TensorNode, n2:TensorNode)->EdgeIndicatorType:
-    for e1 in n1.edges:
-        for e2 in n2.edges:
-            if e1==e2:
-                return e1
-    raise ValueError(f"Nodes '{n1}' and '{n2}' don't have a common edge.")
+    for edge in n1.edges:
+        if edge in n2.edges:
+            return edge
+    raise NetworkConnectionError(f"Nodes '{n1}' and '{n2}' don't have a common edge.")
 
 
 def _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn:KagomeTN, n1:TensorNode, n2:TensorNode):

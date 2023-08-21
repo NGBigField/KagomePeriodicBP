@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 _T = TypeVar("_T")
 
 # Common types in the code:
-from tensor_networks import KagomeTN, ArbitraryTN, ModeTN, TensorNode, MPS, CoreTN
+from tensor_networks import KagomeTN, ArbitraryTN, ModeTN, TensorNode, MPS, CoreTN, get_common_edge
 
 # Everyone needs numpy:
 import numpy as np
@@ -34,7 +34,7 @@ from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS
 from tensor_networks.node import TensorNode
 from lattices.directions import LatticeDirection, BlockSide, check
 from enums import ContractionDepth, NodeFunctionality, UpdateMode
-from containers import MPSOrientation, UpdateEdgeType
+from containers import MPSOrientation, UpdateEdge
 
 # Our utilities:
 from utils import tuples, lists, assertions, prints, parallel_exec
@@ -369,13 +369,73 @@ def reduce_core_to_mode(
     return ModeTN.from_arbitrary_tn(tn, mode=mode)
 
 
+def _reduce_mode_tn_to_edge_and_env_center_version(
+    mode_tn:ModeTN, 
+    edge_tuple:UpdateEdge,
+)->ArbitraryTN:
+
+    ## Find edge:
+    node1 = mode_tn.center_node
+    if edge_tuple.is_in_core():
+        options = [node for node in mode_tn.nodes if node.functionality is NodeFunctionality.CenterUnitCell and node is not node1]
+    else:
+        options = [node for node in mode_tn.nodes if node.functionality is NodeFunctionality.Core]
+    node2 = next((node for node in options if node.unit_cell_flavor in edge_tuple))
+    edge = get_common_edge(node1, node2)
+
+    ## Create copy than can be contracted:
+    tn = mode_tn.to_arbitrary_tn()
+
+    ## Find immediate neighbors:
+    neighbors = []
+    common_neighbor : TensorNode = None
+    for node in tn.nodes:
+        if node in [node1, node2]:
+            continue
+        is_neighbor1 = tn.are_neighbors(node, node1) 
+        is_neighbor2 = tn.are_neighbors(node, node2)
+        if is_neighbor1 or is_neighbor2:
+            neighbors.append(node)
+        if is_neighbor1 and is_neighbor2:
+            common_neighbor = node
+    assert common_neighbor is not None, "Bug. We must find a common neighbor"
+
+    i=1
+    from utils.visuals import save_figure
+    def _plot():
+        nonlocal i
+        tn.plot()
+        save_figure(file_name=f"{i}")
+        i += 1
+        
+
+    ## contract all other nodes into neighbors:
+    nodes_to_keep = neighbors+[node1, node2]
+    for old_neighbor in neighbors:
+        new_neighbor = old_neighbor
+        for node in tn.all_neighbors(new_neighbor):
+            if node in nodes_to_keep:
+                continue
+            new_neighbor = tn.contract_nodes(node, new_neighbor)
+            # _plot()
+        # replace old node in the `to_keep` list:
+        nodes_to_keep.remove(old_neighbor)
+        nodes_to_keep.append(new_neighbor)
+
+    ## Split common neighbor using QE-decomposition:
+    
+
+    print("Done")
+
+
+
 def reduce_mode_tn_to_edge_and_env(
     mode_tn:ModeTN, 
-    edge_tuple:UpdateEdgeType,
-    bubblecon_trunc_dim:int
-)->KagomeTN:
+    edge_tuple:UpdateEdge
+)->ArbitraryTN:
     
-    pass
+    if mode_tn.mode in edge_tuple:
+        return _reduce_mode_tn_to_edge_and_env_center_version(mode_tn, edge_tuple)
 
 
 
@@ -472,6 +532,7 @@ def calc_edge_environment(
     core1, core2, environment_tensors = _rearange_tensors_legs_to_canonical_order(tn_env, mode)
 
     return core1, core2, environment_tensors, tn_env
+
 
 
 
