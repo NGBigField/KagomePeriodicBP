@@ -34,7 +34,7 @@ from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS
 from tensor_networks.node import TensorNode
 from lattices.directions import LatticeDirection, BlockSide, check
 from enums import ContractionDepth, NodeFunctionality, UpdateMode
-from containers import MPSOrientation
+from containers import MPSOrientation, UpdateEdgeType
 
 # Our utilities:
 from utils import tuples, lists, assertions, prints, parallel_exec
@@ -156,7 +156,7 @@ def _contract_tn_from_sides_and_create_mpss(
 
     return mpss, con_orders, orientations
 
-def _basic_data(
+def _reduce_tn_to_core_basic_data(
     tn:KagomeTN, parallel:bool
 )->tuple[
     list[TensorNode],
@@ -189,7 +189,7 @@ def _basic_data(
     return core_nodes, num_core_connections, num_side_overlap_connections, directions
 
 
-def _verifications(con_orders, core_nodes, mpss, orientations, num_core_connections, num_side_overlap_connections, directions)->None:
+def _reduce_tn_to_core_verifications(con_orders, core_nodes, mpss, orientations, num_core_connections, num_side_overlap_connections, directions)->None:
     ## Check contraction order:
     _s0 = set(con_orders.buttom_up)
     _s1 = set(con_orders.top_down)
@@ -298,7 +298,7 @@ def _add_env_tensors_to_small_tn(small_tn:ArbitraryTN, env_tensors:list[TensorNo
 def reduce_tn_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool=False) -> CoreTN:
 
     ## I. Parse and derive data
-    core_nodes, num_core_connections, num_side_overlap_connections, directions = _basic_data(tn, parallel)
+    core_nodes, num_core_connections, num_side_overlap_connections, directions = _reduce_tn_to_core_basic_data(tn, parallel)
 
     ## II. Prepare two MPSs, contract untill core:
 	#      One MPS is "from the buttom-up" and the other is "from the top-down"
@@ -306,7 +306,7 @@ def reduce_tn_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool=False)
     
     ## Some verifications:
     if DEBUG_MODE:
-        _verifications(con_orders, core_nodes, mpss, orientations, num_core_connections, num_side_overlap_connections, directions)
+        _reduce_tn_to_core_verifications(con_orders, core_nodes, mpss, orientations, num_core_connections, num_side_overlap_connections, directions)
 
 	## III. Contract the upper/lower MPSs:
     mpss = _zip_mps_at_overlap_outside_core(mpss, num_side_overlap_connections, num_core_connections)
@@ -331,7 +331,6 @@ def reduce_tn_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool=False)
 
 def reduce_core_to_mode(
     core_tn:CoreTN, 
-    bubblecon_trunc_dim:int,
     mode:UpdateMode
 )->ModeTN:
     
@@ -370,61 +369,109 @@ def reduce_core_to_mode(
     return ModeTN.from_arbitrary_tn(tn, mode=mode)
 
 
-def reduce_core_and_environment_to_edge_and_environment(
-    tn_small:KagomeTN, side:None, # fix side\mode 
+def reduce_mode_tn_to_edge_and_env(
+    mode_tn:ModeTN, 
+    edge_tuple:UpdateEdgeType,
     bubblecon_trunc_dim:int
 )->KagomeTN:
-    tn_env = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[side], depth=2)
-    ## Find and Swallow the two corner tensors:
-    remaining_core_tensors = [t for t in tn_env.nodes if t.functionality is NodeFunctionality.CenterUnitCell]
-    assert len(remaining_core_tensors)==2
-    for t in tn_env.nodes:
-        # pass on core nodes:
-        if t is remaining_core_tensors[0] or t is remaining_core_tensors[1]:
-            continue
-        # pass on environment of core nodes:
-        if tn_env.are_neigbors(t, remaining_core_tensors[0]) or tn_env.are_neigbors(t, remaining_core_tensors[1]):
-            continue
-        neighbor_in_direction = tn_env.find_neighbor(t, side)
-
-        tn_env.contract_nodes(t, neighbor_in_direction)
-    return tn_env
-
-
-#TODO check if needed
-def reduce_tn_using_bubblecon(tn:KagomeTN, bubblecon_trunc_dim:int, directions:Iterable[BlockSide], depth:ContractionDepth|int, parallel:bool=False)->KagomeTN:
-
-    # prepare inputs:
-    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=bubblecon_trunc_dim, depth=depth)
-    directions = lists.shuffle(list(directions))
     
-    # Sandwich Tensor-Network from both sides at once if parallel:
-    if parallel:
-        fixed_arguments["print_progress"]=False
-        con_results = parallel_exec.parallel(func=contract_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
+    pass
+
+
+
+def _rearrange_legs(
+    c1:TensorNode,
+    c2:TensorNode,
+    env:list[TensorNode],
+)->tuple[
+    TensorNode, TensorNode, list[TensorNode]
+]:
+    ## init Indices:
+    env_left_legs_indices = []
+    env_mid_legs_indices = []
+    env_right_legs_indices = []
+    c1_legs_indices = []
+    c2_legs_indices = []
+
+    ## core tensors start with legs towards each other:
+    i1, i2 = get_common_edge_legs(c1, c2)
+    c1_legs_indices.append(i1)
+    c2_legs_indices.append(i2)
+
+    ## Go counter-clockwise - relate core to environment:
+    # half touching to c1:
+    for m in env[0:3]:
+        i1, i2 = get_common_edge_legs(c1, m)
+        c1_legs_indices.append(i1)
+        env_mid_legs_indices.append(i2)
+    # half touching c2:
+    for m in env[3:]:
+        i1, i2 = get_common_edge_legs(c2, m)
+        c2_legs_indices.append(i1)
+        env_mid_legs_indices.append(i2)
+
+    ## Go counter-clockwise - check leg order of environment:
+    for prev, this, next in lists.iterate_with_periodic_prev_next_items(env):
+        i1, _ = get_common_edge_legs(this, prev)
+        env_left_legs_indices.append(i1)
+        i1, _ = get_common_edge_legs(this, next)
+        env_right_legs_indices.append(i1)
+
+    ## Permute:
+    c1.permute(c1_legs_indices)
+    c2.permute(c2_legs_indices)
+    for ind, i_left, i_mid, i_right in zip(range(len(env)), env_left_legs_indices, env_mid_legs_indices, env_right_legs_indices ,strict=True):
+        env[ind].permute([i_left, i_mid, i_right])
+
+    return c1, c2, env
+
+
+def _find_node_in_relative_direction(dir:LatticeDirection, n1:TensorNode, n2:TensorNode)->TensorNode:
+    vec = dir.unit_vector()
+    if tuples.equal( n1.pos, tuples.add(vec, n2.pos) ):
+        return n1
+    elif tuples.equal( n2.pos, tuples.add(vec, n1.pos) ):
+        return n2
     else:
-        fixed_arguments["print_progress"] = True
-        con_results = parallel_exec.concurrent(func=contract_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
-    
-    # Rearrange outputs:
-    mpss        = {direction:tupl[0] for direction, tupl in con_results.items()}
-    con_indices = lists.join_sub_lists([tupl[1] for tupl in con_results.values()])
-    mps_orientations =                  [tupl[2] for tupl in con_results.values()]
+        raise ValueError(f"None of nodes [{n1.name!r}, {n2.name!r}] are in correct relation with direction {dir.name!r}.")
 
 
-    ## Ignore tensors that are accounted-for by the messages:
-    remaining_indices = [node.index for node in tn.nodes if node.index not in con_indices]
-    reduced_tn = tn.sub_tn(remaining_indices)
-    if DEBUG_MODE: reduced_tn.validate()
-    
-    ## Connect messages directly to the remaining tensors:
-    for (direction, mps), orientation in zip(mpss.items(), mps_orientations, strict=True):
-        assert isinstance(mps, MPS)
-        reduced_tn = _fuse_mps_with_tn( reduced_tn, mps, orientation, direction.opposite() )
-    if DEBUG_MODE: reduced_tn.validate()
+def _rearange_tensors_legs_to_canonical_order(
+    tn_env:KagomeTN, side:None # Fix mode\side
+)->tuple[TensorNode, TensorNode, list[np.ndarray]]:
+    core_tensors = tn_env.get_nodes_by_functionality()
+    core1 = _find_node_in_relative_direction(side.next_counterclockwise(), *core_tensors)
+    core2 = _find_node_in_relative_direction(side.next_clockwise(), *core_tensors)
+    environment_nodes = [
+        tn_env.find_neighbor(core1, side),
+        tn_env.find_neighbor(core1, side.next_counterclockwise()),
+        tn_env.find_neighbor(core1, side.opposite()),
+        tn_env.find_neighbor(core2, side.opposite()),
+        tn_env.find_neighbor(core2, side.next_clockwise()),
+        tn_env.find_neighbor(core2, side),
+    ]
 
-    ## Return:
-    return reduced_tn
+    ## Rearange legs in required order:
+    core1, core2, environment_nodes = _rearrange_legs(core1, core2, environment_nodes)
+    environment_tensors = [physical_tensor_with_split_mid_leg(n) for n in environment_nodes]    # Open environment mps legs:
+    return core1, core2, environment_tensors
+
+#TODO assert used
+def calc_edge_environment(
+    tn:KagomeTN, mode:None,  #TODO fix mode type
+    bubblecon_trunc_dim:int, already_reduced_to_core:bool=False
+)->tuple[
+    TensorNode, TensorNode,         # core1/2
+    list[np.ndarray],         # environment
+    KagomeTN       # small_tn
+]:
+    ## Get the smallest Tensor-Network around the mode (edge):
+    tn_env = calc_reduced_tn_around_edge(tn, mode, bubblecon_trunc_dim, method, already_reduced_to_core)
+
+    ## get all tensors in correct order:
+    core1, core2, environment_tensors = _rearange_tensors_legs_to_canonical_order(tn_env, mode)
+
+    return core1, core2, environment_tensors, tn_env
 
 
 

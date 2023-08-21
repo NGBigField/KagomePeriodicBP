@@ -3,18 +3,19 @@ from physics.hamiltonians import HamiltonianFuncType, zero
 from dataclasses import dataclass, field, fields
 from utils import strings, saveload, assertions
 from utils.arguments import Stats
-from typing import Generator, Union, Any
+from typing import Generator, Union, Any, TypeAlias
 from copy import deepcopy
 
 # Other containers and enums:
 from enums.imaginary_time_evolution import UpdateMode
+from enums.tensor_networks import UnitCellFlavor
 from containers.belief_propagation import BPStats
 from containers.density_matrices import MatrixMetrics 
 from _error_types import ITEError
 
 
 KagomeTensorNetwork = None  #TODO fix
-
+UpdateEdgeType : TypeAlias = tuple[UnitCellFlavor, UnitCellFlavor]
 
 
 SUB_FOLDER = "ite_trackers"

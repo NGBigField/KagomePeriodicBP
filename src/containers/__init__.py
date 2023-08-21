@@ -1,6 +1,6 @@
 from containers.contractions import BubbleConConfig, MPSOrientation
 from containers.belief_propagation import BPConfig, BPStats, Message, MessageDictType
-from containers.imaginary_time_evolution import ITEConfig, ITEPerModeStats, ITESegmentStats, ITEProgressTracker
+from containers.imaginary_time_evolution import ITEConfig, ITEPerModeStats, ITESegmentStats, ITEProgressTracker, UpdateEdgeType
 from containers.sizes_and_dimensions import TNSizesAndDimensions
 from containers.global_config import Config
 from containers.results import Measurements
