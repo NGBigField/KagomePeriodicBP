@@ -99,7 +99,7 @@ class TensorNode():
             raise NetworkConnectionError(f"Direction {dir!r} is not in directions of nodes: {[dir.name for dir in self.directions]}")
         return self.edges[index]
     
-    def permute(self, axes:list[int]):
+    def permute(self, axes:list[int])->None:
         """Like numpy.transpose but permutes "physical_tensor", "fused_tensor", "edges" & "direction" all together
         """
         if self.is_ket:

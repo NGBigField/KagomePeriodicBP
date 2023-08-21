@@ -56,20 +56,18 @@ def all_same(l:List[_Numeric]|List[np.ndarray]) -> bool:
     return True
 
 
-def deep_unique(l:list) -> List[_T]:
-    values : List[_T] = []
+def deep_unique(l:list) -> set[_T]:
+    seen_values : set[_T] = set()
     
     def _gather_elements(list_:list):        
         for element in list_:
             if isinstance(element, list):
                 _gather_elements(element)
             else:
-                values.append(element)
+                seen_values.add(element)
     _gather_elements(l)
 
-    values = np.array(values) # type: ignore
-    unique_set = np.unique(values) # type: ignore
-    return unique_set.tolist()
+    return seen_values
 
 
 def average(l:List[_FloatOrComplex]) -> _FloatOrComplex:
@@ -291,10 +289,15 @@ def reversed(lis:list[_T])->_T:
 def cycle_items(lis:list[_T], k:int)->list[_T]:
     """Push items from the end to the beginning of the list in a cyclic manner
 
-    ## Example:
-    >>> l1 = [1, 2, 3, 4]
+    ## Example1:
+    >>> l1 = [1, 2, 3, 4, 5]
     >>> l2 = cyclic_items(l1, 2)
-    >>> print(l2)   # [3, 4, 1, 2]
+    >>> print(l2)   # [3, 4, 5, 1, 2]
+
+    ## Example2:
+    >>> l1 = [1, 2, 3, 4, 5]
+    >>> l2 = cyclic_items(l1, -1)
+    >>> print(l2)   # [2, 3, 4, 5, 1]
 
     Args:
         lis (list[_T]): list of items
@@ -304,9 +307,14 @@ def cycle_items(lis:list[_T], k:int)->list[_T]:
         list[_T]: list of items with rotated items.
     """
     l = lis.copy()
-    for _ in range(k):
-        item = l.pop()
-        l.insert(0, item)
+    for _ in range(abs(k)):
+        if k>0:
+            item = l.pop()
+            l.insert(0, item)
+        else:
+            item = l.pop(0)
+            l.append(item)
+
     return l
 
 ## Test:

@@ -14,7 +14,7 @@ from _config_reader import DEBUG_MODE
 
 # Directions:
 from lattices.directions import BlockSide, LatticeDirection, Direction
-from lattices.directions import check
+from lattices.directions import check, create
 
 # Other lattice structure:
 from tensor_networks.node import TensorNode
@@ -26,7 +26,7 @@ import lattices.triangle as triangle_lattice
 from _types import EdgeIndicatorType, PosScalarType, EdgesDictType
 
 from enums import NodeFunctionality, UpdateMode
-from utils import assertions, lists, tuples, numerics, indices, decorators, dicts
+from utils import assertions, lists, tuples, numerics, indices, strings
 
 import numpy as np
 from typing import NamedTuple
@@ -100,6 +100,10 @@ class BaseTensorNetwork(ABC):
     @property
     def edges_dict(self)->EdgesDictType:
         return edges_dict_from_edges_list(self.edges_list)
+    
+    @property
+    def edges_names(self)->set[EdgeIndicatorType]:
+        return lists.deep_unique(self.edges_list)
 
     @property
     def positions(self)->list[tuple[PosScalarType,...]]:
@@ -211,7 +215,16 @@ class BaseTensorNetwork(ABC):
             if edge in n2.edges:
                 return True
         return False    
-    
+
+    # ================================================= #
+    #|                     Edges                       |#
+    # ================================================= #    
+    def unique_edge_name(self, suggestion:str)->str:
+        crnt_suggestion = suggestion
+        existing_edges = self.edges_names
+        while suggestion in existing_edges:
+            crnt_suggestion += strings.random(1)
+        return crnt_suggestion
 
 
 class KagomeTN(BaseTensorNetwork):
@@ -336,72 +349,13 @@ class ArbitraryTN(BaseTensorNetwork):
     # ================================================= #
     #|                Instance method                  |#
     # ================================================= #
-    def _pop_node(self, ind:int)->TensorNode:
-        #TODO should be here?
-
-        # Update indices of all nodes places above this index:
-        for i in range(ind+1, len(self.nodes)):
-            self.nodes[i].index -= 1
-        # pop from list:
-        return self.nodes.pop(ind)
-
     def contract_nodes(self, n1:TensorNode|int, n2:TensorNode|int)->TensorNode:
-
-        ## Also accept indices as inputs:
-        if isinstance(n1, int) and isinstance(n2, int):
-            n1 = self.nodes[n1]
-            n2 = self.nodes[n2]
-        assert isinstance(n1, TensorNode) and isinstance(n2, TensorNode)
-        ## Collect basic data:
-        i1, i2 = n1.index, n2.index
-        if DEBUG_MODE:
-            assert self.nodes[i1] is n1, f"Node in index {i1} should match {n1.index}"
-            assert self.nodes[i2] is n2, f"Node in index {i2} should match {n2.index}"
-        ## Get contracted tensor data:
-        contraction_edge, edges, directions, functionality, pos, name, on_boundary = _derive_node_data_from_contracted_nodes_and_fix_neighbors(self, n1, n2)
-        ## Remove nodes from list while updating indices in both self.edges and self.nodes:
-        n1_ = self._pop_node(n1.index)    
-        n2_ = self._pop_node(n2.index)            
-        if DEBUG_MODE:
-            assert n1_ is n1
-            assert n2_ is n2
-        ## Derive index of edge for each node:
-        ie1 = n1.edges.index(contraction_edge)
-        ie2 = n2.edges.index(contraction_edge)
-
-        ## Open tensors (with physical legs) behave differently than fused tensors.
-        # Always use fused-tensors. If not already fuse, cause them to be fused.
-        is_ket = False
-        tensor = np.tensordot(n1.fused_tensor, n2.fused_tensor, axes=(ie1, ie2))
-            
-        ## Add node:
-        new_node = TensorNode(
-            tensor=tensor,
-            is_ket=is_ket,
-            functionality=functionality,
-            edges=edges,
-            directions=directions,
-            pos=pos,
-            index=len(self.nodes),  # Two old nodes are already deleted from list, new will be appended to the end.
-            name=name,
-            boundaries=on_boundary
-        )
-        self.nodes.append(new_node)
-
-        ## Fuse double edges:
-        seen_neighbors : set[int] = set()
-        for edge in new_node.edges:
-            neighbor = self._find_neighbor_by_edge(new_node, edge)
-            ## if we've already seen this neighbor, then this is a double edge
-            if neighbor.index in seen_neighbors:
-                _fuse_double_legs(new_node, neighbor)
-            seen_neighbors.add(neighbor.index)
-
-        ## Check:
-        if DEBUG_MODE: self.validate()
-        return new_node
+        return _contract_nodes(self, n1, n2)
 
     def replace(self, node:TensorNode):
+        #TODO Check if used
+        print("replace is used")
+
         # validate:
         ind = node.index
         if DEBUG_MODE:
@@ -420,14 +374,30 @@ class ArbitraryTN(BaseTensorNetwork):
         # replace:
         self.nodes[ind] = node
 
-    def add(self, node:TensorNode):
+    def add_node(self, node:TensorNode):
         # Add node:
         assert node.index == len(self.nodes)
         self.nodes.append(node)
+    
+    def pop_node(self, ind:int)->TensorNode:
+        # Update indices of all nodes places above this index:
+        for i in range(ind+1, len(self.nodes)):
+            self.nodes[i].index -= 1
+        # pop from list:
+        return self.nodes.pop(ind)
+    
+    def qr_decomp(self, node:TensorNode, edges1:list[EdgeIndicatorType], edges2:list[EdgeIndicatorType])->tuple[TensorNode, TensorNode]:
+        """Perform QR decomposition on a tensor, while preserving the relation to other tensors in the network via the inputs edges1/2
 
-    def qr_decomp(self, node:TensorNode)->tuple[TensorNode, TensorNode]:
-        pass
+        Args:
+            node (TensorNode): the node
+            edges1 (list[EdgeIndicatorType]): the edges that will be connected to Q
+            edges2 (list[EdgeIndicatorType]): the edges that will be connected to R
 
+        Returns:
+            tuple[TensorNode, TensorNode]: the Q and R tensors
+        """
+        return _qr_decomposition(self, node, edges1, edges2)
 
 class _FrozenSpecificNetwork(BaseTensorNetwork):
     def __init__(self, nodes:list[TensorNode], copy=True) -> None:
@@ -866,6 +836,144 @@ def _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn:KagomeTN, n1:Te
 
     return contraction_edge, edges, directions, functionality, pos, name, on_boundary
 
+
+def _qr_decomposition(tn:ArbitraryTN, node:TensorNode, edges1:list[EdgeIndicatorType], edges2:list[EdgeIndicatorType])->tuple[TensorNode, TensorNode]:
+
+    ## Some checks:
+    if DEBUG_MODE:
+        assert not node.is_ket, "we don't yet support ket tensors"
+        assert set(edges1).isdisjoint(set(edges2)), "edges must be strictly different"
+        assert len(edges1)+len(edges2)==len(node.directions)
+
+    ## Derive indices and dimensions in consistent order of legs:
+    indices1, indices2 = [], []
+    directions1, directions2 = [], []
+    dims1, dims2 = [], []
+    edges_in_order1, edges_in_order2 = [], []
+    for i, (direction, edge, dim) in enumerate(node.legs()):
+        if edge in edges1:
+            dims1.append(dim)
+            directions1.append(direction)
+            indices1.append(i)
+            edges_in_order1.append(edge)
+
+        elif edge in edges2:
+            dims2.append(dim)
+            directions2.append(direction)
+            indices2.append(i)
+            edges_in_order2.append(edge)
+
+        else:
+            raise ValueError("Not an expected case")
+
+
+    ## Turn tensor into a matrix:
+    *_ , dim1 = itertools.accumulate(dims1, func=operator.mul)
+    *_ , dim2 = itertools.accumulate(dims2, func=operator.mul)
+    node.permute(indices1+indices2)
+    m = node.tensor.reshape((dim1, dim2))
+
+    ## Perform QR-Decomposition:
+    q, r = np.linalg.qr(m, mode='reduced')
+
+    ## spread dimensions of q-r matrices into tensors that match original dimensions and connections:
+    k = q.shape[-1]
+    assert k == r.shape[0]
+    t1 = q.reshape(dims1+[k])
+    t2 = r.reshape([k]+dims2)
+
+    ## Derive the properties of the new nodes:
+    pos1 = tuples.add(node.pos, tuples.multiply(create.mean_direction(directions1).unit_vector, 0.5))
+    pos2 = tuples.add(node.pos, tuples.multiply(create.mean_direction(directions2).unit_vector, 0.5))
+    qr_edge_name = tn.unique_edge_name("qr_edge")
+    qr_direction1 = create.direction_from_positions(pos1, pos2)
+
+    ## Create the two new tensors
+    n1 = TensorNode(
+        index=tn.size-1,
+        name="Q",
+        tensor=t1,
+        is_ket=False,
+        pos=pos1,
+        edges=edges_in_order1+[qr_edge_name],
+        directions=directions1+[qr_direction1]
+    )
+    n2 = TensorNode(
+        index=tn.size,
+        name="R",
+        tensor=t2,
+        is_ket=False,
+        pos=pos2,
+        edges=[qr_edge_name]+edges_in_order2,
+        directions=[qr_direction1.opposite()]+directions2
+    )
+    if DEBUG_MODE:
+        n1.validate()
+        n2.validate()
+
+    ## Insert the new nodes instead of the old node
+    tn.pop_node(node.index)
+    tn.add_node(n1)
+    tn.add_node(n2)
+
+    return n1, n2
+
+
+def _contract_nodes(tn:ArbitraryTN, n1:TensorNode|int, n2:TensorNode|int)->TensorNode:
+
+    ## Also accept indices as inputs:
+    if isinstance(n1, int) and isinstance(n2, int):
+        n1 = tn.nodes[n1]
+        n2 = tn.nodes[n2]
+    assert isinstance(n1, TensorNode) and isinstance(n2, TensorNode)
+    ## Collect basic data:
+    i1, i2 = n1.index, n2.index
+    if DEBUG_MODE:
+        assert tn.nodes[i1] is n1, f"Node in index {i1} should match {n1.index}"
+        assert tn.nodes[i2] is n2, f"Node in index {i2} should match {n2.index}"
+    ## Get contracted tensor data:
+    contraction_edge, edges, directions, functionality, pos, name, on_boundary = _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn, n1, n2)
+    ## Remove nodes from list while updating indices in both self.edges and self.nodes:
+    n1_ = tn.pop_node(n1.index)    
+    n2_ = tn.pop_node(n2.index)            
+    if DEBUG_MODE:
+        assert n1_ is n1
+        assert n2_ is n2
+    ## Derive index of edge for each node:
+    ie1 = n1.edges.index(contraction_edge)
+    ie2 = n2.edges.index(contraction_edge)
+
+    ## Open tensors (with physical legs) behave differently than fused tensors.
+    # Always use fused-tensors. If not already fuse, cause them to be fused.
+    is_ket = False
+    tensor = np.tensordot(n1.fused_tensor, n2.fused_tensor, axes=(ie1, ie2))
+        
+    ## Add node:
+    new_node = TensorNode(
+        tensor=tensor,
+        is_ket=is_ket,
+        functionality=functionality,
+        edges=edges,
+        directions=directions,
+        pos=pos,
+        index=len(tn.nodes),  # Two old nodes are already deleted from list, new will be appended to the end.
+        name=name,
+        boundaries=on_boundary
+    )
+    tn.nodes.append(new_node)
+
+    ## Fuse double edges:
+    seen_neighbors : set[int] = set()
+    for edge in new_node.edges:
+        neighbor = tn._find_neighbor_by_edge(new_node, edge)
+        ## if we've already seen this neighbor, then this is a double edge
+        if neighbor.index in seen_neighbors:
+            _fuse_double_legs(new_node, neighbor)
+        seen_neighbors.add(neighbor.index)
+
+    ## Check:
+    if DEBUG_MODE: tn.validate()
+    return new_node
 
 
 if __name__ == "__main__":

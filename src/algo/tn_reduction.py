@@ -32,7 +32,7 @@ from algo.contract_tensor_network import contract_tensor_network
 # Types we need in our module:
 from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS
 from tensor_networks.node import TensorNode
-from lattices.directions import LatticeDirection, BlockSide, check
+from lattices.directions import Direction, LatticeDirection, BlockSide, check, sort_by_clock_order
 from enums import ContractionDepth, NodeFunctionality, UpdateMode
 from containers import MPSOrientation, UpdateEdge
 
@@ -278,7 +278,7 @@ def _add_env_tensors_to_small_tn(small_tn:ArbitraryTN, env_tensors:list[TensorNo
             ## Update:
             inside_neighbor.boundaries.add(outside_direction)
             inside_neighbor.edges[inside_neighbor.directions.index(dir2_opposite)] = new_connection_edge_name
-            small_tn.add(node)
+            small_tn.add_node(node)
             env_nodes.append(node)
 
             ## for next iteration:
@@ -369,6 +369,19 @@ def reduce_core_to_mode(
     return ModeTN.from_arbitrary_tn(tn, mode=mode)
 
 
+
+
+
+def reduce_mode_tn_to_edge_and_env(
+    mode_tn:ModeTN, 
+    edge_tuple:UpdateEdge
+)->ArbitraryTN:
+    
+    if mode_tn.mode in edge_tuple:
+        return _reduce_mode_tn_to_edge_and_env_center_version(mode_tn, edge_tuple)
+
+
+
 def _reduce_mode_tn_to_edge_and_env_center_version(
     mode_tn:ModeTN, 
     edge_tuple:UpdateEdge,
@@ -400,15 +413,6 @@ def _reduce_mode_tn_to_edge_and_env_center_version(
             common_neighbor = node
     assert common_neighbor is not None, "Bug. We must find a common neighbor"
 
-    i=1
-    from utils.visuals import save_figure
-    def _plot():
-        nonlocal i
-        tn.plot()
-        save_figure(file_name=f"{i}")
-        i += 1
-        
-
     ## contract all other nodes into neighbors:
     nodes_to_keep = neighbors+[node1, node2]
     for old_neighbor in neighbors:
@@ -417,26 +421,46 @@ def _reduce_mode_tn_to_edge_and_env_center_version(
             if node in nodes_to_keep:
                 continue
             new_neighbor = tn.contract_nodes(node, new_neighbor)
-            # _plot()
+
         # replace old node in the `to_keep` list:
         nodes_to_keep.remove(old_neighbor)
         nodes_to_keep.append(new_neighbor)
+        if old_neighbor is common_neighbor:
+            common_neighbor = new_neighbor
 
     ## Split common neighbor using QE-decomposition:
-    
+    center_directions, _, extrema_directions = _split_direction_by_type(common_neighbor.directions)
+    directions_sorted = _sort_direction_by_angle_keeping_extrema(center_directions, extrema_directions)
+    assert len(directions_sorted)==4
+    edge1 = [common_neighbor.edge_in_dir(directions_sorted[i]) for i in [0,1]]
+    edge2 = [common_neighbor.edge_in_dir(directions_sorted[i]) for i in [2,3]]
+
+    q, r = tn.qr_decomp(common_neighbor, edge1, edge2)
 
     print("Done")
 
 
+def _sort_direction_by_angle_keeping_extrema(center_directions:list[Direction], extrema_directions:list[Direction])->list[Direction]:
+    lis = sorted(center_directions+extrema_directions, key=lambda d: d.angle)
+    if lis[-2] in extrema_directions and lis[-1] in extrema_directions:
+        lis = lists.cycle_items(lis, 1)
+    elif lis[0] in extrema_directions and lis[1] in extrema_directions:
+        lis = lists.cycle_items(lis, -1)
+    return lis
 
-def reduce_mode_tn_to_edge_and_env(
-    mode_tn:ModeTN, 
-    edge_tuple:UpdateEdge
-)->ArbitraryTN:
-    
-    if mode_tn.mode in edge_tuple:
-        return _reduce_mode_tn_to_edge_and_env_center_version(mode_tn, edge_tuple)
 
+def _split_direction_by_type(directions:list[Direction])->tuple[list[LatticeDirection], list[BlockSide], list[Direction]]:
+    lattice, block, arbitrary = [], [], []
+    for dir in directions:
+        if isinstance(dir, LatticeDirection):
+            lattice.append(dir)
+        elif isinstance(dir, BlockSide):
+            block.append(dir)
+        elif isinstance(dir, Direction):
+            arbitrary.append(dir)
+        else:
+            raise TypeError(f"Not an expected type {type(dir)!r}")
+    return lattice, block, arbitrary 
 
 
 def _rearrange_legs(

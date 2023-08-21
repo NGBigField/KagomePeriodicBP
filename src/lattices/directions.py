@@ -6,7 +6,7 @@ import numpy as np
 from enum import Enum
 from typing import Generator, Callable, Any, Final, TypeGuard
 from numpy import pi, random
-from utils import strings, lists, numerics
+from utils import strings, lists, numerics, tuples
 from functools import cache, cached_property
 from abc import ABC, abstractclassmethod
 
@@ -28,6 +28,7 @@ def _angle_dist(x:float, y:float)->float:
     y = numerics.force_between_0_and_2pi(y)
     return abs(x-y)
     
+
 def _unit_vector_from_angle(angle:float)->tuple[int, int]:
     x = numerics.force_integers_on_close_to_round(np.cos(angle))
     y = numerics.force_integers_on_close_to_round(np.sin(angle))
@@ -273,13 +274,15 @@ def sort_by_clock_order(directions:list[Direction], clockwise:bool=True)->list[D
             return final_order
     raise DirectionError("Directions are not related")
 
-
-def is_non_specific_direction(dir:Direction) -> TypeGuard[Direction]:
-    if isinstance(dir, LatticeDirection) or isinstance(dir, BlockSide):
-        return False
-    if isinstance(dir, Direction):
-        return True
-    return False
+class create:
+    def mean_direction(directions:list[Direction])->Direction:
+        angles = [dir.angle for dir in directions]
+        angle = sum(angles)/len(angles)
+        return Direction(name="mean", angle=angle)
+    
+    def direction_from_positions(p1:tuple[float, float], p2:tuple[float, float])->Direction:
+        angle = tuples.angle(p1, p2)
+        return Direction(name="relative", angle=angle)
 
 
 class check:
@@ -299,7 +302,7 @@ class check:
             lattice_options = dir2.opposite_lattice_directions()
             lattice_dir = dir1
             mixed_cased = True
-        elif is_non_specific_direction(dir1) and is_non_specific_direction(dir2):  # Not a standard direction
+        elif check.is_non_specific_direction(dir1) and check.is_non_specific_direction(dir2):  # Not a standard direction
             a1 = dir1.angle
             a2 = numerics.force_between_0_and_2pi(dir2.angle + np.pi)
             return abs(a1-a2)<EPSILON
@@ -320,7 +323,14 @@ class check:
         # Slower values check:
         if (dir1.__class__.__name__==dir2.__class__.__name__ 
             and  dir1.name==dir2.name ):
-            if is_non_specific_direction(dir1) or is_non_specific_direction(dir2):
+            if check.is_non_specific_direction(dir1) or check.is_non_specific_direction(dir2):
                 return _angle_dist(dir1.angle, dir2.angle)<EPSILON
+            return True
+        return False
+    
+    def is_non_specific_direction(dir:Direction) -> TypeGuard[Direction]:
+        if isinstance(dir, LatticeDirection) or isinstance(dir, BlockSide):
+            return False
+        if isinstance(dir, Direction):
             return True
         return False

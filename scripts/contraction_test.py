@@ -131,6 +131,7 @@ def main_test():
     # contract_to_core_test()
     # contract_to_mode_test()
     contract_to_edge_test()
+    
 
 
 if __name__ == "__main__":
