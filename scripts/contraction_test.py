@@ -9,7 +9,7 @@ from containers import UpdateEdge
 
 # Algos we test here:
 from algo.core_measurements import measure_xyz_expectation_values_with_tn
-from algo.tn_reduction import reduce_tn_to_core, reduce_core_to_mode, reduce_mode_tn_to_edge_and_env
+from algo.tn_reduction import reduce_full_kagome_to_core, reduce_core_to_mode, reduce_mode_to_edge_and_env
 
 # useful utils:
 from utils import visuals
@@ -87,7 +87,7 @@ def contract_to_mode_test(
     res = measure_xyz_expectation_values_with_tn(full_tn, reduce=False)
     print(res['x'])
     # contract network:
-    core_tn = reduce_tn_to_core(full_tn, bubblecon_trunc_dim=chi)
+    core_tn = reduce_full_kagome_to_core(full_tn, bubblecon_trunc_dim=chi)
     # base results:
     res = measure_xyz_expectation_values_with_tn(core_tn, reduce=False)
     print(res['x'])
@@ -119,15 +119,16 @@ def contract_to_edge_test(
     C = UnitCellFlavor.C
 
     mode = UpdateMode.A
-    edge = UpdateEdge(C, B)
+    edge = UpdateEdge(A, B)
     
     ##Contraction Sequence:
     full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     full_tn.connect_random_messages()
-    core_tn = reduce_tn_to_core(full_tn, bubblecon_trunc_dim=chi)
+    core_tn = reduce_full_kagome_to_core(full_tn, bubblecon_trunc_dim=chi)
     mode_tn = reduce_core_to_mode(core_tn, mode=mode)
-    edge_tn = reduce_mode_tn_to_edge_and_env(mode_tn, edge)
+    edge_tn = reduce_mode_to_edge_and_env(mode_tn, edge)
     print("Done")
+    edge_tn.plot()
 
 
     

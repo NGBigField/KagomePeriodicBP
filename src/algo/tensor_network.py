@@ -14,7 +14,7 @@ from _config_reader import DEBUG_MODE
 # Everyone needs numpy:
 import numpy as np
 
-# For type anotation:
+# For type annotation:
 from typing import TypeVar
 
 # Common types in the code:
@@ -29,13 +29,13 @@ from _types import EdgeIndicatorType
 from tensor_networks.unit_cell import UnitCell
 
 # Our utilities:
-from utils import tuples, lists, assertions, parallel_exec, prints
+from utils import lists, assertions, parallel_exec, prints
 
 # Our needed algos:
 from tensor_networks.tensor_network import get_common_edge_legs
 from algo.mps import physical_tensor_with_split_mid_leg
 from algo.contract_tensor_network import contract_tensor_network
-from algo.tn_reduction import reduce_tn_to_core
+from algo.tn_reduction import reduce_full_kagome_to_core
 
 # For energy estimation:
 from libs.ITE import rho_ij
@@ -48,12 +48,12 @@ TensorNetworkType = TypeVar("TensorNetworkType", bound=BaseTensorNetwork)
 
 def _get_corner_tensors(tn:KagomeTN) -> list[TensorNode]:
     min_x, max_x, min_y, max_y = tn.positions_min_max()
-    corner_tesnors = [] 
+    corner_tensors = [] 
     for x in [min_x, max_x]:
         for y in  [min_y, max_y]:
             t = tn.get_node_in_pos((x, y))
-            corner_tesnors.append(t)    
-    return corner_tesnors
+            corner_tensors.append(t)    
+    return corner_tensors
 
 def _sandwich_fused_tensors_with_expectation_values(tn_in:TensorNetworkType, mat:np.matrix, ind:int)->TensorNetworkType:
 
@@ -97,7 +97,7 @@ def _calc_and_check_expectation_value(numerator, denominator, force_real:bool) -
 
     ## Check inputs:
     if DEBUG_MODE:
-        err_msg = f"Braket results should be scalar values. Got numerator={numerator}, denominator={denominator}"
+        err_msg = f"Bracket results should be scalar values. Got numerator={numerator}, denominator={denominator}"
         for val in [numerator, denominator]:
             if separate_exp:
                 assert isinstance(val, tuple), "BubbleCon should return tuple[complex, int]"
@@ -184,7 +184,7 @@ def calc_unit_cell_expectation_values(
     """ Compute expectation values of unit cell nodes
 
     For each operator (np.matrix) in `operators`, returns a UnitCell object (with A,B,C attributes) with the 
-    corrosponding expectation values of this specific tensor in the unit cell for the operator.
+    corresponding expectation values of this specific tensor in the unit cell for the operator.
 
     """
     ## Prepare output:
@@ -201,12 +201,12 @@ def calc_unit_cell_expectation_values(
 
     ## Perform all common actions:
     if reduce:
-        tn_reduced = reduce_tn_to_core(tn, bubblecon_trunc_dim, parallel)
+        tn_reduced = reduce_full_kagome_to_core(tn, bubblecon_trunc_dim, parallel)
     else:
         tn_reduced = tn
     denominator, _, _ = contract_tensor_network(tn_reduced, direction=direction, depth=ContractionDepth.Full, bubblecon_trunc_dim=bubblecon_trunc_dim)
     assert not isinstance(denominator, MPS), "Full contraction should result in a number, not an MPS"
-    center_nodes = tn_reduced.get_center_unit_cell_nodes()
+    center_nodes = tn_reduced.get_center_core_nodes()
     unit_cell_indices = UnitCell(
         A = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.A),
         B = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.B),

@@ -1,8 +1,8 @@
 from enum import Enum, auto
 
 class NodeFunctionality(Enum):
-    CenterUnitCell = auto()
-    Core = auto()
+    CenterCore = auto()
+    AroundCore = auto()
     Message = auto()
     Padding = auto()
     Environment = auto()

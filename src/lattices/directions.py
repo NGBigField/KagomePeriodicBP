@@ -312,7 +312,7 @@ class check:
         if mixed_cased:
             return lattice_dir in lattice_options
         else:
-            return dir1.opposite() is dir2
+            return check.is_equal(dir1.opposite(), dir2)
 
     def is_equal(dir1:Direction, dir2:Direction) -> bool:
         # Type check:
@@ -320,14 +320,22 @@ class check:
         # Fast instance check:
         if dir1 is dir2:
             return True
-        # Slower values check:
+        # Fast class and name check:
         if (dir1.__class__.__name__==dir2.__class__.__name__ 
             and  dir1.name==dir2.name ):
-            if check.is_non_specific_direction(dir1) or check.is_non_specific_direction(dir2):
-                return _angle_dist(dir1.angle, dir2.angle)<EPSILON
             return True
+        # Slower values check:
+        if check.is_non_specific_direction(dir1) or check.is_non_specific_direction(dir2):
+            return _angle_dist(dir1.angle, dir2.angle)<EPSILON
         return False
     
+    def all_same(l:list[Direction]) -> bool:
+        dummy = l[0]
+        for item in l:
+            if not check.is_equal(dummy, item):
+                return False                
+        return True
+
     def is_non_specific_direction(dir:Direction) -> TypeGuard[Direction]:
         if isinstance(dir, LatticeDirection) or isinstance(dir, BlockSide):
             return False

@@ -65,7 +65,7 @@ def _derive_core_functionality(index:int, core_size:int, padding:int)->NodeFunct
     if i+p>=N or j+p>=N:
         return NodeFunctionality.Padding
     else: 
-        return NodeFunctionality.CenterUnitCell
+        return NodeFunctionality.CenterCore
     
 
 def _all_possible_couples(N:int) -> Generator[Tuple[int, int], None, None]:

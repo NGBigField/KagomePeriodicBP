@@ -8,6 +8,10 @@ if __name__ == "__main__":
 import numpy as np
 from numpy import ndarray as np_ndarray
 
+
+# Config:
+from _config_reader import DEBUG_MODE
+
 # Use some of our utilities:
 from utils import lists, strings, tuples, assertions
 
@@ -22,7 +26,7 @@ from typing import Tuple, Generator
 
 # For TN methods and types:
 from tensor_networks.operations import fuse_tensor_to_itself
-from lattices.directions import LatticeDirection, BlockSide, Direction
+from lattices.directions import LatticeDirection, BlockSide, Direction, check
 from enums import NodeFunctionality, UnitCellFlavor
 
 # For smart iterations:
@@ -41,6 +45,9 @@ class TensorNode():
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
     unit_cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
     boundaries : set[BlockSide] = field(default_factory=set) 
+
+    def __hash__(self)->int:
+        return hash((self.name, self.pos, self.functionality, self.unit_cell_flavor))
 
     @property
     def physical_tensor(self) -> np_ndarray:
@@ -97,6 +104,10 @@ class TensorNode():
             index = self.directions.index(dir)
         except Exception as e:
             raise NetworkConnectionError(f"Direction {dir!r} is not in directions of nodes: {[dir.name for dir in self.directions]}")
+        
+        if DEBUG_MODE:
+            assert len([_dir for _dir in self.directions if _dir is dir])==1, "Multiple legs with the same direction"
+
         return self.edges[index]
     
     def permute(self, axes:list[int])->None:
@@ -125,7 +136,7 @@ class TensorNode():
         from utils import visuals
                 
         plt.figure()
-        if self.functionality is NodeFunctionality.CenterUnitCell:
+        if self.functionality is NodeFunctionality.CenterCore:
             node_color = 'blue'
         else:
             node_color = 'red'
@@ -178,7 +189,11 @@ class TensorNode():
     def fuse_legs(self, indices_to_fuse:list[int], new_edge_name:str=strings.random(10))->None:
         ## Check:
         directions = [self.directions[i] for i in indices_to_fuse]
-        assert lists.all_same(directions), f"Only supports leg fusion when legs are in the same direction"
+        try:
+            assert check.all_same(directions), f"Only supports leg fusion when legs are in the same direction"
+        except Exception as e:
+            check.is_equal(directions[0], directions[1])
+            pass
 
         ## Collect some data:
         old_dimes = self.dims
