@@ -12,8 +12,8 @@ import numpy as np
 
 from tensor_networks import KagomeTN, TensorNode
 from tensor_networks.construction import repeat_core
-from algo.tensor_network import calc_edge_environment, calc_unit_cell_expectation_values
-from algo.tn_reduction import reduce_tn_to_core
+from algo.tensor_network import calc_unit_cell_expectation_values
+from algo.tn_reduction import reduce_full_kagome_to_core
 from libs.ITE import rho_ij
 from physics import pauli
 from lattices.directions import BlockSide
@@ -24,7 +24,7 @@ from copy import deepcopy
 
 from _error_types import BPNotConvergedError
 
-from algo.belief_propagation import belief_propagation, belief_propagation_pashtida
+from algo.belief_propagation import belief_propagation
 
 from utils import assertions, logs, errors
 
@@ -150,7 +150,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
     tn_stable, _, bp_stats = belief_propagation(tn_open, messages=None, bp_config=config.bp)
     if bp_stats.final_error>config.bp.target_msg_diff:
         raise BPNotConvergedError("")
-    tn_stable_around_core = reduce_tn_to_core(tn_stable, chi, method=config.reduce2core_method)
+    tn_stable_around_core = reduce_full_kagome_to_core(tn_stable, chi, method=config.reduce2core_method)
 
     ## Calc 
     # Energies:

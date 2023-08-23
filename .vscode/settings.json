@@ -1,7 +1,14 @@
 {
     "cSpell.words": [
+        "ABCA",
         "Appendable",
+        "bmpslib",
         "bubblecon",
-        "kagome"
+        "decomp",
+        "kagome",
+        "mpss"
+    ],
+    "cSpell.ignoreWords": [
+        "arange"
     ]
 }

@@ -14,7 +14,7 @@ from _config_reader import DEBUG_MODE
 # Everyone needs numpy:
 import numpy as np
 
-# For type anotation:
+# For type annotation:
 from typing import TypeVar
 
 # Common types in the code:
@@ -29,13 +29,13 @@ from _types import EdgeIndicatorType
 from tensor_networks.unit_cell import UnitCell
 
 # Our utilities:
-from utils import tuples, lists, assertions, parallel_exec, prints
+from utils import lists, assertions, parallel_exec, prints
 
 # Our needed algos:
 from tensor_networks.tensor_network import get_common_edge_legs
 from algo.mps import physical_tensor_with_split_mid_leg
 from algo.contract_tensor_network import contract_tensor_network
-from algo.tn_reduction import reduce_tn_to_core
+from algo.tn_reduction import reduce_full_kagome_to_core
 
 # For energy estimation:
 from libs.ITE import rho_ij
@@ -48,12 +48,12 @@ TensorNetworkType = TypeVar("TensorNetworkType", bound=BaseTensorNetwork)
 
 def _get_corner_tensors(tn:KagomeTN) -> list[TensorNode]:
     min_x, max_x, min_y, max_y = tn.positions_min_max()
-    corner_tesnors = [] 
+    corner_tensors = [] 
     for x in [min_x, max_x]:
         for y in  [min_y, max_y]:
             t = tn.get_node_in_pos((x, y))
-            corner_tesnors.append(t)    
-    return corner_tesnors
+            corner_tensors.append(t)    
+    return corner_tensors
 
 def _sandwich_fused_tensors_with_expectation_values(tn_in:TensorNetworkType, mat:np.matrix, ind:int)->TensorNetworkType:
 
@@ -97,7 +97,7 @@ def _calc_and_check_expectation_value(numerator, denominator, force_real:bool) -
 
     ## Check inputs:
     if DEBUG_MODE:
-        err_msg = f"Braket results should be scalar values. Got numerator={numerator}, denominator={denominator}"
+        err_msg = f"Bracket results should be scalar values. Got numerator={numerator}, denominator={denominator}"
         for val in [numerator, denominator]:
             if separate_exp:
                 assert isinstance(val, tuple), "BubbleCon should return tuple[complex, int]"
@@ -159,100 +159,6 @@ def _sandwich_with_operator_and_contract_fully(
     return numerator
 
 
-def _rearrange_legs(
-    c1:TensorNode,
-    c2:TensorNode,
-    env:list[TensorNode],
-)->tuple[
-    TensorNode, TensorNode, list[TensorNode]
-]:
-    ## init Indices:
-    env_left_legs_indices = []
-    env_mid_legs_indices = []
-    env_right_legs_indices = []
-    c1_legs_indices = []
-    c2_legs_indices = []
-
-    ## core tensors start with legs towards each other:
-    i1, i2 = get_common_edge_legs(c1, c2)
-    c1_legs_indices.append(i1)
-    c2_legs_indices.append(i2)
-
-    ## Go counter-clockwise - relate core to environment:
-    # half touching to c1:
-    for m in env[0:3]:
-        i1, i2 = get_common_edge_legs(c1, m)
-        c1_legs_indices.append(i1)
-        env_mid_legs_indices.append(i2)
-    # half touching c2:
-    for m in env[3:]:
-        i1, i2 = get_common_edge_legs(c2, m)
-        c2_legs_indices.append(i1)
-        env_mid_legs_indices.append(i2)
-
-    ## Go counter-clockwise - check leg order of environment:
-    for prev, this, next in lists.iterate_with_periodic_prev_next_items(env):
-        i1, _ = get_common_edge_legs(this, prev)
-        env_left_legs_indices.append(i1)
-        i1, _ = get_common_edge_legs(this, next)
-        env_right_legs_indices.append(i1)
-
-    ## Permute:
-    c1.permute(c1_legs_indices)
-    c2.permute(c2_legs_indices)
-    for ind, i_left, i_mid, i_right in zip(range(len(env)), env_left_legs_indices, env_mid_legs_indices, env_right_legs_indices ,strict=True):
-        env[ind].permute([i_left, i_mid, i_right])
-
-    return c1, c2, env
-
-
-def _find_node_in_relative_direction(dir:LatticeDirection, n1:TensorNode, n2:TensorNode)->TensorNode:
-    vec = dir.unit_vector()
-    if tuples.equal( n1.pos, tuples.add(vec, n2.pos) ):
-        return n1
-    elif tuples.equal( n2.pos, tuples.add(vec, n1.pos) ):
-        return n2
-    else:
-        raise ValueError(f"None of nodes [{n1.name!r}, {n2.name!r}] are in correct relation with direction {dir.name!r}.")
-
-
-def rearange_tensors_legs_to_canonical_order(
-    tn_env:KagomeTN, side:None # Fix mode\side
-)->tuple[TensorNode, TensorNode, list[np.ndarray]]:
-    core_tensors = tn_env.get_nodes_by_functionality()
-    core1 = _find_node_in_relative_direction(side.next_counterclockwise(), *core_tensors)
-    core2 = _find_node_in_relative_direction(side.next_clockwise(), *core_tensors)
-    environment_nodes = [
-        tn_env.find_neighbor(core1, side),
-        tn_env.find_neighbor(core1, side.next_counterclockwise()),
-        tn_env.find_neighbor(core1, side.opposite()),
-        tn_env.find_neighbor(core2, side.opposite()),
-        tn_env.find_neighbor(core2, side.next_clockwise()),
-        tn_env.find_neighbor(core2, side),
-    ]
-
-    ## Rearange legs in required order:
-    core1, core2, environment_nodes = _rearrange_legs(core1, core2, environment_nodes)
-    environment_tensors = [physical_tensor_with_split_mid_leg(n) for n in environment_nodes]    # Open environment mps legs:
-    return core1, core2, environment_tensors
-
-#TODO assert used
-def calc_edge_environment(
-    tn:KagomeTN, mode:None,  #TODO fix mode type
-    bubblecon_trunc_dim:int, already_reduced_to_core:bool=False
-)->tuple[
-    TensorNode, TensorNode,         # core1/2
-    list[np.ndarray],         # environment
-    KagomeTN       # small_tn
-]:
-    ## Get the smallest Tensor-Network around the mode (edge):
-    tn_env = calc_reduced_tn_around_edge(tn, mode, bubblecon_trunc_dim, method, already_reduced_to_core)
-
-    ## get all tensors in correct order:
-    core1, core2, environment_tensors = rearange_tensors_legs_to_canonical_order(tn_env, mode)
-
-    return core1, core2, environment_tensors, tn_env
-
 #TODO assert used
 def calc_interaction_energies_in_core(tn:KagomeTN, interaction_hamiltonain:np.ndarray, bubblecon_trunc_dim:int) -> list[float]:
     energies = []
@@ -278,7 +184,7 @@ def calc_unit_cell_expectation_values(
     """ Compute expectation values of unit cell nodes
 
     For each operator (np.matrix) in `operators`, returns a UnitCell object (with A,B,C attributes) with the 
-    corrosponding expectation values of this specific tensor in the unit cell for the operator.
+    corresponding expectation values of this specific tensor in the unit cell for the operator.
 
     """
     ## Prepare output:
@@ -295,12 +201,12 @@ def calc_unit_cell_expectation_values(
 
     ## Perform all common actions:
     if reduce:
-        tn_reduced = reduce_tn_to_core(tn, bubblecon_trunc_dim, parallel)
+        tn_reduced = reduce_full_kagome_to_core(tn, bubblecon_trunc_dim, parallel)
     else:
         tn_reduced = tn
     denominator, _, _ = contract_tensor_network(tn_reduced, direction=direction, depth=ContractionDepth.Full, bubblecon_trunc_dim=bubblecon_trunc_dim)
     assert not isinstance(denominator, MPS), "Full contraction should result in a number, not an MPS"
-    center_nodes = tn_reduced.get_center_unit_cell_nodes()
+    center_nodes = tn_reduced.get_center_core_nodes()
     unit_cell_indices = UnitCell(
         A = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.A),
         B = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.B),

@@ -241,11 +241,11 @@ def plot_network(
 
     def node_style(node:TensorNode):
         # Marker:
-        if node.functionality is NodeFunctionality.CenterUnitCell:
+        if node.functionality is NodeFunctionality.CenterCore:
             marker = f"${node.unit_cell_flavor}$"
             size1 = 120
             size2 = 180
-        elif node.functionality is NodeFunctionality.Core:
+        elif node.functionality is NodeFunctionality.AroundCore:
             marker = "H"
             size1 = 60
             size2 = 80
@@ -332,6 +332,7 @@ def plot_network(
         if detailed:
             text = f" [{node.index}]" + f" {name}" 
             plt.text(x, y, text)
+            assert i==node.index, "Non consistent indexing"
 
     ## Collect basic data:
     network_bounds = _derive_boundary(pos_list)

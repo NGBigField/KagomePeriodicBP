@@ -1,24 +1,13 @@
-if __name__ == "__main__":
-	import pathlib, sys
-	sys.path.append(
-		pathlib.Path(__file__).parent.parent.__str__()
-	)
-	sys.path.append(
-		pathlib.Path(__file__).parent.parent.parent.__str__()
-	)
-
-
-
 # Control flags:
 from _config_reader import DEBUG_MODE
 
 # For a little bit of OOP:
-from typing import Any, NamedTuple, Generic, TypeVar, Generator, Iterable
+from typing import Generic, TypeVar, Generator
 from dataclasses import dataclass, field
 _T = TypeVar("_T")
 
 # Common types in the code:
-from tensor_networks import KagomeTN, ArbitraryTN, ModeTN, TensorNode, MPS, CoreTN
+from tensor_networks import KagomeTN, ArbitraryTN, ModeTN, TensorNode, MPS, CoreTN, get_common_edge
 
 # Everyone needs numpy:
 import numpy as np
@@ -32,12 +21,14 @@ from algo.contract_tensor_network import contract_tensor_network
 # Types we need in our module:
 from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS
 from tensor_networks.node import TensorNode
-from lattices.directions import LatticeDirection, BlockSide, check
+from lattices.directions import Direction, LatticeDirection, BlockSide, check
 from enums import ContractionDepth, NodeFunctionality, UpdateMode
-from containers import MPSOrientation
+from containers import MPSOrientation, UpdateEdge
 
 # Our utilities:
 from utils import tuples, lists, assertions, prints, parallel_exec
+
+
 
 
 L  = LatticeDirection.L
@@ -68,62 +59,38 @@ CORE_CONNECTION_NODES = {
 NUM_CONNECTIONS_PER_SIDE = 2  # number of connections per side
 
 
-
-
 @dataclass
 class _PerSide(Generic[_T]):
-    """_Side(top_down, buttom_up)
+    """_Side(top_down, bottom_up)
 
     Used for repeating structure where one part comes from the top of the hexagonal block down, meeting first the top of the center triangle,
-    and the other part comes from the buttom of the hexagonal block going up, meeting first the base of the center triangle.
+    and the other part comes from the bottom of the hexagonal block going up, meeting first the base of the center triangle.
     """
     top_down  : _T = field(default=None) 
-    buttom_up : _T = field(default=None)
+    bottom_up : _T = field(default=None)
 
     def items(self)->Generator[tuple[str, _T], None, None]:
         yield "top_down" , self.top_down 
-        yield "buttom_up", self.buttom_up 
+        yield "bottom_up", self.bottom_up 
 
     @staticmethod
     def side_names()->Generator[str, None, None]:
         yield "top_down" 
-        yield "buttom_up"
+        yield "bottom_up"
 
     def __getitem__(self, key:str)->_T:
         if key == "top_down":  return self.top_down
-        elif key == "buttom_up":  return self.buttom_up
+        elif key == "bottom_up":  return self.bottom_up
         else:
             raise KeyError(f"No a valid option {key!r}")
     
     def __setitem__(self, key:str, value:_T)->None:
         if key == "top_down":  self.top_down = value
-        elif key == "buttom_up":  self.buttom_up = value
+        elif key == "bottom_up":  self.bottom_up = value
         else:
             raise KeyError(f"No a valid option {key!r}")
 
 
-
-def _zip_mps_at_overlap_outside_core(mpss:_PerSide[MPS], overlap_length:int, num_core_connections:_PerSide[int])->_PerSide[MPS]:
-    LTensor : np.ndarray = None  #type: ignore
-    for j in range(0, overlap_length):
-        LTensor = bmpslib.updateCLeft(LTensor,
-            mpss.top_down.A[-j-1].transpose([2,1,0]), \
-            mpss.buttom_up.A[j])
-    # LTensor legs are [i_up, i_down]. Absorb it in the first tensor of
-    # mps 'from buttom up' that going to appear in the small TN
-    mpss.buttom_up.A[overlap_length] = np.tensordot(LTensor, mpss.buttom_up.A[overlap_length], axes=([1],[0]))
-
-    # Now create RTensor, which is the contraction of the right part
-    # of the up/down MPSs
-    RTensor : np.ndarray = None  #type: ignore
-    for j in range(0, overlap_length):
-        RTensor = bmpslib.updateCRight(RTensor,
-            mpss.top_down.A[j].transpose([2,1,0]), \
-            mpss.buttom_up.A[-1-j])
-    # Absorb the RTensor[i_up, i_down] in the first tensor of mps 'top_down'
-    mpss.top_down.A[overlap_length] = np.tensordot(RTensor, mpss.top_down.A[overlap_length], axes=([0],[0]))
-
-    return mpss
 
 
 def _contract_tn_from_sides_and_create_mpss(
@@ -172,35 +139,58 @@ def _basic_data(
     # Caused by the choice to always stop the contraction at the line defined by the base of the triangle:
     num_core_connections = _PerSide[int](
         top_down=7,
-        buttom_up=5
+        bottom_up=5
     )
 
     ## Derive data for the zipping algorithm:
     num_side_overlap_connections = 2*N - 3  # length of overlap between sides of the zipping algorithm
 
     # Choose a random contraction direction that meets the base of the center triangle, first, and goes "up":
-    from_buttom_up_direction = lists.random_item([BlockSide.U, BlockSide.DL, BlockSide.DR])  
+    from_bottom_up_direction = lists.random_item([BlockSide.U, BlockSide.DL, BlockSide.DR])  
 
     directions = _PerSide[BlockSide](
-        buttom_up=from_buttom_up_direction,
-        top_down=from_buttom_up_direction.opposite()
+        bottom_up=from_bottom_up_direction,
+        top_down=from_bottom_up_direction.opposite()
     )
 
     return core_nodes, num_core_connections, num_side_overlap_connections, directions
 
 
-def _verifications(con_orders, core_nodes, mpss, orientations, num_core_connections, num_side_overlap_connections, directions)->None:
+def _zip_mps_at_overlap_outside_core(mpss:_PerSide[MPS], overlap_length:int, num_core_connections:_PerSide[int])->_PerSide[MPS]:
+    LTensor : np.ndarray = None  #type: ignore
+    for j in range(0, overlap_length):
+        LTensor = bmpslib.updateCLeft(LTensor,
+            mpss.top_down.A[-j-1].transpose([2,1,0]), \
+            mpss.bottom_up.A[j])
+    # LTensor legs are [i_up, i_down]. Absorb it in the first tensor of
+    # mps 'from bottom up' that going to appear in the small TN
+    mpss.bottom_up.A[overlap_length] = np.tensordot(LTensor, mpss.bottom_up.A[overlap_length], axes=([1],[0]))
+
+    # Now create RTensor, which is the contraction of the right part
+    # of the up/down MPSs
+    RTensor : np.ndarray = None  #type: ignore
+    for j in range(0, overlap_length):
+        RTensor = bmpslib.updateCRight(RTensor,
+            mpss.top_down.A[j].transpose([2,1,0]), \
+            mpss.bottom_up.A[-1-j])
+    # Absorb the RTensor[i_up, i_down] in the first tensor of mps 'top_down'
+    mpss.top_down.A[overlap_length] = np.tensordot(RTensor, mpss.top_down.A[overlap_length], axes=([0],[0]))
+
+    return mpss
+
+
+def _verification(con_orders, core_nodes, mpss, orientations, num_core_connections, num_side_overlap_connections, directions)->None:
     ## Check contraction order:
-    _s0 = set(con_orders.buttom_up)
+    _s0 = set(con_orders.bottom_up)
     _s1 = set(con_orders.top_down)
     _core = {node.index for node in core_nodes}
     assert _s0.isdisjoint(_s1)
     assert _core.isdisjoint(_s0)
     assert _core.isdisjoint(_s1)
     ## check resulting MPS orientations:
-    check.is_opposite(orientations.buttom_up.open_towards, orientations.top_down.open_towards) 
-    check.is_opposite(orientations.buttom_up.ordered,      orientations.top_down.ordered) 
-    assert orientations.buttom_up.open_towards is directions.buttom_up
+    check.is_opposite(orientations.bottom_up.open_towards, orientations.top_down.open_towards) 
+    check.is_opposite(orientations.bottom_up.ordered,      orientations.top_down.ordered) 
+    assert orientations.bottom_up.open_towards is directions.bottom_up
     assert orientations.top_down.open_towards is directions.top_down
     ## Check MPS sizes and overlaps:
     assert num_side_overlap_connections > 0
@@ -211,19 +201,19 @@ def _verifications(con_orders, core_nodes, mpss, orientations, num_core_connecti
 
 def _environment_tensors_in_canonical_order(mpss:_PerSide[MPSOrientation], directions:_PerSide[BlockSide], num_side_overlap_connections:int)->list[TensorNode]:
     ## Add the surrounding MPS tensors in the edge order: [D, DR, UR, U, UL, DL] 
-    # (as seen from the perspective of the "buttom-up" durection) 
+    # (as seen from the perspective of the "bottom-up" direction) 
     s = num_side_overlap_connections  # number of indices to ignore from each side
     t = NUM_CONNECTIONS_PER_SIDE
     env_tensors = []
-    env_tensors += mpss.buttom_up.A[s+t : s+2*t+1]  # D+DR
+    env_tensors += mpss.bottom_up.A[s+t : s+2*t+1]  # D+DR
     env_tensors += mpss.top_down.A[s : s+1+3*t]  # DR -> UR -> U -> UL
-    env_tensors += mpss.buttom_up.A[s : s+t]  # DL
+    env_tensors += mpss.bottom_up.A[s : s+t]  # DL
     assert len(env_tensors)==t*6
 
     ## arrange items:
-    # Canonical shape of the small tn hexagonal block is when the first env tensors are the ones connecting to the buttom of the block
+    # Canonical shape of the small tn hexagonal block is when the first env tensors are the ones connecting to the bottom of the block
     # So check how far are we from this rotation.
-    match directions.buttom_up:
+    match directions.bottom_up:
         case BlockSide.U:  rotations_distance = 0 
         case BlockSide.DL: rotations_distance = 2
         case BlockSide.DR: rotations_distance = 4
@@ -234,7 +224,7 @@ def _environment_tensors_in_canonical_order(mpss:_PerSide[MPSOrientation], direc
     return env_tensors
 
 
-def _add_env_tensors_to_small_tn(small_tn:ArbitraryTN, env_tensors:list[TensorNode])->CoreTN:
+def _add_env_tensors_to_open_core(small_tn:ArbitraryTN, env_tensors:list[TensorNode])->CoreTN:
 
     t = NUM_CONNECTIONS_PER_SIDE
     env_nodes : list[TensorNode] = [] 
@@ -278,7 +268,7 @@ def _add_env_tensors_to_small_tn(small_tn:ArbitraryTN, env_tensors:list[TensorNo
             ## Update:
             inside_neighbor.boundaries.add(outside_direction)
             inside_neighbor.edges[inside_neighbor.directions.index(dir2_opposite)] = new_connection_edge_name
-            small_tn.add(node)
+            small_tn.add_node(node)
             env_nodes.append(node)
 
             ## for next iteration:
@@ -295,18 +285,19 @@ def _add_env_tensors_to_small_tn(small_tn:ArbitraryTN, env_tensors:list[TensorNo
     return CoreTN.from_arbitrary_tn(small_tn)
 
 
-def reduce_tn_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool=False) -> CoreTN:
+
+def reduce_full_kagome_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool=False) -> CoreTN:
 
     ## I. Parse and derive data
     core_nodes, num_core_connections, num_side_overlap_connections, directions = _basic_data(tn, parallel)
 
-    ## II. Prepare two MPSs, contract untill core:
-	#      One MPS is "from the buttom-up" and the other is "from the top-down"
+    ## II. Prepare two MPSs, contract until core:
+	#      One MPS is "from the bottom-up" and the other is "from the top-down"
     mpss, con_orders, orientations = _contract_tn_from_sides_and_create_mpss(tn, directions, bubblecon_trunc_dim, parallel)
     
     ## Some verifications:
     if DEBUG_MODE:
-        _verifications(con_orders, core_nodes, mpss, orientations, num_core_connections, num_side_overlap_connections, directions)
+        _verification(con_orders, core_nodes, mpss, orientations, num_core_connections, num_side_overlap_connections, directions)
 
 	## III. Contract the upper/lower MPSs:
     mpss = _zip_mps_at_overlap_outside_core(mpss, num_side_overlap_connections, num_core_connections)
@@ -317,120 +308,17 @@ def reduce_tn_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool=False)
 
     ## first create the small TN and derive the canonical order of the env_tensors:
     core_nodes_in_canonical_order = lists.swap_items(core_nodes, 2, 3, copy=False)
-    small_tn = ArbitraryTN(nodes=core_nodes_in_canonical_order)
+    open_core_tn = ArbitraryTN(nodes=core_nodes_in_canonical_order)
     env_tensors = _environment_tensors_in_canonical_order(mpss, directions, num_side_overlap_connections, )
 
     ## add tensors-nodes into the tensor-network with the correct direction 
-    core_tn = _add_env_tensors_to_small_tn(small_tn, env_tensors)
+    core_tn = _add_env_tensors_to_open_core(open_core_tn, env_tensors)
 
     if False:
         core_tn.plot()
 
+    if DEBUG_MODE:
+        core_tn.validate()
+
     return core_tn 
-
-
-def reduce_core_to_mode(
-    core_tn:CoreTN, 
-    bubblecon_trunc_dim:int,
-    mode:UpdateMode
-)->ModeTN:
-    
-    ## Create a copy which is an arbitrary tn which can be contracted:
-    tn = core_tn.to_arbitrary_tn()
-
-    ## Get basic info:
-    mode_side = mode.side_in_core  # Decide which side corrosponds to the mode:
-
-    ## Also keep a list of nodes that should be contracted:
-    new_nodes : list[TensorNode] = []
-
-    ## Contract:
-    # For each side not being the major core side
-    for side in CoreTN.all_mode_sides:
-        if side is mode_side:
-            continue
-            
-        # For each boundry node
-        boundary_nodes = [node for node in tn.get_nodes_on_boundary(side)]
-        for boundary_node in boundary_nodes:
-
-            # For each beighbor which is on thr environment:
-            neigbors = tn.all_neighbors(boundary_node)
-            for neigbor in neigbors:
-                if neigbor.functionality is NodeFunctionality.Environment:
-                    boundary_node = tn.contract_nodes(neigbor, boundary_node)  # output is the new boundary tensor
-            
-            # keep in list:
-            new_nodes.append(boundary_node)
-
-    ## Let those new tensors know they are part of the environemnt:
-    for node in new_nodes:
-        node.functionality = NodeFunctionality.Environment
-
-    return ModeTN.from_arbitrary_tn(tn, mode=mode)
-
-
-def reduce_core_and_environment_to_edge_and_environment(
-    tn_small:KagomeTN, side:None, # fix side\mode 
-    bubblecon_trunc_dim:int
-)->KagomeTN:
-    tn_env = reduce_tn_using_bubblecon(tn_small, bubblecon_trunc_dim=bubblecon_trunc_dim, directions=[side], depth=2)
-    ## Find and Swallow the two corner tensors:
-    remaining_core_tensors = [t for t in tn_env.nodes if t.functionality is NodeFunctionality.CenterUnitCell]
-    assert len(remaining_core_tensors)==2
-    for t in tn_env.nodes:
-        # pass on core nodes:
-        if t is remaining_core_tensors[0] or t is remaining_core_tensors[1]:
-            continue
-        # pass on environment of core nodes:
-        if tn_env.are_neigbors(t, remaining_core_tensors[0]) or tn_env.are_neigbors(t, remaining_core_tensors[1]):
-            continue
-        neighbor_in_direction = tn_env.find_neighbor(t, side)
-
-        tn_env.contract_nodes(t, neighbor_in_direction)
-    return tn_env
-
-
-#TODO check if needed
-def reduce_tn_using_bubblecon(tn:KagomeTN, bubblecon_trunc_dim:int, directions:Iterable[BlockSide], depth:ContractionDepth|int, parallel:bool=False)->KagomeTN:
-
-    # prepare inputs:
-    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=bubblecon_trunc_dim, depth=depth)
-    directions = lists.shuffle(list(directions))
-    
-    # Sandwich Tensor-Network from both sides at once if parallel:
-    if parallel:
-        fixed_arguments["print_progress"]=False
-        con_results = parallel_exec.parallel(func=contract_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
-    else:
-        fixed_arguments["print_progress"] = True
-        con_results = parallel_exec.concurrent(func=contract_tensor_network, values=directions, value_name="direction", fixed_arguments=fixed_arguments) 
-    
-    # Rearrange outputs:
-    mpss        = {direction:tupl[0] for direction, tupl in con_results.items()}
-    con_indices = lists.join_sub_lists([tupl[1] for tupl in con_results.values()])
-    mps_orientations =                  [tupl[2] for tupl in con_results.values()]
-
-
-    ## Ignore tensors that are accounted-for by the messages:
-    remaining_indices = [node.index for node in tn.nodes if node.index not in con_indices]
-    reduced_tn = tn.sub_tn(remaining_indices)
-    if DEBUG_MODE: reduced_tn.validate()
-    
-    ## Connect messages directly to the remaining tensors:
-    for (direction, mps), orientation in zip(mpss.items(), mps_orientations, strict=True):
-        assert isinstance(mps, MPS)
-        reduced_tn = _fuse_mps_with_tn( reduced_tn, mps, orientation, direction.opposite() )
-    if DEBUG_MODE: reduced_tn.validate()
-
-    ## Return:
-    return reduced_tn
-
-
-
-if __name__ == "__main__":
-    from project_paths import add_scripts; 
-    add_scripts()
-    from scripts import contraction_test
-    contraction_test.main_test()
 

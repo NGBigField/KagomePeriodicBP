@@ -3,17 +3,36 @@ from physics.hamiltonians import HamiltonianFuncType, zero
 from dataclasses import dataclass, field, fields
 from utils import strings, saveload, assertions
 from utils.arguments import Stats
-from typing import Generator, Union, Any
+from typing import Generator, Union, Any, TypeAlias, NamedTuple
 from copy import deepcopy
 
 # Other containers and enums:
 from enums.imaginary_time_evolution import UpdateMode
+from enums.tensor_networks import UnitCellFlavor
 from containers.belief_propagation import BPStats
 from containers.density_matrices import MatrixMetrics 
 from _error_types import ITEError
 
 
 KagomeTensorNetwork = None  #TODO fix
+
+
+_NEXT_IN_ABC_ORDER = {
+    UnitCellFlavor.A : UnitCellFlavor.B,
+    UnitCellFlavor.B : UnitCellFlavor.C,
+    UnitCellFlavor.C : UnitCellFlavor.A
+}
+
+class UpdateEdge(NamedTuple): 
+    first : UnitCellFlavor
+    second : UnitCellFlavor
+
+    def is_in_core(self)->bool:  
+        """Checking if the edge is part of the 3 edges in-core, is the same as checking if the first-second items are ordered in the 'ABCA' order
+        Returns:
+            bool
+        """
+        return self.second is _NEXT_IN_ABC_ORDER[self.first]
 
 
 

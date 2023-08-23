@@ -15,7 +15,7 @@ from _types import EdgeIndicatorType
 from containers import BubbleConConfig, MPSOrientation, MessageDictType
 
 # Our utilities:
-from utils import tuples
+from utils import tuples, numerics
 
 # Our needed algos:
 from algo.contraction_order import get_contraction_order
@@ -23,13 +23,6 @@ from algo.contraction_order import get_contraction_order
 # Other modules we made and need here   
 from libs.bubblecon import bubblecon
 
-
-def _fix_angle(a:float)->float:
-    while a < 0:
-        a += 2*np.pi
-    while a>2*np.pi:
-        a -= 2*np.pi
-    return a
 
 def connect_corner_messages(
     tn:KagomeTN, outgoing_dir:BlockSide
@@ -63,7 +56,7 @@ def connect_corner_messages(
     ## Derive new angles:
     new_a = [0.0, 0.0]
     new_a[0] = tuples.angle(pos[0], pos[1])
-    new_a[1] = _fix_angle(new_a[0]+np.pi)
+    new_a[1] = numerics.force_between_0_and_2pi(new_a[0]+np.pi)
     new_angle = [old_angles[i]+[new_a[i]] for i in [0, 1]]
 
     ## Assign results to list

@@ -56,20 +56,18 @@ def all_same(l:List[_Numeric]|List[np.ndarray]) -> bool:
     return True
 
 
-def deep_unique(l:list) -> List[_T]:
-    values : List[_T] = []
+def deep_unique(l:list) -> set[_T]:
+    seen_values : set[_T] = set()
     
     def _gather_elements(list_:list):        
         for element in list_:
             if isinstance(element, list):
                 _gather_elements(element)
             else:
-                values.append(element)
+                seen_values.add(element)
     _gather_elements(l)
 
-    values = np.array(values) # type: ignore
-    unique_set = np.unique(values) # type: ignore
-    return unique_set.tolist()
+    return seen_values
 
 
 def average(l:List[_FloatOrComplex]) -> _FloatOrComplex:
@@ -190,17 +188,18 @@ def min_max(list_:List[_Numeric])->Tuple[_Numeric, _Numeric]:
     return min_, max_  # type: ignore
     
 def swap_items(lis:List[_T], i1:int, i2:int, copy:bool=True) -> List[_T]:
+    if copy:
+        lis = lis.copy()
+
+    if i1==i2:
+        return lis
+    
     item1 = lis[i1]
     item2 = lis[i2]
-    if copy:
-        new_list = lis.copy()
-        new_list[i1] = item2
-        new_list[i2] = item1
-        return new_list
-    else:
-        lis[i1] = item2
-        lis[i2] = item1
-        return lis
+    
+    lis[i1] = item2
+    lis[i2] = item1
+    return lis
 
 def random_item(lis:list[_T])->_T:
     n = len(lis)
@@ -226,7 +225,7 @@ def rearrange(l:List[_T], order:List[int]) -> List[_T]:
     # all indices are different and number of indices is correct:
     assert len(set(order))==len(order)==len(l)
 
-    ## rearange:
+    ## rearrange:
     return [ l[i] for i in order ]
 
 def is_sorted(l:list[int]|list[float])->bool:
@@ -288,13 +287,18 @@ def reversed(lis:list[_T])->_T:
     return res
 
 
-def cycle_items(lis:list[_T], k:int)->list[_T]:
+def cycle_items(lis:list[_T], k:int, copy:bool=True)->list[_T]:
     """Push items from the end to the beginning of the list in a cyclic manner
 
-    ## Example:
-    >>> l1 = [1, 2, 3, 4]
+    ## Example1:
+    >>> l1 = [1, 2, 3, 4, 5]
     >>> l2 = cyclic_items(l1, 2)
-    >>> print(l2)   # [3, 4, 1, 2]
+    >>> print(l2)   # [3, 4, 5, 1, 2]
+
+    ## Example2:
+    >>> l1 = [1, 2, 3, 4, 5]
+    >>> l2 = cyclic_items(l1, -1)
+    >>> print(l2)   # [2, 3, 4, 5, 1]
 
     Args:
         lis (list[_T]): list of items
@@ -303,11 +307,18 @@ def cycle_items(lis:list[_T], k:int)->list[_T]:
     Returns:
         list[_T]: list of items with rotated items.
     """
-    l = lis.copy()
-    for _ in range(k):
-        item = l.pop()
-        l.insert(0, item)
-    return l
+    if copy:
+        lis = lis.copy()
+
+    for _ in range(abs(k)):
+        if k>0:
+            item = lis.pop()
+            lis.insert(0, item)
+        else:
+            item = lis.pop(0)
+            lis.append(item)
+
+    return lis
 
 ## Test:
 if __name__ == "__main__":

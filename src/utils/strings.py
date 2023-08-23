@@ -69,11 +69,20 @@ def to_list(s:str)->list[str]:
     return [c for c in s]
 
 
+ASCII_UPPERCASE_LIST = to_list(ASCII_UPPERCASE)
+DIGITS_LIST = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
 def random(len:int=1)->str:
-    ascii_list = to_list(ASCII_UPPERCASE)
     s = ""
     for _ in range(len):
-        s += lists.random_item(ascii_list)
+        s += lists.random_item(ASCII_UPPERCASE_LIST)
+    return s
+
+
+def random_digits(len:int=1)->str:
+    s = ""
+    for _ in range(len):
+        s += f"{lists.random_item(DIGITS_LIST)}"
     return s
 
 

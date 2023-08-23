@@ -8,8 +8,12 @@ if __name__ == "__main__":
 import numpy as np
 from numpy import ndarray as np_ndarray
 
+
+# Config:
+from _config_reader import DEBUG_MODE
+
 # Use some of our utilities:
-from utils import lists, strings, tuples
+from utils import lists, strings, tuples, assertions
 
 # for type namings:
 from _types import EdgeIndicatorType, PosScalarType
@@ -22,7 +26,7 @@ from typing import Tuple, Generator
 
 # For TN methods and types:
 from tensor_networks.operations import fuse_tensor_to_itself
-from lattices.directions import LatticeDirection, BlockSide, Direction
+from lattices.directions import LatticeDirection, BlockSide, Direction, check
 from enums import NodeFunctionality, UnitCellFlavor
 
 # For smart iterations:
@@ -41,6 +45,9 @@ class TensorNode():
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
     unit_cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
     boundaries : set[BlockSide] = field(default_factory=set) 
+
+    def __hash__(self)->int:
+        return hash((self.name, self.pos, self.functionality, self.unit_cell_flavor))
 
     @property
     def physical_tensor(self) -> np_ndarray:
@@ -64,7 +71,7 @@ class TensorNode():
         if not self.is_ket:
             return self.tensor.shape
         connectable_dims = self.tensor.shape[1:]        
-        return tuples.multiply(connectable_dims, 2)
+        return tuples.power(connectable_dims, 2)
     
     @property
     def norm(self) -> np.float64:
@@ -97,9 +104,13 @@ class TensorNode():
             index = self.directions.index(dir)
         except Exception as e:
             raise NetworkConnectionError(f"Direction {dir!r} is not in directions of nodes: {[dir.name for dir in self.directions]}")
+        
+        if DEBUG_MODE:
+            assert len([_dir for _dir in self.directions if _dir is dir])==1, "Multiple legs with the same direction"
+
         return self.edges[index]
     
-    def permute(self, axes:list[int]):
+    def permute(self, axes:list[int])->None:
         """Like numpy.transpose but permutes "physical_tensor", "fused_tensor", "edges" & "direction" all together
         """
         if self.is_ket:
@@ -125,7 +136,7 @@ class TensorNode():
         from utils import visuals
                 
         plt.figure()
-        if self.functionality is NodeFunctionality.CenterUnitCell:
+        if self.functionality is NodeFunctionality.CenterCore:
             node_color = 'blue'
         else:
             node_color = 'red'
@@ -171,10 +182,18 @@ class TensorNode():
                 return False
         return True
     
+    def turn_into_bracket(self)->None:
+        self.tensor = self.fused_tensor
+        self.is_ket = True
+    
     def fuse_legs(self, indices_to_fuse:list[int], new_edge_name:str=strings.random(10))->None:
         ## Check:
         directions = [self.directions[i] for i in indices_to_fuse]
-        assert lists.all_same(directions), f"Only supports leg fusion when legs are in the same direction"
+        try:
+            assert check.all_same(directions), f"Only supports leg fusion when legs are in the same direction"
+        except Exception as e:
+            check.is_equal(directions[0], directions[1])
+            pass
 
         ## Collect some data:
         old_dimes = self.dims
@@ -190,6 +209,9 @@ class TensorNode():
 
         ## Fuse legs:
         # fuse tensor with numpy.reshape():
+        if self.is_ket:
+            d = self.tensor.shape[0]
+            new_dims = [d]+[_validated_int_square_root(dim) for dim in new_dims]
         self.tensor = self.tensor.reshape(new_dims)
         # Deal with the rest of the data:
         for _ in range(num_fused_legs-1):
@@ -203,3 +225,5 @@ class TensorNode():
         return f"Node '{self.name}' at index [{self.index}] on site {tuple(positions)}"
 
     
+def _validated_int_square_root(a:int)->int:
+    return assertions.integer(np.sqrt(a))

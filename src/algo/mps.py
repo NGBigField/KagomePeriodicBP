@@ -43,7 +43,6 @@ def initial_message(
         raise ValueError("Not a valid option")
 
 
-
 def normalize_messages(mpss:MessageDictType)->MessageDictType:
     exponents = [ mps.nr_exp for mps in mpss.values() ]
     mean_exponents = int(sum(exponents)/len(exponents))

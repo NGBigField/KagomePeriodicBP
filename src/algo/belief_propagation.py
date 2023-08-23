@@ -15,7 +15,7 @@ import numpy as np
 
 # other used types in our code:
 from tensor_networks import KagomeTN, MPS
-from lattices.directions import BlockSide, LatticeDirection
+from lattices.directions import BlockSide
 from enums import ContractionDepth
 from containers import BPStats, BPConfig, MessageDictType, Message
 
@@ -26,7 +26,7 @@ from algo.tensor_network import contract_tensor_network
 from libs import ITE as ite
 
 # Common used utilities:
-from utils import decorators, strings, parallel_exec, lists, visuals, prints
+from utils import decorators, parallel_exec, lists, visuals, prints
 
 # OOP:
 from copy import deepcopy
@@ -120,65 +120,6 @@ def _belief_propagation_step(
         next_error = np.sqrt( sum(distances) )/len(distances)
 
     return tn, next_messages, next_error
-
-
-@decorators.add_stats()
-def belief_propagation_pashtida(
-    open_tn:KagomeTN, 
-    messages:MessageDictType|None, # initial messages
-    bp_config:BPConfig
-) -> tuple[ 
-    KagomeTN,
-    MessageDictType, # final messages
-    BPStats
-]:
-    """
-    A wrapper for the Pashtida version of BP
-
-    
-    Input of inner-function
-    	mps_list --- list of the 4 incoming MPS messages, ordered
-	             counter-clockwise by: D, R, U, L
-    """ 
-    ## Check inputs
-    assert len(open_tn.original_lattice_dims)==2
-    assert open_tn.original_lattice_dims[0] == open_tn.original_lattice_dims[1]
-
-    ## Unpack Inputs:
-    # Tensor-Network data:
-    T_list = open_tn.tensors
-    e_list = open_tn.edges_list
-    a_list = open_tn.angles
-    N = open_tn.original_lattice_dims[0]
-    # Messages
-    if messages is None:
-        prev_BP_mps_messages = None
-    else:
-        prev_BP_mps_messages = [messages[direction][0] for direction in Direction.all_in_counterclockwise_order()]
-    # bubblecon cofig:
-    D_trunc = bp_config.max_swallowing_dim
-    delta = bp_config.target_msg_diff
-    max_iter = bp_config.max_iterations
-
-    ## Parallel computing:
-    mpi_comm = None
-
-    ## Call main function  
-    BP_mps_messages = robust_BP(
-        N, T_list, e_list, a_list,
-        prev_BP_mps_messages, D_trunc, max_iter, delta, mpi_comm
-    )
-
-    ## Pack results
-    messages = {}
-    for mps, direction in zip(BP_mps_messages, Direction.all_in_counterclockwise_order(), strict=True):
-        messages[direction] = (mps, direction.next_counterclockwise())
-    tn_with_messages = connect_messages_with_tn(open_tn, messages) 
-    tn_with_messages.validate()
-    stats = BPStats( )
-
-    return tn_with_messages, messages, stats
-		
 
 
 @decorators.add_stats()
