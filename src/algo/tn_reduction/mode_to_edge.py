@@ -219,7 +219,7 @@ def reduce_mode_to_edge_and_env(
     if DEBUG_MODE:
         edge_tn.validate()
 
-    return tn
+    return edge_tn
 
 
 

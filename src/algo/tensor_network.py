@@ -33,7 +33,7 @@ from utils import lists, assertions, parallel_exec, prints
 
 # Our needed algos:
 from tensor_networks.tensor_network import get_common_edge_legs
-from algo.mps import physical_tensor_with_split_mid_leg
+from tensor_networks.mps import physical_tensor_with_split_mid_leg
 from algo.contract_tensor_network import contract_tensor_network
 from algo.tn_reduction import reduce_full_kagome_to_core
 

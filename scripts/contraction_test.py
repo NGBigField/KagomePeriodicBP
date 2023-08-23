@@ -8,14 +8,16 @@ from enums import UpdateMode, UnitCellFlavor
 from containers import UpdateEdge
 
 # Algos we test here:
-from algo.core_measurements import measure_xyz_expectation_values_with_tn
+from algo.core_measurements import measure_xyz_expectation_values_with_tn, measure_xyz_expectation_values_with_rdms
 from algo.tn_reduction import reduce_full_kagome_to_core, reduce_core_to_mode, reduce_mode_to_edge_and_env
+from libs.ITE import rho_ij
 
 # useful utils:
 from utils import visuals
 
-# For tests:
+# For testing performance:
 from time import perf_counter
+
 
 
 A = UnitCellFlavor.A
@@ -127,6 +129,13 @@ def contract_to_edge_test(
     core_tn = reduce_full_kagome_to_core(full_tn, bubblecon_trunc_dim=chi)
     mode_tn = reduce_core_to_mode(core_tn, mode=mode)
     edge_tn = reduce_mode_to_edge_and_env(mode_tn, edge)
+    print("Done")
+
+    ## Get measurements in two different methods:
+    rho = rho_ij(edge_tn.core1.physical_tensor, edge_tn.core2.physical_tensor, edge_tn.open_mps_env)
+    print(rho)
+
+
     print("Done")
 
 

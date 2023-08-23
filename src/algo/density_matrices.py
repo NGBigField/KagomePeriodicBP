@@ -41,12 +41,3 @@ def calc_metrics(rho:np.ndarray)->MatrixMetrics:
         trace=rho.trace()
     )
     
-
-    
-
-    
-
-    
-
-
-    return output

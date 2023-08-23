@@ -42,7 +42,7 @@ import functools
 import operator
 
 # Other supporting algo:
-from algo.mps import initial_message, physical_tensor_with_split_mid_leg
+from tensor_networks.mps import initial_message, physical_tensor_with_split_mid_leg
 
 # For OOP:
 from abc import ABC, abstractmethod, abstractproperty
@@ -524,16 +524,17 @@ class EdgeTN(_FrozenSpecificNetwork):
         return res
     
     @property
-    def node1(self)->TensorNode:
+    def core1(self)->TensorNode:
         return self._get_main_core_node(0)
     
     @property
-    def node2(self)->TensorNode:
+    def core2(self)->TensorNode:
         return self._get_main_core_node(1)
     
     @property
-    def open_env_tensors(self)->list[np.ndarray]:
+    def open_mps_env(self)->list[np.ndarray]:
         environment_nodes = self.nodes[2:]
+        assert len(environment_nodes)==6
         environment_tensors = [physical_tensor_with_split_mid_leg(n) for n in environment_nodes]    # Open environment mps legs:        
         return environment_tensors
     
