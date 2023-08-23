@@ -44,7 +44,7 @@ _T = TypeVar('_T')
 all_paulis = [pauli.x, pauli.y, pauli.z]
 all_pauli_names = ['x', 'y', 'z'] 
 
-H = np.matrix(
+H : np.matrix= np.matrix(
     [[1,  1],
      [1, -1]]
 ) / np.sqrt(2)   # Hadamard
@@ -376,8 +376,8 @@ def _expectation_values_with_rdm(
 
 
 def _per_op_expectation_values_with_rdm(
-    rho_i:np.ndarray, 
-    rho_j:np.ndarray, 
+    rho_i:np.matrix, 
+    rho_j:np.matrix, 
     pauli_name:str,
     force_real:bool=True
 ) -> tuple[complex, complex]:
@@ -387,7 +387,7 @@ def _per_op_expectation_values_with_rdm(
         case 'z'|'Z':           
             rotated_rho_i = rho_i                        
             rotated_rho_j = rho_j                           
-        case 'y'|'Y':           
+        case 'y'|'Y':        
             rotated_rho_i = -1j * H @ rho_i @ pauli.z @ H                        
             rotated_rho_j = -1j * H @ rho_j @ pauli.z @ H                            
         case 'x'|'X':           
@@ -402,11 +402,17 @@ def _per_op_expectation_values_with_rdm(
     projection_j = _get_z_projection(rotated_rho_j)
 
     if force_real:
-        r_i = assertions.real(projection_i)
-        r_j = assertions.real(projection_j)
+        if DEBUG_MODE:
+            r_i = assertions.real(projection_i)
+            r_j = assertions.real(projection_j)
+        else:
+            r_i = float(projection_i.real)
+            r_j = float(projection_j.real)
+
     else:
         r_i = complex(projection_i)
         r_j = complex(projection_j)
+
 
     return r_i, r_j
 

@@ -110,8 +110,8 @@ def contract_to_mode_test(
 
 def contract_to_edge_test(
     d = 2,
-    D = 3,
-    chi = 20,
+    D = 4,
+    chi = 8,
     N = 4,
 ):
     ## Load or randomize unit_cell
@@ -121,7 +121,7 @@ def contract_to_edge_test(
         unit_cell.save(f"random_D={D}")
 
     mode = UpdateMode.A
-    edge = UpdateEdge(A, B)
+    edge = UpdateEdge(C, A)
     
     ##Contraction Sequence:
     full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
@@ -137,7 +137,7 @@ def contract_to_edge_test(
     results2 = derive_xyz_expectation_values_using_rdm(edge_tn)
 
 
-    for node in ['A', 'B']:
+    for node in ['A', 'C']:
         print(f"Node-{node!r}:")
         lis1 = []
         lis2 = []
