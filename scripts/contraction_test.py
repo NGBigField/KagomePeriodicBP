@@ -13,10 +13,14 @@ from algo.tn_reduction import reduce_full_kagome_to_core, reduce_core_to_mode, r
 
 # useful utils:
 from utils import visuals
-from matplotlib import pyplot as plt
 
 # For tests:
 from time import perf_counter
+
+
+A = UnitCellFlavor.A
+B = UnitCellFlavor.B
+C = UnitCellFlavor.C
 
 
 def contract_to_core_test(
@@ -106,17 +110,13 @@ def contract_to_edge_test(
     d = 2,
     D = 2,
     chi = 8,
-    N = 2,
+    N = 4,
 ):
     ## Load or randomize unit_cell
     unit_cell= UnitCell.load(f"random_D={D}")
     if unit_cell is None:
         unit_cell = UnitCell.random(d=d, D=D)
         unit_cell.save(f"random_D={D}")
-
-    A = UnitCellFlavor.A
-    B = UnitCellFlavor.B
-    C = UnitCellFlavor.C
 
     mode = UpdateMode.A
     edge = UpdateEdge(A, B)
@@ -128,7 +128,6 @@ def contract_to_edge_test(
     mode_tn = reduce_core_to_mode(core_tn, mode=mode)
     edge_tn = reduce_mode_to_edge_and_env(mode_tn, edge)
     print("Done")
-    edge_tn.plot()
 
 
     
