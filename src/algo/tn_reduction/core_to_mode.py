@@ -50,6 +50,10 @@ def reduce_core_to_mode(
     for node in new_nodes:
         node.functionality = NodeFunctionality.Environment
 
-    return ModeTN.from_arbitrary_tn(tn, mode=mode)
+    mode_tn = ModeTN.from_arbitrary_tn(tn, mode=mode)
+    if DEBUG_MODE:
+        mode_tn.validate()
+
+    return mode_tn
 
 

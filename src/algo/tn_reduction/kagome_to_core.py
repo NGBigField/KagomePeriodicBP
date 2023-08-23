@@ -317,5 +317,8 @@ def reduce_full_kagome_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bo
     if False:
         core_tn.plot()
 
+    if DEBUG_MODE:
+        core_tn.validate()
+
     return core_tn 
 

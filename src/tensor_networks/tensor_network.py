@@ -18,14 +18,18 @@ from lattices.directions import check, create
 
 # Other lattice structure:
 from tensor_networks.node import TensorNode
-from lattices.edges import edges_dict_from_edges_list, same_dicts
 from tensor_networks.unit_cell import UnitCell
+from lattices.edges import edges_dict_from_edges_list, same_dicts
 from lattices.kagome import KagomeLattice, Node, UpperTriangle
 import lattices.triangle as triangle_lattice
 
+# Common types:
 from _types import EdgeIndicatorType, PosScalarType, EdgesDictType
-
+from _error_types import TensorNetworkError, LatticeError, DirectionError, NetworkConnectionError
 from enums import NodeFunctionality, UpdateMode
+from containers import MessageDictType, Message, TNSizesAndDimensions, MPSOrientation
+
+# utilities used in our code:
 from utils import assertions, lists, tuples, numerics, indices, strings
 
 import numpy as np
@@ -37,15 +41,12 @@ import itertools
 import functools
 import operator
 
-from _error_types import TensorNetworkError, LatticeError, DirectionError, NetworkConnectionError
-from containers import MessageDictType, Message, TNSizesAndDimensions, MPSOrientation
-
 # Other supporting algo:
-from algo.mps import initial_message
+from algo.mps import initial_message, physical_tensor_with_split_mid_leg
 
 # For OOP:
 from abc import ABC, abstractmethod, abstractproperty
-from typing import Any, Self
+from typing import Any, Self, Final
 
 _T = TypeVar("_T")
 
@@ -406,6 +407,9 @@ class ArbitraryTN(BaseTensorNetwork):
         return _qr_decomposition(self, node, edges1, edges2)
 
 class _FrozenSpecificNetwork(BaseTensorNetwork):
+    num_core_tensors : int
+    num_env_tensors  : int
+
     def __init__(self, nodes:list[TensorNode], copy=True) -> None:
         if copy:
             nodes = _copy_nodes_and_fix_indices(nodes)
@@ -414,7 +418,6 @@ class _FrozenSpecificNetwork(BaseTensorNetwork):
     @classmethod
     def from_arbitrary_tn(cls, tn:ArbitraryTN, **kwargs) -> "_FrozenSpecificNetwork":        
         new = cls(tn.nodes, copy=False, **kwargs)
-        del tn
         return new
     
     def to_arbitrary_tn(self)->ArbitraryTN:
@@ -433,12 +436,22 @@ class _FrozenSpecificNetwork(BaseTensorNetwork):
     def nodes(self)->list[TensorNode]:
         return self._nodes
     
+    # ================================================= #
+    #|    Specific check for each inherited class      |#
+    # ================================================= #
+    def validate(self) -> None:
+        cls = type(self)
+        assert len(self.nodes) == cls.num_core_tensors + cls.num_env_tensors    
+        return super().validate()
+    
 
 class CoreTN(_FrozenSpecificNetwork):
+    num_core_tensors : Final[int] = 3*3
+    num_env_tensors  : Final[int] = 3*4
     all_mode_sides = [BlockSide.U, BlockSide.DL, BlockSide.DR]
 
-    def __init__(self, nodes: list[TensorNode], copy=True) -> None:
-        super().__init__(nodes, copy)
+    # def __init__(self, nodes: list[TensorNode], copy=True) -> None:
+    #     super().__init__(nodes, copy)
 
     # ================================================= #
     #|        Core nodes and their relations           |#
@@ -472,13 +485,15 @@ class CoreTN(_FrozenSpecificNetwork):
 
 
 class ModeTN(_FrozenSpecificNetwork):
+    num_core_tensors : Final[int] = 5
+    num_env_tensors  : Final[int] = 8
 
     def __init__(self, nodes: list[TensorNode], mode:UpdateMode, copy=True) -> None:
         super().__init__(nodes, copy)
         self.mode : UpdateMode = mode
     
     @classmethod 
-    def from_arbitrary_tn(cls, tn: ArbitraryTN, mode:UpdateMode) -> "ModeTN":
+    def from_arbitrary_tn(cls, tn:ArbitraryTN, mode:UpdateMode) -> "ModeTN":
         return super().from_arbitrary_tn(tn, mode=mode)
     
     def copy(self) -> Self:
@@ -496,8 +511,6 @@ class ModeTN(_FrozenSpecificNetwork):
         assert side in self.major_directions
         return [self.find_neighbor(self.center_node, direction) for direction in side.matching_lattice_directions()]
 
-
-
     # ================================================= #
     #|             Structure and Geometry              |#
     # ================================================= #
@@ -508,6 +521,37 @@ class ModeTN(_FrozenSpecificNetwork):
             case UpdateMode.B:  return [BlockSide.UR, BlockSide.DL]
             case UpdateMode.C:  return [BlockSide.UL, BlockSide.DR]
 
+
+class EdgeTN(_FrozenSpecificNetwork):
+    num_core_tensors : Final[int] = 2
+    num_env_tensors  : Final[int] = 6
+
+    # ================================================= #
+    #|        Core nodes and their relations           |#
+    # ================================================= #       
+
+    def _get_main_core_node(self, i)->TensorNode:
+        res = self.nodes[i]
+        assert res.functionality in [NodeFunctionality.CenterCore, NodeFunctionality.AroundCore]
+        return res
+    
+    @property
+    def node1(self)->TensorNode:
+        return self._get_main_core_node(0)
+    
+    @property
+    def node2(self)->TensorNode:
+        return self._get_main_core_node(1)
+    
+    @property
+    def open_env_tensors()->list[np.ndarray]:
+        environment_nodes = 0
+        environment_tensors = [physical_tensor_with_split_mid_leg(n) for n in environment_nodes]    # Open environment mps legs:        
+        return environment_tensors
+    
+    # ================================================= #
+    #|             Structure and Geometry              |#
+    # ================================================= #
 
 
 def _copy_nodes_and_fix_indices(nodes:list[TensorNode])->list[TensorNode]:

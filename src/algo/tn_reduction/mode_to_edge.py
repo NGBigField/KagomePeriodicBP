@@ -15,7 +15,7 @@ from _config_reader import DEBUG_MODE
 
 # Types we need in our module:
 from lattices.directions import Direction, LatticeDirection, BlockSide
-from tensor_networks import KagomeTN, ArbitraryTN, ModeTN, TensorNode, MPS, CoreTN, get_common_edge, get_common_edge_legs
+from tensor_networks import ArbitraryTN, ModeTN, EdgeTN, TensorNode, MPS, CoreTN, get_common_edge, get_common_edge_legs
 from tensor_networks import TensorNode
 from tensor_networks.node import TensorNode
 from enums import ContractionDepth, NodeFunctionality, UpdateMode
@@ -87,19 +87,19 @@ def _find_node_in_relative_direction(dir:LatticeDirection, n1:TensorNode, n2:Ten
         raise ValueError(f"None of nodes [{n1.name!r}, {n2.name!r}] are in correct relation with direction {dir.name!r}.")
 
 
-def _rearrange_tensors_legs_to_canonical_order(
-    tn_env:KagomeTN, side:None # Fix mode\side
-)->tuple[TensorNode, TensorNode, list[np.ndarray]]:
-    core_tensors = tn_env.get_nodes_by_functionality()
+def _rearrange_legs_into_canonical_order(
+    tn:ArbitraryTN, side:None # Fix mode\side
+)->EdgeTN:
+    core_tensors = tn.get_nodes_by_functionality()
     core1 = _find_node_in_relative_direction(side.next_counterclockwise(), *core_tensors)
     core2 = _find_node_in_relative_direction(side.next_clockwise(), *core_tensors)
     environment_nodes = [
-        tn_env.find_neighbor(core1, side),
-        tn_env.find_neighbor(core1, side.next_counterclockwise()),
-        tn_env.find_neighbor(core1, side.opposite()),
-        tn_env.find_neighbor(core2, side.opposite()),
-        tn_env.find_neighbor(core2, side.next_clockwise()),
-        tn_env.find_neighbor(core2, side),
+        tn.find_neighbor(core1, side),
+        tn.find_neighbor(core1, side.next_counterclockwise()),
+        tn.find_neighbor(core1, side.opposite()),
+        tn.find_neighbor(core2, side.opposite()),
+        tn.find_neighbor(core2, side.next_clockwise()),
+        tn.find_neighbor(core2, side),
     ]
 
     ## Rearrange legs in required order:
@@ -108,22 +108,6 @@ def _rearrange_tensors_legs_to_canonical_order(
     return core1, core2, environment_tensors
 
 
-#TODO assert used
-def calc_edge_environment(
-    tn:KagomeTN, mode:None,  #TODO fix mode type
-    bubblecon_trunc_dim:int, already_reduced_to_core:bool=False
-)->tuple[
-    TensorNode, TensorNode,         # core1/2
-    list[np.ndarray],         # environment
-    KagomeTN       # small_tn
-]:
-    ## Get the smallest Tensor-Network around the mode (edge):
-    tn_env = calc_reduced_tn_around_edge(tn, mode, bubblecon_trunc_dim, method, already_reduced_to_core)
-
-    ## get all tensors in correct order:
-    core1, core2, environment_tensors = _rearrange_tensors_legs_to_canonical_order(tn_env, mode)
-
-    return core1, core2, environment_tensors, tn_env
 
 
 """ ================================================================================================================ """
@@ -220,6 +204,19 @@ def _contract_all_nodes_except_neighbors(
     return tn, common_neighbor
 
 
+def _derive_commons_neighbor_edges_connections_as_a_matrix(
+    tn:ArbitraryTN,
+    common_neighbor:TensorNode,
+)->tuple[list[EdgeIndicatorType], list[EdgeIndicatorType]]:
+    inner_directions = [dir for dir in common_neighbor.directions if tn.find_neighbor(common_neighbor, dir).functionality!=NodeFunctionality.Environment]
+    outer_directions = [dir for dir in common_neighbor.directions if tn.find_neighbor(common_neighbor, dir).functionality==NodeFunctionality.Environment] 
+    directions_sorted = _sort_direction_by_angle_keeping_outer_directions_out(inner_directions, outer_directions)
+    assert len(directions_sorted)==4
+    edge1 = [common_neighbor.edge_in_dir(directions_sorted[i]) for i in [0,1]]
+    edge2 = [common_neighbor.edge_in_dir(directions_sorted[i]) for i in [2,3]]
+    return edge1, edge2 
+
+
 def reduce_mode_to_edge_and_env(
     mode_tn:ModeTN, 
     edge_tuple:UpdateEdge
@@ -231,16 +228,17 @@ def reduce_mode_to_edge_and_env(
     ## Contract everything except the mode and its neighbors:
     tn, common_neighbor = _contract_all_nodes_except_neighbors(mode_tn.to_arbitrary_tn(), node1, node2)
 
-    ## Decide which of the common_neighbor's legs fit where
-    inner_directions = [dir for dir in common_neighbor.directions if tn.find_neighbor(common_neighbor, dir).functionality!=NodeFunctionality.Environment]
-    outer_directions = [dir for dir in common_neighbor.directions if tn.find_neighbor(common_neighbor, dir).functionality==NodeFunctionality.Environment] 
-    directions_sorted = _sort_direction_by_angle_keeping_outer_directions_out(inner_directions, outer_directions)
-    assert len(directions_sorted)==4
-    edge1 = [common_neighbor.edge_in_dir(directions_sorted[i]) for i in [0,1]]
-    edge2 = [common_neighbor.edge_in_dir(directions_sorted[i]) for i in [2,3]]
+    ## Decide which of the common_neighbor's legs fit at which side:
+    edge1, edge2 = _derive_commons_neighbor_edges_connections_as_a_matrix(tn, common_neighbor)
 
     ## Split common neighbor using QE-decomposition:
     _, _ = tn.qr_decomp(common_neighbor, edge1, edge2)
+
+    ## Rearrange legs in a canonical order used in the input of `ite.rho_ij()`
+    env_tn = _rearrange_legs_into_canonical_order(0)
+
+    if DEBUG_MODE:
+        env_tn.validate()
 
     return tn
 
