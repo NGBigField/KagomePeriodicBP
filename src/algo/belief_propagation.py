@@ -20,7 +20,7 @@ from enums import ContractionDepth
 from containers import BPStats, BPConfig, MessageDictType, Message
 
 # needed algo:
-from algo.tensor_network import contract_tensor_network
+from algo.contract_tensor_network import contract_tensor_network
 
 # for ite stuff:
 from libs import ITE as ite

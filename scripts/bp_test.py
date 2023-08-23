@@ -10,7 +10,7 @@ from algo.belief_propagation import belief_propagation
 from containers import BPConfig
 
 # Measure core data
-from algo.core_measurements import measure_xyz_expectation_values_with_tn, calc_unit_cell_expectation_values, pauli
+from algo.measurements import measure_xyz_expectation_values_with_tn, calc_unit_cell_expectation_values, pauli
 
 # Numpy for math stuff:
 import numpy as np

@@ -29,7 +29,7 @@ from _error_types import BPNotConvergedError
 
 # Other needed algorithms:
 from algo.tensor_network import get_common_edge_legs, calc_edge_environment, reduce_tn_to_core_and_environment
-from algo.core_measurements import measure_xyz_expectation_values_with_tn, measure_core_energies, measure_xyz_expectation_values_with_rdms
+from algo.measurements import measure_xyz_expectation_values_with_tn, measure_core_energies, measure_xyz_expectation_values_with_rdms
 from algo.density_matrices import rho_ij_to_rho, calc_metrics
 
 from tensor_networks.construction import create_core, repeat_core

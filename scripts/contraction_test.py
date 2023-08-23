@@ -8,7 +8,7 @@ from enums import UpdateMode, UnitCellFlavor
 from containers import UpdateEdge
 
 # Algos we test here:
-from algo.core_measurements import measure_xyz_expectation_values_with_tn, measure_xyz_expectation_values_with_rdms
+from algo.measurements import measure_xyz_expectation_values_with_tn, measure_xyz_expectation_values_with_rdms
 from algo.tn_reduction import reduce_full_kagome_to_core, reduce_core_to_mode, reduce_mode_to_edge_and_env
 from libs.ITE import rho_ij
 
