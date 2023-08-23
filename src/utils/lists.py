@@ -188,17 +188,18 @@ def min_max(list_:List[_Numeric])->Tuple[_Numeric, _Numeric]:
     return min_, max_  # type: ignore
     
 def swap_items(lis:List[_T], i1:int, i2:int, copy:bool=True) -> List[_T]:
+    if copy:
+        lis = lis.copy()
+
+    if i1==i2:
+        return lis
+    
     item1 = lis[i1]
     item2 = lis[i2]
-    if copy:
-        new_list = lis.copy()
-        new_list[i1] = item2
-        new_list[i2] = item1
-        return new_list
-    else:
-        lis[i1] = item2
-        lis[i2] = item1
-        return lis
+    
+    lis[i1] = item2
+    lis[i2] = item1
+    return lis
 
 def random_item(lis:list[_T])->_T:
     n = len(lis)
@@ -224,7 +225,7 @@ def rearrange(l:List[_T], order:List[int]) -> List[_T]:
     # all indices are different and number of indices is correct:
     assert len(set(order))==len(order)==len(l)
 
-    ## rearange:
+    ## rearrange:
     return [ l[i] for i in order ]
 
 def is_sorted(l:list[int]|list[float])->bool:
@@ -286,7 +287,7 @@ def reversed(lis:list[_T])->_T:
     return res
 
 
-def cycle_items(lis:list[_T], k:int)->list[_T]:
+def cycle_items(lis:list[_T], k:int, copy:bool=True)->list[_T]:
     """Push items from the end to the beginning of the list in a cyclic manner
 
     ## Example1:
@@ -306,16 +307,18 @@ def cycle_items(lis:list[_T], k:int)->list[_T]:
     Returns:
         list[_T]: list of items with rotated items.
     """
-    l = lis.copy()
+    if copy:
+        lis = lis.copy()
+
     for _ in range(abs(k)):
         if k>0:
-            item = l.pop()
-            l.insert(0, item)
+            item = lis.pop()
+            lis.insert(0, item)
         else:
-            item = l.pop(0)
-            l.append(item)
+            item = lis.pop(0)
+            lis.append(item)
 
-    return l
+    return lis
 
 ## Test:
 if __name__ == "__main__":

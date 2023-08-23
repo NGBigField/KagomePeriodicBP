@@ -18,6 +18,7 @@ from _error_types import DirectionError
 
 EPSILON : Final = 0.000001
 NUM_MAIN_DIRECTIONS : Final = 6
+MAX_DIRECTIONS_STR_LENGTH = 2
 
 # ============================================================================ #
 #|                            Helper Functions                                |#
@@ -245,15 +246,13 @@ MATCHING_LATTICE_DIRECTIONS_TO_BLOCK_SIDES : Final[dict[BlockSide, list[LatticeD
 
 
 # ============================================================================ #
-#|                        Common Data Derived Once                            |#
+#|                            Helper Functions                                |#
 # ============================================================================ #
 
-MAX_DIRECTIONS_STR_LENGTH = 2
 
 # ============================================================================ #
-#|                           Declared Function                                |#
+#|                           Declared Functions                               |#
 # ============================================================================ #
-
 
 def next_clockwise_or_counterclockwise(dir:Direction, clockwise:bool=True)->Direction:
     if clockwise:
@@ -261,18 +260,6 @@ def next_clockwise_or_counterclockwise(dir:Direction, clockwise:bool=True)->Dire
     else:
         return dir.next_counterclockwise()
 
-
-def sort_by_clock_order(directions:list[Direction], clockwise:bool=True)->list[Direction]:
-    ## Try different first directions:
-    for dir_first in directions:
-        final_order = [dir_first]
-        dir_next = next_clockwise_or_counterclockwise(dir_first, clockwise)
-        while dir_next in directions:
-            final_order.append(dir_next)
-            dir_next = next_clockwise_or_counterclockwise(dir_next, clockwise)
-        if len(final_order)==len(directions):
-            return final_order
-    raise DirectionError("Directions are not related")
 
 class create:
     def mean_direction(directions:list[Direction])->Direction:
@@ -342,3 +329,46 @@ class check:
         if isinstance(dir, Direction):
             return True
         return False
+
+class sort:
+
+    def specific_typed_directions_by_clock_order(directions:list[Direction], clockwise:bool=True)->list[Direction]:
+        ## Try different first directions:
+        for dir_first in directions:
+            final_order = [dir_first]
+            dir_next = next_clockwise_or_counterclockwise(dir_first, clockwise)
+            while dir_next in directions:
+                final_order.append(dir_next)
+                dir_next = next_clockwise_or_counterclockwise(dir_next, clockwise)
+            if len(final_order)==len(directions):
+                return final_order
+        raise DirectionError("Directions are not related")
+
+
+    def arbitrary_directions_by_clock_order(first_direction:Direction, directions:list[Direction], clockwise:bool=True)->list[Direction]:
+        """Given many arbitrary directions, order them in clockwise order as a continuation of a given starting direction.
+
+        Args:
+            first_direction (Direction): The direction from which we draw the relation
+            directions (list[Direction]): The options.
+            clockwise (bool): The order (defaults to `True`)
+
+        Returns:
+            list[Direction]: The directions in clockwise/counter-clockwise order from all options.
+        """
+
+        ## Directions hierarchy key:
+        if clockwise:
+            key = lambda dir: -dir.angle
+        else:
+            key = lambda dir: dir.angle
+
+        ## Sort:
+        sorted_directions = sorted(directions, key=key)
+
+        ## Push first item in list until it is really the first:
+        i = sorted_directions.index(first_direction)
+        sorted_directions = lists.cycle_items(sorted_directions, -i, copy=False)
+        
+        return sorted_directions
+

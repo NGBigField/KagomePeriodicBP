@@ -14,7 +14,7 @@ if __name__ == "__main__":
 from _config_reader import DEBUG_MODE
 
 # Types we need in our module:
-from lattices.directions import Direction, LatticeDirection, BlockSide
+from lattices.directions import Direction, LatticeDirection, BlockSide, sort
 from tensor_networks import ArbitraryTN, ModeTN, EdgeTN, TensorNode, MPS, CoreTN, get_common_edge, get_common_edge_legs
 from tensor_networks import TensorNode
 from tensor_networks.node import TensorNode
@@ -29,83 +29,61 @@ from utils import lists, tuples
 import numpy as np
 
 
-
-def _rearrange_legs(
-    c1:TensorNode,
-    c2:TensorNode,
-    env:list[TensorNode],
-)->tuple[
-    TensorNode, TensorNode, list[TensorNode]
-]:
-    ## init Indices:
-    env_left_legs_indices = []
-    env_mid_legs_indices = []
-    env_right_legs_indices = []
-    c1_legs_indices = []
-    c2_legs_indices = []
-
-    ## core tensors start with legs towards each other:
-    i1, i2 = get_common_edge_legs(c1, c2)
-    c1_legs_indices.append(i1)
-    c2_legs_indices.append(i2)
-
-    ## Go counter-clockwise - relate core to environment:
-    # half touching to c1:
-    for m in env[0:3]:
-        i1, i2 = get_common_edge_legs(c1, m)
-        c1_legs_indices.append(i1)
-        env_mid_legs_indices.append(i2)
-    # half touching c2:
-    for m in env[3:]:
-        i1, i2 = get_common_edge_legs(c2, m)
-        c2_legs_indices.append(i1)
-        env_mid_legs_indices.append(i2)
-
-    ## Go counter-clockwise - check leg order of environment:
-    for prev, this, next in lists.iterate_with_periodic_prev_next_items(env):
-        i1, _ = get_common_edge_legs(this, prev)
-        env_left_legs_indices.append(i1)
-        i1, _ = get_common_edge_legs(this, next)
-        env_right_legs_indices.append(i1)
-
-    ## Permute:
-    c1.permute(c1_legs_indices)
-    c2.permute(c2_legs_indices)
-    for ind, i_left, i_mid, i_right in zip(range(len(env)), env_left_legs_indices, env_mid_legs_indices, env_right_legs_indices ,strict=True):
-        env[ind].permute([i_left, i_mid, i_right])
-
-    return c1, c2, env
+def _rearrange_tensors_and_legs_into_canonical_order(tn:ArbitraryTN)->None:
+    ## Basic info:
+    # Get core nodes:
+    cores = tn.nodes[:2]
+    # Find neighbors, not in order
+    neighbors1 = [node for node in tn.all_neighbors(cores[0]) if node is not cores[1]]
+    neighbors2 = [node for node in tn.all_neighbors(cores[1]) if node is not cores[0]]
+    # Check:
+    if DEBUG_MODE:
+        assert len(neighbors1) == len(neighbors2) == 3
+        assert cores[0].functionality in [NodeFunctionality.CenterCore, NodeFunctionality.AroundCore]
+        assert cores[1].functionality in [NodeFunctionality.CenterCore, NodeFunctionality.AroundCore]
 
 
-def _find_node_in_relative_direction(dir:LatticeDirection, n1:TensorNode, n2:TensorNode)->TensorNode:
-    vec = dir.unit_vector()
-    if tuples.equal( n1.pos, tuples.add(vec, n2.pos) ):
-        return n1
-    elif tuples.equal( n2.pos, tuples.add(vec, n1.pos) ):
-        return n2
-    else:
-        raise ValueError(f"None of nodes [{n1.name!r}, {n2.name!r}] are in correct relation with direction {dir.name!r}.")
+    # find middle leg between cores:
+    ie1, ie2 = get_common_edge_legs(cores[0], cores[1])
+    ## Rearrange the legs of the core nodes and the order of env_tensors connected to them:
+    env_index = 2
+    for core_node, edge_index in zip([cores[0], cores[1]], [ie1, ie2]):
+        ## Correct order of core_node legs:
+        direction_to_other_core = core_node.directions[edge_index]
+        ordered_directions = sort.arbitrary_directions_by_clock_order(direction_to_other_core, core_node.directions, clockwise=False)
+        permutation_order = [core_node.directions.index(dir) for dir in ordered_directions]
+        core_node.permute(permutation_order)
 
+        ## Correct the indices of the neighbors in the TN ordering of nodes:
+        for is_first, _, direction in lists.iterate_with_edge_indicators(core_node.directions):
+            # First directions should now be the other core:
+            if is_first:
+                if DEBUG_MODE:
+                    assert direction is direction_to_other_core
+                continue
+            
+            # Give node a new index:
+            neighbor = tn.find_neighbor(core_node, direction)
+            crnt_neighbor_index = tn.nodes.index(neighbor)
+            tn.swap_nodes(crnt_neighbor_index, env_index)
 
-def _rearrange_legs_into_canonical_order(
-    tn:ArbitraryTN, side:None # Fix mode\side
-)->EdgeTN:
-    core_tensors = tn.get_nodes_by_functionality()
-    core1 = _find_node_in_relative_direction(side.next_counterclockwise(), *core_tensors)
-    core2 = _find_node_in_relative_direction(side.next_clockwise(), *core_tensors)
-    environment_nodes = [
-        tn.find_neighbor(core1, side),
-        tn.find_neighbor(core1, side.next_counterclockwise()),
-        tn.find_neighbor(core1, side.opposite()),
-        tn.find_neighbor(core2, side.opposite()),
-        tn.find_neighbor(core2, side.next_clockwise()),
-        tn.find_neighbor(core2, side),
-    ]
+            env_index += 1
 
-    ## Rearrange legs in required order:
-    core1, core2, environment_nodes = _rearrange_legs(core1, core2, environment_nodes)
-    environment_tensors = [physical_tensor_with_split_mid_leg(n) for n in environment_nodes]    # Open environment mps legs:
-    return core1, core2, environment_tensors
+    ## Rearrange legs of env tensors:
+    env_tensors = tn.nodes[2:]
+    assert len(env_tensors) == 6, "Must have 6 environment tensors"
+    for prev, crnt, next in lists.iterate_with_periodic_prev_next_items(env_tensors):
+        for i, direction in enumerate(crnt.directions):
+            neighbor = tn.find_neighbor(crnt, direction) 
+            if   neighbor is prev:   i0 = i
+            elif neighbor in cores:  i1 = i
+            elif neighbor is next:   i2 = i
+            else:   
+                raise ValueError("Bug. Should have found a correct neighbor")
+        permutation_order = [i0, i1, i2]
+        crnt.permute(permutation_order)
+
+    return tn
 
 
 
@@ -235,10 +213,11 @@ def reduce_mode_to_edge_and_env(
     _, _ = tn.qr_decomp(common_neighbor, edge1, edge2)
 
     ## Rearrange legs in a canonical order used in the input of `ite.rho_ij()`
-    env_tn = _rearrange_legs_into_canonical_order(0)
+    _rearrange_tensors_and_legs_into_canonical_order(tn)
 
+    edge_tn = EdgeTN.from_arbitrary_tn(tn)
     if DEBUG_MODE:
-        env_tn.validate()
+        edge_tn.validate()
 
     return tn
 

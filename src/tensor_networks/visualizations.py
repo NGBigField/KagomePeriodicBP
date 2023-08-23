@@ -332,6 +332,7 @@ def plot_network(
         if detailed:
             text = f" [{node.index}]" + f" {name}" 
             plt.text(x, y, text)
+            assert i==node.index, "Non consistent indexing"
 
     ## Collect basic data:
     network_bounds = _derive_boundary(pos_list)

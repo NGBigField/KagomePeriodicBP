@@ -359,28 +359,6 @@ class ArbitraryTN(BaseTensorNetwork):
                 num_contracted_neighbors += crnt_num
         return nodes_to_keep_output_list
 
-    def replace(self, node:TensorNode):
-        #TODO Check if used
-        print("replace is used")
-
-        # validate:
-        ind = node.index
-        if DEBUG_MODE:
-            new_node = node  # for easier reading
-            old_node = self.nodes[ind]
-            _error_msg = f"Trying to replace node {old_node.name!r} with node {node.name!r}, but nodes don't match!"
-            old_shape = old_node.fused_tensor.shape
-            new_shape = new_node.fused_tensor.shape
-            assert len(old_shape)==len(new_shape), _error_msg
-            for i, (old_edge, old_direction) in enumerate(zip(old_node.edges, old_node.directions)):
-                old_dim, new_dim = old_shape[i], new_shape[i]
-                new_edge, new_direction = new_node.edges[i], new_node.directions[i]
-                assert new_edge==old_edge, _error_msg
-                assert new_direction==old_direction, _error_msg
-                assert new_dim==old_dim, _error_msg
-        # replace:
-        self.nodes[ind] = node
-
     def add_node(self, node:TensorNode):
         # Add node:
         assert node.index == len(self.nodes)
@@ -392,7 +370,17 @@ class ArbitraryTN(BaseTensorNetwork):
             self.nodes[i].index -= 1
         # pop from list:
         return self.nodes.pop(ind)
-    
+
+    def swap_nodes(self, i1:int, i2:int)->None:
+        if i1==i2:
+            return
+        n1 = self.nodes[i1]
+        n2 = self.nodes[i2]
+        self.nodes[i1] = n2
+        self.nodes[i2] = n1
+        n1.index = i2
+        n2.index = i1
+
     def qr_decomp(self, node:TensorNode, edges1:list[EdgeIndicatorType], edges2:list[EdgeIndicatorType])->tuple[TensorNode, TensorNode]:
         """Perform QR decomposition on a tensor, while preserving the relation to other tensors in the network via the inputs edges1/2
 
@@ -544,8 +532,8 @@ class EdgeTN(_FrozenSpecificNetwork):
         return self._get_main_core_node(1)
     
     @property
-    def open_env_tensors()->list[np.ndarray]:
-        environment_nodes = 0
+    def open_env_tensors(self)->list[np.ndarray]:
+        environment_nodes = self.nodes[2:]
         environment_tensors = [physical_tensor_with_split_mid_leg(n) for n in environment_nodes]    # Open environment mps legs:        
         return environment_tensors
     

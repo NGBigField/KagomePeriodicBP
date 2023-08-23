@@ -14,7 +14,7 @@ from _config_reader import DEBUG_MODE
 
 # Import our types and calsses:
 from tensor_networks import KagomeTN, TensorNode, CoreTN, ModeTN
-from lattices.directions import Direction, BlockSide, LatticeDirection, sort_by_clock_order
+from lattices.directions import Direction, BlockSide, LatticeDirection, sort
 from enums import ContractionDepth, NodeFunctionality
 
 ## For common types:
@@ -492,14 +492,14 @@ def _two_level_deep_sorted_clockwise_search(tn:ModeTN, node_level0:TensorNode, m
 
     # for all core nodes in clockwise order:
     directions_level1 = major_direction.matching_lattice_directions()
-    directions_level1_in_clockwise_order = sort_by_clock_order(directions_level1, clockwise=True )
+    directions_level1_in_clockwise_order = sort.specific_typed_directions_by_clock_order(directions_level1, clockwise=True )
     for direction_level1 in directions_level1_in_clockwise_order:
         node_level1 = tn.find_neighbor(node_level0, direction_level1)
         indices_level1.append(node_level1.index)
 
         # for all env nodes in clockwise order:
         directions_level2 = [dir for dir in node_level1.directions if tn.find_neighbor(node_level1, dir).functionality is NodeFunctionality.Environment  ]
-        directions_level2_in_clockwise_order = sort_by_clock_order(directions_level2, clockwise=True)
+        directions_level2_in_clockwise_order = sort.specific_typed_directions_by_clock_order(directions_level2, clockwise=True)
         for direction_level2 in directions_level2_in_clockwise_order:
             node_level2 = tn.find_neighbor(node_level1, direction_level2)
             indices_level2.append(node_level2.index)
