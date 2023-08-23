@@ -1,14 +1,21 @@
+
 if __name__ == "__main__":
-    import pathlib, sys
-    sys.path.append(
-        pathlib.Path(__file__).parent.parent.__str__()
-    )
+	import pathlib, sys
+	sys.path.append(
+		pathlib.Path(__file__).parent.parent.__str__()
+	)
+	sys.path.append(
+		pathlib.Path(__file__).parent.parent.parent.__str__()
+	)
+
 
 
 ## Get config:
 from _config_reader import DEBUG_MODE
 
+# Everyone needs numpy:
 import numpy as np
+
 
 # Other of our modules we need here:
 from libs.ITE import rho_ij
@@ -27,12 +34,15 @@ from containers.results import Measurements, Expectations
 from tensor_networks.construction import repeat_core
 from algo.tn_reduction import reduce_full_kagome_to_core
 from algo.belief_propagation import belief_propagation
+from algo.contract_tensor_network import contract_tensor_network
 from physics import pauli
 from lattices.directions import BlockSide
 
+# For energy estimation:
+from libs.ITE import rho_ij
 
 # Utils:
-from utils import assertions, logs, errors
+from utils import assertions, logs, errors, lists, parallel_exec, prints
 
 # A bit of OOP:
 from copy import deepcopy
@@ -50,41 +60,6 @@ H : np.matrix= np.matrix(
 ) / np.sqrt(2)   # Hadamard
 
 
-
-if __name__ == "__main__":
-	import pathlib, sys
-	sys.path.append(
-		pathlib.Path(__file__).parent.parent.__str__()
-	)
-	sys.path.append(
-		pathlib.Path(__file__).parent.parent.parent.__str__()
-	)
-
-
-# Control flags:
-from _config_reader import DEBUG_MODE
-
-# Everyone needs numpy:
-import numpy as np
-
-# For type annotation:
-from typing import TypeVar
-
-
-
-# Our utilities:
-from utils import lists, assertions, parallel_exec, prints
-
-# Our needed algos:
-from tensor_networks.tensor_network import get_common_edge_legs
-from tensor_networks.mps import physical_tensor_with_split_mid_leg
-from algo.contract_tensor_network import contract_tensor_network
-from algo.tn_reduction import reduce_full_kagome_to_core
-
-# For energy estimation:
-from libs.ITE import rho_ij
-
-
 MULTIPROCESSING = False
 
 TensorNetworkType = TypeVar("TensorNetworkType", bound=BaseTensorNetwork)
@@ -93,10 +68,6 @@ TensorNetworkType = TypeVar("TensorNetworkType", bound=BaseTensorNetwork)
 
 def _mean(list_:list[_T])->_T:
     return sum(list_)/len(list_)  #type: ignore
-
-
-def _get_z_projection(rho:np.ndarray)->complex:
-    return rho[0,0] - rho[1,1] 
 
 
 def measure_xyz_expectation_values_with_rdms(rdms:list[np.ndarray])->dict[str, float|complex]:
@@ -110,18 +81,7 @@ def measure_xyz_expectation_values_with_rdms(rdms:list[np.ndarray])->dict[str, f
         projections_per_axis = dict()
         for pauli_name in all_pauli_names:
 
-            match pauli_name:       
-                case 'z':           
-                    rotated_rho_i = rho_i                        
-                    rotated_rho_j = rho_j                           
-                case 'y':           
-                    rotated_rho_i = -1j * H @ rho_i @ pauli.z @ H                        
-                    rotated_rho_j = -1j * H @ rho_j @ pauli.z @ H                            
-                case 'x':           
-                    rotated_rho_i = H @ rho_i @ H                        
-                    rotated_rho_j = H @ rho_j @ H    
-                case _:
-                    raise ValueError("Not an option")
+
                 
             assert isinstance(rotated_rho_i, np.ndarray)
             assert isinstance(rotated_rho_j, np.ndarray)
@@ -347,7 +307,7 @@ def _sandwich_with_operator_and_contract_fully(
     direction:BlockSide,
     print_progress:bool=False
 ) -> complex|tuple:
-    # Replace fused-tensor <psi|psi> in `node_ind` with  <psi|Z|psi>:
+    # Replace ket tensor |psi> in `node_ind` with the bracket <psi|Z|psi>:
     tn_with_observable = _sandwich_fused_tensors_with_expectation_values(tn, operator, node_ind)
     ## Calculate Expectation Value:
     numerator, _, _ = contract_tensor_network(
@@ -362,7 +322,6 @@ def _sandwich_with_operator_and_contract_fully(
     return numerator
 
 
-
 def _expectation_values_with_rdm(
     rdm:np.ndarray,
     force_real:bool=True
@@ -370,12 +329,12 @@ def _expectation_values_with_rdm(
     rho_i = np.trace(rdm, axis1=2, axis2=3)
     rho_j = np.trace(rdm, axis1=0, axis2=1)
     return {
-        pauli_name : _per_op_expectation_values_with_rdm(rho_i, rho_j, pauli_name, force_real=force_real) 
+        pauli_name : _per_pauli_expectation_values_with_two_rdm(rho_i, rho_j, pauli_name, force_real=force_real) 
         for pauli_name in all_pauli_names
     }
 
 
-def _per_op_expectation_values_with_rdm(
+def _per_pauli_expectation_values_with_two_rdm(
     rho_i:np.matrix, 
     rho_j:np.matrix, 
     pauli_name:str,
@@ -383,38 +342,9 @@ def _per_op_expectation_values_with_rdm(
 ) -> tuple[complex, complex]:
     """ Compute expectation values of ab edge using its RDM
     """
-    match pauli_name:       
-        case 'z'|'Z':           
-            rotated_rho_i = rho_i                        
-            rotated_rho_j = rho_j                           
-        case 'y'|'Y':        
-            rotated_rho_i = -1j * H @ rho_i @ pauli.z @ H                        
-            rotated_rho_j = -1j * H @ rho_j @ pauli.z @ H                            
-        case 'x'|'X':           
-            rotated_rho_i = H @ rho_i @ H                        
-            rotated_rho_j = H @ rho_j @ H    
-        case _:
-            raise ValueError("Not an option")
-            
-    assert isinstance(rotated_rho_i, np.ndarray)
-    assert isinstance(rotated_rho_j, np.ndarray)
-    projection_i = _get_z_projection(rotated_rho_i)
-    projection_j = _get_z_projection(rotated_rho_j)
-
-    if force_real:
-        if DEBUG_MODE:
-            r_i = assertions.real(projection_i)
-            r_j = assertions.real(projection_j)
-        else:
-            r_i = float(projection_i.real)
-            r_j = float(projection_j.real)
-
-    else:
-        r_i = complex(projection_i)
-        r_j = complex(projection_j)
-
-
-    return r_i, r_j
+    projection_i = _calc_rdm_projection_in_axis(rho_i, pauli_name, force_real=force_real)
+    projection_j = _calc_rdm_projection_in_axis(rho_j, pauli_name, force_real=force_real)
+    return projection_i, projection_j
 
 
 #TODO assert used
@@ -430,7 +360,7 @@ def calc_interaction_energies_in_core(tn:KagomeTN, interaction_hamiltonain:np.nd
 
 
 def calc_unit_cell_expectation_values_from_tn(
-    tn:KagomeTN, 
+    tn:BaseTensorNetwork, 
     operators:list[np.matrix], 
     bubblecon_trunc_dim:int, 
     direction:BlockSide|None=None, 
@@ -459,6 +389,7 @@ def calc_unit_cell_expectation_values_from_tn(
 
     ## Perform all common actions:
     if reduce:
+        assert isinstance(tn, KagomeTN)
         tn_reduced = reduce_full_kagome_to_core(tn, bubblecon_trunc_dim, parallel)
     else:
         tn_reduced = tn
@@ -483,7 +414,7 @@ def calc_unit_cell_expectation_values_from_tn(
         for key in UnitCell.all_keys():
             prog_bar.next()
             index = unit_cell_indices[key]
-            value = calc_mean_value(
+            value = _calc_mean_value_by_bracket_tn(
                 tn_reduced, [index], operator, bubblecon_trunc_dim=bubblecon_trunc_dim, 
                 direction=direction, denominator=denominator, force_real=force_real,
                 print_progress=print_progress
@@ -494,8 +425,8 @@ def calc_unit_cell_expectation_values_from_tn(
     return results
 
 
-def calc_mean_value(
-    tn:KagomeTN, 
+def _calc_mean_value_by_bracket_tn(
+    tn:BaseTensorNetwork, 
     node_indices:list[int], 
     operator:np.matrix,
     bubblecon_trunc_dim:int, 
@@ -544,20 +475,57 @@ def calc_mean_value(
     return lists.average(expectation_values)
 
 
-def derive_xyz_expectation_values_with_tn(tn_stable_around_core:KagomeTN, reduce:bool=True, bubblecon_trunc_dim:int=18)->dict[str, float|complex]:
-    res = calc_unit_cell_expectation_values_from_tn(tn_stable_around_core, operators=all_paulis, bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=reduce)
+def _get_z_projection(rho:np.ndarray)->complex:
+    return rho[0,0] - rho[1,1] 
+
+
+def _rotate_rdm(rho:np.matrix, pauli_name:str)->np.matrix:
+    match pauli_name:       
+        case 'x'|'X':           
+            return H @ rho @ H                        
+        case 'y'|'Y':        
+            return -1j * H @ rho @ pauli.z @ H                            
+        case 'z'|'Z':           
+            return rho
+        case _:
+            raise ValueError("Not an option")
+
+
+def _calc_rdm_projection_in_axis(rho:np.matrix, pauli_name:str, force_real:bool=False)->complex|float:
+    ## Calculate:
+    rotated_rho = _rotate_rdm(rho, pauli_name)
+    projection =  _get_z_projection(rotated_rho)     
+
+    ## Real/Complex:
+    if force_real:
+        if DEBUG_MODE:
+            return assertions.real(projection)
+        else:
+            return float(np.real(projection))
+    else:
+        return complex(projection)
+
+
+def derive_xyz_expectation_values_with_tn(
+    tn:BaseTensorNetwork, 
+    reduce:bool=False, 
+    bubblecon_trunc_dim:int=18,
+    force_real:bool=True
+)->dict[str, float|complex]:
+    res = calc_unit_cell_expectation_values_from_tn(tn, operators=all_paulis, bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=force_real, reduce=reduce)
     return dict(x=res[0], y=res[1], z=res[2])
 
 
 def derive_xyz_expectation_values_using_rdm(
-    edge_tn:EdgeTN
+    edge_tn:EdgeTN,
+    force_real:bool=True
 ) -> dict[str, complex]:
     ## Get RDM:
     t1, t2, mps_env = edge_tn.edge_and_environment()
     rdm = rho_ij(t1, t2, mps_env=mps_env)
 
     ## Compute Expectation values:
-    per_ij_results = _expectation_values_with_rdm(rdm, force_real=True)
+    per_ij_results = _expectation_values_with_rdm(rdm, force_real=force_real)
 
     ## Rearrange:
     type1 = edge_tn.core1.unit_cell_flavor

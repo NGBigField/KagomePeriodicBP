@@ -110,9 +110,10 @@ def contract_to_mode_test(
 
 def contract_to_edge_test(
     d = 2,
-    D = 4,
-    chi = 8,
+    D = 2,
+    chi = 20,
     N = 4,
+    with_bp:bool = True
 ):
     ## Load or randomize unit_cell
     unit_cell= UnitCell.load(f"random_D={D}")
@@ -121,23 +122,27 @@ def contract_to_edge_test(
         unit_cell.save(f"random_D={D}")
 
     mode = UpdateMode.A
-    edge = UpdateEdge(C, A)
+    edge = UpdateEdge(B, C)
     
     ##Contraction Sequence:
     full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
-    full_tn.connect_random_messages()
+    if with_bp:
+        from algo.belief_propagation import belief_propagation, BPConfig
+        belief_propagation(full_tn, bp_config=BPConfig(max_swallowing_dim=chi//2))
+    else:        
+        full_tn.connect_random_messages()
+
     core_tn = reduce_full_kagome_to_core(full_tn, bubblecon_trunc_dim=chi)
     mode_tn = reduce_core_to_mode(core_tn.copy(), mode=mode)
     edge_tn = reduce_mode_to_edge_and_env(mode_tn.copy(), edge)
     print("Done")
 
-
     ## Get measurements in two different methods:
-    results1 = derive_xyz_expectation_values_with_tn(mode_tn, reduce=False)
-    results2 = derive_xyz_expectation_values_using_rdm(edge_tn)
+    results1 = derive_xyz_expectation_values_with_tn(mode_tn, bubblecon_trunc_dim=chi, force_real=False)
+    results2 = derive_xyz_expectation_values_using_rdm(edge_tn, force_real=False)
 
-
-    for node in ['A', 'C']:
+    ## Arrange results
+    for node in ['A', 'B', 'C']:
         print(f"Node-{node!r}:")
         lis1 = []
         lis2 = []

@@ -125,8 +125,8 @@ def _belief_propagation_step(
 @decorators.add_stats()
 def belief_propagation(
     tn:KagomeTN, 
-    messages:MessageDictType|None, # initial messages
-    bp_config:BPConfig,
+    messages:MessageDictType|None=None, # initial messages
+    bp_config:BPConfig=BPConfig(),
     live_plots:bool=False
 ) -> tuple[ 
     KagomeTN,
