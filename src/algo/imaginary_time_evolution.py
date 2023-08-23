@@ -29,7 +29,7 @@ from _error_types import BPNotConvergedError
 
 # Other needed algorithms:
 from algo.tensor_network import get_common_edge_legs, calc_edge_environment, reduce_tn_to_core_and_environment
-from algo.measurements import measure_xyz_expectation_values_with_tn, measure_core_energies, measure_xyz_expectation_values_with_rdms
+from algo.measurements import derive_xyz_expectation_values_with_tn, measure_core_energies, measure_xyz_expectation_values_with_rdms
 from algo.density_matrices import rho_ij_to_rho, calc_metrics
 
 from tensor_networks.construction import create_core, repeat_core
@@ -488,7 +488,7 @@ def full_ite(
         tn_open = _core_to_big_open_tn(core_in, config.tn)
         tn_stable, messages, bp_stats = belief_propagation(tn_open, messages, deepcopy(config.bp))  # Perform BlockBP:
         tn_stable_around_core = reduce_tn_to_core_and_environment(tn_stable, config.bubblecon_trunc_dim, method=config.reduce2core_method)
-        expectation_values = measure_xyz_expectation_values_with_tn(tn_stable_around_core, reduce=False)
+        expectation_values = derive_xyz_expectation_values_with_tn(tn_stable_around_core, reduce=False)
         energies_per_site, _ = measure_core_energies(tn_stable_around_core, config.ite.interaction_hamiltonain, config.bubblecon_trunc_dim)
         energy = sum(energies_per_site)/len(energies_per_site) 
 

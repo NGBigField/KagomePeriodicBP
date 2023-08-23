@@ -22,6 +22,7 @@ class UnitCell:
             case 'C': return self.C
             case _: 
                 raise KeyError("No an option")
+
        
     def all(self)->Generator[tuple[np_ndarray, UnitCellFlavor], None, None]:
         yield self.A, UnitCellFlavor.A
@@ -31,6 +32,7 @@ class UnitCell:
     @staticmethod
     def all_keys()->list[str]:
         return ["A", "B", "C"]
+    
     
     @staticmethod
     def size()->int:

@@ -515,7 +515,7 @@ class EdgeTN(_FrozenSpecificNetwork):
     num_env_tensors  : Final[int] = 6
 
     # ================================================= #
-    #|        Core nodes and their relations           |#
+    #|           nodes and their relations             |#
     # ================================================= #       
 
     def _get_main_core_node(self, i)->TensorNode:
@@ -537,6 +537,12 @@ class EdgeTN(_FrozenSpecificNetwork):
         assert len(environment_nodes)==6
         environment_tensors = [physical_tensor_with_split_mid_leg(n) for n in environment_nodes]    # Open environment mps legs:        
         return environment_tensors
+    
+    # ================================================= #
+    #|              Edge params for ITE                |#
+    # ================================================= #  
+    def edge_and_environment(self)->tuple[np.ndarray, np.ndarray, list[np.ndarray]]:
+        return self.core1.physical_tensor, self.core2.physical_tensor, self.open_mps_env
     
     # ================================================= #
     #|             Structure and Geometry              |#

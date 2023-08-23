@@ -10,7 +10,7 @@ from algo.belief_propagation import belief_propagation
 from containers import BPConfig
 
 # Measure core data
-from algo.measurements import measure_xyz_expectation_values_with_tn, calc_unit_cell_expectation_values, pauli
+from algo.measurements import derive_xyz_expectation_values_with_tn, calc_unit_cell_expectation_values_from_tn, pauli
 
 # Numpy for math stuff:
 import numpy as np
@@ -64,7 +64,7 @@ def bp_single_call(
     else:
         tn.connect_random_messages()
     
-    return calc_unit_cell_expectation_values(tn, operators=[pauli.x, pauli.y, pauli.z], bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=False)
+    return calc_unit_cell_expectation_values_from_tn(tn, operators=[pauli.x, pauli.y, pauli.z], bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=False)
 
 
 def growing_tn_bp_test2(
@@ -110,7 +110,7 @@ def growing_tn_bp_test2(
         else:
             tn.connect_random_messages()
         
-        results = calc_unit_cell_expectation_values(tn, operators=[pauli.x, pauli.y, pauli.z], bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=False)
+        results = calc_unit_cell_expectation_values_from_tn(tn, operators=[pauli.x, pauli.y, pauli.z], bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=False)
         zs = results[2]
         print(zs)
         a = zs['A']
@@ -145,7 +145,7 @@ def growing_tn_bp_test(
     ## small network:
     small_tn = create_kagome_tn(d=d, D=D, N=bp_N, unit_cell=unit_cell)
     small_tn, messages, stats = belief_propagation(small_tn, messages=None, bp_config=bp_config)
-    small_res = measure_xyz_expectation_values_with_tn(small_tn, reduce=False)
+    small_res = derive_xyz_expectation_values_with_tn(small_tn, reduce=False)
     print(" ")
     print("Base values")
     print(small_res)
@@ -156,7 +156,7 @@ def growing_tn_bp_test(
     for N in range(min_N, max_N+1):
         big_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
         big_tn.connect_random_messages()
-        big_res = measure_xyz_expectation_values_with_tn(big_tn, reduce=False)
+        big_res = derive_xyz_expectation_values_with_tn(big_tn, reduce=False)
         print(" ")
         print(f"N={N:2}: ")
         print(big_res)

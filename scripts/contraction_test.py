@@ -1,16 +1,16 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 
 # Tensor-Networks creation:
-from tensor_networks.construction import create_kagome_tn, UnitCell
+from tensor_networks.construction import create_kagome_tn
 
 # Types in the code:
 from enums import UpdateMode, UnitCellFlavor
 from containers import UpdateEdge
+from tensor_networks.unit_cell import UnitCell
 
 # Algos we test here:
-from algo.measurements import measure_xyz_expectation_values_with_tn, measure_xyz_expectation_values_with_rdms
+from algo.measurements import derive_xyz_expectation_values_with_tn, derive_xyz_expectation_values_using_rdm
 from algo.tn_reduction import reduce_full_kagome_to_core, reduce_core_to_mode, reduce_mode_to_edge_and_env
-from libs.ITE import rho_ij
 
 # useful utils:
 from utils import visuals
@@ -58,7 +58,7 @@ def contract_to_core_test(
         tn.connect_random_messages()
         for reduce in [False, True]:
             t1 = perf_counter()
-            res = measure_xyz_expectation_values_with_tn(tn, reduce=reduce)
+            res = derive_xyz_expectation_values_with_tn(tn, reduce=reduce)
             t2 = perf_counter()
             time = t2-t1
             print("   ")
@@ -90,19 +90,19 @@ def contract_to_mode_test(
     # Full tn:
     full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     full_tn.connect_random_messages()
-    res = measure_xyz_expectation_values_with_tn(full_tn, reduce=False)
+    res = derive_xyz_expectation_values_with_tn(full_tn, reduce=False)
     print(res['x'])
     # contract network:
     core_tn = reduce_full_kagome_to_core(full_tn, bubblecon_trunc_dim=chi)
     # base results:
-    res = measure_xyz_expectation_values_with_tn(core_tn, reduce=False)
+    res = derive_xyz_expectation_values_with_tn(core_tn, reduce=False)
     print(res['x'])
 
     for mode in UpdateMode:
     
         # contract to mode:
         mode_tn = reduce_core_to_mode(core_tn.copy(), bubblecon_trunc_dim=chi, mode=mode)
-        res = measure_xyz_expectation_values_with_tn(mode_tn, reduce=False)
+        res = derive_xyz_expectation_values_with_tn(mode_tn, reduce=False)
         print(res['x'])
 
     print("Done")
@@ -110,8 +110,8 @@ def contract_to_mode_test(
 
 def contract_to_edge_test(
     d = 2,
-    D = 2,
-    chi = 8,
+    D = 3,
+    chi = 20,
     N = 4,
 ):
     ## Load or randomize unit_cell
@@ -127,13 +127,28 @@ def contract_to_edge_test(
     full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     full_tn.connect_random_messages()
     core_tn = reduce_full_kagome_to_core(full_tn, bubblecon_trunc_dim=chi)
-    mode_tn = reduce_core_to_mode(core_tn, mode=mode)
-    edge_tn = reduce_mode_to_edge_and_env(mode_tn, edge)
+    mode_tn = reduce_core_to_mode(core_tn.copy(), mode=mode)
+    edge_tn = reduce_mode_to_edge_and_env(mode_tn.copy(), edge)
     print("Done")
 
+
     ## Get measurements in two different methods:
-    rho = rho_ij(edge_tn.core1.physical_tensor, edge_tn.core2.physical_tensor, edge_tn.open_mps_env)
-    print(rho)
+    results1 = derive_xyz_expectation_values_with_tn(mode_tn, reduce=False)
+    results2 = derive_xyz_expectation_values_using_rdm(edge_tn)
+
+
+    for node in ['A', 'B']:
+        print(f"Node-{node!r}:")
+        lis1 = []
+        lis2 = []
+        for op in ['x', 'y', 'z']:
+            res1 = results1[op][node]            
+            res2 = results2[op][node]
+            lis1.append( res1 )
+            lis2.append( res2 )
+            
+        print(f"    {lis1}")
+        print(f"    {lis2}")
 
 
     print("Done")

@@ -15,7 +15,7 @@ from libs.ITE import rho_ij
 
 # Common types in the code:
 from containers import Config, BubbleConConfig
-from tensor_networks import KagomeTN, BaseTensorNetwork, ModeTN, TensorNode, MPS
+from tensor_networks import KagomeTN, BaseTensorNetwork, ModeTN, EdgeTN, TensorNode, MPS
 from lattices.directions import BlockSide, check
 from _error_types import TensorNetworkError, BPNotConvergedError
 from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor
@@ -91,21 +91,12 @@ TensorNetworkType = TypeVar("TensorNetworkType", bound=BaseTensorNetwork)
 
 
 
-
-
-
-
 def _mean(list_:list[_T])->_T:
     return sum(list_)/len(list_)  #type: ignore
 
 
 def _get_z_projection(rho:np.ndarray)->complex:
     return rho[0,0] - rho[1,1] 
-
-
-def measure_xyz_expectation_values_with_tn(tn_stable_around_core:KagomeTN, reduce:bool=True, bubblecon_trunc_dim:int=18)->dict[str, float|complex]:
-    res = calc_unit_cell_expectation_values(tn_stable_around_core, operators=all_paulis, bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=reduce)
-    return dict(x=res[0], y=res[1], z=res[2])
 
 
 def measure_xyz_expectation_values_with_rdms(rdms:list[np.ndarray])->dict[str, float|complex]:
@@ -117,7 +108,7 @@ def measure_xyz_expectation_values_with_rdms(rdms:list[np.ndarray])->dict[str, f
         rho_j = np.trace(rdm_ij, axis1=0, axis2=1)
 
         projections_per_axis = dict()
-        for pauli_name, pauli_op in zip(all_pauli_names, all_paulis, strict=True):
+        for pauli_name in all_pauli_names:
 
             match pauli_name:       
                 case 'z':           
@@ -212,9 +203,9 @@ def _measurements_everything_on_duplicated_core_specific_size(
         expectation_values = measure_xyz_expectation_values_with_rdms(rdms)
     else:
         if reduce_for_xyz:
-            expectation_values = measure_xyz_expectation_values_with_tn(tn_stable_around_core, reduce=False)
+            expectation_values = derive_xyz_expectation_values_with_tn(tn_stable_around_core, reduce=False)
         else:
-            expectation_values = measure_xyz_expectation_values_with_tn(tn_stable, reduce=False)
+            expectation_values = derive_xyz_expectation_values_with_tn(tn_stable, reduce=False)
 
     ## Pack results:
     measurements = Measurements(
@@ -265,7 +256,6 @@ def measurements_everything_on_duplicated_core(
     assert measurements is not None, f"Not even a single attempt succeeded"
     assert isinstance(measurements, Measurements) , f"Not even a single attempt succeeded"
     return measurements
-
 
 
 def _sandwich_fused_tensors_with_expectation_values(tn_in:TensorNetworkType, mat:np.matrix, ind:int)->TensorNetworkType:
@@ -372,6 +362,55 @@ def _sandwich_with_operator_and_contract_fully(
     return numerator
 
 
+
+def _expectation_values_with_rdm(
+    rdm:np.ndarray,
+    force_real:bool=True
+) -> dict[str, tuple[complex, complex]]:
+    rho_i = np.trace(rdm, axis1=2, axis2=3)
+    rho_j = np.trace(rdm, axis1=0, axis2=1)
+    return {
+        pauli_name : _per_op_expectation_values_with_rdm(rho_i, rho_j, pauli_name, force_real=force_real) 
+        for pauli_name in all_pauli_names
+    }
+
+
+def _per_op_expectation_values_with_rdm(
+    rho_i:np.ndarray, 
+    rho_j:np.ndarray, 
+    pauli_name:str,
+    force_real:bool=True
+) -> tuple[complex, complex]:
+    """ Compute expectation values of ab edge using its RDM
+    """
+    match pauli_name:       
+        case 'z'|'Z':           
+            rotated_rho_i = rho_i                        
+            rotated_rho_j = rho_j                           
+        case 'y'|'Y':           
+            rotated_rho_i = -1j * H @ rho_i @ pauli.z @ H                        
+            rotated_rho_j = -1j * H @ rho_j @ pauli.z @ H                            
+        case 'x'|'X':           
+            rotated_rho_i = H @ rho_i @ H                        
+            rotated_rho_j = H @ rho_j @ H    
+        case _:
+            raise ValueError("Not an option")
+            
+    assert isinstance(rotated_rho_i, np.ndarray)
+    assert isinstance(rotated_rho_j, np.ndarray)
+    projection_i = _get_z_projection(rotated_rho_i)
+    projection_j = _get_z_projection(rotated_rho_j)
+
+    if force_real:
+        r_i = assertions.real(projection_i)
+        r_j = assertions.real(projection_j)
+    else:
+        r_i = complex(projection_i)
+        r_j = complex(projection_j)
+
+    return r_i, r_j
+
+
 #TODO assert used
 def calc_interaction_energies_in_core(tn:KagomeTN, interaction_hamiltonain:np.ndarray, bubblecon_trunc_dim:int) -> list[float]:
     energies = []
@@ -384,7 +423,7 @@ def calc_interaction_energies_in_core(tn:KagomeTN, interaction_hamiltonain:np.nd
     return energies
 
 
-def calc_unit_cell_expectation_values(
+def calc_unit_cell_expectation_values_from_tn(
     tn:KagomeTN, 
     operators:list[np.matrix], 
     bubblecon_trunc_dim:int, 
@@ -434,7 +473,7 @@ def calc_unit_cell_expectation_values(
 
     ## Perform calculation per operator:
     for operator in operators:     
-        res_unit_cell = UnitCell(A=0.0, B=0.0, C=0.0)   
+        res_unit_cell = dict(A=0.0, B=0.0, C=0.0)   
         for key in UnitCell.all_keys():
             prog_bar.next()
             index = unit_cell_indices[key]
@@ -443,7 +482,7 @@ def calc_unit_cell_expectation_values(
                 direction=direction, denominator=denominator, force_real=force_real,
                 print_progress=print_progress
             )
-            res_unit_cell.__setattr__(key, value)
+            res_unit_cell[key] = value
         results.append(res_unit_cell)
     prog_bar.clear()
     return results
@@ -499,7 +538,31 @@ def calc_mean_value(
     return lists.average(expectation_values)
 
 
+def derive_xyz_expectation_values_with_tn(tn_stable_around_core:KagomeTN, reduce:bool=True, bubblecon_trunc_dim:int=18)->dict[str, float|complex]:
+    res = calc_unit_cell_expectation_values_from_tn(tn_stable_around_core, operators=all_paulis, bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=reduce)
+    return dict(x=res[0], y=res[1], z=res[2])
 
+
+def derive_xyz_expectation_values_using_rdm(
+    edge_tn:EdgeTN
+) -> dict[str, complex]:
+    ## Get RDM:
+    t1, t2, mps_env = edge_tn.edge_and_environment()
+    rdm = rho_ij(t1, t2, mps_env=mps_env)
+
+    ## Compute Expectation values:
+    per_ij_results = _expectation_values_with_rdm(rdm, force_real=True)
+
+    ## Rearrange:
+    type1 = edge_tn.core1.unit_cell_flavor
+    type2 = edge_tn.core2.unit_cell_flavor
+    res = {}
+    for key, values in per_ij_results.items():
+        crnt_res = dict(A=None, B=None, C=None)
+        for value, type_ in zip(values, [type1, type2], strict=True):
+            crnt_res[type_.name] = value
+        res[key] = crnt_res
+    return res
 
 
 

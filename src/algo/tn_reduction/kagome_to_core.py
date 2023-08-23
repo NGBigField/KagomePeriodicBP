@@ -282,7 +282,7 @@ def _add_env_tensors_to_open_core(small_tn:ArbitraryTN, env_tensors:list[TensorN
         if not check.is_opposite(this.directions[-1], next.directions[0]) and this.directions[0] is prev.directions[0]:
             next.directions[0] = this.directions[0]
 
-    return CoreTN.from_arbitrary_tn(small_tn)
+    return small_tn
 
 
 
@@ -312,11 +312,9 @@ def reduce_full_kagome_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bo
     env_tensors = _environment_tensors_in_canonical_order(mpss, directions, num_side_overlap_connections, )
 
     ## add tensors-nodes into the tensor-network with the correct direction 
-    core_tn = _add_env_tensors_to_open_core(open_core_tn, env_tensors)
+    small_tn = _add_env_tensors_to_open_core(open_core_tn, env_tensors)
 
-    if False:
-        core_tn.plot()
-
+    core_tn = CoreTN.from_arbitrary_tn(small_tn)
     if DEBUG_MODE:
         core_tn.validate()
 
