@@ -64,6 +64,50 @@ MULTIPROCESSING = False
 TensorNetworkType = TypeVar("TensorNetworkType", bound=BaseTensorNetwork)
 
 
+
+
+
+def _find_not_none_item_in_double_dict( d :dict[str, dict[str, _T]], keys1, keys2) -> _T:
+    for k1 in keys1:
+        for k2 in keys2:
+            item = d[k1][k2]
+            if item is not None:
+                return item
+
+
+def print_results_table(results:dict[str, dict[str, float]])->None:
+    node_keys = ["A", "B", "C"]
+    proj_keys = ["x", "y", "z"]
+    space_per_node = 25
+    space_between_numbers = 3
+    space_per_number = space_per_node - space_between_numbers
+
+    _dummy = _find_not_none_item_in_double_dict(results, proj_keys, node_keys)
+    if isinstance(_dummy, complex):
+        space_per_node *= 2
+
+
+    row_str = "   "+" "*space_between_numbers
+    for node_key in node_keys:
+        s = " "*(space_per_node//2)+f"{node_key}"+" "*(space_per_node//2-1)
+        row_str += s
+    print(row_str)
+
+    for proj_key in proj_keys:
+        proj_res = results[proj_key]
+        row_str = f" {proj_key}:"+" "*space_between_numbers
+        for node_key in node_keys:
+            node_proj_res = proj_res[node_key]
+            if node_proj_res is None:
+                s = " "*(space_per_node-2)
+            else:
+                s = strings.formatted(node_proj_res, fill=' ', alignment="<", width=space_per_number, precision=space_per_number-3, signed=True)
+                s += " "*space_between_numbers
+            row_str += s
+        print(row_str)
+
+
+
 def _mean(list_:list[_T])->_T:
     return sum(list_)/len(list_)  #type: ignore
         
@@ -282,7 +326,7 @@ def _sandwich_with_operator_and_contract_fully(
     return numerator
 
 
-def _expectation_values_with_rdm(
+def expectation_values_with_rdm(
     rdm:np.ndarray,
     force_real:bool=True
 ) -> dict[str, tuple[complex, complex]]:
@@ -444,17 +488,26 @@ def _rotate_rdm(rho:np.matrix, pauli_name:str)->np.matrix:
         case 'x'|'X':           
             return H @ rho @ H                        
         case 'y'|'Y':        
-            return -1j * H @ Z @ rho @ H  #TODO: Check why (-)
+            return 1j * H @ Z @ rho @ H  
         case 'z'|'Z':           
             return rho
         case _:
             raise ValueError("Not an option")
 
 
-def _calc_rdm_projection_in_axis(rho:np.matrix, pauli_name:str, force_real:bool=False)->complex|float:
+def _calc_rdm_projection_in_axis(rho:np.matrix, pauli_name:str, force_real:bool=False, using_rotation_method:bool=False)->complex|float:
+
     ## Calculate:
-    rotated_rho = _rotate_rdm(rho, pauli_name)
-    projection =  _get_z_projection(rotated_rho)     
+    if using_rotation_method:
+        rotated_rho = _rotate_rdm(rho, pauli_name)
+        projection =  _get_z_projection(rotated_rho)     
+    else:
+        obs = pauli.by_name(pauli_name)
+        projection = np.trace( obs @ rho )
+
+    ## Fix y values:   #TODO: Check why (-)
+    if pauli_name=='y':
+        projection *= -1
 
     ## Real/Complex:
     if force_real:
@@ -481,11 +534,12 @@ def derive_xyz_expectation_values_using_rdm(
     force_real:bool=True
 ) -> dict[str, complex]:
     ## Get RDM:
+    assert isinstance(edge_tn, EdgeTN)
     t1, t2, mps_env = edge_tn.edge_and_environment()
     rdm = rho_ij(t1, t2, mps_env=mps_env)
 
     ## Compute Expectation values:
-    per_ij_results = _expectation_values_with_rdm(rdm, force_real=force_real)
+    per_ij_results = expectation_values_with_rdm(rdm, force_real=force_real)
 
     ## Rearrange:
     type1 = edge_tn.core1.unit_cell_flavor
@@ -497,45 +551,6 @@ def derive_xyz_expectation_values_using_rdm(
             crnt_res[type_.name] = value
         res[key] = crnt_res
     return res
-
-def _find_not_none_item_in_double_dict( d :dict[str, dict[str, _T]], keys1, keys2) -> _T:
-    for k1 in keys1:
-        for k2 in keys2:
-            item = d[k1][k2]
-            if item is not None:
-                return item
-
-
-def print_results_table(results:dict[str, dict[str, float]])->None:
-    node_keys = ["A", "B", "C"]
-    proj_keys = ["x", "y", "z"]
-    space_per_node = 25
-    space_between_numbers = 3
-    space_per_number = space_per_node - space_between_numbers
-
-    _dummy = _find_not_none_item_in_double_dict(results, proj_keys, node_keys)
-    if isinstance(_dummy, complex):
-        space_per_node *= 2
-
-
-    row_str = "   "+" "*space_between_numbers
-    for node_key in node_keys:
-        s = " "*(space_per_node//2)+f"{node_key}"+" "*(space_per_node//2-1)
-        row_str += s
-    print(row_str)
-
-    for proj_key in proj_keys:
-        proj_res = results[proj_key]
-        row_str = f" {proj_key}:"+" "*space_between_numbers
-        for node_key in node_keys:
-            node_proj_res = proj_res[node_key]
-            if node_proj_res is None:
-                s = " "*(space_per_node-2)
-            else:
-                s = strings.formatted(node_proj_res, fill=' ', alignment="<", width=space_per_number, precision=space_per_number-3, signed=True)
-                s += " "*space_between_numbers
-            row_str += s
-        print(row_str)
 
 
 if __name__ == "__main__":

@@ -20,6 +20,13 @@ id = np.matrix(
 )
 
 
+PAULI_OPERATORS : dict[str, np.matrix] = dict(
+    x = x,
+    y = y,
+    z = z
+)
+
+
 @overload
 def all_paulis(with_names:bool=False)->Generator[np.matrix, None, None]:...
 @overload
@@ -31,3 +38,6 @@ def all_paulis(with_names:bool=False)->Generator[tuple[np.matrix, str]|np.matrix
             yield op, name
         else:
             yield op
+
+def by_name(name:str)->np.matrix:
+    return PAULI_OPERATORS[name]

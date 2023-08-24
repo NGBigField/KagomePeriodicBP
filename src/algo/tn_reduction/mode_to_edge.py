@@ -156,25 +156,27 @@ def _contract_all_nodes_except_neighbors(
     node2:TensorNode = tn.nodes[i2]
 
     ## Find immediate neighbors:
-    neighbors = []
     common_neighbor : TensorNode = None
+    other_neighbors = []
     for node in tn.nodes:
         if node is node1 or node is node2:
             continue
         is_neighbor1 = tn.are_neighbors(node, node1) 
         is_neighbor2 = tn.are_neighbors(node, node2)
-        if is_neighbor1 or is_neighbor2:
-            neighbors.append(node)
         if is_neighbor1 and is_neighbor2:
             common_neighbor = node
+        elif is_neighbor1 or is_neighbor2:
+            other_neighbors.append(node)
     assert common_neighbor is not None, "Bug. We must find a common neighbor"
 
     ## Contract all tensors than we don't need:
-    nodes_to_keep_old = neighbors+[node1, node2]
-    nodes_to_keep_new = tn.contract_all_nodes_with_exceptions(nodes_to_keep_old)
+    # this order forces the common neighbor to draw most of the neighbor to be swallowed by it:
+    nodes_to_keep_old = [common_neighbor, node1, node2] + other_neighbors   
+    # Swallow everything except the neighbors of the 2 core nodes:
+    nodes_to_keep_new = tn.contract_all_nodes_into_exceptions(nodes_to_keep_old)
 
     ## Update common_neighbor:
-    common_neighbor = nodes_to_keep_new[nodes_to_keep_old.index(common_neighbor)]
+    common_neighbor = nodes_to_keep_new[0]  # The new list keeps the same order
 
     ## mark all env nodes:
     for node in tn.nodes:
@@ -185,7 +187,7 @@ def _contract_all_nodes_except_neighbors(
     return tn, common_neighbor
 
 
-def _derive_commons_neighbor_edges_connections_as_a_matrix(
+def _derive_commons_neighbors_connections_if_it_was_a_matrix(
     tn:ArbitraryTN,
     common_neighbor:TensorNode,
 )->tuple[list[EdgeIndicatorType], list[EdgeIndicatorType]]:
@@ -198,7 +200,7 @@ def _derive_commons_neighbor_edges_connections_as_a_matrix(
     return edge1, edge2 
 
 
-def reduce_mode_to_edge_and_env(
+def reduce_mode_to_edge(
     mode_tn:ModeTN, 
     edge_tuple:UpdateEdge,
     copy:bool=True
@@ -212,7 +214,7 @@ def reduce_mode_to_edge_and_env(
     tn, common_neighbor = _contract_all_nodes_except_neighbors(tn, i1, i2)
 
     ## Decide which of the common_neighbor's legs fit at which side:
-    edge1, edge2 = _derive_commons_neighbor_edges_connections_as_a_matrix(tn, common_neighbor)
+    edge1, edge2 = _derive_commons_neighbors_connections_if_it_was_a_matrix(tn, common_neighbor)
 
     ## Split common neighbor using QE-decomposition:
     _, _ = tn.qr_decomp(common_neighbor, edge1, edge2)

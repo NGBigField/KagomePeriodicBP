@@ -162,7 +162,7 @@ class BaseTensorNetwork(ABC):
     
     def nodes_connected_to_edge(self, edge:str)->list[TensorNode]:
         indices = self.edges_dict[edge]
-        indices = list(set(indices))  # If the tensor apears twice, get only 1 copy of its index.
+        indices = list(set(indices))  # If the tensor appears twice, get only 1 copy of its index.
         return [ self.nodes[node_ind] for node_ind in indices ]
 
     def _find_neighbor_by_edge(self, node:TensorNode, edge:EdgeIndicatorType)->TensorNode:
@@ -341,23 +341,20 @@ class ArbitraryTN(BaseTensorNetwork):
     def contract(self, n1:TensorNode|int, n2:TensorNode|int)->TensorNode:
         return _contract_nodes(self, n1, n2)
     
-    def contract_all_nodes_with_exceptions(self, nodes_to_keep:list[TensorNode])->list[TensorNode]:        
-        nodes_to_keep_efficient_set = set(nodes_to_keep) 
-        nodes_to_keep_output_list = nodes_to_keep.copy()  # We return a relative list with all displaced nodes
+    def contract_all_nodes_into_exceptions(self, nodes_to_keep:list[TensorNode])->list[TensorNode]:        
+        to_keep_updated = nodes_to_keep.copy()  # We return a relative list with all displaced nodes
         ## At each stage of the loop, contract only immediate neighbors, until no more neighbors:
         num_contracted_neighbors = np.inf
         while num_contracted_neighbors>0:
             num_contracted_neighbors = 0
             ## Get a simple iterable list of nodes to keep:
-            this_round_order = list(nodes_to_keep_efficient_set)
-            for old_node_to_keep in this_round_order:
+            for old_node_to_keep in to_keep_updated:
                 ## For each such node, contract all its neighbors that are not "to-keep"
-                new_node_to_keep, crnt_num = _contract_immediate_neighbors(self, old_node_to_keep, nodes_to_keep_efficient_set)
+                new_node_to_keep, crnt_num = _contract_immediate_neighbors(self, old_node_to_keep, to_keep_updated)
                 ## Update set and counter:
-                _replace_items(nodes_to_keep_efficient_set, old_node_to_keep, new_node_to_keep)
-                _replace_items(nodes_to_keep_output_list, old_node_to_keep, new_node_to_keep)
+                _replace_items(to_keep_updated, old_node_to_keep, new_node_to_keep)
                 num_contracted_neighbors += crnt_num
-        return nodes_to_keep_output_list
+        return to_keep_updated
 
     def add_node(self, node:TensorNode):
         # Add node:
@@ -1075,7 +1072,6 @@ def _contract_nodes(tn:ArbitraryTN, n1:TensorNode|int, n2:TensorNode|int)->Tenso
             _fuse_double_legs(new_node, neighbor, changed_leg_index)
         seen_neighbors.add(neighbor.index)
 
-
     ## Check:
     if DEBUG_MODE: tn.validate()
     return new_node
@@ -1097,7 +1093,7 @@ def _contract_until_no_more_neighbors_to_contract_into_this_node(tn:ArbitraryTN,
     return major_node
 
 
-def _contract_immediate_neighbors(tn:ArbitraryTN, major_node:TensorNode, nodes_to_keep:set[TensorNode])->tuple[TensorNode, int]:
+def _contract_immediate_neighbors(tn:ArbitraryTN, major_node:TensorNode, nodes_to_keep:list[TensorNode])->tuple[TensorNode, int]:
     counter = 0
     nodes_to_contract = {node for node in tn.all_neighbors(major_node) if node not in nodes_to_keep}
     while len(nodes_to_contract)>0:

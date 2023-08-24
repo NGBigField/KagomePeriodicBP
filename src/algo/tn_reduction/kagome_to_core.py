@@ -58,6 +58,8 @@ CORE_CONNECTION_NODES = {
 
 NUM_CONNECTIONS_PER_SIDE = 2  # number of connections per side
 
+VALID_BOTTOM_UP_CONTRACTION_TO_CORE_DIRECTIONS = [BlockSide.U, BlockSide.DL, BlockSide.DR]
+
 
 @dataclass
 class _PerSide(Generic[_T]):
@@ -124,7 +126,7 @@ def _contract_tn_from_sides_and_create_mpss(
     return mpss, con_orders, orientations
 
 def _basic_data(
-    tn:KagomeTN, parallel:bool
+    tn:KagomeTN, parallel:bool, direction:BlockSide|None
 )->tuple[
     list[TensorNode],
     _PerSide[int],
@@ -146,7 +148,11 @@ def _basic_data(
     num_side_overlap_connections = 2*N - 3  # length of overlap between sides of the zipping algorithm
 
     # Choose a random contraction direction that meets the base of the center triangle, first, and goes "up":
-    from_bottom_up_direction = lists.random_item([BlockSide.U, BlockSide.DL, BlockSide.DR])  
+    if direction is None:
+        from_bottom_up_direction = lists.random_item(VALID_BOTTOM_UP_CONTRACTION_TO_CORE_DIRECTIONS)  
+    else:
+        assert direction in VALID_BOTTOM_UP_CONTRACTION_TO_CORE_DIRECTIONS, f"Not all directions can be used for contraction to core"
+        from_bottom_up_direction = direction
 
     directions = _PerSide[BlockSide](
         bottom_up=from_bottom_up_direction,
@@ -286,10 +292,10 @@ def _add_env_tensors_to_open_core(small_tn:ArbitraryTN, env_tensors:list[TensorN
 
 
 
-def reduce_full_kagome_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool=False) -> CoreTN:
+def reduce_full_kagome_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool=False, direction:BlockSide|None=None) -> CoreTN:
 
     ## I. Parse and derive data
-    core_nodes, num_core_connections, num_side_overlap_connections, directions = _basic_data(tn, parallel)
+    core_nodes, num_core_connections, num_side_overlap_connections, directions = _basic_data(tn, parallel, direction)
 
     ## II. Prepare two MPSs, contract until core:
 	#      One MPS is "from the bottom-up" and the other is "from the top-down"

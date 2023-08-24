@@ -7,13 +7,14 @@ from tensor_networks.construction import create_kagome_tn
 from enums import UpdateMode, UnitCellFlavor
 from containers import UpdateEdge
 from tensor_networks.unit_cell import UnitCell
+from lattices.directions import BlockSide
 
 # Algos we test here:
 from algo.measurements import derive_xyz_expectation_values_with_tn, derive_xyz_expectation_values_using_rdm, print_results_table
-from algo.tn_reduction import reduce_full_kagome_to_core, reduce_core_to_mode, reduce_mode_to_edge_and_env
+from algo.tn_reduction import reduce_full_kagome_to_core, reduce_core_to_mode, reduce_mode_to_edge
 
 # useful utils:
-from utils import visuals, dicts
+from utils import visuals, dicts, saveload
 
 # For testing performance:
 from time import perf_counter
@@ -119,28 +120,30 @@ def contract_to_mode_test(
 def contract_to_edge_test(
     d = 2,
     D = 2,
-    chi = 20,
-    N = 5,
+    chi = 14,
+    N = 3,
     with_bp:bool = True
 ):
     ## Load or randomize unit_cell
     unit_cell = load_or_randomize_unit_cell(d, D)
 
-    mode = UpdateMode.C
+    mode = UpdateMode.A
     edge = UpdateEdge(C, B)
     
     ##Contraction Sequence:
     full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     if with_bp:
+        messages = saveload.load("last_messages", if_exist=True)
         from algo.belief_propagation import belief_propagation, BPConfig
         bp_config=BPConfig(max_swallowing_dim=chi//2, target_msg_diff=1e-6)
-        belief_propagation(full_tn, bp_config=bp_config)
+        _, messages, _ = belief_propagation(full_tn, messages, bp_config=bp_config)
+        saveload.save(messages, "last_messages")
     else:        
         full_tn.connect_random_messages()
 
-    core_tn = reduce_full_kagome_to_core(full_tn, bubblecon_trunc_dim=chi)
+    core_tn = reduce_full_kagome_to_core(full_tn, bubblecon_trunc_dim=chi, direction=BlockSide.U)
     mode_tn = reduce_core_to_mode(core_tn, mode=mode)
-    edge_tn = reduce_mode_to_edge_and_env(mode_tn, edge)
+    edge_tn = reduce_mode_to_edge(mode_tn, edge)
     print("Done")
 
     ## Get measurements in two different methods:
@@ -192,28 +195,29 @@ def test_all_edges_contraction(
 
     ## Mode tn:
     for mode in UpdateMode.all_options():
-        # mode_tn = reduce_core_to_mode(core_tn, mode=mode)
+        mode_tn = reduce_core_to_mode(core_tn, mode=mode)
 
         ## Edge TN:
         for edge in UpdateEdge.all_options():        
-            # edge_tn = reduce_mode_to_edge_and_env(mode_tn, edge)
-
             print(f"mode={mode} ; edge={edge} :")   
 
-    results_rdms = derive_xyz_expectation_values_using_rdm(edge_tn, force_real=real_results)
-    diff = dicts.subtract(results_base, results_rdms)
-    print_results_table(diff)
-    print(" ")
+            edge_tn = reduce_mode_to_edge(mode_tn, edge)
 
-    print("Done")
+
+            results_rdms = derive_xyz_expectation_values_using_rdm(edge_tn, force_real=real_results)
+            diff = dicts.subtract(results_base, results_rdms)
+            print_results_table(diff)
+            print(" ")
+
+            print("Done")
 
 
     
 def main_test():
     # contract_to_core_test()
     # contract_to_mode_test()
-    # contract_to_edge_test()
-    test_all_edges_contraction()
+    contract_to_edge_test()
+    # test_all_edges_contraction()
     
 
 
