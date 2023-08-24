@@ -79,10 +79,11 @@ def _belief_propagation_step(
     ## Keep Old messages for comparison (error calculation):
     prev_messages = { direction : message.copy() for direction, message in tn.messages.items() }
     if DEBUG_MODE:
-        assert sum([ 
+        _copy_distance = sum([ 
             MPS.l2_distance(prev_messages[dir].mps, tn.messages[dir].mps) 
             for dir in BlockSide.all_in_counter_clockwise_order() 
-        ]) < 1e-14, "Copying messages has a numeric bug!"
+        ]) 
+        assert _copy_distance < 1e-14, "Copying messages has a numeric bug!"
     
 
     ## Compute out-going message for all possible sizes:

@@ -408,8 +408,8 @@ class _FrozenSpecificNetwork(BaseTensorNetwork):
         new = cls(tn.nodes, copy=False, **kwargs)
         return new
     
-    def to_arbitrary_tn(self)->ArbitraryTN:
-        return ArbitraryTN(self.nodes, copy=False)
+    def to_arbitrary_tn(self, copy:bool=False)->ArbitraryTN:
+        return ArbitraryTN(self.nodes, copy=copy)
     
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#

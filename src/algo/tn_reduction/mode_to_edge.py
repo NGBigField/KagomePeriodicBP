@@ -120,7 +120,7 @@ def _split_direction_by_type(directions:list[Direction])->tuple[list[LatticeDire
 def _derive_edge_and_nodes(
     mode_tn:ModeTN, 
     edge_tuple:UpdateEdge
-)->tuple[EdgeIndicatorType, TensorNode, TensorNode]:
+)->tuple[EdgeIndicatorType, int, int]:
     """ Find the correct edge nodes """
 
     is_in_core = edge_tuple.is_in_core()
@@ -143,20 +143,23 @@ def _derive_edge_and_nodes(
     node2 = next((node for node in options if node.unit_cell_flavor in edge_tuple))
 
     edge = get_common_edge(node1, node2)
-    return edge, node1, node2     
+    return edge, node1.index, node2.index     
 
 
 def _contract_all_nodes_except_neighbors(
     tn:ArbitraryTN,
-    node1:TensorNode,
-    node2:TensorNode
+    i1:int, i2:int
 )->tuple[ArbitraryTN, TensorNode]:
+
+    ## Derive the main two nodes:
+    node1:TensorNode = tn.nodes[i1]
+    node2:TensorNode = tn.nodes[i2]
 
     ## Find immediate neighbors:
     neighbors = []
     common_neighbor : TensorNode = None
     for node in tn.nodes:
-        if node in [node1, node2]:
+        if node is node1 or node is node2:
             continue
         is_neighbor1 = tn.are_neighbors(node, node1) 
         is_neighbor2 = tn.are_neighbors(node, node2)
@@ -197,14 +200,16 @@ def _derive_commons_neighbor_edges_connections_as_a_matrix(
 
 def reduce_mode_to_edge_and_env(
     mode_tn:ModeTN, 
-    edge_tuple:UpdateEdge
+    edge_tuple:UpdateEdge,
+    copy:bool=True
 )->EdgeTN:
     
     ## Get basic data:
-    edge, node1, node2 = _derive_edge_and_nodes(mode_tn, edge_tuple)
+    edge, i1, i2 = _derive_edge_and_nodes(mode_tn, edge_tuple)
 
     ## Contract everything except the mode and its neighbors:
-    tn, common_neighbor = _contract_all_nodes_except_neighbors(mode_tn.to_arbitrary_tn(), node1, node2)
+    tn = mode_tn.to_arbitrary_tn(copy=copy)
+    tn, common_neighbor = _contract_all_nodes_except_neighbors(tn, i1, i2)
 
     ## Decide which of the common_neighbor's legs fit at which side:
     edge1, edge2 = _derive_commons_neighbor_edges_connections_as_a_matrix(tn, common_neighbor)

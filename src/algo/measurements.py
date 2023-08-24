@@ -40,7 +40,7 @@ from algo.contract_tensor_network import contract_tensor_network
 from libs.ITE import rho_ij
 
 # Utils:
-from utils import assertions, logs, errors, lists, parallel_exec, prints
+from utils import assertions, logs, errors, lists, parallel_exec, prints, strings
 
 # A bit of OOP:
 from copy import deepcopy
@@ -444,7 +444,7 @@ def _rotate_rdm(rho:np.matrix, pauli_name:str)->np.matrix:
         case 'x'|'X':           
             return H @ rho @ H                        
         case 'y'|'Y':        
-            return 1j * H @ Z @ rho @ H                            
+            return -1j * H @ Z @ rho @ H  #TODO: Check why (-)
         case 'z'|'Z':           
             return rho
         case _:
@@ -498,6 +498,44 @@ def derive_xyz_expectation_values_using_rdm(
         res[key] = crnt_res
     return res
 
+def _find_not_none_item_in_double_dict( d :dict[str, dict[str, _T]], keys1, keys2) -> _T:
+    for k1 in keys1:
+        for k2 in keys2:
+            item = d[k1][k2]
+            if item is not None:
+                return item
+
+
+def print_results_table(results:dict[str, dict[str, float]])->None:
+    node_keys = ["A", "B", "C"]
+    proj_keys = ["x", "y", "z"]
+    space_per_node = 25
+    space_between_numbers = 3
+    space_per_number = space_per_node - space_between_numbers
+
+    _dummy = _find_not_none_item_in_double_dict(results, proj_keys, node_keys)
+    if isinstance(_dummy, complex):
+        space_per_node *= 2
+
+
+    row_str = "   "+" "*space_between_numbers
+    for node_key in node_keys:
+        s = " "*(space_per_node//2)+f"{node_key}"+" "*(space_per_node//2-1)
+        row_str += s
+    print(row_str)
+
+    for proj_key in proj_keys:
+        proj_res = results[proj_key]
+        row_str = f" {proj_key}:"+" "*space_between_numbers
+        for node_key in node_keys:
+            node_proj_res = proj_res[node_key]
+            if node_proj_res is None:
+                s = " "*(space_per_node-2)
+            else:
+                s = strings.formatted(node_proj_res, fill=' ', alignment="<", width=space_per_number, precision=space_per_number-3, signed=True)
+                s += " "*space_between_numbers
+            row_str += s
+        print(row_str)
 
 
 if __name__ == "__main__":

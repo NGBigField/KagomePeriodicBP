@@ -9,11 +9,11 @@ from containers import UpdateEdge
 from tensor_networks.unit_cell import UnitCell
 
 # Algos we test here:
-from algo.measurements import derive_xyz_expectation_values_with_tn, derive_xyz_expectation_values_using_rdm
+from algo.measurements import derive_xyz_expectation_values_with_tn, derive_xyz_expectation_values_using_rdm, print_results_table
 from algo.tn_reduction import reduce_full_kagome_to_core, reduce_core_to_mode, reduce_mode_to_edge_and_env
 
 # useful utils:
-from utils import visuals
+from utils import visuals, dicts
 
 # For testing performance:
 from time import perf_counter
@@ -23,6 +23,14 @@ from time import perf_counter
 A = UnitCellFlavor.A
 B = UnitCellFlavor.B
 C = UnitCellFlavor.C
+
+
+def load_or_randomize_unit_cell(d, D)->UnitCell:
+    unit_cell= UnitCell.load(f"random_D={D}")
+    if unit_cell is None:
+        unit_cell = UnitCell.random(d=d, D=D)
+        unit_cell.save(f"random_D={D}")
+    return unit_cell
 
 
 def contract_to_core_test(
@@ -112,104 +120,90 @@ def contract_to_edge_test(
     d = 2,
     D = 2,
     chi = 20,
-    N = 3,
+    N = 5,
     with_bp:bool = True
 ):
     ## Load or randomize unit_cell
-    unit_cell= UnitCell.load(f"random_D={D}")
-    if unit_cell is None:
-        unit_cell = UnitCell.random(d=d, D=D)
-        unit_cell.save(f"random_D={D}")
+    unit_cell = load_or_randomize_unit_cell(d, D)
 
-    mode = UpdateMode.A
-    edge = UpdateEdge(A, B)
+    mode = UpdateMode.C
+    edge = UpdateEdge(C, B)
     
     ##Contraction Sequence:
     full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     if with_bp:
         from algo.belief_propagation import belief_propagation, BPConfig
-        bp_config=BPConfig(max_swallowing_dim=chi//2, target_msg_diff=1e-7)
+        bp_config=BPConfig(max_swallowing_dim=chi//2, target_msg_diff=1e-6)
         belief_propagation(full_tn, bp_config=bp_config)
     else:        
         full_tn.connect_random_messages()
 
     core_tn = reduce_full_kagome_to_core(full_tn, bubblecon_trunc_dim=chi)
-    mode_tn = reduce_core_to_mode(core_tn.copy(), mode=mode)
-    edge_tn = reduce_mode_to_edge_and_env(mode_tn.copy(), edge)
+    mode_tn = reduce_core_to_mode(core_tn, mode=mode)
+    edge_tn = reduce_mode_to_edge_and_env(mode_tn, edge)
     print("Done")
 
     ## Get measurements in two different methods:
+    print("Using TN Contraction:")
     results1 = derive_xyz_expectation_values_with_tn(core_tn, bubblecon_trunc_dim=chi, force_real=False)
+    print_results_table(results1)
+
+    print("")
+
+    print("Using RDMs:")
     results2 = derive_xyz_expectation_values_using_rdm(edge_tn, force_real=False)
+    print_results_table(results2)
 
-    ## Arrange results
-    for node in ['A', 'B', 'C']:
-        print(f"Node-{node!r}:")
-        lis1 = []
-        lis2 = []
-        for op in ['x', 'y', 'z']:
-            res1 = results1[op][node]            
-            res2 = results2[op][node]
-            lis1.append( res1 )
-            lis2.append( res2 )
-            
-        print(f"    {lis1}")
-        print(f"    {lis2}")
+    print("")
+
+    print("Diff:")
+    diff = dicts.subtract(results1, results2)
+    print_results_table(diff)
 
 
+    print("")
     print("Done")
 
 
 
-
-def all_edgescontract_to_edge_test(
+def test_all_edges_contraction(
     d = 2,
     D = 2,
-    chi = 20,
+    chi = 16,
     N = 3,
-    with_bp:bool = True
+    with_bp:bool = False,
+    real_results = False
 ):
     ## Load or randomize unit_cell
-    unit_cell= UnitCell.load(f"random_D={D}")
-    if unit_cell is None:
-        unit_cell = UnitCell.random(d=d, D=D)
-        unit_cell.save(f"random_D={D}")
+    unit_cell = load_or_randomize_unit_cell(d, D)
 
-    mode = UpdateMode.A
-    edge = UpdateEdge(A, B)
-    
-    ##Contraction Sequence:
+    ## Full tn with messages:
     full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     if with_bp:
         from algo.belief_propagation import belief_propagation, BPConfig
-        bp_config=BPConfig(max_swallowing_dim=chi//2, target_msg_diff=1e-7)
+        bp_config=BPConfig(max_swallowing_dim=chi, target_msg_diff=1e-7)
         belief_propagation(full_tn, bp_config=bp_config)
     else:        
         full_tn.connect_random_messages()
 
+    ## Core tn:
     core_tn = reduce_full_kagome_to_core(full_tn, bubblecon_trunc_dim=chi)
-    mode_tn = reduce_core_to_mode(core_tn.copy(), mode=mode)
-    edge_tn = reduce_mode_to_edge_and_env(mode_tn.copy(), edge)
-    print("Done")
+    results_base = derive_xyz_expectation_values_with_tn(core_tn, bubblecon_trunc_dim=chi, force_real=real_results)
 
-    ## Get measurements in two different methods:
-    results1 = derive_xyz_expectation_values_with_tn(core_tn, bubblecon_trunc_dim=chi, force_real=False)
-    results2 = derive_xyz_expectation_values_using_rdm(edge_tn, force_real=False)
+    ## Mode tn:
+    for mode in UpdateMode.all_options():
+        # mode_tn = reduce_core_to_mode(core_tn, mode=mode)
 
-    ## Arrange results
-    for node in ['A', 'B', 'C']:
-        print(f"Node-{node!r}:")
-        lis1 = []
-        lis2 = []
-        for op in ['x', 'y', 'z']:
-            res1 = results1[op][node]            
-            res2 = results2[op][node]
-            lis1.append( res1 )
-            lis2.append( res2 )
-            
-        print(f"    {lis1}")
-        print(f"    {lis2}")
+        ## Edge TN:
+        for edge in UpdateEdge.all_options():        
+            # edge_tn = reduce_mode_to_edge_and_env(mode_tn, edge)
 
+            print(f"mode={mode} ; edge={edge} :")   
+
+    results_rdms = derive_xyz_expectation_values_using_rdm(edge_tn, force_real=real_results)
+    diff = dicts.subtract(results_base, results_rdms)
+    print_results_table(diff)
+    print(" ")
 
     print("Done")
 
@@ -218,7 +212,8 @@ def all_edgescontract_to_edge_test(
 def main_test():
     # contract_to_core_test()
     # contract_to_mode_test()
-    contract_to_edge_test()
+    # contract_to_edge_test()
+    test_all_edges_contraction()
     
 
 

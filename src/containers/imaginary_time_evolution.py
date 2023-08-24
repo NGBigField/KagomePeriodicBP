@@ -37,11 +37,14 @@ class UpdateEdge(NamedTuple):
         """
         return self.second is _NEXT_IN_ABC_ORDER[self.first]
     
+    def __str__(self) -> str:
+        return f"({self.first}, {self.second})"
+
     @staticmethod
     def all_options()->Generator["UpdateEdge", None, None]:
         flavors = [UnitCellFlavor.A, UnitCellFlavor.B, UnitCellFlavor.C]
-        for a, b in itertools.combinations(flavors, 2):
-            yield (a, b)
+        for a, b in itertools.permutations(flavors, 2):
+            yield UpdateEdge(a, b)
 
 
 

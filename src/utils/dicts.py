@@ -13,7 +13,14 @@ def subtract(d1:dict[_T, _Numeric], d2:dict[_T, _Numeric])->dict[_T, _Numeric]:
     for key, val1 in d1.items():
         assert key in d2.keys()
         val2 = d2[key]
-        new_val = val1-val2
+
+        if isinstance(val1, dict) and isinstance(val2, dict):
+            new_val = subtract(val1, val2)        
+        elif val1 is None or val2 is None:
+            new_val = None
+        else:
+            new_val = val1-val2
+
         new_d[key] = new_val
     return new_d
 

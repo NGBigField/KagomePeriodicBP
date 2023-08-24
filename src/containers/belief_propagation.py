@@ -38,7 +38,7 @@ class Message(NamedTuple):
 
     def copy(self)->"Message":
         return Message(
-            mps=self.mps.copy(),
+            mps=self.mps.copy(full=True),
             orientation=self.orientation
         )
 
