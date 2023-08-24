@@ -13,6 +13,9 @@ from containers.belief_propagation import BPStats
 from containers.density_matrices import MatrixMetrics 
 from _error_types import ITEError
 
+# For smart iterations:
+import itertools
+
 
 KagomeTensorNetwork = None  #TODO fix
 
@@ -33,6 +36,12 @@ class UpdateEdge(NamedTuple):
             bool
         """
         return self.second is _NEXT_IN_ABC_ORDER[self.first]
+    
+    @staticmethod
+    def all_options()->Generator["UpdateEdge", None, None]:
+        flavors = [UnitCellFlavor.A, UnitCellFlavor.B, UnitCellFlavor.C]
+        for a, b in itertools.combinations(flavors, 2):
+            yield (a, b)
 
 
 

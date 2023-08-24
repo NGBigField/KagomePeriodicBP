@@ -21,12 +21,12 @@ id = np.matrix(
 
 
 @overload
-def all_variations(with_names:bool=False)->Generator[np.matrix, None, None]:...
+def all_paulis(with_names:bool=False)->Generator[np.matrix, None, None]:...
 @overload
-def all_variations(with_names:bool=True)->Generator[tuple[np.matrix, str], None, None]:...
+def all_paulis(with_names:bool=True)->Generator[tuple[np.matrix, str], None, None]:...
 #
-def all_variations(with_names:bool=True)->Generator[tuple[np.matrix, str]|np.matrix, None, None]:
-    for op, name in [(x,'x'), (y,'y'), (z,'z'), (id,'id')]:
+def all_paulis(with_names:bool=False)->Generator[tuple[np.matrix, str]|np.matrix, None, None]:
+    for op, name in [(x,'x'), (y,'y'), (z,'z')]:
         if with_names:
             yield op, name
         else:

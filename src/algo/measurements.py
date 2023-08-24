@@ -23,7 +23,7 @@ from libs.ITE import rho_ij
 # Common types in the code:
 from containers import Config, BubbleConConfig
 from tensor_networks import KagomeTN, BaseTensorNetwork, ModeTN, EdgeTN, TensorNode, MPS
-from lattices.directions import BlockSide, check
+from lattices.directions import BlockSide
 from _error_types import TensorNetworkError, BPNotConvergedError
 from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor
 from physics import pauli
@@ -35,8 +35,6 @@ from tensor_networks.construction import repeat_core
 from algo.tn_reduction import reduce_full_kagome_to_core
 from algo.belief_propagation import belief_propagation
 from algo.contract_tensor_network import contract_tensor_network
-from physics import pauli
-from lattices.directions import BlockSide
 
 # For energy estimation:
 from libs.ITE import rho_ij
@@ -51,13 +49,14 @@ from typing import TypeVar
 _T = TypeVar('_T')
 
 
-all_paulis = [pauli.x, pauli.y, pauli.z]
+all_paulis = list(pauli.all_paulis(with_names=False))
 all_pauli_names = ['x', 'y', 'z'] 
 
-H : np.matrix= np.matrix(
+H : np.matrix = np.matrix(
     [[1,  1],
      [1, -1]]
 ) / np.sqrt(2)   # Hadamard
+Z : np.matrix = pauli.z
 
 
 MULTIPROCESSING = False
@@ -65,47 +64,8 @@ MULTIPROCESSING = False
 TensorNetworkType = TypeVar("TensorNetworkType", bound=BaseTensorNetwork)
 
 
-
 def _mean(list_:list[_T])->_T:
     return sum(list_)/len(list_)  #type: ignore
-
-
-def measure_xyz_expectation_values_with_rdms(rdms:list[np.ndarray])->dict[str, float|complex]:
-
-    ## Collect all projections:
-    projections_per_edge : list[dict[str, complex]] = []
-    for rdm_ij in rdms:
-        rho_i = np.trace(rdm_ij, axis1=2, axis2=3)
-        rho_j = np.trace(rdm_ij, axis1=0, axis2=1)
-
-        projections_per_axis = dict()
-        for pauli_name in all_pauli_names:
-
-
-                
-            assert isinstance(rotated_rho_i, np.ndarray)
-            assert isinstance(rotated_rho_j, np.ndarray)
-            projection_i = _get_z_projection(rotated_rho_i)
-            projection_j = _get_z_projection(rotated_rho_j)
-
-            projections_per_axis[pauli_name] = 0.5*(projection_i + projection_j)
-
-        projections_per_edge.append(projections_per_axis)
-
-    ## sum results by axis:
-    per_projection_dict : dict[str, list[complex]] = dict()
-    for pauli_name in all_pauli_names:
-        per_projection_dict[pauli_name] = []
-
-    for edge_dict in projections_per_edge:
-        for pauli_name, projection in edge_dict.items():
-            per_projection_dict[pauli_name].append(projection)
-
-    res : dict[str, complex] = dict()
-    for key, list_ in per_projection_dict.items():
-        res[key] = _mean(list_)
-
-    return res
         
 
 def measure_core_energies(
@@ -230,9 +190,9 @@ def _sandwich_fused_tensors_with_expectation_values(tn_in:TensorNetworkType, mat
     D2 = D*D
     
     ket_op = np.tensordot(ket, mat, axes=([0],[0]))
-    res = np.tensordot(ket_op, bra, axes=([4],[0]))
+    ket_op_bra = np.tensordot(ket_op, bra, axes=([4],[0]))
 
-    res2 = np.transpose(res, axes=[0, 4, 1, 5, 2, 6, 3, 7])
+    res2 = np.transpose(ket_op_bra, axes=[0, 4, 1, 5, 2, 6, 3, 7])
     fused_data = res2.reshape([D2, D2, D2, D2])
 
     ## Replace node in original tensor_network:
@@ -484,7 +444,7 @@ def _rotate_rdm(rho:np.matrix, pauli_name:str)->np.matrix:
         case 'x'|'X':           
             return H @ rho @ H                        
         case 'y'|'Y':        
-            return -1j * H @ rho @ pauli.z @ H                            
+            return 1j * H @ Z @ rho @ H                            
         case 'z'|'Z':           
             return rho
         case _:
