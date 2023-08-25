@@ -161,9 +161,15 @@ class BaseTensorNetwork(ABC):
     # ================================================= #
     
     def nodes_connected_to_edge(self, edge:str)->list[TensorNode]:
-        indices = self.edges_dict[edge]
-        indices = list(set(indices))  # If the tensor appears twice, get only 1 copy of its index.
-        return [ self.nodes[node_ind] for node_ind in indices ]
+        iterat = (i for i, e_list in enumerate(self.edges_list) if edge in e_list)
+        i1 = next(iterat)
+        try:
+            i2 = next(iterat)
+        except StopIteration:
+            # Only a single node is connected to this edge. i.e., open edge
+            return [ self.nodes[i1] ]
+        else:
+            return [ self.nodes[i] for i in [i1, i2] ]
 
     def _find_neighbor_by_edge(self, node:TensorNode, edge:EdgeIndicatorType)->TensorNode:
         nodes = self.nodes_connected_to_edge(edge)
@@ -204,6 +210,14 @@ class BaseTensorNetwork(ABC):
             if edge in n2.edges:
                 return True
         return False    
+    
+    def find_open_leg_of_node(self, node:TensorNode)->tuple[int, Direction, EdgeIndicatorType, int]:
+        for leg_index, (direction, edge, dim) in enumerate(node.legs()):
+            nodes_ = self.nodes_connected_to_edge(edge)
+            if len(nodes_)==1:  # Only one neighbor
+                return leg_index, direction, edge, dim
+        raise TensorNetworkError("No open legs")    
+    
 
     # ================================================= #
     #|                     Edges                       |#
@@ -493,14 +507,14 @@ class ModeTN(_FrozenSpecificNetwork):
         return next((node for node in self.nodes if self.mode.is_matches_flavor(node.unit_cell_flavor)))
 
     def get_nodes_on_side(self, side:BlockSide)->list[TensorNode]:
-        assert side in self.major_directions
+        assert side in self.major_sides
         return [self.find_neighbor(self.center_node, direction) for direction in side.matching_lattice_directions()]
 
     # ================================================= #
     #|             Structure and Geometry              |#
     # ================================================= #
     @property
-    def major_directions(self)->list[BlockSide]:
+    def major_sides(self)->list[BlockSide]:
         match self.mode:
             case UpdateMode.A:  return [BlockSide.U , BlockSide.D ]
             case UpdateMode.B:  return [BlockSide.UR, BlockSide.DL]
@@ -673,7 +687,7 @@ def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
         if functionality is NodeFunctionality.CenterCore:
             center_nodes.append(network_node)
 
-    # Nearest-neighbors of the center triangles are part of the core:
+    # Nearest-neighbors of the center triangles are part of the outer-core:
     for node in center_nodes:
         for edge in node.edges:
             neighbor_index = tn.lattice.get_neighbor(node, edge).index

@@ -505,15 +505,17 @@ def _two_level_deep_sorted_clockwise_search(tn:ModeTN, node_level0:TensorNode, m
             indices_level2.append(node_level2.index)
 
     first2, *rest2, last2 = indices_level2
+    rest2.reverse()
     return [first2] + indices_level1 + [last2] + rest2
 
 
 def derive_mode_tn_full_contraction_order(
     tn:ModeTN,  
-    direction:BlockSide
+    direction:BlockSide,
+    depth:ContractionDepth
 )->list[int]:
     # Check:
-    assert direction in tn.major_directions, "Not all direction are possible in the small mode-TN"
+    assert direction in tn.major_sides, "Not all direction are possible in the small mode-TN"
 
     ## Use breadth-first algorithm to get con_order for each side:
     up_to_core = _two_level_deep_sorted_clockwise_search(tn, tn.center_node, direction.opposite())
@@ -521,8 +523,11 @@ def derive_mode_tn_full_contraction_order(
 
     ## When we start bubblecon, the order is reversed:
     up_to_core.reverse()
-
     con_order = up_to_core + [tn.center_node.index] + from_core
+
+    ## Trim if we go only up to edge:
+    if depth is ContractionDepth.ToEdge:
+        con_order = con_order[:-6]
     return con_order
 
 
@@ -607,11 +612,14 @@ def get_contraction_order(tn:KagomeTN|CoreTN, direction:BlockSide, depth:Contrac
     
     ## In the case where it's a Mode (which is small and simple but a bit different each time)
     if isinstance(tn, ModeTN):
-        assert depth is ContractionDepth.Full
-        return derive_mode_tn_full_contraction_order(tn, direction) 
+        assert depth in [ ContractionDepth.Full, ContractionDepth.ToEdge]
+        return derive_mode_tn_full_contraction_order(tn, direction, depth) 
 
+
+    ## In the case where it's a Full Kagome lattice TN:
     ## Get cached contractions or derive them:
     assert isinstance(tn, KagomeTN)
+    assert depth is not ContractionDepth.ToEdge, f"Contraction to edge method does not exist for a full Kagome TN"
     global FULL_CONTRACTION_ORDERS_CACHE
     cache_key = (tn.lattice.N, direction, depth)
     if cache_key in FULL_CONTRACTION_ORDERS_CACHE:

@@ -121,9 +121,9 @@ def contract_tensor_network(
     )
 
     ## Derive outgoing mps direction
-    mps_orientation = MPSOrientation.standard(direction)
+    orientation = MPSOrientation.standard(direction)
 
     ## Check outputs:
     assert not isinstance(mps, list)  # This is not an expected output
 
-    return mps, contraction_order, mps_orientation
+    return mps, contraction_order, orientation

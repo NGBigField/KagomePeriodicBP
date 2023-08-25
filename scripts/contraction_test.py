@@ -102,7 +102,7 @@ def contract_to_mode_test(
     res = derive_xyz_expectation_values_with_tn(full_tn, reduce=False)
     print(res['x'])
     # contract network:
-    core_tn = reduce_full_kagome_to_core(full_tn, bubblecon_trunc_dim=chi)
+    core_tn = reduce_full_kagome_to_core(full_tn, trunc_dim=chi)
     # base results:
     res = derive_xyz_expectation_values_with_tn(core_tn, reduce=False)
     print(res['x'])
@@ -141,9 +141,9 @@ def contract_to_edge_test(
     else:        
         full_tn.connect_random_messages()
 
-    core_tn = reduce_full_kagome_to_core(full_tn, bubblecon_trunc_dim=chi, direction=BlockSide.U)
+    core_tn = reduce_full_kagome_to_core(full_tn, trunc_dim=chi, direction=BlockSide.U)
     mode_tn = reduce_core_to_mode(core_tn, mode=mode)
-    edge_tn = reduce_mode_to_edge(mode_tn, edge)
+    edge_tn = reduce_mode_to_edge(mode_tn, edge, trunc_dim=chi)
     print("Done")
 
     ## Get measurements in two different methods:
@@ -190,7 +190,7 @@ def test_all_edges_contraction(
         full_tn.connect_random_messages()
 
     ## Core tn:
-    core_tn = reduce_full_kagome_to_core(full_tn, bubblecon_trunc_dim=chi)
+    core_tn = reduce_full_kagome_to_core(full_tn, trunc_dim=chi)
     results_base = derive_xyz_expectation_values_with_tn(core_tn, bubblecon_trunc_dim=chi, force_real=real_results)
 
     ## Mode tn:

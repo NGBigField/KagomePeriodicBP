@@ -22,7 +22,7 @@ from _config_reader import DEBUG_MODE
 from utils import assertions
 
 ## Types in the code:
-from tensor_networks.node import TensorNode
+from tensor_networks.node import TensorNode, validated_int_square_root
 from containers import MessageDictType
 from enums import MessageModel
 
@@ -171,6 +171,16 @@ def physical_tensor_with_split_mid_leg(node:TensorNode)->np.ndarray:
     t = node.tensor
     old_shape = t.shape
     assert len(old_shape)==3
-    half_mid_d = assertions.integer( np.sqrt(old_shape[1]) )
+    half_mid_d = validated_int_square_root(old_shape[1])
     physical_m = t.reshape([old_shape[0], half_mid_d, half_mid_d, old_shape[2]])
     return physical_m
+
+
+def mps_index_of_open_leg(mps:MPS, node_index_in_order:int)->int:
+	n = mps.N
+	if node_index_in_order==0:
+		return 0
+	elif node_index_in_order==n-1:
+		return 1
+	else:
+		return 1

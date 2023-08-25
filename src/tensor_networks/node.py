@@ -211,7 +211,7 @@ class TensorNode():
         # fuse tensor with numpy.reshape():
         if self.is_ket:
             d = self.tensor.shape[0]
-            new_dims = [d]+[_validated_int_square_root(dim) for dim in new_dims]
+            new_dims = [d]+[validated_int_square_root(dim) for dim in new_dims]
         self.tensor = self.tensor.reshape(new_dims)
         # Deal with the rest of the data:
         for _ in range(num_fused_legs-1):
@@ -225,5 +225,16 @@ class TensorNode():
         return f"Node '{self.name}' at index [{self.index}] on site {tuple(positions)}"
 
     
-def _validated_int_square_root(a:int)->int:
+def validated_int_square_root(a:int)->int:
     return assertions.integer(np.sqrt(a))
+
+
+def two_nodes_ordered_by_relative_direction(n1:TensorNode, n2:TensorNode, direction:Direction)->tuple[TensorNode, TensorNode]:
+    opposite = direction.opposite()
+    if n1.edge_in_dir(direction) == n2.edge_in_dir(opposite):
+        return n1, n2
+    elif n2.edge_in_dir(direction) == n1.edge_in_dir(opposite):
+        return n2, n1
+    else:
+        raise NetworkConnectionError(f"Nodes are not connected in given direction {direction.name!r}")
+

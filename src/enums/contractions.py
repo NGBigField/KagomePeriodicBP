@@ -4,4 +4,5 @@ class ContractionDepth(Enum):
     Full = auto()
     ToMessage = auto()
     ToCore = auto()
+    ToEdge = auto()
 

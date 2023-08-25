@@ -384,7 +384,7 @@ def calc_unit_cell_expectation_values_from_tn(
     ## Check or choose direction:
     if direction is None:
         if isinstance(tn, ModeTN):
-            direction = lists.random_item(tn.major_directions)
+            direction = lists.random_item(tn.major_sides)
         else:
             direction = BlockSide.random()
     else:

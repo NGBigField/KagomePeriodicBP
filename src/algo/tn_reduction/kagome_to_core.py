@@ -20,7 +20,7 @@ from algo.contract_tensor_network import contract_tensor_network
 
 # Types we need in our module:
 from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS
-from tensor_networks.node import TensorNode
+from tensor_networks.node import TensorNode, two_nodes_ordered_by_relative_direction
 from lattices.directions import Direction, LatticeDirection, BlockSide, check
 from enums import ContractionDepth, NodeFunctionality, UpdateMode
 from containers import MPSOrientation, UpdateEdge
@@ -292,14 +292,14 @@ def _add_env_tensors_to_open_core(small_tn:ArbitraryTN, env_tensors:list[TensorN
 
 
 
-def reduce_full_kagome_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool=False, direction:BlockSide|None=None) -> CoreTN:
+def reduce_full_kagome_to_core(tn:KagomeTN, trunc_dim:int, parallel:bool=False, direction:BlockSide|None=None) -> CoreTN:
 
     ## I. Parse and derive data
     core_nodes, num_core_connections, num_side_overlap_connections, directions = _basic_data(tn, parallel, direction)
 
     ## II. Prepare two MPSs, contract until core:
 	#      One MPS is "from the bottom-up" and the other is "from the top-down"
-    mpss, con_orders, orientations = _contract_tn_from_sides_and_create_mpss(tn, directions, bubblecon_trunc_dim, parallel)
+    mpss, con_orders, orientations = _contract_tn_from_sides_and_create_mpss(tn, directions, trunc_dim, parallel)
     
     ## Some verifications:
     if DEBUG_MODE:
