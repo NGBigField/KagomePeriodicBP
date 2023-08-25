@@ -232,8 +232,7 @@ def _sandwich_fused_tensors_with_expectation_values(tn_in:TensorNetworkType, mat
 
     D = ket.shape[1]
     D2 = D*D
-    
-    ket_op = np.tensordot(ket, mat, axes=([0],[0]))
+    ket_op = np.tensordot(ket, mat, axes=([0], [1]))
     ket_op_bra = np.tensordot(ket_op, bra, axes=([4],[0]))
 
     res2 = np.transpose(ket_op_bra, axes=[0, 4, 1, 5, 2, 6, 3, 7])
@@ -504,10 +503,6 @@ def _calc_rdm_projection_in_axis(rho:np.matrix, pauli_name:str, force_real:bool=
     else:
         obs = pauli.by_name(pauli_name)
         projection = np.trace( obs @ rho )
-
-    ## Fix y values:   #TODO: Check why (-)
-    if pauli_name=='y':
-        projection *= -1
 
     ## Real/Complex:
     if force_real:
