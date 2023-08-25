@@ -16,8 +16,12 @@ from algo.tn_reduction import reduce_full_kagome_to_core, reduce_core_to_mode, r
 # useful utils:
 from utils import visuals, dicts, saveload
 
-# For testing performance:
+# For testing and showing performance:
 from time import perf_counter
+from matplotlib import pyplot as plt
+
+# Useful for math:
+import numpy as np
 
 
 
@@ -171,12 +175,14 @@ def contract_to_edge_test(
 
 def test_all_edges_contraction(
     d = 2,
-    D = 2,
+    D = 3,
     chi = 16,
-    N = 3,
+    N = 4,
     with_bp:bool = False,
     real_results = False
 ):
+    accumulted_diff = 0.0
+
     ## Load or randomize unit_cell
     unit_cell = load_or_randomize_unit_cell(d, D)
 
@@ -200,24 +206,62 @@ def test_all_edges_contraction(
         ## Edge TN:
         for edge in UpdateEdge.all_options():        
             print(f"mode={mode} ; edge={edge} :")   
-
-            edge_tn = reduce_mode_to_edge(mode_tn, edge)
-
+            edge_tn = reduce_mode_to_edge(mode_tn, edge, trunc_dim=chi)
 
             results_rdms = derive_xyz_expectation_values_using_rdm(edge_tn, force_real=real_results)
             diff = dicts.subtract(results_base, results_rdms)
             print_results_table(diff)
             print(" ")
 
-            print("Done")
+            accumulted_diff += dicts.accumulate_values(diff, function=lambda x: abs(x))
 
+    print(f"accumulted absolute diff = {accumulted_diff}")
+    mean_accumulted_diff = accumulted_diff/(3*6*6)
+    print(f"mean absolute diff       = {mean_accumulted_diff}")
+
+
+    print("Done")
+    return mean_accumulted_diff
+
+
+def test_all_edges_contraction_accumulated_diff_with_chi(
+    d = 2,
+    D = 3,
+    N = 4,
+    with_bp:bool = True,
+    real_results = False ,       
+    chis = range(2, 61)
+):
+    title_str = f"Core-TN Contraction vs RDM from Edge-TN \nD={D}"
+    filename_str = f"Core-TN Contraction vs RDM from Edge-TN D={D}"
+
+    plot = visuals.AppendablePlot()
+    plot.axis.set_xlabel("chi")
+    plot.axis.set_ylabel("diff")
+    plot.axis.set_title(title_str)
+    plot.axis.set_ylim(bottom=0.0)
+    plt.grid("on")
+    visuals.draw_now()
+
+    diffs = []
+    for chi in chis:
+        diff = test_all_edges_contraction(d=d, D=D, chi=chi, N=N, real_results=real_results, with_bp=with_bp)
+        plot.append(diff=(chi, diff))
+        diffs.append(diff)
+        plot.axis.set_ylim(top=max(diffs))
+
+    print("All tests done")
+    visuals.save_figure(file_name=filename_str)
+    print("Done saving")
+    
 
     
 def main_test():
     # contract_to_core_test()
     # contract_to_mode_test()
-    contract_to_edge_test()
+    # contract_to_edge_test()
     # test_all_edges_contraction()
+    test_all_edges_contraction_accumulated_diff_with_chi()
     
 
 

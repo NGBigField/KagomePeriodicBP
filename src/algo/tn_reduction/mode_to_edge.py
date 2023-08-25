@@ -267,12 +267,12 @@ def _contract_half_using_bubblecon(
         assert i1 not in contraction_order
         assert i2 not in contraction_order
 
-    ## Create a version of the TN where we remove the contracted nodes:
+    ## Create a version of the TN where the contracted nodes are removed:
     tn = mode_tn.to_arbitrary_tn(copy=copy)
     nodes_to_remove = [tn.nodes[i] for i in contraction_order]
     for node_to_remove in nodes_to_remove:
         tn.pop_node(node_to_remove.index)
-    edge_nodes = [tn.nodes[old_node.index] for old_node in edge_nodes]
+    edge_nodes = [tn.get_node_in_pos(old_node.pos) for old_node in edge_nodes]
 
     ## Derive the tensors and legs we need to connect to:
     mps_order_direction = orientation.ordered
