@@ -1125,5 +1125,5 @@ def _contract_immediate_neighbors(tn:ArbitraryTN, major_node:TensorNode, nodes_t
 
 
 if __name__ == "__main__":
-    from scripts.contraction_test import main_test
+    from scripts.test_contraction import main_test
     main_test()

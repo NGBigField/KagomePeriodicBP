@@ -551,7 +551,7 @@ def derive_xyz_expectation_values_using_rdm(
 if __name__ == "__main__":
     from project_paths import add_scripts; 
     add_scripts()
-    from scripts import bp_test
-    bp_test.main_test()
+    from scripts import test_bp
+    test_bp.main_test()
 
 

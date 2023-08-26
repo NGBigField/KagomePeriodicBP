@@ -354,5 +354,5 @@ def reduce_mode_to_edge(
 
 
 if __name__ == "__main__":
-    from scripts.contraction_test import main_test
+    from scripts.test_contraction import main_test
     main_test()

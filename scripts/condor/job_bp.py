@@ -10,7 +10,7 @@ if __name__ == "__main__":
     )
 
 
-from scripts.bp_test import bp_single_call, _standard_row_from_results
+from scripts.test_bp import bp_single_call, _standard_row_from_results
 
 
 def main(
