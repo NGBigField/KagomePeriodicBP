@@ -56,7 +56,11 @@ class TensorDims(NamedTuple):
     physical : int
 
 
-class BaseTensorNetwork(ABC):
+class TensorNetwork(ABC):
+    """The base Tensor-Network (TN) class
+
+    An Abstract Base Class (ABC) that sets the required methods and properties in order to be qualified as a TN.
+    """
     # ================================================= #
     #|   Implementation Specific Methods\Properties    |#
     # ================================================= #
@@ -103,7 +107,7 @@ class BaseTensorNetwork(ABC):
     # ================================================= #
     #|            Instance Copy\Creation               |#
     # ================================================= #
-    def sub_tn(self, indices:list[int])->"BaseTensorNetwork":
+    def sub_tn(self, indices:list[int])->"TensorNetwork":
         return _derive_sub_tn(self, indices)
 
     # ================================================= #
@@ -230,7 +234,7 @@ class BaseTensorNetwork(ABC):
         return crnt_suggestion
 
 
-class KagomeTN(BaseTensorNetwork):
+class KagomeTN(TensorNetwork):
 
     # ================================================= #
     #|                Basic Attributes                 |#
@@ -336,7 +340,7 @@ class KagomeTN(BaseTensorNetwork):
 
 
 
-class ArbitraryTN(BaseTensorNetwork):
+class ArbitraryTN(TensorNetwork):
     def __init__(self, nodes:list[TensorNode], copy=True) -> None:
         if copy:
             nodes = _copy_nodes_and_fix_indices(nodes)
@@ -405,7 +409,7 @@ class ArbitraryTN(BaseTensorNetwork):
         """
         return _qr_decomposition(self, node, edges1, edges2)
 
-class _FrozenSpecificNetwork(BaseTensorNetwork):
+class _FrozenSpecificNetwork(TensorNetwork):
     num_core_tensors : int
     num_env_tensors  : int
 
@@ -755,7 +759,7 @@ def _derive_message_indices(N:int, direction:BlockSide)->list[int]:
     return res.tolist()
 
 
-def _derive_sub_tn(tn:BaseTensorNetwork, indices:list[int])->ArbitraryTN:
+def _derive_sub_tn(tn:TensorNetwork, indices:list[int])->ArbitraryTN:
     
     ## the nodes in the sub-system must be indexed again:
     nodes : list[TensorNode] = []
@@ -827,7 +831,7 @@ def _derive_edges_kagome_tn(self:KagomeTN)->dict[str, tuple[int, int]]:
     return edges
 
 
-def _validate_tn(tn:BaseTensorNetwork):
+def _validate_tn(tn:TensorNetwork):
     # Generic error message:
     _error_message = f"Failed validation of tensor-network."
     # Provoke cached properties:

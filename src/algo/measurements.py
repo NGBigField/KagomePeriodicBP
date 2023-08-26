@@ -22,7 +22,7 @@ from libs.ITE import rho_ij
 
 # Common types in the code:
 from containers import Config, BubbleConConfig
-from tensor_networks import KagomeTN, BaseTensorNetwork, ModeTN, EdgeTN, TensorNode, MPS
+from tensor_networks import KagomeTN, TensorNetwork, ModeTN, EdgeTN, TensorNode, MPS
 from lattices.directions import BlockSide
 from _error_types import TensorNetworkError, BPNotConvergedError
 from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor
@@ -61,7 +61,7 @@ Z : np.matrix = pauli.z
 
 MULTIPROCESSING = False
 
-TensorNetworkType = TypeVar("TensorNetworkType", bound=BaseTensorNetwork)
+TensorNetworkType = TypeVar("TensorNetworkType", bound=TensorNetwork)
 
 
 
@@ -304,7 +304,7 @@ def _calc_and_check_expectation_value(numerator, denominator, force_real:bool) -
 
 def _sandwich_with_operator_and_contract_fully(
     node_ind:int,
-    tn:BaseTensorNetwork, 
+    tn:TensorNetwork, 
     operator:np.matrix,
     max_con_dim:int, 
     direction:BlockSide,
@@ -363,7 +363,7 @@ def calc_interaction_energies_in_core(tn:KagomeTN, interaction_hamiltonain:np.nd
 
 
 def calc_unit_cell_expectation_values_from_tn(
-    tn:BaseTensorNetwork, 
+    tn:TensorNetwork, 
     operators:list[np.matrix], 
     bubblecon_trunc_dim:int, 
     direction:BlockSide|None=None, 
@@ -429,7 +429,7 @@ def calc_unit_cell_expectation_values_from_tn(
 
 
 def _calc_mean_value_by_bracket_tn(
-    tn:BaseTensorNetwork, 
+    tn:TensorNetwork, 
     node_indices:list[int], 
     operator:np.matrix,
     bubblecon_trunc_dim:int, 
@@ -515,7 +515,7 @@ def _calc_rdm_projection_in_axis(rho:np.matrix, pauli_name:str, force_real:bool=
 
 
 def derive_xyz_expectation_values_with_tn(
-    tn:BaseTensorNetwork, 
+    tn:TensorNetwork, 
     reduce:bool=False, 
     bubblecon_trunc_dim:int=18,
     force_real:bool=True

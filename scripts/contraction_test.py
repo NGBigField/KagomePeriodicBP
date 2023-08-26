@@ -11,7 +11,7 @@ from lattices.directions import BlockSide
 
 # Algos we test here:
 from algo.measurements import derive_xyz_expectation_values_with_tn, derive_xyz_expectation_values_using_rdm, print_results_table
-from algo.tn_reduction import reduce_full_kagome_to_core, reduce_core_to_mode, reduce_mode_to_edge
+from algo.tn_reduction import reduce_full_kagome_to_core, reduce_core_to_mode, reduce_mode_to_edge, reduce_tn
 
 # useful utils:
 from utils import visuals, dicts, saveload
@@ -175,9 +175,9 @@ def contract_to_edge_test(
 
 def test_all_edges_contraction(
     d = 2,
-    D = 3,
-    chi = 16,
-    N = 4,
+    D = 2,
+    chi = 8,
+    N = 3,
     with_bp:bool = False,
     real_results = False
 ):
@@ -260,8 +260,8 @@ def main_test():
     # contract_to_core_test()
     # contract_to_mode_test()
     # contract_to_edge_test()
-    # test_all_edges_contraction()
-    test_all_edges_contraction_accumulated_diff_with_chi()
+    test_all_edges_contraction()
+    # test_all_edges_contraction_accumulated_diff_with_chi()
     
 
 
