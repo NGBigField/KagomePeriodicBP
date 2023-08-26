@@ -15,11 +15,12 @@ from enums import ContractionDepth, NodeFunctionality, UpdateMode
 
 def reduce_core_to_mode(
     core_tn:CoreTN, 
-    mode:UpdateMode
+    mode:UpdateMode,
+    copy:bool=True
 )->ModeTN:
     
     ## Create a copy which is an arbitrary tn which can be contracted:
-    tn = core_tn.to_arbitrary_tn()
+    tn = core_tn.to_arbitrary_tn(copy=copy)
 
     ## Get basic info:
     mode_side = mode.side_in_core  # Decide which side corresponds to the mode:

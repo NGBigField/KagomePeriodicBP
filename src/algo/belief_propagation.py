@@ -20,7 +20,7 @@ from enums import ContractionDepth
 from containers import BPStats, BPConfig, MessageDictType, Message
 
 # needed algo:
-from algo.tensor_network import contract_tensor_network
+from algo.contract_tensor_network import contract_tensor_network
 
 # for ite stuff:
 from libs import ITE as ite
@@ -65,6 +65,15 @@ def _bp_error_str(error:float|None):
     return f"{error}" if error is not None else "NaN"
 
 
+def _verify_copy_messages(tn:KagomeTN, prev_messages:dict[BlockSide, Message])->None:
+    _copy_distances = []
+    for _side in BlockSide.all_in_counter_clockwise_order():
+        _a = prev_messages[_side].mps
+        _b = tn.messages[_side].mps
+        _copy_distances.append(MPS.l2_distance(_a, _b))
+    assert sum(_copy_distances) < 1e-14, "Copying messages has a numeric bug!"
+
+
 def _belief_propagation_step(
     tn:KagomeTN,
     prev_error:float|None,
@@ -76,14 +85,8 @@ def _belief_propagation_step(
     float           # next_eerror
 ]:
 
-    ## Keep Old messages for comparison (error calculation):
-    prev_messages = { direction : message.copy() for direction, message in tn.messages.items() }
-    if DEBUG_MODE:
-        assert sum([ 
-            MPS.l2_distance(prev_messages[dir].mps, tn.messages[dir].mps) 
-            for dir in BlockSide.all_in_counter_clockwise_order() 
-        ]) < 1e-14, "Copying messages has a numeric bug!"
-    
+    ## Keep old messages for comparison (error calculation):
+    prev_messages = tn.messages
 
     ## Compute out-going message for all possible sizes:
     # prepare inputs:
@@ -125,8 +128,8 @@ def _belief_propagation_step(
 @decorators.add_stats()
 def belief_propagation(
     tn:KagomeTN, 
-    messages:MessageDictType|None, # initial messages
-    bp_config:BPConfig,
+    messages:MessageDictType|None=None, # initial messages
+    bp_config:BPConfig=BPConfig(),
     live_plots:bool=False
 ) -> tuple[ 
     KagomeTN,

@@ -57,7 +57,14 @@ class Direction():
     
     
     def __hash__(self) -> int:
-        return hash((self.__class__.__name__, self.name))
+        angle_with_limited_precision = round(self.angle, 5)
+        return hash((self.__class__.__name__, self.name, angle_with_limited_precision))
+    
+    def __eq__(self, other:object) -> bool:
+        if not isinstance(other, Direction):
+            return False
+        return hash(self)==hash(other)
+        # return check.is_equal(self, other)
 
     ## Get other by relation:
     def opposite(self)->"Direction":

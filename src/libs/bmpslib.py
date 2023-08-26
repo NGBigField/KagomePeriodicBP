@@ -217,12 +217,16 @@ class mps:
 	#
 	#
 	
-	def copy(self):
+	def copy(self, full:bool=False):
 		
 		new_mps = mps(self.N)
 		
 		new_mps.A = self.A.copy()
 		new_mps.Corder = self.Corder.copy()
+
+		if full:
+			new_mps.nr_exp      = self.nr_exp
+			new_mps.nr_mantissa = self.nr_mantissa
 		
 		return new_mps
 		

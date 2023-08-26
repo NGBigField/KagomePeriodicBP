@@ -430,9 +430,9 @@ def rho_ij(Ti, Tj, env_i=None, env_j=None, mps_env=None)->np.ndarray:
 	              order, and j2, j3, ... are ordered from bottom in 
 	              counter-clockwise order.
 	             
-	              i2           i6
-	           i3  |           |   j5
-	            \  |           |  /
+                i2           i6
+	         i3  |           |   j5
+	          \  |           |  /
                \ |           | /
         i4 ----- O ========= O ----- j4
                / |           | \

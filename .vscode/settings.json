@@ -5,8 +5,12 @@
         "bmpslib",
         "bubblecon",
         "decomp",
+        "hermicity",
         "kagome",
-        "mpss"
+        "ketbra",
+        "mpss",
+        "paulis",
+        "rdms"
     ],
     "cSpell.ignoreWords": [
         "arange"

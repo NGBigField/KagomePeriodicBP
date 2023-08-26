@@ -168,6 +168,9 @@ def repeat_core(
     repeats:int
 ) -> KagomeTN:
     
+    #TODO Check, adjust and fix
+    print("Is it used?!")
+
     repeats = assertions.odd(repeats, reason="No support yet for odd big tensors")
     
     ## create a matrix of references to core 

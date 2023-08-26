@@ -16,23 +16,26 @@ import numpy as np
 # |                                  Constants                                       | #
 # ==================================================================================== #
 TOLERANCE = 0.00001  # Used for distance validation
-IMAGINARY_TOLERANCE = 0.001
+IMAGINARY_TOLERANCE = 0.0001
 
 # ==================================================================================== #
 # |                               Inner Functions                                    | #
 # ==================================================================================== #
 
-def _assert(condition:bool, reason:Optional[str]=None, default_reason:Optional[str]=None):
+def _assert(condition:bool, reason:Optional[str]=None, default_reason:Optional[str]=None, got:Any=None):
     # if condition passed successfully:
     if condition:
         return
-    # If error is needed:
+    ## If error is needed:
+    # Get error message
+    msg = ""
     if reason is not None and isinstance(reason, str):
-        raise AssertionError(reason)
+        msg = reason
     elif default_reason is not None and isinstance(default_reason, str):
-        raise AssertionError(default_reason)
-    else:
-        raise AssertionError()
+        msg = default_reason
+    if got is not None:
+        msg += f" (got {got})"
+    raise AssertionError(msg)
 
 
 def _is_positive_semidefinite(m:np.matrix) -> bool:
@@ -58,27 +61,27 @@ def _is_hermitian(m:np.matrix) -> bool:
 
 def real(x:complex|float|int, /, reason:Optional[str]=None) -> float|int:
     imaginary_factor = abs(np.imag(x))/abs(np.real(x))
-    _assert( imaginary_factor<IMAGINARY_TOLERANCE, reason=reason, default_reason=f"Must be real")
+    _assert( imaginary_factor<IMAGINARY_TOLERANCE, reason=reason, default_reason=f"Must be real", got=x)
     return float(np.real(x))
 
 def integer(x:float|int, /, reason:Optional[str]=None) -> int:
     # _assert( isinstance(x, (int, float)), reason=reason )
-    _assert( round(x) == x, reason=reason )
+    _assert( round(x) == x, reason=reason, got=x)
     return int(x)
 
 def index(x:float|int, /, reason:Optional[str]=None) -> int:
     x = integer(x, reason=reason)
-    _assert( x >= 0, reason=reason )
+    _assert( x >= 0, reason=reason, got=x)
     return x
 
 def bit(x:float|int, /, reason:Optional[str]=None) -> int:
     x = integer(x, reason=reason)
-    _assert( x in [0, 1], reason=reason )
+    _assert( x in [0, 1], reason=reason, got=x)
     return x
 
 def even(x:float|int, /, reason:Optional[str]=None) -> int:
     x = integer(x, reason=reason)
-    _assert( float(x)/2 == int(int(x)/2), reason=reason )
+    _assert( float(x)/2 == int(int(x)/2), reason=reason, got=x)
     return x
 
 def odd(x:float|int, /, reason:Optional[str]=None ) -> int:

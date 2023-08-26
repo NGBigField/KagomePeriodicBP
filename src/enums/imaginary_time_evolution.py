@@ -1,5 +1,6 @@
 from enum import Enum, auto
 from enums.tensor_networks import UnitCellFlavor
+from typing import Generator
 from lattices.directions import BlockSide
 
 class UpdateMode(Enum):
@@ -21,6 +22,14 @@ class UpdateMode(Enum):
     
     def __hash__(self) -> int:
         return hash((self.name, type(self)))
+    
+    def __str__(self) -> str:
+        return self.name
+    
+    @staticmethod
+    def all_options()->Generator["UpdateMode", None, None]:
+        return (mode for mode in UpdateMode)
+            
     
 
 MODES_SIDES : dict[UpdateMode, BlockSide] = {

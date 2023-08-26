@@ -20,7 +20,7 @@ from algo.contract_tensor_network import contract_tensor_network
 
 # Types we need in our module:
 from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS
-from tensor_networks.node import TensorNode
+from tensor_networks.node import TensorNode, two_nodes_ordered_by_relative_direction
 from lattices.directions import Direction, LatticeDirection, BlockSide, check
 from enums import ContractionDepth, NodeFunctionality, UpdateMode
 from containers import MPSOrientation, UpdateEdge
@@ -57,6 +57,8 @@ CORE_CONNECTION_NODES = {
 }
 
 NUM_CONNECTIONS_PER_SIDE = 2  # number of connections per side
+
+VALID_BOTTOM_UP_CONTRACTION_TO_CORE_DIRECTIONS = [BlockSide.U, BlockSide.DL, BlockSide.DR]
 
 
 @dataclass
@@ -124,7 +126,7 @@ def _contract_tn_from_sides_and_create_mpss(
     return mpss, con_orders, orientations
 
 def _basic_data(
-    tn:KagomeTN, parallel:bool
+    tn:KagomeTN, parallel:bool, direction:BlockSide|None
 )->tuple[
     list[TensorNode],
     _PerSide[int],
@@ -146,7 +148,11 @@ def _basic_data(
     num_side_overlap_connections = 2*N - 3  # length of overlap between sides of the zipping algorithm
 
     # Choose a random contraction direction that meets the base of the center triangle, first, and goes "up":
-    from_bottom_up_direction = lists.random_item([BlockSide.U, BlockSide.DL, BlockSide.DR])  
+    if direction is None:
+        from_bottom_up_direction = lists.random_item(VALID_BOTTOM_UP_CONTRACTION_TO_CORE_DIRECTIONS)  
+    else:
+        assert direction in VALID_BOTTOM_UP_CONTRACTION_TO_CORE_DIRECTIONS, f"Not all directions can be used for contraction to core"
+        from_bottom_up_direction = direction
 
     directions = _PerSide[BlockSide](
         bottom_up=from_bottom_up_direction,
@@ -282,18 +288,18 @@ def _add_env_tensors_to_open_core(small_tn:ArbitraryTN, env_tensors:list[TensorN
         if not check.is_opposite(this.directions[-1], next.directions[0]) and this.directions[0] is prev.directions[0]:
             next.directions[0] = this.directions[0]
 
-    return CoreTN.from_arbitrary_tn(small_tn)
+    return small_tn
 
 
 
-def reduce_full_kagome_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bool=False) -> CoreTN:
+def reduce_full_kagome_to_core(tn:KagomeTN, trunc_dim:int, parallel:bool=False, direction:BlockSide|None=None) -> CoreTN:
 
     ## I. Parse and derive data
-    core_nodes, num_core_connections, num_side_overlap_connections, directions = _basic_data(tn, parallel)
+    core_nodes, num_core_connections, num_side_overlap_connections, directions = _basic_data(tn, parallel, direction)
 
     ## II. Prepare two MPSs, contract until core:
 	#      One MPS is "from the bottom-up" and the other is "from the top-down"
-    mpss, con_orders, orientations = _contract_tn_from_sides_and_create_mpss(tn, directions, bubblecon_trunc_dim, parallel)
+    mpss, con_orders, orientations = _contract_tn_from_sides_and_create_mpss(tn, directions, trunc_dim, parallel)
     
     ## Some verifications:
     if DEBUG_MODE:
@@ -312,11 +318,9 @@ def reduce_full_kagome_to_core(tn:KagomeTN, bubblecon_trunc_dim:int, parallel:bo
     env_tensors = _environment_tensors_in_canonical_order(mpss, directions, num_side_overlap_connections, )
 
     ## add tensors-nodes into the tensor-network with the correct direction 
-    core_tn = _add_env_tensors_to_open_core(open_core_tn, env_tensors)
+    small_tn = _add_env_tensors_to_open_core(open_core_tn, env_tensors)
 
-    if False:
-        core_tn.plot()
-
+    core_tn = CoreTN.from_arbitrary_tn(small_tn)
     if DEBUG_MODE:
         core_tn.validate()
 

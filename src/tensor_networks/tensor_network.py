@@ -42,7 +42,7 @@ import functools
 import operator
 
 # Other supporting algo:
-from algo.mps import initial_message, physical_tensor_with_split_mid_leg
+from tensor_networks.mps import initial_message, physical_tensor_with_split_mid_leg
 
 # For OOP:
 from abc import ABC, abstractmethod, abstractproperty
@@ -56,7 +56,11 @@ class TensorDims(NamedTuple):
     physical : int
 
 
-class BaseTensorNetwork(ABC):
+class TensorNetwork(ABC):
+    """The base Tensor-Network (TN) class
+
+    An Abstract Base Class (ABC) that sets the required methods and properties in order to be qualified as a TN.
+    """
     # ================================================= #
     #|   Implementation Specific Methods\Properties    |#
     # ================================================= #
@@ -103,7 +107,7 @@ class BaseTensorNetwork(ABC):
     # ================================================= #
     #|            Instance Copy\Creation               |#
     # ================================================= #
-    def sub_tn(self, indices:list[int])->"BaseTensorNetwork":
+    def sub_tn(self, indices:list[int])->"TensorNetwork":
         return _derive_sub_tn(self, indices)
 
     # ================================================= #
@@ -161,9 +165,15 @@ class BaseTensorNetwork(ABC):
     # ================================================= #
     
     def nodes_connected_to_edge(self, edge:str)->list[TensorNode]:
-        indices = self.edges_dict[edge]
-        indices = list(set(indices))  # If the tensor apears twice, get only 1 copy of its index.
-        return [ self.nodes[node_ind] for node_ind in indices ]
+        iterat = (i for i, e_list in enumerate(self.edges_list) if edge in e_list)
+        i1 = next(iterat)
+        try:
+            i2 = next(iterat)
+        except StopIteration:
+            # Only a single node is connected to this edge. i.e., open edge
+            return [ self.nodes[i1] ]
+        else:
+            return [ self.nodes[i] for i in [i1, i2] ]
 
     def _find_neighbor_by_edge(self, node:TensorNode, edge:EdgeIndicatorType)->TensorNode:
         nodes = self.nodes_connected_to_edge(edge)
@@ -204,6 +214,14 @@ class BaseTensorNetwork(ABC):
             if edge in n2.edges:
                 return True
         return False    
+    
+    def find_open_leg_of_node(self, node:TensorNode)->tuple[int, Direction, EdgeIndicatorType, int]:
+        for leg_index, (direction, edge, dim) in enumerate(node.legs()):
+            nodes_ = self.nodes_connected_to_edge(edge)
+            if len(nodes_)==1:  # Only one neighbor
+                return leg_index, direction, edge, dim
+        raise TensorNetworkError("No open legs")    
+    
 
     # ================================================= #
     #|                     Edges                       |#
@@ -216,7 +234,7 @@ class BaseTensorNetwork(ABC):
         return crnt_suggestion
 
 
-class KagomeTN(BaseTensorNetwork):
+class KagomeTN(TensorNetwork):
 
     # ================================================= #
     #|                Basic Attributes                 |#
@@ -322,7 +340,7 @@ class KagomeTN(BaseTensorNetwork):
 
 
 
-class ArbitraryTN(BaseTensorNetwork):
+class ArbitraryTN(TensorNetwork):
     def __init__(self, nodes:list[TensorNode], copy=True) -> None:
         if copy:
             nodes = _copy_nodes_and_fix_indices(nodes)
@@ -341,23 +359,20 @@ class ArbitraryTN(BaseTensorNetwork):
     def contract(self, n1:TensorNode|int, n2:TensorNode|int)->TensorNode:
         return _contract_nodes(self, n1, n2)
     
-    def contract_all_nodes_with_exceptions(self, nodes_to_keep:list[TensorNode])->list[TensorNode]:        
-        nodes_to_keep_efficient_set = set(nodes_to_keep) 
-        nodes_to_keep_output_list = nodes_to_keep.copy()  # We return a relative list with all displaced nodes
+    def contract_all_nodes_into_exceptions(self, nodes_to_keep:list[TensorNode])->list[TensorNode]:        
+        to_keep_updated = nodes_to_keep.copy()  # We return a relative list with all displaced nodes
         ## At each stage of the loop, contract only immediate neighbors, until no more neighbors:
         num_contracted_neighbors = np.inf
         while num_contracted_neighbors>0:
             num_contracted_neighbors = 0
             ## Get a simple iterable list of nodes to keep:
-            this_round_order = list(nodes_to_keep_efficient_set)
-            for old_node_to_keep in this_round_order:
+            for old_node_to_keep in to_keep_updated:
                 ## For each such node, contract all its neighbors that are not "to-keep"
-                new_node_to_keep, crnt_num = _contract_immediate_neighbors(self, old_node_to_keep, nodes_to_keep_efficient_set)
+                new_node_to_keep, crnt_num = _contract_immediate_neighbors(self, old_node_to_keep, to_keep_updated)
                 ## Update set and counter:
-                _replace_items(nodes_to_keep_efficient_set, old_node_to_keep, new_node_to_keep)
-                _replace_items(nodes_to_keep_output_list, old_node_to_keep, new_node_to_keep)
+                _replace_items(to_keep_updated, old_node_to_keep, new_node_to_keep)
                 num_contracted_neighbors += crnt_num
-        return nodes_to_keep_output_list
+        return to_keep_updated
 
     def add_node(self, node:TensorNode):
         # Add node:
@@ -394,7 +409,7 @@ class ArbitraryTN(BaseTensorNetwork):
         """
         return _qr_decomposition(self, node, edges1, edges2)
 
-class _FrozenSpecificNetwork(BaseTensorNetwork):
+class _FrozenSpecificNetwork(TensorNetwork):
     num_core_tensors : int
     num_env_tensors  : int
 
@@ -408,8 +423,8 @@ class _FrozenSpecificNetwork(BaseTensorNetwork):
         new = cls(tn.nodes, copy=False, **kwargs)
         return new
     
-    def to_arbitrary_tn(self)->ArbitraryTN:
-        return ArbitraryTN(self.nodes, copy=False)
+    def to_arbitrary_tn(self, copy:bool=False)->ArbitraryTN:
+        return ArbitraryTN(self.nodes, copy=copy)
     
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
@@ -496,14 +511,14 @@ class ModeTN(_FrozenSpecificNetwork):
         return next((node for node in self.nodes if self.mode.is_matches_flavor(node.unit_cell_flavor)))
 
     def get_nodes_on_side(self, side:BlockSide)->list[TensorNode]:
-        assert side in self.major_directions
+        assert side in self.major_sides
         return [self.find_neighbor(self.center_node, direction) for direction in side.matching_lattice_directions()]
 
     # ================================================= #
     #|             Structure and Geometry              |#
     # ================================================= #
     @property
-    def major_directions(self)->list[BlockSide]:
+    def major_sides(self)->list[BlockSide]:
         match self.mode:
             case UpdateMode.A:  return [BlockSide.U , BlockSide.D ]
             case UpdateMode.B:  return [BlockSide.UR, BlockSide.DL]
@@ -515,7 +530,7 @@ class EdgeTN(_FrozenSpecificNetwork):
     num_env_tensors  : Final[int] = 6
 
     # ================================================= #
-    #|        Core nodes and their relations           |#
+    #|           nodes and their relations             |#
     # ================================================= #       
 
     def _get_main_core_node(self, i)->TensorNode:
@@ -524,18 +539,25 @@ class EdgeTN(_FrozenSpecificNetwork):
         return res
     
     @property
-    def node1(self)->TensorNode:
+    def core1(self)->TensorNode:
         return self._get_main_core_node(0)
     
     @property
-    def node2(self)->TensorNode:
+    def core2(self)->TensorNode:
         return self._get_main_core_node(1)
     
     @property
-    def open_env_tensors(self)->list[np.ndarray]:
+    def open_mps_env(self)->list[np.ndarray]:
         environment_nodes = self.nodes[2:]
+        assert len(environment_nodes)==6
         environment_tensors = [physical_tensor_with_split_mid_leg(n) for n in environment_nodes]    # Open environment mps legs:        
         return environment_tensors
+    
+    # ================================================= #
+    #|              Edge params for ITE                |#
+    # ================================================= #  
+    def edge_and_environment(self)->tuple[np.ndarray, np.ndarray, list[np.ndarray]]:
+        return self.core1.physical_tensor, self.core2.physical_tensor, self.open_mps_env
     
     # ================================================= #
     #|             Structure and Geometry              |#
@@ -669,7 +691,7 @@ def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
         if functionality is NodeFunctionality.CenterCore:
             center_nodes.append(network_node)
 
-    # Nearest-neighbors of the center triangles are part of the core:
+    # Nearest-neighbors of the center triangles are part of the outer-core:
     for node in center_nodes:
         for edge in node.edges:
             neighbor_index = tn.lattice.get_neighbor(node, edge).index
@@ -737,7 +759,7 @@ def _derive_message_indices(N:int, direction:BlockSide)->list[int]:
     return res.tolist()
 
 
-def _derive_sub_tn(tn:BaseTensorNetwork, indices:list[int])->ArbitraryTN:
+def _derive_sub_tn(tn:TensorNetwork, indices:list[int])->ArbitraryTN:
     
     ## the nodes in the sub-system must be indexed again:
     nodes : list[TensorNode] = []
@@ -809,7 +831,7 @@ def _derive_edges_kagome_tn(self:KagomeTN)->dict[str, tuple[int, int]]:
     return edges
 
 
-def _validate_tn(tn:BaseTensorNetwork):
+def _validate_tn(tn:TensorNetwork):
     # Generic error message:
     _error_message = f"Failed validation of tensor-network."
     # Provoke cached properties:
@@ -1068,7 +1090,6 @@ def _contract_nodes(tn:ArbitraryTN, n1:TensorNode|int, n2:TensorNode|int)->Tenso
             _fuse_double_legs(new_node, neighbor, changed_leg_index)
         seen_neighbors.add(neighbor.index)
 
-
     ## Check:
     if DEBUG_MODE: tn.validate()
     return new_node
@@ -1090,7 +1111,7 @@ def _contract_until_no_more_neighbors_to_contract_into_this_node(tn:ArbitraryTN,
     return major_node
 
 
-def _contract_immediate_neighbors(tn:ArbitraryTN, major_node:TensorNode, nodes_to_keep:set[TensorNode])->tuple[TensorNode, int]:
+def _contract_immediate_neighbors(tn:ArbitraryTN, major_node:TensorNode, nodes_to_keep:list[TensorNode])->tuple[TensorNode, int]:
     counter = 0
     nodes_to_contract = {node for node in tn.all_neighbors(major_node) if node not in nodes_to_keep}
     while len(nodes_to_contract)>0:
