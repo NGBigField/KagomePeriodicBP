@@ -24,7 +24,6 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 
-
 A = UnitCellFlavor.A
 B = UnitCellFlavor.B
 C = UnitCellFlavor.C
@@ -216,7 +215,7 @@ def test_all_edges_contraction(
             accumulted_diff += dicts.accumulate_values(diff, function=lambda x: abs(x))
 
     print(f"accumulted absolute diff = {accumulted_diff}")
-    mean_accumulted_diff = accumulted_diff/(3*6*6)
+    mean_accumulted_diff = accumulted_diff/(3*6*2*3)  # 3 modes X 6 edges X 2 Nodes X 3 xyz expectation values
     print(f"mean absolute diff       = {mean_accumulted_diff}")
 
 
