@@ -1,9 +1,4 @@
 
-## Get config:
-from utils.config import DEBUG_MODE, ALLOW_VISUALS, VERBOSE_MODE
-
-from lib.ncon import ncon
-
 # Import belief propagation code:
 from algo.belief_propagation import BPConfig, BPStats
 
@@ -18,7 +13,7 @@ from _error_types import BPNotConvergedError
 from utils import lists, logs, strings
 
 # For useful tracking plots:
-from visualizations.ite import ITEPlots
+from algo.imaginary_time_evolution._visuals import ITEPlots
 
 
 

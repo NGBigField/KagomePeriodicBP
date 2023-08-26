@@ -11,7 +11,6 @@ if __name__ == "__main__":
 
 # Get Global-Config:
 from _config_reader import DEBUG_MODE
-from scripts import test_bp
 
 # Import our types and calsses:
 from tensor_networks import KagomeTN, TensorNode, CoreTN, ModeTN

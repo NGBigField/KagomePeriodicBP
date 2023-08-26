@@ -1,36 +1,38 @@
-
 if __name__ == "__main__":
-    import sys, pathlib
-    sys.path.append(
-        pathlib.Path(__file__).parent.parent.__str__()
-    )
+	import pathlib, sys
+	sys.path.append(
+		pathlib.Path(__file__).parent.parent.__str__()
+	)
+	sys.path.append(
+		pathlib.Path(__file__).parent.parent.parent.__str__()
+	)
 
-## Get config:
-from utils.config import DEBUG_MODE, ALLOW_VISUALS, VERBOSE_MODE
 
-from lib.ncon import ncon
+# Get Global-Config:
+from _config_reader import DEBUG_MODE
 
 # Import belief propagation code:
 from algo.belief_propagation import belief_propagation, MPS, BPConfig, BPStats
 
-# Import containers of ite:
+# Import containers needed for ite:
 from containers.imaginary_time_evolution import ITEConfig, ITEProgressTracker, ITEPerModeStats, ITESegmentStats
 from containers.sizes_and_dimensions import TNSizesAndDimensions
 from containers.density_matrices import MatrixMetrics
 from containers import Config
 
-# Import need types:
-from enums import UpdateMode, Directions, InitialTNMode
-from tensor_networks import KagomeTN, NodeFunctionality, TensorNode
+# Import other needed types:
+from enums import UpdateMode, NodeFunctionality
+from containers import MessageDictType
+from tensor_networks import KagomeTN, TensorNode
+from _error_types import BPNotConvergedError, ITEError
+from lattices.directions import Direction
 
-# Common errors:
-from lib.ITE import ITEError
-from _error_types import BPNotConvergedError
-
-# Other needed algorithms:
-from algo.tensor_network import get_common_edge_legs, calc_edge_environment, reduce_tn_to_core_and_environment
-from algo.measurements import derive_xyz_expectation_values_with_tn, measure_core_energies, measure_xyz_expectation_values_with_rdms
+# Other algorithms we need:
+from algo.measurements import derive_xyz_expectation_values_with_tn, measure_core_energies, 
 from algo.density_matrices import rho_ij_to_rho, calc_metrics
+from libs.ncon import ncon
+from libs import ITE as ite
+
 
 from tensor_networks.construction import create_core, repeat_core
 
@@ -39,7 +41,6 @@ import numpy as np
 from numpy.linalg import norm
 
 # the modules we are using, by I.A.
-from lib import ITE as ite
 
 # Import our shared utilities
 from utils import tuples, lists, assertions, saveload, logs, decorators, errors, visuals, strings, dicts
@@ -47,25 +48,10 @@ from utils import tuples, lists, assertions, saveload, logs, decorators, errors,
 # For copying config:
 from copy import deepcopy
 
-# Tracking and plotting function for ITE:
-from visualizations.ite import ITEPlots
-from algo.ite_helpers.logs_and_prints import _print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, _print_or_log_ite_segment_msg, _fix_config_if_bp_struggled
-
-
-## ==== Constants ==== ##
-ENV_HERMICITY_THRESHOLD = 1e-5
-EPSILON = 1e-5
-CONVERGENCE_CHECK_LENGTH = 3
-DEFAULT_D = 3
-
-## ==== Helper Types ==== ##
-_BPMessagesType = dict[Directions, tuple[MPS, Directions]]
-
-
-def _core_to_big_open_tn(core:KagomeTN, tn_config:TNSizesAndDimensions) -> KagomeTN:
-    assert tn_config.core_size == core.original_lattice_dims[0] == core.original_lattice_dims[1]
-    repeats = assertions.odd(tn_config.big_lattice_size/tn_config.core_size)
-    return repeat_core(core, repeats=repeats)
+# Helper function and types for ITE:
+from algo.imaginary_time_evolution._visuals import ITEPlots
+from algo.imaginary_time_evolution._logs_and_prints import _print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, _print_or_log_ite_segment_msg, _fix_config_if_bp_struggled
+from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH
 
 
 def _check_converged(energies_in:list[complex|None], delta_ts:list[float], crnt_delta_t:float)->bool:
@@ -120,176 +106,6 @@ def get_imaginary_time_evolution_operator(h:np.ndarray, delta_t:float)->tuple[np
     return h, g
 
 
-def _duplicate_to_core(core1:TensorNode, core2:TensorNode, update_mode:UpdateMode, config:Config)->KagomeTN:
-    """ Arrange 2 cell tensors into a 2x2 core.
-
-    core tensor network is of basic cell
-    [ a  b ]
-    [ b  a ]
-    According to `update_mode`, these tensors are arranged to a tensor-network of type `TensorNetwork`.
-
-    Args:
-        core1 (Node)
-        core2 (Node)
-        update_mode (UpdateMode)
-
-    Returns:
-        TensorNetwork
-    """
-    ## Get basic info:
-    i1, i2 = get_common_edge_legs(core1, core2)
-    assert core1.dims[i1] == core2.dims[i2]
-    common_edge_dim = assertions.integer(np.sqrt(core1.dims[i1]))
-    assert core1.physical_tensor is not None
-    physical_dim = core1.physical_tensor.shape[0]
-    assert common_edge_dim == config.tn.virtual_dim
-    assert physical_dim == config.tn.physical_dim
-
-    ## permute legs back to canonical ordering:
-    for node in [core1, core2]:
-        # node.plot()
-        perm = [node.directions.index(dir) for dir in Directions.standard_order()]
-        node.permute(perm)
-        # node.plot()
-
-    ## arrange tensors in list according to mode:
-    p1 = core1.physical_tensor
-    p2 = core2.physical_tensor
-    assert p1 is not None and p2 is not None
-    match update_mode:
-        case UpdateMode.Up | UpdateMode.Down:
-            a, b = p1, p2
-        case UpdateMode.Right | UpdateMode.Left:
-            a, b = p2, p1
-        case _:
-            raise ValueError(f"Not a legit case {update_mode!r}")
-    peps_list = [a, b, b, a]
-
-    ## Create 2x2 core tensor network:
-    core = create_core(config.tn, creation_mode=peps_list)
-    if DEBUG_MODE: core.validate()
-
-    return core
-
-
-def _calc_environment_equivalent_matrix(environment_tensors:list[np.ndarray]) -> np.ndarray:
-
-    ## Parse inputs:
-    num_tensors = len(environment_tensors)
-    d_physical = environment_tensors[0].shape[2]
-    d_virutal  = environment_tensors[0].shape[0]
-
-    ## Prepare ncon inputs:
-    tensors_ids = [i for i, _ in enumerate(environment_tensors)]
-    edge_list = []
-
-    for prev, crnt, next in lists.iterate_with_periodic_prev_next_items(tensors_ids):
-        tensor_edges = []
-        tensor_edges.append(crnt)
-        tensor_edges.append(-100-crnt)
-        tensor_edges.append(-200-crnt)
-        tensor_edges.append(next)
-
-        edge_list.append(tensor_edges)
-
-    ## Get matrix from using ncon:
-    env_tensor = ncon(environment_tensors, edge_list)
-    assert isinstance(env_tensor, np.ndarray)
-    assert len(env_tensor.shape) == num_tensors*2
-    assert env_tensor.shape[0] == d_physical
-    mat_d = d_physical**num_tensors
-
-    perm_list = []
-    half_size = len(env_tensor.shape)//2
-    for i in range(half_size):
-        perm_list.append(i)
-        perm_list.append(i+half_size)
-
-    m = env_tensor.copy()
-    # m = m.transpose(perm_list)
-    m = m.reshape([mat_d, mat_d])
-    # m /= norm(m)
-
-    return m
-
-
-def update_core_tensors(
-    mode_tn:KagomeTN,
-    core1:TensorNode,
-    core2:TensorNode,
-    environment_tensors:list[np.ndarray],
-    ite_config:ITEConfig,
-    delta_t:float,
-    logger:logs.Logger
-)->tuple[
-    TensorNode,  # core1
-    TensorNode,  # core2 
-    float, # energy
-    MatrixMetrics # env_data
-]:
-
-    # environment_mat = _calc_environment_equivalent_matrix(environment_tensors)
-    # env_metrics = calc_metrics(environment_mat)
-
-    ## Collect data:
-    #  Get Time Evolution Operator
-    h, g = get_imaginary_time_evolution_operator(ite_config.interaction_hamiltonain, delta_t)
-    # dimensions:
-    d_virtual = mode_tn.tensor_dims.virtual
-    # Get physical core tensors:
-    ti = core1.physical_tensor
-    tj = core2.physical_tensor
-    assert isinstance(ti, np.ndarray)
-    assert isinstance(tj, np.ndarray)
-
-    ## Get metrics
-    rdm_before = ite.rho_ij(ti, tj, mps_env=environment_tensors)
-    env_metrics = calc_metrics(rho_ij_to_rho(rdm_before))    
-
-    ## Check state:
-    if env_metrics.hermicity>ENV_HERMICITY_THRESHOLD:
-        raise ITEError(f"env_hermicity={env_metrics.hermicity}")
-    sum_eigenvalues = assertions.real(env_metrics.sum_eigenvalues)
-    if abs(sum_eigenvalues-1)>ENV_HERMICITY_THRESHOLD:
-        raise ITEError(f"env is not psd. sum-eigenvalues={sum_eigenvalues}")
-    if env_metrics.negativity>0.1:
-        raise ITEError(f"env is not psd. negativity={env_metrics.negativity}")    
-
-    ## Update tensors:
-    new_ti, new_tj = ite.apply_2local_gate( g=g, Dmax=d_virtual, Ti=ti, Tj=tj, mps_env=environment_tensors )    
-
-    ## Calc energy and updated env metrics:
-    rdm_after = ite.rho_ij(new_ti, new_tj, mps_env=environment_tensors)
-    energy_after  = np.dot(rdm_after.flatten(),  h.flatten())
-    env_metrics = calc_metrics(rho_ij_to_rho(rdm_after))    
-
-    ## Check change
-    if DEBUG_MODE and VERBOSE_MODE:
-        #
-        rdm_diff = norm(rdm_after-rdm_before)/norm(rdm_before)
-        s_ = strings.add_color(f"rdm_diff={rdm_diff}", strings.PrintColors.GREEN)
-        print(f"        "+s_)
-        #
-        ti_diff = norm(new_ti-ti)/norm(ti)
-        s_ = strings.add_color(f"ti_diff ={ti_diff}", strings.PrintColors.GREEN)
-        print(f"        "+s_)
-        #
-        tj_diff = norm(new_tj-tj)/norm(tj)
-        s_ = strings.add_color(f"tj_diff ={tj_diff}", strings.PrintColors.GREEN)
-        print(f"        "+s_)
-
-    ## normalize
-    new_ti = new_ti / norm(new_ti)
-    new_tj = new_tj / norm(new_tj)
-
-    ## keep new data in nodes:
-    core1.tensor = new_ti
-    core2.tensor = new_tj
-    assert core1.is_ket == True
-    assert core2.is_ket == True
-
-    return core1, core2, energy_after, env_metrics
-
 
 ## ==== Main ITE Functions ==== ##
 
@@ -297,14 +113,14 @@ def update_core_tensors(
 @decorators.add_stats()
 def ite_per_mode(
     core:KagomeTN,
-    messages:_BPMessagesType|None,
+    messages:MessageDictType|None,
     delta_t:float,
     logger:logs.Logger,
     config:Config,
     update_mode:UpdateMode
 )->tuple[
     KagomeTN,          # core
-    _BPMessagesType,        # messages
+    MessageDictType,        # messages
     float,                  # edge_energy
     ITEPerModeStats         # Stats
 ]:
@@ -341,14 +157,14 @@ def ite_per_mode(
 @decorators.multiple_tries(3)
 def ite_segment(
     core:KagomeTN,
-    messages:_BPMessagesType|None,
+    messages:MessageDictType|None,
     delta_t:float,
     logger:logs.Logger,
     config_in:Config,
     prev_stats:ITESegmentStats
 )->tuple[
     KagomeTN,          # core
-    _BPMessagesType,        # messages
+    MessageDictType,        # messages
     KagomeTN,          # tn_stable
     ITESegmentStats         # stats
 ]:
@@ -392,10 +208,10 @@ def ite_segment(
 
 # @decorators.multiple_tries(3)
 def ite_per_delta_t(
-    core:KagomeTN, messages:_BPMessagesType|None, delta_t:float, num_repeats:int, config:Config, 
+    core:KagomeTN, messages:MessageDictType|None, delta_t:float, num_repeats:int, config:Config, 
     plots:ITEPlots, logger:logs.Logger, tracker:ITEProgressTracker, step_stats:ITESegmentStats
 ) -> tuple[
-    KagomeTN, _BPMessagesType|None, bool, ITESegmentStats
+    KagomeTN, MessageDictType|None, bool, ITESegmentStats
     # core, messages, at_least_one_succesful_run, step_stats
 ]:
 
@@ -541,6 +357,6 @@ def robust_full_ite(
 
 
 if __name__ == "__main__":
-    from scripts.core_ite_test import main
+    from scripts.test_ite import main
     main()
 
