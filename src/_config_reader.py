@@ -13,3 +13,4 @@ with open(str(config_file_path), 'r') as f:
     
 ALLOW_VISUALS : bool = data["allow_visuals"]
 DEBUG_MODE : bool = data["debug_mode"]
+KEEP_LOGS : bool = data["keep_logs"]

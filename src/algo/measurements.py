@@ -31,7 +31,6 @@ from tensor_networks.unit_cell import UnitCell
 from containers.results import Measurements, Expectations
 
 ## Algos we need:
-from tensor_networks.construction import repeat_core
 from algo.tn_reduction import reduce_full_kagome_to_core
 from algo.belief_propagation import belief_propagation
 from algo.contract_tensor_network import contract_tensor_network

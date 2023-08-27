@@ -1,4 +1,5 @@
 {
     "allow_visuals" : true,
-    "debug_mode"    : true
+    "debug_mode"    : true,
+    "keep_logs"     : true
 }

@@ -12,7 +12,7 @@ if __name__ == "__main__":
 
 
 # Get Global-Config:
-from _config_reader import DEBUG_MODE
+from _config_reader import DEBUG_MODE, KEEP_LOGS, ALLOW_VISUALS
 
 # Import belief propagation code:
 from algo.belief_propagation import belief_propagation
@@ -26,17 +26,15 @@ from containers import Config
 # Import other needed types:
 from enums import UpdateMode, NodeFunctionality
 from containers import MessageDictType
-from tensor_networks import KagomeTN, TensorNode, UnitCell
+from tensor_networks import KagomeTN, CoreTN, TensorNode, UnitCell
 from _error_types import BPNotConvergedError, ITEError
 from lattices.directions import Direction
 
 # Other algorithms we need:
 from algo.measurements import derive_xyz_expectation_values_with_tn, measure_core_energies
 from algo.density_matrices import rho_ij_to_rho, calc_metrics
+from algo.tn_reduction import reduce_tn
 from libs import ITE as ite
-
-
-from tensor_networks.construction import repeat_core
 
 # For numeric stuff:
 import numpy as np
@@ -52,26 +50,33 @@ from copy import deepcopy
 
 # Helper function and types for ITE:
 from algo.imaginary_time_evolution._logs_and_prints import _print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, _print_or_log_ite_segment_msg, _fix_config_if_bp_struggled
-from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH
+from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
 from algo.imaginary_time_evolution._visualization import ITEPlots
 from algo.imaginary_time_evolution._tn_control import kagome_tn_from_unit_cell
 
 
 
-def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:logs.Logger):
+def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:logs.Logger)->None:
+    # Inputs:
     delta_t = 0.0
+    messages = None
+
+    ## Get the state of the system at iteration 0:
     logger.info("Calculating measurements of initial core...")
-    tn_open = kagome_tn_from_unit_cell(unit_cell, config.dims)
-    tn_stable, messages, bp_stats = belief_propagation(tn_open, messages, deepcopy(config.bp))  # Perform BlockBP:
-    tn_stable_around_core = reduce_tn_to_core_and_environment(tn_stable, config.bubblecon_trunc_dim, method=config.reduce2core_method)
-    expectation_values = derive_xyz_expectation_values_with_tn(tn_stable_around_core, reduce=False)
-    energies_per_site, _ = measure_core_energies(tn_stable_around_core, config.ite.interaction_hamiltonain, config.bubblecon_trunc_dim)
+    full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
+    messages, bp_stats = belief_propagation(full_tn, messages, config.bp.copy() )  # Perform BlockBP:
+    core_tn = reduce_tn(full_tn, CoreTN, config.bubblecon_trunc_dim, method=config.reduce2core_method)
+
+    ## Compute values:
+    expectation_values = derive_xyz_expectation_values_with_tn(core_tn, reduce=False)
+    energies_per_site, _ = measure_core_energies(core_tn, config.ite.interaction_hamiltonain, config.bubblecon_trunc_dim)
     energy = sum(energies_per_site)/len(energies_per_site) 
 
     ## Save data, print performance and plot graphs:
     ite_tracker.log_segment(delta_t=delta_t, energy=energy, unit_cell=unit_cell, messages=messages, expectation_values=expectation_values, stats=step_stats)
     plots.update(energies_per_site, step_stats, delta_t, expectation_values, _initial=True)
     logger.info(f"Mean energy at iteration 0: {energy}")
+
 
 def _check_converged(energies_in:list[complex|None], delta_ts:list[float], crnt_delta_t:float)->bool:
 
@@ -296,7 +301,7 @@ def full_ite(
     ## Initial Settings:
     # Config:
     if config is None:
-        config = Config.derive_from_physical_dim(DEFAULT_D)
+        config = Config.derive_from_physical_dim(DEFAULT_PHYSICAL_DIM)
     # Unit-Cell:
     if unit_cell is None:
         unit_cell_in = UnitCell.random(d=config.dims.physical_dim, D=config.dims.virtual_dim)
@@ -306,7 +311,7 @@ def full_ite(
         raise TypeError(f"Not an expected type for input 'initial_core' of type {type(unit_cell)!r}")
     # Logger:
     if logger is None:
-        logger = logs.get_logger(verbose=config.visuals.verbose)
+        logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=KEEP_LOGS)
     elif not isinstance(logger, logs.Logger):
         raise TypeError(f"Not an expected type for input 'logger' of type {type(logger)!r}")
     

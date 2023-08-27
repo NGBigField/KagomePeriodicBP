@@ -7,6 +7,7 @@ from typing import NamedTuple, TypeAlias
 from lattices.directions import LatticeDirection
 from libs.bmpslib import mps as MPS
 from lattices.directions import BlockSide
+from copy import deepcopy
 
 
 @dataclass
@@ -23,6 +24,10 @@ class BPConfig:
 
     def __repr__(self) -> str:
         return container_repr(self)
+    
+    def copy(self)->"BPConfig":
+        return deepcopy(self)
+
 
 @dataclass
 class BPStats(Stats):

@@ -1,15 +1,19 @@
 
-from utils import visuals, strings, logs
+from utils import visuals, strings, logs, prints
 from containers import Config, ITESegmentStats
 import numpy as np
 from dataclasses import dataclass, fields
 from typing import TypeVar, Generic, Generator
 _T = TypeVar('_T')
 
+# Control flags:
+from _config_reader import ALLOW_VISUALS
+
+
 class ITEPlots():
 
     @dataclass
-    class Options(Generic[_T]):
+    class _PlotVariations(Generic[_T]):
         main  : _T = None  #type: ignore
         env   : _T = None  #type: ignore
         cores : _T = None  #type: ignore
@@ -31,9 +35,9 @@ class ITEPlots():
         ## Save data:
         self.config = config
         self.active = active
-        self.plots = ITEPlots.Options[dict[str, visuals.AppendablePlot]]()
-        self.figs  = ITEPlots.Options[visuals.Figure]()
-        self.show  = ITEPlots.Options[bool]()
+        self.plots = ITEPlots._PlotVariations[dict[str, visuals.AppendablePlot]]()
+        self.figs  = ITEPlots._PlotVariations[visuals.Figure]()
+        self.show  = ITEPlots._PlotVariations[bool]()
         # Track state
         self._iteration = 0
 
@@ -44,6 +48,10 @@ class ITEPlots():
         self.show.cores = plots_to_show[2]
 
         if not active:
+            return
+        if not ALLOW_VISUALS:
+            prints.print_warning(f"configuration.json file not allowing for figures, but input config variable does allow it.\n"+
+                                 f"Consider setting the correct configuration input or changing the configuration file.")
             return
         
         from matplotlib import pyplot as plt

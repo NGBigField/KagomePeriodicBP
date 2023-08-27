@@ -4,6 +4,7 @@ from containers.sizes_and_dimensions import TNDimensions
 from containers.imaginary_time_evolution import ITEConfig
 from containers.visuals import VisualsConfig
 from utils import strings
+from copy import deepcopy
 
 # Control flags:
 from _config_reader import DEBUG_MODE, ALLOW_VISUALS
@@ -54,7 +55,7 @@ class Config(_ConfigClassWithSubClasses):
         if self.bubblecon_trunc_dim == -1:
             self.bubblecon_trunc_dim = self.bp.max_swallowing_dim*2
         if not ALLOW_VISUALS:
-            self.live_plots = False
+            self.visuals.live_plots = False
 
 
     def __repr__(self) -> str:        
@@ -64,6 +65,10 @@ class Config(_ConfigClassWithSubClasses):
             value = getattr(self, field.name)
             s += f"{field.name}: {value}"
         return s
+    
+
+    def copy(self)->"Config":
+        return deepcopy(self)
     
 
 

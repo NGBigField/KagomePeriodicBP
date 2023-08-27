@@ -4,4 +4,5 @@ from containers.imaginary_time_evolution import ITEConfig, ITEPerModeStats, ITES
 from containers.sizes_and_dimensions import TNDimensions
 from containers.global_config import Config
 from containers.results import Measurements
+from containers.density_matrices import MatrixMetrics
 from containers import configs

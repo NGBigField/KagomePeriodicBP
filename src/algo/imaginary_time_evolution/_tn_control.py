@@ -1,5 +1,5 @@
-from containers import TNDimensions, ITEConfig, Config
-from tensor_networks import TensorNetwork, TensorNode, KagomeTN, UnitCell
+from containers import TNDimensions, ITEConfig, Config, MatrixMetrics
+from tensor_networks import TensorNetwork, TensorNode, KagomeTN, UnitCell, create_kagome_tn
 from utils import lists, logs
 
 import numpy as np
@@ -47,10 +47,12 @@ def _calc_environment_equivalent_matrix(environment_tensors:list[np.ndarray]) ->
 
 
 def kagome_tn_from_unit_cell(unit_cell:UnitCell, dims:TNDimensions) -> KagomeTN:
-    assert dims.core_size == core.original_lattice_dims[0] == core.original_lattice_dims[1]
-    repeats = assertions.odd(dims.big_lattice_size/dims.core_size)
-    return repeat_core(core, repeats=repeats)
-
+    return create_kagome_tn(
+        d = dims.physical_dim,
+        D = dims.virtual_dim,
+        N = dims.big_lattice_size,
+        unit_cell = unit_cell
+    )
 
 
 def update_unit_cell_tensors(

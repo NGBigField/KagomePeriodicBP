@@ -132,7 +132,6 @@ def belief_propagation(
     bp_config:BPConfig=BPConfig(),
     live_plots:bool=False
 ) -> tuple[ 
-    KagomeTN,
     MessageDictType, # final messages
     BPStats
 ]:
@@ -213,7 +212,7 @@ def belief_propagation(
 
     # Check result and finish:
     if DEBUG_MODE: tn.validate()
-    return tn, messages, stats
+    return messages, stats
     
 
 
