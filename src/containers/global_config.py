@@ -1,27 +1,39 @@
 from dataclasses import dataclass, fields
-from enums import MessageModel
 from containers.belief_propagation import BPConfig
-from containers.sizes_and_dimensions import TNSizesAndDimensions
+from containers.sizes_and_dimensions import TNDimensions
 from containers.imaginary_time_evolution import ITEConfig
+from containers.visuals import VisualsConfig
 from utils import strings
 
 # Control flags:
 from _config_reader import DEBUG_MODE, ALLOW_VISUALS
 
+
+class _ConfigClassWithSubClasses:
+    # For easier reach of these needed config data classes:
+    BPConfig      = BPConfig
+    TNDimensions  = TNDimensions
+    ITEConfig     = ITEConfig
+    VisualsConfig = VisualsConfig
+
+
 @dataclass
-class Config: 
+class Config(_ConfigClassWithSubClasses): 
+    # The actuall stored data:
     bp : BPConfig 
     ite : ITEConfig 
-    tn : TNSizesAndDimensions
+    dims : TNDimensions
+    visuals : VisualsConfig
     bubblecon_trunc_dim : int
-    live_plots : bool = False
+
 
     @staticmethod
-    def from_D(D:int)->"Config":
+    def derive_from_physical_dim(D:int)->"Config":
         return Config(
             bp=BPConfig(max_swallowing_dim=D**2),
             ite=ITEConfig(),
-            tn=TNSizesAndDimensions(virtual_dim=D),
+            dims=TNDimensions(virtual_dim=D),
+            visuals=VisualsConfig(),
             bubblecon_trunc_dim=2*D**2
         )
 
@@ -53,3 +65,5 @@ class Config:
             s += f"{field.name}: {value}"
         return s
     
+
+

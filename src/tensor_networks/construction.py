@@ -31,7 +31,7 @@ from lattices.directions import Direction, LatticeDirection
 from lattices.edges import edges_dict_from_edges_list
 from tensor_networks.unit_cell import UnitCell
 
-from containers import TNSizesAndDimensions
+from containers import TNDimensions
 from lattices.kagome import KagomeLattice
 
 

@@ -11,13 +11,11 @@ from enums.imaginary_time_evolution import UpdateMode
 from enums.tensor_networks import UnitCellFlavor
 from containers.belief_propagation import BPStats
 from containers.density_matrices import MatrixMetrics 
+from tensor_networks import UnitCell
 from _error_types import ITEError
 
 # For smart iterations:
 import itertools
-
-
-KagomeTensorNetwork = None  #TODO fix
 
 
 _NEXT_IN_ABC_ORDER = {
@@ -116,15 +114,22 @@ class ITESegmentStats(Stats):
 
 
 
-
-_TrackerStepOutputs = tuple[float, complex|None, ITESegmentStats, dict, KagomeTensorNetwork, dict]  # delta_t, energy, env_hermicity, expectation, value, core, messages
+                        
+_TrackerStepOutputs = tuple[
+    float,              # delta_t
+    complex|None,       # energy    
+    ITESegmentStats,    # env_hermicity      
+    dict,               # expectation-value
+    UnitCell,           # core
+    dict                # messages
+]  
 
 
 class ITEProgressTracker():
 
-    def __init__(self, core:KagomeTensorNetwork, messages:dict|None, config:Any):
+    def __init__(self, unit_cell:UnitCell, messages:dict|None, config:Any):
         # From input:
-        self.last_core : KagomeTensorNetwork = core.copy()
+        self.last_unit_cell : UnitCell = unit_cell.copy()
         self.last_messages : dict = deepcopy(messages)  #type: ignore
         self.config = config
         # Fresh variables:
@@ -135,24 +140,24 @@ class ITEProgressTracker():
         self.delta_ts : list[float] = []
         self.energies : list[complex|None] = []
         self.expectation_values : list[dict] = []
-        self.cores : list[KagomeTensorNetwork] = []
+        self.unit_cells : list[UnitCell] = []
         self.messages : list[dict] = []
         self.stats : list[ITESegmentStats] = []
     
-    def log_segment(self, delta_t:float, core:KagomeTensorNetwork, messages:dict, expectation_values:dict, energy:complex, stats:ITESegmentStats )->None:
+    def log_segment(self, delta_t:float, unit_cell:UnitCell, messages:dict, expectation_values:dict, energy:complex, stats:ITESegmentStats )->None:
         # Get a solid copy
-        _core = core.copy()
+        _unit_cell = unit_cell.copy()
         messages = deepcopy(messages)
         expectation_values = deepcopy(expectation_values)
         ## Lists:
         self.delta_ts.append(delta_t)
         self.energies.append(energy)
-        self.cores.append(_core)
+        self.unit_cells.append(_unit_cell)
         self.messages.append(messages)
         self.expectation_values.append(expectation_values)
         self.stats.append(stats)
         ## Up_to_date memory:
-        self.last_core = _core
+        self.last_unit_cell = _unit_cell
         self.last_messages = messages
         self.last_iter += 1
         ## Save to file
@@ -189,12 +194,12 @@ class ITEProgressTracker():
         for _ in range(num_iter):
             delta_t = self.delta_ts.pop()
             energy = self.energies.pop()
-            core = self.cores.pop()
+            core = self.unit_cells.pop()
             messages = self.messages.pop()
             exepectation_values = self.expectation_values.pop()
             step_stats = self.stats.pop()
         # Up to date memory:
-        self.last_core = core  #type: ignore
+        self.last_unit_cell = core  #type: ignore
         self.last_messages = messages  #type: ignore
         self.last_iter -= num_iter
         # Return:

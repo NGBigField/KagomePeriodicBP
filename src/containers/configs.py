@@ -2,4 +2,4 @@ from containers.belief_propagation import BPConfig
 from containers.contractions import BubbleConConfig
 from containers.global_config import Config
 from containers.imaginary_time_evolution import ITEConfig
-from containers.sizes_and_dimensions import TNSizesAndDimensions
+from containers.sizes_and_dimensions import TNDimensions

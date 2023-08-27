@@ -1,56 +1,8 @@
+from containers import TNDimensions, ITEConfig, Config
+from tensor_networks import TensorNetwork, TensorNode, KagomeTN, UnitCell
+from utils import lists, logs
 
-def _duplicate_to_core(core1:TensorNode, core2:TensorNode, update_mode:UpdateMode, config:Config)->KagomeTN:
-    """ Arrange 2 cell tensors into a 2x2 core.
-
-    core tensor network is of basic cell
-    [ a  b ]
-    [ b  a ]
-    According to `update_mode`, these tensors are arranged to a tensor-network of type `TensorNetwork`.
-
-    Args:
-        core1 (Node)
-        core2 (Node)
-        update_mode (UpdateMode)
-
-    Returns:
-        TensorNetwork
-    """
-    ## Get basic info:
-    i1, i2 = get_common_edge_legs(core1, core2)
-    assert core1.dims[i1] == core2.dims[i2]
-    common_edge_dim = assertions.integer(np.sqrt(core1.dims[i1]))
-    assert core1.physical_tensor is not None
-    physical_dim = core1.physical_tensor.shape[0]
-    assert common_edge_dim == config.tn.virtual_dim
-    assert physical_dim == config.tn.physical_dim
-
-    ## permute legs back to canonical ordering:
-    for node in [core1, core2]:
-        # node.plot()
-        perm = [node.directions.index(dir) for dir in Directions.standard_order()]
-        node.permute(perm)
-        # node.plot()
-
-    ## arrange tensors in list according to mode:
-    p1 = core1.physical_tensor
-    p2 = core2.physical_tensor
-    assert p1 is not None and p2 is not None
-    match update_mode:
-        case UpdateMode.Up | UpdateMode.Down:
-            a, b = p1, p2
-        case UpdateMode.Right | UpdateMode.Left:
-            a, b = p2, p1
-        case _:
-            raise ValueError(f"Not a legit case {update_mode!r}")
-    peps_list = [a, b, b, a]
-
-    ## Create 2x2 core tensor network:
-    core = create_core(config.tn, creation_mode=peps_list)
-    if DEBUG_MODE: core.validate()
-
-    return core
-
-
+import numpy as np
 
 
 def _calc_environment_equivalent_matrix(environment_tensors:list[np.ndarray]) -> np.ndarray:
@@ -94,9 +46,9 @@ def _calc_environment_equivalent_matrix(environment_tensors:list[np.ndarray]) ->
     return m
 
 
-def _core_to_big_open_tn(core:KagomeTN, tn_config:TNSizesAndDimensions) -> KagomeTN:
-    assert tn_config.core_size == core.original_lattice_dims[0] == core.original_lattice_dims[1]
-    repeats = assertions.odd(tn_config.big_lattice_size/tn_config.core_size)
+def kagome_tn_from_unit_cell(unit_cell:UnitCell, dims:TNDimensions) -> KagomeTN:
+    assert dims.core_size == core.original_lattice_dims[0] == core.original_lattice_dims[1]
+    repeats = assertions.odd(dims.big_lattice_size/dims.core_size)
     return repeat_core(core, repeats=repeats)
 
 

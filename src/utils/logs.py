@@ -10,7 +10,7 @@ if __name__ == "__main__":
 import logging
 from logging import Logger
 from typing import Final, Mapping
-from utils import strings, saveload
+from utils import strings, saveload, prints
 from enum import Enum, auto
 import types
 
@@ -70,12 +70,12 @@ class _MyCFormatter(logging.Formatter):
         level_value = record.levelno
 
         if level_value in [LoggerLevels.CRITICAL.value, LoggerLevels.ERROR.value]:
-            color = strings.PrintColors.RED
-            s = strings.add_color(s, color)
+            color = prints.PrintColors.RED
+            s = prints.add_color(s, color)
         elif level_value == LoggerLevels.WARNING.value:
-            warn1color = strings.PrintColors.HIGHLIGHTED_YELLOW
-            warn2color = strings.PrintColors.YELLOW_DARK
-            s = strings.add_color("Warning:", warn1color) + strings.add_color(s, warn2color)
+            warn1color = prints.PrintColors.HIGHLIGHTED_YELLOW
+            warn2color = prints.PrintColors.YELLOW_DARK
+            s = prints.add_color("Warning:", warn1color) + prints.add_color(s, warn2color)
 
         return s
     
@@ -85,7 +85,7 @@ class _MyFFormatter(logging.Formatter):
         s = super().format(record)
         
         # Remove coloring strings from message:
-        for color in strings.PrintColors:
+        for color in prints.PrintColors:
             color_s = f"{color}"
             s = s.replace(color_s, '')
 
@@ -123,18 +123,19 @@ def _to_file(logger:Logger, msg: object, *args: object, **kwargs) -> None:
     self._log(LoggerLevels.ONLYFILE.value, msg, args, **kwargs)
 
 def get_logger(
-    level:LoggerLevels|None=None,
+    verbose:bool=False,
     filename:str|None=None
     )->Logger:
 
     # Define default arguments:
-    if level is None:
-        if VERBOSE_MODE:
-            level = LoggerLevels.DEBUG
-        else:
-            level = LoggerLevels.INFO
     if filename is None:
         filename = strings.time_stamp()+" "+strings.random(6)
+
+    # Define logger level:
+    if verbose:
+        level = LoggerLevels.DEBUG
+    else:
+        level = LoggerLevels.INFO
 
     # Get logger obj:
     logger = logging.getLogger(filename)

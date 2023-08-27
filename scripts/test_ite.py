@@ -1,16 +1,11 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 
-# Tensor-Networks creation:
-from tensor_networks.construction import create_kagome_tn
-
 # Types in the code:
 from enums import UpdateMode, UnitCellFlavor
-from containers import UpdateEdge
-from tensor_networks.unit_cell import UnitCell
-from lattices.directions import BlockSide
+from containers import ITEConfig, Config
+
 
 # Algos we test here:
-from algo.measurements import derive_xyz_expectation_values_with_tn, derive_xyz_expectation_values_using_rdm, print_results_table
 from algo.imaginary_time_evolution import full_ite
 
 # useful utils:
@@ -25,14 +20,26 @@ import numpy as np
 
 
 
+def test_full_ite(
+    D = 2,
+    N = 3
+):
+    ## Config:
+    config = Config.derive_from_physical_dim(D)
+    config.dims.big_lattice_size = N
+
+    ## Run:
+    unit_cell_out, ite_tracker, logger = full_ite(config=config)
+    print("Done")
 
 
 
 
 
-def main():
-    pass
+
+def main_test():
+    test_full_ite()
 
 
 if __name__ == "__main__":
-    main()
+    main_test()

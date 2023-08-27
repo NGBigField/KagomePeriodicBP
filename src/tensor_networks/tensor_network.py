@@ -27,7 +27,8 @@ import lattices.triangle as triangle_lattice
 from _types import EdgeIndicatorType, PosScalarType, EdgesDictType
 from _error_types import TensorNetworkError, LatticeError, DirectionError, NetworkConnectionError
 from enums import NodeFunctionality, UpdateMode
-from containers import MessageDictType, Message, TNSizesAndDimensions, MPSOrientation
+from containers.belief_propagation import MessageDictType, Message, MPSOrientation
+from containers.sizes_and_dimensions import TNDimensions
 
 # utilities used in our code:
 from utils import assertions, lists, tuples, numerics, indices, strings
@@ -250,10 +251,9 @@ class KagomeTN(TensorNetwork):
         self.lattice : KagomeLattice = lattice
         self.messages : MessageDictType = {}
         self.unit_cell : UnitCell = unit_cell
-        self.dimensions : TNSizesAndDimensions = TNSizesAndDimensions(
+        self.dimensions : TNDimensions = TNDimensions(
             virtual_dim=D,
             physical_dim=d,
-            core_size=2,
             big_lattice_size=lattice.N
         )
 

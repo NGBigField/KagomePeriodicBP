@@ -1,36 +1,38 @@
+# For allowing tests and scripts to run while debuging this module
 if __name__ == "__main__":
-	import pathlib, sys
-	sys.path.append(
-		pathlib.Path(__file__).parent.parent.__str__()
-	)
-	sys.path.append(
-		pathlib.Path(__file__).parent.parent.parent.__str__()
-	)
+    import sys, pathlib
+    sys.path.append(
+        pathlib.Path(__file__).parent.parent.parent.__str__()
+    )
+    from project_paths import add_src, add_base, add_scripts
+    add_src()
+    add_base()
+    add_scripts()
+
 
 
 # Get Global-Config:
 from _config_reader import DEBUG_MODE
 
 # Import belief propagation code:
-from algo.belief_propagation import belief_propagation, MPS, BPConfig, BPStats
+from algo.belief_propagation import belief_propagation
 
 # Import containers needed for ite:
 from containers.imaginary_time_evolution import ITEConfig, ITEProgressTracker, ITEPerModeStats, ITESegmentStats
-from containers.sizes_and_dimensions import TNSizesAndDimensions
+from containers.sizes_and_dimensions import TNDimensions
 from containers.density_matrices import MatrixMetrics
 from containers import Config
 
 # Import other needed types:
 from enums import UpdateMode, NodeFunctionality
 from containers import MessageDictType
-from tensor_networks import KagomeTN, TensorNode
+from tensor_networks import KagomeTN, TensorNode, UnitCell
 from _error_types import BPNotConvergedError, ITEError
 from lattices.directions import Direction
 
 # Other algorithms we need:
 from algo.measurements import derive_xyz_expectation_values_with_tn, measure_core_energies
 from algo.density_matrices import rho_ij_to_rho, calc_metrics
-from libs.ncon import ncon
 from libs import ITE as ite
 
 
@@ -49,10 +51,27 @@ from utils import tuples, lists, assertions, saveload, logs, decorators, errors,
 from copy import deepcopy
 
 # Helper function and types for ITE:
-# from algo.imaginary_time_evolution._visuals import  #TODO
 from algo.imaginary_time_evolution._logs_and_prints import _print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, _print_or_log_ite_segment_msg, _fix_config_if_bp_struggled
 from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH
+from algo.imaginary_time_evolution._visualization import ITEPlots
+from algo.imaginary_time_evolution._tn_control import kagome_tn_from_unit_cell
 
+
+
+def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:logs.Logger):
+    delta_t = 0.0
+    logger.info("Calculating measurements of initial core...")
+    tn_open = kagome_tn_from_unit_cell(unit_cell, config.dims)
+    tn_stable, messages, bp_stats = belief_propagation(tn_open, messages, deepcopy(config.bp))  # Perform BlockBP:
+    tn_stable_around_core = reduce_tn_to_core_and_environment(tn_stable, config.bubblecon_trunc_dim, method=config.reduce2core_method)
+    expectation_values = derive_xyz_expectation_values_with_tn(tn_stable_around_core, reduce=False)
+    energies_per_site, _ = measure_core_energies(tn_stable_around_core, config.ite.interaction_hamiltonain, config.bubblecon_trunc_dim)
+    energy = sum(energies_per_site)/len(energies_per_site) 
+
+    ## Save data, print performance and plot graphs:
+    ite_tracker.log_segment(delta_t=delta_t, energy=energy, unit_cell=unit_cell, messages=messages, expectation_values=expectation_values, stats=step_stats)
+    plots.update(energies_per_site, step_stats, delta_t, expectation_values, _initial=True)
+    logger.info(f"Mean energy at iteration 0: {energy}")
 
 def _check_converged(energies_in:list[complex|None], delta_ts:list[float], crnt_delta_t:float)->bool:
 
@@ -126,7 +145,7 @@ def ite_per_mode(
 ]:
 
     ## Duplicate core into a big tensor-network:
-    tn_open = _core_to_big_open_tn(core, config.tn)
+    tn_open = _core_to_big_open_tn(core, config.dims)
 
     ## Perform BlockBP:
     tn_stable, messages, bp_stats = belief_propagation(tn_open, messages, deepcopy(config.bp), live_plots=config.live_plots)
@@ -199,7 +218,7 @@ def ite_segment(
 
     ## Calc final stable TN:
     logger.debug(f"    Calculating stable reduced TN..")    
-    tn_open = _core_to_big_open_tn(core, config.tn)  # Duplicate core into a big tensor-network:
+    tn_open = _core_to_big_open_tn(core, config.dims)  # Duplicate core into a big tensor-network:
     tn_stable, messages, bp_stats = belief_propagation(tn_open, messages, deepcopy(config.bp))  # Perform BlockBP:
     _print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
 
@@ -253,7 +272,7 @@ def ite_per_delta_t(
             expectation_values = {}
 
         ## Save data, print performance and plot graphs:
-        tracker.log_segment(delta_t=delta_t, energy=energy, core=core, messages=messages, expectation_values=expectation_values, stats=step_stats)
+        tracker.log_segment(delta_t=delta_t, energy=energy, unit_cell=core, messages=messages, expectation_values=expectation_values, stats=step_stats)
         plots.update(energies_per_site, step_stats, delta_t, expectation_values)
         logger.info(f"Mean energy after sequence = {energy}")
 
@@ -265,7 +284,7 @@ def ite_per_delta_t(
 
 
 def full_ite(
-    initial_core:KagomeTN|None=None,
+    unit_cell:UnitCell|None=None,
     config:Config|None=None,
     logger:logs.Logger|None=None
 )->tuple[
@@ -275,16 +294,19 @@ def full_ite(
 ]:
 
     ## Initial Settings:
+    # Config:
     if config is None:
-        config = Config.from_D(DEFAULT_D)
-    if initial_core is None:
-        core_in = create_core(config.tn, creation_mode=InitialTNMode.Random, _check_core=False)
-    elif isinstance(initial_core, KagomeTN):
-        core_in = initial_core.copy()
+        config = Config.derive_from_physical_dim(DEFAULT_D)
+    # Unit-Cell:
+    if unit_cell is None:
+        unit_cell_in = UnitCell.random(d=config.dims.physical_dim, D=config.dims.virtual_dim)
+    elif isinstance(unit_cell, UnitCell):
+        unit_cell_in = unit_cell.copy()
     else:
-        raise TypeError(f"Not an expected type for input 'initial_core' of type {type(initial_core)!r}")
+        raise TypeError(f"Not an expected type for input 'initial_core' of type {type(unit_cell)!r}")
+    # Logger:
     if logger is None:
-        logger = logs.get_logger()
+        logger = logs.get_logger(verbose=config.visuals.verbose)
     elif not isinstance(logger, logs.Logger):
         raise TypeError(f"Not an expected type for input 'logger' of type {type(logger)!r}")
     
@@ -294,40 +316,28 @@ def full_ite(
     messages = None
 
     ## Prepare tracking lists and plots:
-    ite_tracker = ITEProgressTracker(core=core_in, messages=messages, config=config)
+    ite_tracker = ITEProgressTracker(unit_cell=unit_cell_in, messages=messages, config=config)
     _log_and_print_starting_message(logger, config, ite_tracker)  # Print and log valuable information: 
-    plots = ITEPlots(active=config.live_plots, config=config)
+    plots = ITEPlots(active=config.visuals.live_plots, config=config)
 
     ## Calculate observables of starting core:
-    if config.live_plots:
-        delta_t = 0.0
-        logger.info("Calculating measurements of initial core...")
-        tn_open = _core_to_big_open_tn(core_in, config.tn)
-        tn_stable, messages, bp_stats = belief_propagation(tn_open, messages, deepcopy(config.bp))  # Perform BlockBP:
-        tn_stable_around_core = reduce_tn_to_core_and_environment(tn_stable, config.bubblecon_trunc_dim, method=config.reduce2core_method)
-        expectation_values = derive_xyz_expectation_values_with_tn(tn_stable_around_core, reduce=False)
-        energies_per_site, _ = measure_core_energies(tn_stable_around_core, config.ite.interaction_hamiltonain, config.bubblecon_trunc_dim)
-        energy = sum(energies_per_site)/len(energies_per_site) 
-
-        ## Save data, print performance and plot graphs:
-        ite_tracker.log_segment(delta_t=delta_t, energy=energy, core=core_in, messages=messages, expectation_values=expectation_values, stats=step_stats)
-        plots.update(energies_per_site, step_stats, delta_t, expectation_values, _initial=True)
-        logger.info(f"Mean energy at iteration 0: {energy}")
+    if config.visuals.live_plots:
+        _compute_and_plot_zero_iteration_(unit_cell_in, config, logger)
 
     ## Repetitively perform ITE algo:
-    core_out = core_in  # for output type check
+    unit_cell_out = unit_cell_in  # for output type check
     for delta_t, num_repeats in lists.repeated_items(config.ite.time_steps):
-        core_out, messages, success, step_stats = ite_per_delta_t(core_in, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)
+        unit_cell_out, messages, success, step_stats = ite_per_delta_t(unit_cell_in, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)
         if not success:  # One more try
-            core_out, messages, success, step_stats = ite_per_delta_t(core_in, None, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)
+            unit_cell_out, messages, success, step_stats = ite_per_delta_t(unit_cell_in, None, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)
             if not success:
                 raise ITEError(f"ITE didn't work on delte={delta_t}")
-        core_in = core_out
+        unit_cell_in = unit_cell_out
 
     ## Log finish:
     _log_and_print_finish_message(logger, config, ite_tracker, plots)  # Print and log valuable information: 
 
-    return core_out, ite_tracker, logger
+    return unit_cell_out, ite_tracker, logger
 
 
 def robust_full_ite(
@@ -350,14 +360,14 @@ def robust_full_ite(
 
     # Multiple attempts:
     try:
-        return full_ite(config=config, initial_core=initial_core, logger=logger)
+        return full_ite(config=config, unit_cell=initial_core, logger=logger)
     except Exception as e:
         errors.print_traceback(e)
         # config.strengthen()
-        return full_ite(config=config, initial_core=None, logger=logger)
+        return full_ite(config=config, unit_cell=None, logger=logger)
+    
 
 
 if __name__ == "__main__":
-    from scripts.test_ite import main
-    main()
-
+    from scripts.test_ite import main_test
+    main_test()
