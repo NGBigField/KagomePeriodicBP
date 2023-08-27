@@ -13,7 +13,7 @@ from _error_types import BPNotConvergedError
 from utils import lists, logs, strings
 
 # For useful tracking plots:
-from algo.imaginary_time_evolution._visuals import ITEPlots
+# from algo.imaginary_time_evolution._visuals import ITEPlots  #TODO
 
 
 
@@ -32,7 +32,7 @@ def _log_and_print_starting_message(logger:logs.Logger, config:Config, ite_track
     logger.info(" ")
 
 
-def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker, plots:ITEPlots)->None:
+def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker, plots:None="ITEPlots")->None: #TODO ITEPlots
     logger.info("\n")
     _common_logger_prints(logger, config, ite_tracker)
     plots.save(logger)

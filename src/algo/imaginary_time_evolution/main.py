@@ -28,13 +28,13 @@ from _error_types import BPNotConvergedError, ITEError
 from lattices.directions import Direction
 
 # Other algorithms we need:
-from algo.measurements import derive_xyz_expectation_values_with_tn, measure_core_energies, 
+from algo.measurements import derive_xyz_expectation_values_with_tn, measure_core_energies
 from algo.density_matrices import rho_ij_to_rho, calc_metrics
 from libs.ncon import ncon
 from libs import ITE as ite
 
 
-from tensor_networks.construction import create_core, repeat_core
+from tensor_networks.construction import repeat_core
 
 # For numeric stuff:
 import numpy as np
@@ -49,7 +49,7 @@ from utils import tuples, lists, assertions, saveload, logs, decorators, errors,
 from copy import deepcopy
 
 # Helper function and types for ITE:
-from algo.imaginary_time_evolution._visuals import ITEPlots
+# from algo.imaginary_time_evolution._visuals import  #TODO
 from algo.imaginary_time_evolution._logs_and_prints import _print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, _print_or_log_ite_segment_msg, _fix_config_if_bp_struggled
 from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH
 
@@ -209,7 +209,8 @@ def ite_segment(
 # @decorators.multiple_tries(3)
 def ite_per_delta_t(
     core:KagomeTN, messages:MessageDictType|None, delta_t:float, num_repeats:int, config:Config, 
-    plots:ITEPlots, logger:logs.Logger, tracker:ITEProgressTracker, step_stats:ITESegmentStats
+    logger:logs.Logger, tracker:ITEProgressTracker, step_stats:ITESegmentStats,
+    plots:None="ITEPlots",   #TODO ITE Plots
 ) -> tuple[
     KagomeTN, MessageDictType|None, bool, ITESegmentStats
     # core, messages, at_least_one_succesful_run, step_stats
