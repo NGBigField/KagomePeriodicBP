@@ -61,6 +61,8 @@ def _is_hermitian(m:np.matrix) -> bool:
 
 def real(x:complex|float|int, /, reason:Optional[str]=None) -> float|int:
     imaginary_factor = abs(np.imag(x))/abs(np.real(x))
+    if x==0:
+        return 0
     _assert( imaginary_factor<IMAGINARY_TOLERANCE, reason=reason, default_reason=f"Must be real", got=x)
     return float(np.real(x))
 

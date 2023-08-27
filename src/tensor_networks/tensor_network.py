@@ -44,6 +44,7 @@ import operator
 
 # Other supporting algo:
 from tensor_networks.mps import initial_message, physical_tensor_with_split_mid_leg
+from libs.ITE import rho_ij
 
 # For OOP:
 from abc import ABC, abstractmethod, abstractproperty
@@ -558,6 +559,13 @@ class EdgeTN(_FrozenSpecificNetwork):
     # ================================================= #  
     def edge_and_environment(self)->tuple[np.ndarray, np.ndarray, list[np.ndarray]]:
         return self.core1.physical_tensor, self.core2.physical_tensor, self.open_mps_env
+    
+    @property
+    def rdm(self)->np.ndarray:
+        """Compute the Reduce-Density-Matrix (RDM) using the edge and environment
+        """
+        t1, t2, mps_env = self.edge_and_environment()
+        return rho_ij(t1, t2, mps_env=mps_env)
     
     # ================================================= #
     #|             Structure and Geometry              |#

@@ -15,9 +15,13 @@ from enums import ContractionDepth, NodeFunctionality, UpdateMode
 
 def reduce_core_to_mode(
     core_tn:CoreTN, 
-    mode:UpdateMode,
+    mode:UpdateMode|None=None,
     copy:bool=True
 )->ModeTN:
+    
+    ## Complete missing inputs:
+    if mode is None:
+        mode = UpdateMode.random()
     
     ## Create a copy which is an arbitrary tn which can be contracted:
     tn = core_tn.to_arbitrary_tn(copy=copy)

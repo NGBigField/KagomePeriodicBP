@@ -21,17 +21,17 @@ import numpy as np
 from libs.ITE import rho_ij
 
 # Common types in the code:
-from containers import Config, BubbleConConfig
+from containers import Config, BubbleConConfig, UpdateEdge
 from tensor_networks import KagomeTN, TensorNetwork, ModeTN, EdgeTN, TensorNode, MPS
 from lattices.directions import BlockSide
 from _error_types import TensorNetworkError, BPNotConvergedError
-from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor
+from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor, UpdateMode
 from physics import pauli
 from tensor_networks.unit_cell import UnitCell
 from containers.results import Measurements, Expectations
 
 ## Algos we need:
-from algo.tn_reduction import reduce_full_kagome_to_core
+from algo.tn_reduction import reduce_full_kagome_to_core, reduce_tn
 from algo.belief_propagation import belief_propagation
 from algo.contract_tensor_network import contract_tensor_network
 
@@ -112,24 +112,31 @@ def _mean(list_:list[_T])->_T:
         
 
 def measure_core_energies(
-    tn_stable_around_core:KagomeTN, hamiltonian:np.ndarray, bubblecon_trunc_dim:int
+    tn:TensorNetwork, 
+    hamiltonian:np.ndarray, 
+    trunc_dim:int,
+    mode:UpdateMode|None=None
 )->tuple[
     list[complex],
     list[np.ndarray]
 ]:
+    ## Prepare outputs and check inputs:
     energies_per_site = []
-    # Reduce to small square of core:    
-    if DEBUG_MODE: tn_stable_around_core.validate()
+    if DEBUG_MODE: tn.validate()
+    if mode is None:
+        mode = UpdateMode.random()
+
+    ## Contract to mode:
+    mode_tn = reduce_tn(tn, ModeTN, trunc_dim, copy=True, mode=mode)
+
     ## For each edge, reduce a bit more and calc energy:
     rdms = []
-    for side in BlockSide.all_in_counter_clockwise_order():
+    for edge_tuple in UpdateEdge.all_options():
         # do the final needed contraction for this specific edge:
-        core1, core2, environment_tensors, tn_env = calc_edge_environment(tn_stable_around_core, side, bubblecon_trunc_dim, already_reduced_to_core=True)
-        # Get physical core tensors:
-        ti = core1.physical_tensor
-        tj = core2.physical_tensor
-        ## Get metrics
-        rdm = rho_ij(ti, tj, mps_env=environment_tensors)
+        edge_tn = reduce_tn(mode_tn, target_type=EdgeTN, trunc_dim=trunc_dim, copy=True, edge_tuple=edge_tuple)
+        # Compute Reduce-Density-Matrix (RDM)
+        rdm = edge_tn.rdm
+        # Calc energies:
         edge_energy  = np.dot(rdm.flatten(),  hamiltonian.flatten())
         if DEBUG_MODE:
             edge_energy = assertions.real(edge_energy)
@@ -367,7 +374,6 @@ def calc_unit_cell_expectation_values_from_tn(
     bubblecon_trunc_dim:int, 
     direction:BlockSide|None=None, 
     force_real:bool=False, 
-    reduce:bool=True,
     print_progress:bool=True,
     parallel:bool=False
 ) -> list[UnitCell]:
@@ -389,15 +395,10 @@ def calc_unit_cell_expectation_values_from_tn(
     else:
         assert isinstance(direction, BlockSide)
 
-    ## Perform all common actions:
-    if reduce:
-        assert isinstance(tn, KagomeTN)
-        tn_reduced = reduce_full_kagome_to_core(tn, bubblecon_trunc_dim, parallel)
-    else:
-        tn_reduced = tn
-    denominator, _, _ = contract_tensor_network(tn_reduced, direction=direction, depth=ContractionDepth.Full, bubblecon_trunc_dim=bubblecon_trunc_dim)
+    ## Find nodes to sandwich with observables:
+    denominator, _, _ = contract_tensor_network(tn, direction=direction, depth=ContractionDepth.Full, bubblecon_trunc_dim=bubblecon_trunc_dim)
     assert not isinstance(denominator, MPS), "Full contraction should result in a number, not an MPS"
-    center_nodes = tn_reduced.get_center_core_nodes()
+    center_nodes = tn.get_center_core_nodes()
     unit_cell_indices = UnitCell(
         A = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.A),
         B = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.B),
@@ -417,7 +418,7 @@ def calc_unit_cell_expectation_values_from_tn(
             prog_bar.next()
             index = unit_cell_indices[key]
             value = _calc_mean_value_by_bracket_tn(
-                tn_reduced, [index], operator, bubblecon_trunc_dim=bubblecon_trunc_dim, 
+                tn, [index], operator, bubblecon_trunc_dim=bubblecon_trunc_dim, 
                 direction=direction, denominator=denominator, force_real=force_real,
                 print_progress=print_progress
             )
@@ -515,11 +516,10 @@ def _calc_rdm_projection_in_axis(rho:np.matrix, pauli_name:str, force_real:bool=
 
 def derive_xyz_expectation_values_with_tn(
     tn:TensorNetwork, 
-    reduce:bool=False, 
     bubblecon_trunc_dim:int=18,
     force_real:bool=True
 )->dict[str, float|complex]:
-    res = calc_unit_cell_expectation_values_from_tn(tn, operators=all_paulis, bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=force_real, reduce=reduce)
+    res = calc_unit_cell_expectation_values_from_tn(tn, operators=all_paulis, bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=force_real)
     return dict(x=res[0], y=res[1], z=res[2])
 
 

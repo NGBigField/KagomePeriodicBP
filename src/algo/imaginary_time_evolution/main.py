@@ -56,20 +56,21 @@ from algo.imaginary_time_evolution._tn_control import kagome_tn_from_unit_cell
 
 
 
-def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:logs.Logger)->None:
+def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:logs.Logger, ite_tracker:ITEProgressTracker, plots:ITEPlots)->None:
     # Inputs:
     delta_t = 0.0
     messages = None
+    step_stats = ITESegmentStats()
 
     ## Get the state of the system at iteration 0:
     logger.info("Calculating measurements of initial core...")
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
     messages, bp_stats = belief_propagation(full_tn, messages, config.bp.copy() )  # Perform BlockBP:
-    core_tn = reduce_tn(full_tn, CoreTN, config.bubblecon_trunc_dim, method=config.reduce2core_method)
+    core_tn = reduce_tn(full_tn, CoreTN, config.bubblecon_trunc_dim)
 
     ## Compute values:
-    expectation_values = derive_xyz_expectation_values_with_tn(core_tn, reduce=False)
     energies_per_site, _ = measure_core_energies(core_tn, config.ite.interaction_hamiltonain, config.bubblecon_trunc_dim)
+    expectation_values = derive_xyz_expectation_values_with_tn(core_tn)
     energy = sum(energies_per_site)/len(energies_per_site) 
 
     ## Save data, print performance and plot graphs:
@@ -326,8 +327,8 @@ def full_ite(
     plots = ITEPlots(active=config.visuals.live_plots, config=config)
 
     ## Calculate observables of starting core:
-    if config.visuals.live_plots:
-        _compute_and_plot_zero_iteration_(unit_cell_in, config, logger)
+    if config.visuals.live_plots: 
+        _compute_and_plot_zero_iteration_(unit_cell_in, config, logger, ite_tracker, plots)
 
     ## Repetitively perform ITE algo:
     unit_cell_out = unit_cell_in  # for output type check
