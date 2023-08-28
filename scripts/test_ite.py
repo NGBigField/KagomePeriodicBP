@@ -22,11 +22,13 @@ import numpy as np
 
 def test_full_ite(
     D = 2,
-    N = 3
+    N = 3,
+    live_plots:bool = False
 ):
     ## Config:
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
+    config.visuals.live_plots = live_plots
 
     ## Run:
     unit_cell_out, ite_tracker, logger = full_ite(config=config)

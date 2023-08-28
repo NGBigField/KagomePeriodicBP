@@ -50,8 +50,8 @@ def _print_or_log_ite_segment_msg(
     delta_t:float, i:int, num_repeats:int
 )->None:
     counter = 0
-    for delte_t_, num_repeats_ in lists.repeated_items(config.ite.time_steps):
-        if abs(delte_t_-delta_t)<1e-10 and num_repeats_==num_repeats:
+    for delta_t_, num_repeats_ in lists.repeated_items(config.ite.time_steps):
+        if abs(delta_t_-delta_t)<1e-10 and num_repeats_==num_repeats:
             counter += i 
             break
         else:

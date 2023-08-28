@@ -33,6 +33,11 @@ class UpdateMode(Enum):
         return (mode for mode in UpdateMode)
     
     @staticmethod
+    def all_in_random_order()->Generator["UpdateMode", None, None]:
+        random_order = lists.shuffle(list(UpdateMode.all_options()))
+        return (mode for mode in random_order)
+
+    @staticmethod
     def random()->"UpdateMode":
         return lists.random_item(list(UpdateMode.all_options()))
             

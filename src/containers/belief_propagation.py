@@ -32,9 +32,10 @@ class BPConfig:
 @dataclass
 class BPStats(Stats):
     iterations      : int   = -1
-    final_error     : float = -1.0  
     attempts        : int   = 1
+    final_error     : float = -1.0  
     final_config    : BPConfig = field(default_factory=BPConfig)
+    success         : bool = False
 
 
 class Message(NamedTuple):

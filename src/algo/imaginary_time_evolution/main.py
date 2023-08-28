@@ -9,13 +9,8 @@ if __name__ == "__main__":
     add_base()
     add_scripts()
 
-
-
 # Get Global-Config:
 from _config_reader import DEBUG_MODE, KEEP_LOGS, ALLOW_VISUALS
-
-# Import belief propagation code:
-from algo.belief_propagation import belief_propagation
 
 # Import containers needed for ite:
 from containers.imaginary_time_evolution import ITEConfig, ITEProgressTracker, ITEPerModeStats, ITESegmentStats
@@ -30,17 +25,9 @@ from tensor_networks import KagomeTN, CoreTN, TensorNode, UnitCell
 from _error_types import BPNotConvergedError, ITEError
 from lattices.directions import Direction
 
-# Other algorithms we need:
-from algo.measurements import derive_xyz_expectation_values_with_tn, measure_core_energies
-from algo.density_matrices import rho_ij_to_rho, calc_metrics
-from algo.tn_reduction import reduce_tn
-from libs import ITE as ite
-
 # For numeric stuff:
 import numpy as np
 from numpy.linalg import norm
-
-# the modules we are using, by I.A.
 
 # Import our shared utilities
 from utils import tuples, lists, assertions, saveload, logs, decorators, errors, visuals, strings, dicts
@@ -54,6 +41,13 @@ from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH, D
 from algo.imaginary_time_evolution._visualization import ITEPlots
 from algo.imaginary_time_evolution._tn_control import kagome_tn_from_unit_cell
 
+# Import belief propagation code:
+from algo.belief_propagation import robust_belief_propagation
+
+# Other algorithms we need:
+from algo.measurements import derive_xyz_expectation_values_with_tn, measure_core_energies
+from algo.tn_reduction import reduce_tn
+from libs import ITE as ite
 
 
 def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:logs.Logger, ite_tracker:ITEProgressTracker, plots:ITEPlots)->None:
@@ -134,10 +128,9 @@ def get_imaginary_time_evolution_operator(h:np.ndarray, delta_t:float)->tuple[np
 
 ## ==== Main ITE Functions ==== ##
 
-
 @decorators.add_stats()
 def ite_per_mode(
-    core:KagomeTN,
+    unit_cell:KagomeTN,
     messages:MessageDictType|None,
     delta_t:float,
     logger:logs.Logger,
@@ -151,10 +144,10 @@ def ite_per_mode(
 ]:
 
     ## Duplicate core into a big tensor-network:
-    tn_open = _core_to_big_open_tn(core, config.dims)
+    full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
 
     ## Perform BlockBP:
-    tn_stable, messages, bp_stats = belief_propagation(tn_open, messages, deepcopy(config.bp), live_plots=config.live_plots)
+    messages, bp_stats = robust_belief_propagation(full_tn, messages, config.bp, update_plots_between_steps=config.visuals.live_plots)
     _print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
     # tn_stable, messages, bp_stats = belief_propagation_pashtida(tn_open, messages, config.bp)
     # If block-bp increased the virtual dimension, the other modules must also use a higher dimension:
@@ -179,9 +172,9 @@ def ite_per_mode(
 
 
 @decorators.add_stats()
-@decorators.multiple_tries(3)
+# @decorators.multiple_tries(3)
 def ite_segment(
-    core:KagomeTN,
+    unit_cell:KagomeTN,
     messages:MessageDictType|None,
     delta_t:float,
     logger:logs.Logger,
@@ -200,7 +193,7 @@ def ite_segment(
         messages = None  # force bp to start with fresh-new messages
     ## Generate a random mode order without repeating the same mode previous twice in a row
     modes_order = _mode_order_without_repetitions(prev_stats.modes_order, config.ite)
-    ## Follow stats:
+    ## Keep track of stats:
     stats = ITESegmentStats()
     stats.modes_order = modes_order
     stats.delta_t = delta_t
@@ -212,8 +205,8 @@ def ite_segment(
             # Each mode is another edge that needs to be updated:
             logger.info(f"    update_mode={update_mode.name: <4}")
             ## Run:
-            core, messages, edge_energy, ite_per_mode_stats = ite_per_mode(
-                core=core, messages=messages, delta_t=delta_t, logger=logger, config=config, update_mode=update_mode
+            unit_cell, messages, edge_energy, ite_per_mode_stats = ite_per_mode(
+                unit_cell, messages, delta_t, logger, config, update_mode
             )
             ## Track results:
             stats.ite_per_mode_stats.append(ite_per_mode_stats)
@@ -224,35 +217,34 @@ def ite_segment(
 
     ## Calc final stable TN:
     logger.debug(f"    Calculating stable reduced TN..")    
-    tn_open = _core_to_big_open_tn(core, config.dims)  # Duplicate core into a big tensor-network:
+    tn_open = _core_to_big_open_tn(unit_cell, config.dims)  # Duplicate core into a big tensor-network:
     tn_stable, messages, bp_stats = belief_propagation(tn_open, messages, deepcopy(config.bp))  # Perform BlockBP:
     _print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
 
-    return core, messages, tn_stable, stats
+    return unit_cell, messages, tn_stable, stats
 
 
 # @decorators.multiple_tries(3)
 def ite_per_delta_t(
-    core:KagomeTN, messages:MessageDictType|None, delta_t:float, num_repeats:int, config:Config, 
-    logger:logs.Logger, tracker:ITEProgressTracker, step_stats:ITESegmentStats,
-    plots:None="ITEPlots",   #TODO ITE Plots
+    unit_cell:KagomeTN, messages:MessageDictType|None, delta_t:float, num_repeats:int, config:Config, 
+    plots:ITEPlots, logger:logs.Logger, tracker:ITEProgressTracker, step_stats:ITESegmentStats
 ) -> tuple[
     KagomeTN, MessageDictType|None, bool, ITESegmentStats
-    # core, messages, at_least_one_succesful_run, step_stats
+    # core, messages, at_least_one_successful_run, step_stats
 ]:
 
     ## derive from input:    
     assert num_repeats>0, f"Got num_repeats={num_repeats}. We can't have ITE without repetitions"
 
     ## Perform ITE for all repetitions of this delta_t: 
-    at_least_one_succesful_run : bool = False
+    at_least_one_successful_run : bool = False
     for i in range(num_repeats):
         _print_or_log_ite_segment_msg(config, tracker, logger, delta_t, i, num_repeats)
 
         ## Preform ITE segment:
         try:
-            core, messages, tn_stable, step_stats = ite_segment(
-                core, messages, delta_t, logger=logger, config_in=config, prev_stats=step_stats
+            unit_cell, messages, tn_stable, step_stats = ite_segment(
+                unit_cell, messages, delta_t, logger=logger, config_in=config, prev_stats=step_stats
             )
         except ITEError as e:
             logger.warn(str(e))
@@ -261,12 +253,12 @@ def ite_per_delta_t(
                 raise ITEError(f"ITE Algo experienced {num_errors} errors.")
             elif config.ite.segment_error_cause_state_revert:
                 try:
-                    _, energy, step_stats, _, core, messages = tracker.revert_back(1)
+                    _, energy, step_stats, _, unit_cell, messages = tracker.revert_back(1)
                 except ITEError:
                     raise e
             continue
 
-        at_least_one_succesful_run = True
+        at_least_one_successful_run = True
         
         ## Calculate observables:
         tn_stable_around_core = reduce_tn_to_core_and_environment(tn_stable, config.bubblecon_trunc_dim, method=config.reduce2core_method)
@@ -278,7 +270,7 @@ def ite_per_delta_t(
             expectation_values = {}
 
         ## Save data, print performance and plot graphs:
-        tracker.log_segment(delta_t=delta_t, energy=energy, unit_cell=core, messages=messages, expectation_values=expectation_values, stats=step_stats)
+        tracker.log_segment(delta_t=delta_t, energy=energy, unit_cell=unit_cell, messages=messages, expectation_values=expectation_values, stats=step_stats)
         plots.update(energies_per_site, step_stats, delta_t, expectation_values)
         logger.info(f"Mean energy after sequence = {energy}")
 
@@ -286,7 +278,7 @@ def ite_per_delta_t(
         if config.ite.check_converges and _check_converged(tracker.energies, tracker.delta_ts, delta_t):
             break
 
-    return core, messages, at_least_one_succesful_run, step_stats
+    return unit_cell, messages, at_least_one_successful_run, step_stats
 
 
 def full_ite(

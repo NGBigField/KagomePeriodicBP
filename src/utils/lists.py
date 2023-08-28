@@ -214,6 +214,7 @@ def shuffle(lis:list[_T])->list[_T]:
     res = rearrange(lis, order=new_order)
     return res
 
+
 def convert_whole_numbers_to_int(lis:List[float|int])->List[float|int]:
     lis_copy : list[int|float] = lis.copy()
     for i, x in enumerate(lis):
