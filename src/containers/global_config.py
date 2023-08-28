@@ -25,7 +25,7 @@ class Config(_ConfigClassWithSubClasses):
     ite : ITEConfig 
     dims : TNDimensions
     visuals : VisualsConfig
-    bubblecon_trunc_dim : int
+    trunc_dim : int
 
 
     @staticmethod
@@ -35,7 +35,7 @@ class Config(_ConfigClassWithSubClasses):
             ite=ITEConfig(),
             dims=TNDimensions(virtual_dim=D),
             visuals=VisualsConfig(),
-            bubblecon_trunc_dim=2*D**2
+            trunc_dim=2*D**2
         )
 
     def strengthen(self, _harder_target:bool=True):
@@ -43,17 +43,17 @@ class Config(_ConfigClassWithSubClasses):
             self.bp.max_iterations *= 2
         # self.bp.max_swallowing_dim *= 2
         # self.bp.allowed_retries += 1
-        self.bubblecon_trunc_dim *= 4
+        self.trunc_dim *= 4
         if _harder_target:
             self.bp.target_msg_diff /= 10
 
     def __post_init__(self)->None:
         trunc_d_bp = self.bp.max_swallowing_dim
-        trunc_d_all_other = self.bubblecon_trunc_dim
+        trunc_d_all_other = self.trunc_dim
         if trunc_d_bp > trunc_d_all_other:
             strings.print_warning(f" truncation dim of BP is greater than that of the other bubblcon usages.")
-        if self.bubblecon_trunc_dim == -1:
-            self.bubblecon_trunc_dim = self.bp.max_swallowing_dim*2
+        if self.trunc_dim == -1:
+            self.trunc_dim = self.bp.max_swallowing_dim*2
         if not ALLOW_VISUALS:
             self.visuals.live_plots = False
 

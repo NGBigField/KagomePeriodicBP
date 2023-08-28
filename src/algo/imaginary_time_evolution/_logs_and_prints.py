@@ -10,7 +10,7 @@ from containers import Config
 from _error_types import BPNotConvergedError
 
 # Import our shared utilities
-from utils import lists, logs, strings
+from utils import lists, logs, strings, prints
 
 # For useful tracking plots:
 # from algo.imaginary_time_evolution._visuals import ITEPlots  #TODO
@@ -67,7 +67,7 @@ def _print_or_log_ite_segment_msg(
 
 def _print_or_log_bp_message(config:BPConfig, not_converged_causes_error:bool, stats:BPStats, logger:logs.Logger):
     space = "        "
-    _blue_text = lambda s: strings.add_color(s, strings.PrintColors.BLUE)
+    _blue_text = lambda s: prints.add_color(s, prints.PrintColors.BLUE)
     if stats.final_error<config.target_msg_diff:
         if stats.attempts==1:
             _attempt_msg = f"Block-BP Converged at "\
@@ -92,7 +92,7 @@ def _fix_config_if_bp_struggled(config:Config, bp_stats:BPStats, logger:logs.Log
     if bp_stats.attempts>1: 
         config.bp.max_swallowing_dim = bp_stats.final_config.max_swallowing_dim
         logger.debug(f"        config.bp.max_swallowing_dim updated to {config.bp.max_swallowing_dim}")
-        if bp_stats.final_config.max_swallowing_dim>=config.bubblecon_trunc_dim:
-            config.bubblecon_trunc_dim = int(bp_stats.final_config.max_swallowing_dim*1.5)
-            logger.debug(f"        config.bubblecon_trunc_dim updated to {config.bubblecon_trunc_dim}")
+        if bp_stats.final_config.max_swallowing_dim>=config.trunc_dim:
+            config.trunc_dim = int(bp_stats.final_config.max_swallowing_dim*1.5)
+            logger.debug(f"        config.bubblecon_trunc_dim updated to {config.trunc_dim}")
     return config

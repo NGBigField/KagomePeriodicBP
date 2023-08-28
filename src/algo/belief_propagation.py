@@ -60,7 +60,7 @@ def _belief_propagation_step(
     tn:KagomeTN,
     prev_error:float|None,
     prog_bar:prints.ProgressBar,
-    bp_config:BPConfig
+    config:BPConfig
 )->tuple[
     MessageDictType,   # next_messages
     float           # next_error
@@ -71,10 +71,10 @@ def _belief_propagation_step(
 
     ## Compute out-going message for all possible sizes:
     # prepare inputs:
-    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=bp_config.max_swallowing_dim, hermitize=bp_config.hermitize_messages_between_iterations)
+    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=config.max_swallowing_dim, hermitize=config.hermitize_messages_between_iterations)
     # The message going-out to the left returns from the right as the new incoming message:
-    multi_processing = bp_config.parallel_computing and (
-        tn.tensor_dims.virtual>2 or bp_config.max_swallowing_dim>=16
+    multi_processing = config.parallel_computing and (
+        tn.tensor_dims.virtual>2 or config.max_swallowing_dim>=16
     )
     if multi_processing:
         prog_bar.append_extra_str(f" error={_bp_error_str(prev_error)}")
@@ -98,7 +98,7 @@ def _belief_propagation_step(
         MPS.l2_distance(prev_messages[dir].mps, next_messages[dir].mps) 
         for dir in BlockSide.all_in_counter_clockwise_order() 
     ]
-    if bp_config.msg_diff_squared:
+    if config.msg_diff_squared:
         next_error = sum(distances)/len(distances)
     else:
         next_error = np.sqrt( sum(distances) )/len(distances)
@@ -149,10 +149,7 @@ def belief_propagation(
     for i in prog_bar:
                
         # Preform BP step:
-        messages, error = _belief_propagation_step(
-            tn=tn, prev_error=error, 
-            prog_bar=prog_bar, bp_config=config
-        )
+        messages, error = _belief_propagation_step(tn, error, prog_bar, config)
         
         if update_plots_between_steps:
             visuals.refresh()

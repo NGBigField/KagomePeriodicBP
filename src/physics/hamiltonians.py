@@ -12,7 +12,7 @@ def _tensor_product(op1:np.ndarray, op2:np.ndarray)->np.ndarray:
 	return tensordot(op1, op2, 0)
 
 
-def hisenberg_2d()->np.ndarray:
+def heisenberg_2d()->np.ndarray:
 	return _tensor_product(x,x) + _tensor_product(y,y) + _tensor_product(z,z) 
 
 
@@ -23,12 +23,6 @@ def ising_with_transverse_field(B:float)->np.ndarray:
 	hamiltonian = z_coef*tensordot(z, z, 0) + x_coef*tensordot(x, id, 0) + x_coef*tensordot(id, x, 0)
 	return hamiltonian
 
-# def ising_with_transverse_field(h:float)->np.ndarray:
-# 	z_coef = -4
-# 	x_coef = h
-# 	hamiltonian = z_coef*_tensor_product(z,z) + x_coef*_tensor_product(x, id) + x_coef*_tensor_product(id, x)
-# 	return hamiltonian
-
 
 def zero() -> np.ndarray:
 	h = identity()
@@ -37,6 +31,15 @@ def zero() -> np.ndarray:
 
 def identity() -> np.ndarray:
 	return _tensor_product(id, id)
+
+
+
+
+
+
+
+## Old index dependant functions ##
+# =============================== #
 
 
 def get_su_d_heisenberg(d=2) -> HamiltonianFuncType:

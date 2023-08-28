@@ -1,7 +1,7 @@
 import numpy as np
 from physics.hamiltonians import HamiltonianFuncType, zero
 from dataclasses import dataclass, field, fields
-from utils import strings, saveload, assertions
+from utils import strings, saveload, assertions, lists
 from utils.arguments import Stats
 from typing import Generator, Union, Any, TypeAlias, NamedTuple
 from copy import deepcopy
@@ -44,6 +44,11 @@ class UpdateEdge(NamedTuple):
         for a, b in itertools.permutations(flavors, 2):
             yield UpdateEdge(a, b)
 
+    @staticmethod
+    def all_in_random_order()->Generator["UpdateEdge", None, None]:
+        random_order = lists.shuffle(list(UpdateEdge.all_options()))
+        return (mode for mode in random_order)
+
 
 
 SUB_FOLDER = "ite_trackers"
@@ -66,7 +71,7 @@ def DEFAULT_TIME_STEPS()->list[float]:
 @dataclass
 class ITEConfig():
     # hamiltonian:
-    interaction_hamiltonain : np.ndarray = field(default_factory=zero)
+    interaction_hamiltonian : np.ndarray = field(default_factory=zero)
     _GT_energy : float|None = None  # Ground truth energy, if known
     # ITE time steps:
     time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)

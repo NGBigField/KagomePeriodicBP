@@ -1,5 +1,5 @@
 from containers import TNDimensions, ITEConfig, Config, MatrixMetrics
-from tensor_networks import TensorNetwork, TensorNode, KagomeTN, UnitCell, create_kagome_tn
+from tensor_networks import TensorNetwork, TensorNode, KagomeTN, EdgeTN, UnitCell, create_kagome_tn
 from utils import lists, logs
 
 import numpy as np
@@ -55,11 +55,8 @@ def kagome_tn_from_unit_cell(unit_cell:UnitCell, dims:TNDimensions) -> KagomeTN:
     )
 
 
-def update_unit_cell_tensors(
-    mode_tn:KagomeTN,
-    core1:TensorNode,
-    core2:TensorNode,
-    environment_tensors:list[np.ndarray],
+def update_unit_cell(
+    edge_tn:EdgeTN,
     ite_config:ITEConfig,
     delta_t:float,
     logger:logs.Logger
@@ -75,9 +72,9 @@ def update_unit_cell_tensors(
 
     ## Collect data:
     #  Get Time Evolution Operator
-    h, g = get_imaginary_time_evolution_operator(ite_config.interaction_hamiltonain, delta_t)
+    h, g = get_imaginary_time_evolution_operator(ite_config.interaction_hamiltonian, delta_t)
     # dimensions:
-    d_virtual = mode_tn.tensor_dims.virtual
+    d_virtual = edge_tn.tensor_dims.virtual
     # Get physical core tensors:
     ti = core1.physical_tensor
     tj = core2.physical_tensor

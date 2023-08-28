@@ -155,7 +155,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
     use_rdms_for_xyz:bool=True
 )->Measurements:
     ## Parse commonly used inputs:
-    chi = config.bubblecon_trunc_dim
+    chi = config.trunc_dim
 
     ## Get small stable network:
     tn_open = repeat_core(core, repeats)
@@ -167,7 +167,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
 
     ## Calc 
     # Energies:
-    energies_per_site, rdms = measure_core_energies(tn_stable_around_core, config.ite.interaction_hamiltonain, chi)    
+    energies_per_site, rdms = measure_core_energies(tn_stable_around_core, config.ite.interaction_hamiltonian, chi)    
     # XYZ
     if use_rdms_for_xyz:
         expectation_values = measure_xyz_expectation_values_with_rdms(rdms)

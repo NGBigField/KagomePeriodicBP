@@ -20,8 +20,8 @@ from containers import Config
 
 # Import other needed types:
 from enums import UpdateMode, NodeFunctionality
-from containers import MessageDictType
-from tensor_networks import KagomeTN, CoreTN, TensorNode, UnitCell
+from containers import MessageDictType, UpdateEdge
+from tensor_networks import KagomeTN, CoreTN, ModeTN, EdgeTN, TensorNode, UnitCell
 from _error_types import BPNotConvergedError, ITEError
 from lattices.directions import Direction
 
@@ -39,10 +39,10 @@ from copy import deepcopy
 from algo.imaginary_time_evolution._logs_and_prints import _print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, _print_or_log_ite_segment_msg, _fix_config_if_bp_struggled
 from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
 from algo.imaginary_time_evolution._visualization import ITEPlots
-from algo.imaginary_time_evolution._tn_control import kagome_tn_from_unit_cell
+from algo.imaginary_time_evolution._tn_control import kagome_tn_from_unit_cell, update_unit_cell
 
 # Import belief propagation code:
-from algo.belief_propagation import robust_belief_propagation
+from algo.belief_propagation import robust_belief_propagation, belief_propagation
 
 # Other algorithms we need:
 from algo.measurements import derive_xyz_expectation_values_with_tn, measure_core_energies
@@ -59,11 +59,11 @@ def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:
     ## Get the state of the system at iteration 0:
     logger.info("Calculating measurements of initial core...")
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
-    messages, bp_stats = belief_propagation(full_tn, messages, config.bp.copy() )  # Perform BlockBP:
-    core_tn = reduce_tn(full_tn, CoreTN, config.bubblecon_trunc_dim)
+    messages, bp_stats = belief_propagation(full_tn, messages, config)  # Perform BlockBP:
+    core_tn = reduce_tn(full_tn, CoreTN, config.trunc_dim)
 
     ## Compute values:
-    energies_per_site, _ = measure_core_energies(core_tn, config.ite.interaction_hamiltonain, config.bubblecon_trunc_dim)
+    energies_per_site, _ = measure_core_energies(core_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
     expectation_values = derive_xyz_expectation_values_with_tn(core_tn)
     energy = sum(energies_per_site)/len(energies_per_site) 
 
@@ -120,7 +120,7 @@ def _mode_order_without_repetitions(prev_order:list[UpdateMode], ite_config:ITEC
 
 
 def get_imaginary_time_evolution_operator(h:np.ndarray, delta_t:float)->tuple[np.ndarray, np.ndarray]:
-    # h = ite_config.interaction_hamiltonain
+    # h = ite_config.interaction_hamiltonian
     g = ite.g_from_exp_h(h, delta_t)
     return h, g
 
@@ -135,7 +135,7 @@ def ite_per_mode(
     delta_t:float,
     logger:logs.Logger,
     config:Config,
-    update_mode:UpdateMode
+    mode:UpdateMode
 )->tuple[
     KagomeTN,          # core
     MessageDictType,        # messages
@@ -149,19 +149,22 @@ def ite_per_mode(
     ## Perform BlockBP:
     messages, bp_stats = robust_belief_propagation(full_tn, messages, config.bp, update_plots_between_steps=config.visuals.live_plots)
     _print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
-    # tn_stable, messages, bp_stats = belief_propagation_pashtida(tn_open, messages, config.bp)
-    # If block-bp increased the virtual dimension, the other modules must also use a higher dimension:
+    # If block-bp struggled and increased the virtual dimension, the following iterations must also use a higher dimension:
     config = _fix_config_if_bp_struggled(config, bp_stats, logger)
 
-    ## Reduce to core and its close environment:   
-    core1, core2, environment, tn_mode = calc_edge_environment(tn_stable, mode=update_mode, bubblecon_trunc_dim=config.bubblecon_trunc_dim, method=config.reduce2edge_method)
-    # core1, core2, environment, tn_mode = get_edge_environment_pashtida(tn_stable, side=update_mode, bubblecon_trunc_dim=config.bubblecon_trunc_dim)
+    ## Contract to mode:
+    mode_tn = reduce_tn(full_tn, ModeTN, trunc_dim=config.trunc_dim, mode=mode)
+
+    ## for each edge in the mode, update the tensors
+    for edge_tuple in UpdateEdge.all_in_random_order():
+        edge_tn = reduce_tn(mode_tn, EdgeTN, trunc_dim=config.trunc_dim, edge_tuple=edge_tuple)
+
+        ## Perform ITE update:
+        update_unit_cell(edge_tn, config.ite, delta_t, logger)
     
-    ## Perform the update step:
-    core1, core2, edge_energy, env_metrics = update_core_tensors(tn_mode, core1, core2, environment, config.ite, delta_t, logger)
 
     ## Create core with core tensors:
-    new_core = _duplicate_to_core(core1, core2, update_mode, config)
+    new_core = _duplicate_to_core(core1, core2, mode, config)
 
     ## Return results and statistics:
     stats = ITEPerModeStats()
@@ -248,6 +251,8 @@ def ite_per_delta_t(
             )
         except ITEError as e:
             logger.warn(str(e))
+            if DEBUG_MODE:
+                raise e
             num_errors = tracker.log_error(e)
             if num_errors>config.ite.num_errors_threshold:
                 raise ITEError(f"ITE Algo experienced {num_errors} errors.")
@@ -261,8 +266,8 @@ def ite_per_delta_t(
         at_least_one_successful_run = True
         
         ## Calculate observables:
-        tn_stable_around_core = reduce_tn_to_core_and_environment(tn_stable, config.bubblecon_trunc_dim, method=config.reduce2core_method)
-        energies_per_site, rdms = measure_core_energies(tn_stable_around_core, config.ite.interaction_hamiltonain, config.bubblecon_trunc_dim)
+        tn_stable_around_core = reduce_tn_to_core_and_environment(tn_stable, config.trunc_dim, method=config.reduce2core_method)
+        energies_per_site, rdms = measure_core_energies(tn_stable_around_core, config.ite.interaction_hamiltonian, config.trunc_dim)
         energy = sum(energies_per_site)/len(energies_per_site) 
         if config.live_plots:
             expectation_values = measure_xyz_expectation_values_with_rdms(rdms)
