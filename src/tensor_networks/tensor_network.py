@@ -26,7 +26,7 @@ import lattices.triangle as triangle_lattice
 # Common types:
 from _types import EdgeIndicatorType, PosScalarType, EdgesDictType
 from _error_types import TensorNetworkError, LatticeError, DirectionError, NetworkConnectionError
-from enums import NodeFunctionality, UpdateMode
+from enums import NodeFunctionality, UpdateMode, UnitCellFlavor
 from containers.belief_propagation import MessageDictType, Message, MPSOrientation
 from containers.sizes_and_dimensions import TNDimensions
 
@@ -154,7 +154,7 @@ class TensorNetwork(ABC):
         return [n for n in self.nodes if n.functionality in functions]
     
     def get_nodes_on_boundary(self, side:BlockSide)->list[TensorNode]: 
-        return [t for t in self.nodes if side in t.boundaries ] 
+        return [n for n in self.nodes if side in n.boundaries ] 
 
     def get_core_nodes(self)->list[TensorNode]:
         return self.get_nodes_by_functionality([NodeFunctionality.AroundCore, NodeFunctionality.CenterCore])
@@ -162,6 +162,8 @@ class TensorNetwork(ABC):
     def get_center_core_nodes(self)->list[TensorNode]:
         return self.get_nodes_by_functionality([NodeFunctionality.CenterCore])
     
+    def get_nodes_by_cell_flavor(self, cell_flavor:UnitCellFlavor)->list[TensorNode]:
+        return [n for n in self.nodes if n.cell_flavor is cell_flavor]
     # ================================================= #
     #|                   Neighbors                     |#
     # ================================================= #
@@ -420,7 +422,7 @@ class _FrozenSpecificNetwork(TensorNetwork):
         self._nodes = nodes
 
     @classmethod
-    def from_arbitrary_tn(cls, tn:ArbitraryTN, **kwargs) -> "_FrozenSpecificNetwork":        
+    def from_arbitrary_tn(cls, tn:ArbitraryTN, **kwargs) -> Self:
         new = cls(tn.nodes, copy=False, **kwargs)
         return new
     
@@ -448,6 +450,17 @@ class _FrozenSpecificNetwork(TensorNetwork):
         assert len(self.nodes) == cls.num_core_tensors + cls.num_env_tensors    
         return super().validate()
     
+    # ================================================= #
+    #|             Relation to Unit-Cell               |#
+    # ================================================= #
+
+    def update_unit_cell_tensors(self, unit_cell:UnitCell)->None:
+        for cell_flavor, tensor in unit_cell.items():
+            nodes = self.get_nodes_by_cell_flavor(cell_flavor)
+            for node in nodes:
+                assert node.is_ket
+                node.tensor = tensor
+    
 
 class CoreTN(_FrozenSpecificNetwork):
     num_core_tensors : Final[int] = 3*3
@@ -462,7 +475,7 @@ class CoreTN(_FrozenSpecificNetwork):
     # ================================================= #
     def mode_core_nodes(self, mode:UpdateMode)->list[TensorNode]:
         ## find center nodes of the 
-        center_node = next((node for node in self.center_nodes if mode.is_matches_flavor(node.unit_cell_flavor)))
+        center_node = next((node for node in self.center_nodes if mode.is_matches_flavor(node.cell_flavor)))
         first_neighbors = self.all_neighbors(center_node)
         return first_neighbors + [center_node]
         
@@ -509,7 +522,7 @@ class ModeTN(_FrozenSpecificNetwork):
 
     @functools.cached_property
     def center_node(self)->TensorNode:
-        return next((node for node in self.nodes if self.mode.is_matches_flavor(node.unit_cell_flavor)))
+        return next((node for node in self.nodes if self.mode.is_matches_flavor(node.cell_flavor)))
 
     def get_nodes_on_side(self, side:BlockSide)->list[TensorNode]:
         assert side in self.major_sides
@@ -554,6 +567,10 @@ class EdgeTN(_FrozenSpecificNetwork):
         environment_tensors = [physical_tensor_with_split_mid_leg(n) for n in environment_nodes]    # Open environment mps legs:        
         return environment_tensors
     
+    @property
+    def unit_cell_flavors(self)->tuple[UnitCellFlavor, UnitCellFlavor]:
+        return self.core1.cell_flavor, self.core2.cell_flavor
+
     # ================================================= #
     #|              Edge params for ITE                |#
     # ================================================= #  
@@ -566,6 +583,7 @@ class EdgeTN(_FrozenSpecificNetwork):
         """
         t1, t2, mps_env = self.edge_and_environment()
         return rho_ij(t1, t2, mps_env=mps_env)
+
     
     # ================================================= #
     #|             Structure and Geometry              |#
@@ -669,7 +687,7 @@ def _message_nodes(
 
 def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
     # init lists and iterators:
-    unit_cell_tensors = itertools.cycle(tn.unit_cell.all())
+    unit_cell_tensors = itertools.cycle(tn.unit_cell.items())
     
     # Prepare info:
     center_triangle_index = triangle_lattice.center_vertex_index(tn.lattice.N)
@@ -677,7 +695,7 @@ def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
     
     # Create all nodes:
     nodes : list[TensorNode] = []
-    for (lattice_node, triangle), (tensor, cell_type) in zip(tn.lattice.nodes_and_triangles(), unit_cell_tensors):            
+    for (lattice_node, triangle), (cell_flavor, tensor) in zip(tn.lattice.nodes_and_triangles(), unit_cell_tensors):            
         # Which type of node:
         functionality = NodeFunctionality.CenterCore if triangle.index == center_triangle_index else NodeFunctionality.Padding
 
@@ -690,9 +708,9 @@ def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
             edges=lattice_node.edges,
             directions=lattice_node.directions,
             functionality=functionality,
-            unit_cell_flavor=cell_type,
+            cell_flavor=cell_flavor,
             boundaries=lattice_node.boundaries,
-            name=f"{cell_type}"
+            name=f"{cell_flavor}"
         )
         nodes.append(network_node)
 

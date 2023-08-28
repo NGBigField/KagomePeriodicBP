@@ -22,12 +22,21 @@ class UnitCell:
             case 'C': return self.C
             case _: 
                 raise KeyError("No an option")
+            
+    def __setitem__(self, key:str|UnitCellFlavor, value:np_ndarray)->None:
+        if isinstance(key, UnitCellFlavor):
+            key = key.name
+        match key:
+            case 'A': self.A = value
+            case 'B': self.B = value
+            case 'C': self.C = value
+            case _: 
+                raise KeyError("No an option")
 
-       
-    def all(self)->Generator[tuple[np_ndarray, UnitCellFlavor], None, None]:
-        yield self.A, UnitCellFlavor.A
-        yield self.B, UnitCellFlavor.B
-        yield self.C, UnitCellFlavor.C
+    def items(self)->Generator[tuple[UnitCellFlavor, np_ndarray], None, None]:
+        yield UnitCellFlavor.A, self.A
+        yield UnitCellFlavor.B, self.B
+        yield UnitCellFlavor.C, self.C
 
     @staticmethod
     def all_keys()->list[str]:

@@ -256,7 +256,7 @@ def _sandwich_fused_tensors_with_expectation_values(tn_in:TensorNetworkType, mat
         name            = node.name,
         boundaries      = node.boundaries,
         functionality   = node.functionality,
-        unit_cell_flavor= node.unit_cell_flavor
+        cell_flavor= node.cell_flavor
     )
     if DEBUG_MODE: tn_out.validate()
 
@@ -400,9 +400,9 @@ def calc_unit_cell_expectation_values_from_tn(
     assert not isinstance(denominator, MPS), "Full contraction should result in a number, not an MPS"
     center_nodes = tn.get_center_core_nodes()
     unit_cell_indices = UnitCell(
-        A = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.A),
-        B = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.B),
-        C = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.C)
+        A = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.A),
+        B = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.B),
+        C = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.C)
     )
 
     ## Prepare progress-bar:
@@ -536,8 +536,8 @@ def derive_xyz_expectation_values_using_rdm(
     per_ij_results = expectation_values_with_rdm(rdm, force_real=force_real)
 
     ## Rearrange:
-    type1 = edge_tn.core1.unit_cell_flavor
-    type2 = edge_tn.core2.unit_cell_flavor
+    type1 = edge_tn.core1.cell_flavor
+    type2 = edge_tn.core2.cell_flavor
     res = {}
     for key, values in per_ij_results.items():
         crnt_res = dict(A=None, B=None, C=None)

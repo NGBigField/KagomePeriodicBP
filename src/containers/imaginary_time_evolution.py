@@ -1,5 +1,5 @@
 import numpy as np
-from physics.hamiltonians import HamiltonianFuncType, zero
+from physics.hamiltonians import HamiltonianFuncAndInputs, zero
 from dataclasses import dataclass, field, fields
 from utils import strings, saveload, assertions, lists
 from utils.arguments import Stats
@@ -23,6 +23,9 @@ _NEXT_IN_ABC_ORDER = {
     UnitCellFlavor.B : UnitCellFlavor.C,
     UnitCellFlavor.C : UnitCellFlavor.A
 }
+
+def _default_hamiltonian():
+    return (zero, None)
 
 class UpdateEdge(NamedTuple): 
     first : UnitCellFlavor
@@ -71,7 +74,7 @@ def DEFAULT_TIME_STEPS()->list[float]:
 @dataclass
 class ITEConfig():
     # hamiltonian:
-    interaction_hamiltonian : np.ndarray = field(default_factory=zero)
+    interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=_default_hamiltonian)
     _GT_energy : float|None = None  # Ground truth energy, if known
     # ITE time steps:
     time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)

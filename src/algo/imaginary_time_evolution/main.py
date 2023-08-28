@@ -39,7 +39,7 @@ from copy import deepcopy
 from algo.imaginary_time_evolution._logs_and_prints import _print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, _print_or_log_ite_segment_msg, _fix_config_if_bp_struggled
 from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
 from algo.imaginary_time_evolution._visualization import ITEPlots
-from algo.imaginary_time_evolution._tn_control import kagome_tn_from_unit_cell, update_unit_cell
+from algo.imaginary_time_evolution._tn_update_control import kagome_tn_from_unit_cell, update_unit_cell
 
 # Import belief propagation code:
 from algo.belief_propagation import robust_belief_propagation, belief_propagation
@@ -130,14 +130,14 @@ def get_imaginary_time_evolution_operator(h:np.ndarray, delta_t:float)->tuple[np
 
 @decorators.add_stats()
 def ite_per_mode(
-    unit_cell:KagomeTN,
+    unit_cell:UnitCell,
     messages:MessageDictType|None,
     delta_t:float,
     logger:logs.Logger,
     config:Config,
     mode:UpdateMode
 )->tuple[
-    KagomeTN,          # core
+    UnitCell,               # unit_cell
     MessageDictType,        # messages
     float,                  # edge_energy
     ITEPerModeStats         # Stats
@@ -159,12 +159,12 @@ def ite_per_mode(
     for edge_tuple in UpdateEdge.all_in_random_order():
         edge_tn = reduce_tn(mode_tn, EdgeTN, trunc_dim=config.trunc_dim, edge_tuple=edge_tuple)
 
-        ## Perform ITE update:
-        update_unit_cell(edge_tn, config.ite, delta_t, logger)
-    
+        # Perform ITE update:
+        unit_cell, energy, env_metrics = update_unit_cell(edge_tn, unit_cell, config.ite, delta_t, logger)
 
-    ## Create core with core tensors:
-    new_core = _duplicate_to_core(core1, core2, mode, config)
+        # Update mode_tn:
+        mode_tn.update_unit_cell_tensors(unit_cell)
+        print("")
 
     ## Return results and statistics:
     stats = ITEPerModeStats()
