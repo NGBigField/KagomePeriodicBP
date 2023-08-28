@@ -40,6 +40,10 @@ class UpdateEdge(NamedTuple):
     
     def __str__(self) -> str:
         return f"({self.first}, {self.second})"
+    
+    @property
+    def as_strings(self)->tuple[str, str]:
+        return (self.first.name, self.second.name)
 
     @staticmethod
     def all_options()->Generator["UpdateEdge", None, None]:
@@ -85,7 +89,7 @@ class ITEConfig():
     random_mode_order : bool = True
     start_segment_with_new_bp_message : bool = True
     bp_not_converged_raises_error : bool = True
-    check_converges : bool = False  # If sevral steps didn't improve the lowest energy, go to next delta_t
+    check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
     segment_error_cause_state_revert : bool = False
     # Control numbers:
     num_errors_threshold : int = 10
@@ -116,6 +120,7 @@ class ITESegmentStats(Stats):
     ite_per_mode_stats : list[ITEPerModeStats] = None # type: ignore
     modes_order : list[UpdateMode] = None  # type: ignore
     delta_t : float = None  # type: ignore
+    mean_energy : float = None
 
     def __post_init__(self):
         self.ite_per_mode_stats = list()  # Avoid python's infamous immutable lists problem

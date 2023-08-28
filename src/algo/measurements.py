@@ -22,6 +22,7 @@ from libs.ITE import rho_ij
 
 # Common types in the code:
 from containers import Config, BubbleConConfig, UpdateEdge
+from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
 from tensor_networks import KagomeTN, TensorNetwork, ModeTN, EdgeTN, TensorNode, MPS
 from lattices.directions import BlockSide
 from _error_types import TensorNetworkError, BPNotConvergedError
@@ -34,6 +35,7 @@ from containers.results import Measurements, Expectations
 from algo.tn_reduction import reduce_full_kagome_to_core, reduce_tn
 from algo.belief_propagation import belief_propagation
 from algo.contract_tensor_network import contract_tensor_network
+from algo.imaginary_time_evolution._tn_update import get_imaginary_time_evolution_operator
 
 # For energy estimation:
 from libs.ITE import rho_ij
@@ -111,39 +113,74 @@ def _mean(list_:list[_T])->_T:
     return sum(list_)/len(list_)  #type: ignore
         
 
-def measure_core_energies(
+def measure_energies_and_observables_together(
     tn:TensorNetwork, 
-    hamiltonian:np.ndarray, 
+    hamiltonian:HamiltonianFuncAndInputs, 
     trunc_dim:int,
-    mode:UpdateMode|None=None
+    mode:UpdateMode|None=None,
+    force_real:bool=True
 )->tuple[
-    list[complex],
-    list[np.ndarray]
+    dict[tuple[str, str], float],
+    dict[str, dict[str, float]],
+    float
 ]:
     ## Prepare outputs and check inputs:
-    energies_per_site = []
+    # inputs:
     if DEBUG_MODE: tn.validate()
     if mode is None:
         mode = UpdateMode.random()
-
+    h, g = get_imaginary_time_evolution_operator(hamiltonian, 0)
+    # outputs:
+    energies = dict()
+    expectations = {
+        abc : { xyz : [0.0, 0] for xyz in ['x', 'y', 'z'] } 
+        for abc in ['A', 'B', 'C']
+    }
+    mean_energies = []
+    
     ## Contract to mode:
     mode_tn = reduce_tn(tn, ModeTN, trunc_dim, copy=True, mode=mode)
 
     ## For each edge, reduce a bit more and calc energy:
-    rdms = []
     for edge_tuple in UpdateEdge.all_options():
         # do the final needed contraction for this specific edge:
         edge_tn = reduce_tn(mode_tn, target_type=EdgeTN, trunc_dim=trunc_dim, copy=True, edge_tuple=edge_tuple)
+
         # Compute Reduce-Density-Matrix (RDM)
         rdm = edge_tn.rdm
-        # Calc energies:
-        edge_energy  = np.dot(rdm.flatten(),  hamiltonian.flatten())
-        if DEBUG_MODE:
+
+        # Calc energy:
+        edge_energy  = np.dot(rdm.flatten(),  h.flatten())
+        if DEBUG_MODE and force_real:
             edge_energy = assertions.real(edge_energy)
-        energies_per_site.append(edge_energy/2)
-        # keep rdm:
-        rdms.append(rdm)
-    return energies_per_site, rdms
+        elif force_real:
+            edge_energy = float(np.real(edge_energy))
+
+        # keep energies:
+        mean_energies.append(edge_energy/2)
+        energies[edge_tuple.as_strings] = edge_energy
+
+        # Calc expectations:
+        per_edge_results = expectation_values_with_rdm(rdm, force_real=force_real)
+
+        # Sort expectation values:
+        f1, f2 = edge_tn.unit_cell_flavors
+        for xyz, tuple_ in per_edge_results.items():
+            for value, abc_flavor in zip(tuple_, [f1, f2]):
+                abc = abc_flavor.name
+                expectations[abc][xyz][0] += value # accumulate values
+                expectations[abc][xyz][1] += 1     # count appearances
+
+    # mean expectation values from all appearances :
+    for abc in ['A', 'B', 'C']:
+        for xyz in ['x', 'y', 'z']:
+            sum_, count_ = expectations[abc][xyz]
+            expectations[abc][xyz] = sum_/count_
+    
+    # mean energy from all energies prt site:
+    mean_energy = sum(mean_energies)/len(mean_energies)
+
+    return energies, expectations, mean_energy
 
 
 def _measurements_everything_on_duplicated_core_specific_size(
@@ -167,7 +204,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
 
     ## Calc 
     # Energies:
-    energies_per_site, rdms = measure_core_energies(tn_stable_around_core, config.ite.interaction_hamiltonian, chi)    
+    energies_per_site, rdms = measure_energies_and_observables_together(tn_stable_around_core, config.ite.interaction_hamiltonian, chi)    
     # XYZ
     if use_rdms_for_xyz:
         expectation_values = measure_xyz_expectation_values_with_rdms(rdms)
@@ -548,9 +585,9 @@ def derive_xyz_expectation_values_using_rdm(
 
 
 if __name__ == "__main__":
-    from project_paths import add_scripts; 
+    from project_paths import add_scripts
     add_scripts()
-    from scripts import test_bp
-    test_bp.main_test()
+    from scripts import test_ite
+    test_ite.main_test()
 
 

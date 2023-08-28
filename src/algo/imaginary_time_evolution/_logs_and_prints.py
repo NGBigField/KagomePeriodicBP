@@ -1,9 +1,11 @@
+# For type hints
+from typing import Callable
 
 # Import belief propagation code:
 from algo.belief_propagation import BPConfig, BPStats
 
 # Import containers of ite:
-from containers.imaginary_time_evolution import ITEProgressTracker
+from containers.imaginary_time_evolution import ITEProgressTracker, ITESegmentStats
 from containers import Config
 
 # Common errors:
@@ -45,10 +47,11 @@ def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker
     logger.info("\n")
 
 
-def _print_or_log_ite_segment_msg(
+def print_or_log_ite_segment_progress(
     config:Config, tracker:ITEProgressTracker, logger:logs.Logger,
-    delta_t:float, i:int, num_repeats:int
-)->None:
+    delta_t:float, i:int, num_repeats:int, prev_stats:ITESegmentStats, 
+    prog_bar:prints.ProgressBar
+)->Callable[[str], None]:
     counter = 0
     for delta_t_, num_repeats_ in lists.repeated_items(config.ite.time_steps):
         if abs(delta_t_-delta_t)<1e-10 and num_repeats_==num_repeats:
@@ -60,9 +63,18 @@ def _print_or_log_ite_segment_msg(
         raise ValueError(f"Bug: delta_t={delta_t} was not found in config.ite.time_steps.")
 
     num_segments = len(config.ite.time_steps)
-    logger.info(" ")
-    logger.info("segment: "+strings.num_out_of_num(counter+1, num_segments)+f" ; delta_t={delta_t}: "+strings.num_out_of_num(i+1, num_repeats))
-    logger.info("------------------------------")
+
+    if config.visuals.progress_bars:
+        logger_method = logger.debug
+        prog_bar.next(extra_str=f"mean_energy={prev_stats.mean_energy}")
+    else:
+        logger_method = logger.info
+
+    logger_method(" ")
+    logger_method("segment: "+strings.num_out_of_num(counter+1, num_segments)+f" ; delta_t={delta_t}: "+strings.num_out_of_num(i+1, num_repeats))
+    logger_method("------------------------------")
+    
+    return logger_method
 
 
 def _print_or_log_bp_message(config:BPConfig, not_converged_causes_error:bool, stats:BPStats, logger:logs.Logger):

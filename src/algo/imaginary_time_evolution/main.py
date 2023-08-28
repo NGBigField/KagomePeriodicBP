@@ -30,24 +30,43 @@ import numpy as np
 from numpy.linalg import norm
 
 # Import our shared utilities
-from utils import tuples, lists, assertions, saveload, logs, decorators, errors, visuals, strings, dicts
+from utils import tuples, lists, assertions, saveload, logs, decorators, errors, prints
 
 # For copying config:
 from copy import deepcopy
 
 # Helper function and types for ITE:
-from algo.imaginary_time_evolution._logs_and_prints import _print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, _print_or_log_ite_segment_msg, _fix_config_if_bp_struggled
+from algo.imaginary_time_evolution._logs_and_prints import _print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, print_or_log_ite_segment_progress, _fix_config_if_bp_struggled
 from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
 from algo.imaginary_time_evolution._visualization import ITEPlots
-from algo.imaginary_time_evolution._tn_update_control import kagome_tn_from_unit_cell, update_unit_cell
+from algo.imaginary_time_evolution._tn_update import kagome_tn_from_unit_cell, update_unit_cell
 
 # Import belief propagation code:
 from algo.belief_propagation import robust_belief_propagation, belief_propagation
 
 # Other algorithms we need:
-from algo.measurements import derive_xyz_expectation_values_with_tn, measure_core_energies
+from algo.measurements import derive_xyz_expectation_values_with_tn, measure_energies_and_observables_together
 from algo.tn_reduction import reduce_tn
 from libs import ITE as ite
+
+
+def _calculate_crnt_observables(
+    unit_cell:UnitCell, config:Config, messages:MessageDictType, stats:ITESegmentStats
+)->tuple[
+    dict[tuple[str, str], float],
+    dict[str, dict[str, float]],
+    float
+]:
+    ## Unpack inputs:
+    last_bp_config = stats.ite_per_mode_stats[-1].bp_stats.final_config
+    live_plots = config.visuals.live_plots
+
+    ## Get a new fresh tn:
+    full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
+    messages, _ = belief_propagation(full_tn, messages, last_bp_config, live_plots)
+
+    ## Calculate observables:
+    return measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
 
 
 def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:logs.Logger, ite_tracker:ITEProgressTracker, plots:ITEPlots)->None:
@@ -63,7 +82,7 @@ def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:
     core_tn = reduce_tn(full_tn, CoreTN, config.trunc_dim)
 
     ## Compute values:
-    energies_per_site, _ = measure_core_energies(core_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
+    energies_per_site, _ = measure_energies_and_observables_together(core_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
     expectation_values = derive_xyz_expectation_values_with_tn(core_tn)
     energy = sum(energies_per_site)/len(energies_per_site) 
 
@@ -108,14 +127,31 @@ def _check_converged(energies_in:list[complex|None], delta_ts:list[float], crnt_
     return True
 
 
-def _mode_order_without_repetitions(prev_order:list[UpdateMode], ite_config:ITEConfig)->list[UpdateMode]:
-    if not ite_config.random_mode_order:
-        return list(UpdateMode)
-    new_order = list(UpdateMode.all_in_random_order())
+def _mode_order_without_repetitions(prev_order:list[UpdateMode], ite_config:ITEConfig, num_modes:int)->list[UpdateMode]:
+    # Get random variation:
+    if ite_config.random_mode_order:
+        new_order = list(UpdateMode.all_in_random_order())
+    else:
+        new_order = list(UpdateMode.all_options())
+
     # Don't allow two of the same in a row
-    if prev_order is not None and prev_order[-1] is new_order[0]:
-        new_ind = np.random.randint(low=1, high=4)
+    _counter = 0
+    while prev_order is not None and prev_order[-1] is new_order[0]:
+        new_ind = np.random.randint(low=1, high=len(new_order))
         new_order = lists.swap_items(new_order, 0, new_ind)
+        _counter += 1
+        if _counter>100:
+            raise ValueError("Bug.")
+
+    # add or remove items:
+    if num_modes==3:
+        pass
+    elif num_modes<3:
+        new_order = new_order[:num_modes]
+    elif num_modes>3:
+        new_order = new_order*(num_modes//3 + 1)
+        new_order = new_order[:num_modes]
+
     return new_order
 
 
@@ -139,7 +175,7 @@ def ite_per_mode(
 )->tuple[
     UnitCell,               # unit_cell
     MessageDictType,        # messages
-    float,                  # edge_energy
+    list[float],            # edge_energies
     ITEPerModeStats         # Stats
 ]:
 
@@ -156,22 +192,31 @@ def ite_per_mode(
     mode_tn = reduce_tn(full_tn, ModeTN, trunc_dim=config.trunc_dim, mode=mode)
 
     ## for each edge in the mode, update the tensors
-    for edge_tuple in UpdateEdge.all_in_random_order():
+    edge_tuples = list(UpdateEdge.all_in_random_order())
+    edge_energies = []
+
+    if config.visuals.progress_bars:    prog_bar = prints.ProgressBar(len(edge_tuples), print_prefix=f"Executing ITE per-mode:")
+    else:                               prog_bar = prints.ProgressBar.inactive()
+
+    for edge_tuple in edge_tuples:
+        prog_bar.next(extra_str=f"{edge_tuple}")
+
         edge_tn = reduce_tn(mode_tn, EdgeTN, trunc_dim=config.trunc_dim, edge_tuple=edge_tuple)
 
         # Perform ITE update:
         unit_cell, energy, env_metrics = update_unit_cell(edge_tn, unit_cell, config.ite, delta_t, logger)
+        edge_energies.append(energy)
 
         # Update mode_tn:
         mode_tn.update_unit_cell_tensors(unit_cell)
-        print("")
+    prog_bar.clear()
 
     ## Return results and statistics:
     stats = ITEPerModeStats()
     stats.bp_stats = bp_stats
     stats.env_metrics = env_metrics
 
-    return new_core, messages, edge_energy, stats
+    return unit_cell, messages, edge_energies, stats
 
 
 @decorators.add_stats()
@@ -184,53 +229,60 @@ def ite_segment(
     config_in:Config,
     prev_stats:ITESegmentStats
 )->tuple[
-    KagomeTN,          # core
-    MessageDictType,        # messages
-    KagomeTN,          # tn_stable
-    ITESegmentStats         # stats
+    KagomeTN,           # core
+    MessageDictType,    # messages
+    ITESegmentStats     # stats
 ]:
-
+    ## Copy and parse config:
     config = deepcopy(config_in)
+    use_prog_bar = config.visuals.progress_bars
+    num_modes = config.ite.num_mode_repetitions_per_segment
+
     ## Init messages or use old ones
     if config.ite.start_segment_with_new_bp_message:
         messages = None  # force bp to start with fresh-new messages
+
     ## Generate a random mode order without repeating the same mode previous twice in a row
-    modes_order = _mode_order_without_repetitions(prev_stats.modes_order, config.ite)
+    modes_order = _mode_order_without_repetitions(prev_stats.modes_order, config.ite, num_modes)
+
     ## Keep track of stats:
     stats = ITESegmentStats()
     stats.modes_order = modes_order
     stats.delta_t = delta_t
 
-    ## Iterate for each mode:
-    num_repeats = config.ite.num_mode_repetitions_per_segment
-    for i_rep in range(num_repeats):
-        for update_mode in modes_order:
-            # Each mode is another edge that needs to be updated:
-            logger.info(f"    update_mode={update_mode.name: <4}")
-            ## Run:
-            unit_cell, messages, edge_energy, ite_per_mode_stats = ite_per_mode(
-                unit_cell, messages, delta_t, logger, config, update_mode
-            )
-            ## Track results:
-            stats.ite_per_mode_stats.append(ite_per_mode_stats)
-            logger.debug(f"        Hermicity of environment={ite_per_mode_stats.env_metrics.hermicity!r}")
-            logger.debug(f"        Edge-Energy={edge_energy!r}")
-            ## inputs for next iteration:
-            config.bp = deepcopy(ite_per_mode_stats.bp_stats.final_config)
+    if use_prog_bar:  
+        prog_bar = prints.ProgressBar(len(modes_order), print_prefix=f"Executing ITE Segment  ")
+        log_method = "debug"
+    else:             
+        prog_bar = prints.ProgressBar.inactive()
+        log_method = "info"
 
-    ## Calc final stable TN:
-    logger.debug(f"    Calculating stable reduced TN..")    
-    tn_open = _core_to_big_open_tn(unit_cell, config.dims)  # Duplicate core into a big tensor-network:
-    tn_stable, messages, bp_stats = belief_propagation(tn_open, messages, deepcopy(config.bp))  # Perform BlockBP:
-    _print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
 
-    return unit_cell, messages, tn_stable, stats
+    for update_mode in modes_order:
+        _mode_str = f"update_mode={update_mode.name: <4}"
+        prog_bar.next(extra_str=_mode_str)
+        getattr(logger, log_method)(f"    {_mode_str}")
+
+        ## Run:
+        unit_cell, messages, edge_energies, ite_per_mode_stats = ite_per_mode(
+            unit_cell, messages, delta_t, logger, config, update_mode
+        )
+        ## Track results:
+        stats.ite_per_mode_stats.append(ite_per_mode_stats)
+        logger.debug(f"        Hermicity of environment={ite_per_mode_stats.env_metrics.hermicity!r}")
+        logger.debug(f"        Edge-Energies={edge_energies!r}")
+        ## inputs for next iteration:
+        config.bp = ite_per_mode_stats.bp_stats.final_config
+
+    prog_bar.clear()
+
+    return unit_cell, messages, stats
 
 
 # @decorators.multiple_tries(3)
 def ite_per_delta_t(
     unit_cell:KagomeTN, messages:MessageDictType|None, delta_t:float, num_repeats:int, config:Config, 
-    plots:ITEPlots, logger:logs.Logger, tracker:ITEProgressTracker, step_stats:ITESegmentStats
+    plots:ITEPlots, logger:logs.Logger, tracker:ITEProgressTracker, segment_stats:ITESegmentStats, overall_prog_bar:prints.ProgressBar
 ) -> tuple[
     KagomeTN, MessageDictType|None, bool, ITESegmentStats
     # core, messages, at_least_one_successful_run, step_stats
@@ -239,51 +291,59 @@ def ite_per_delta_t(
     ## derive from input:    
     assert num_repeats>0, f"Got num_repeats={num_repeats}. We can't have ITE without repetitions"
 
+    delta_t_prog_bar = prints.ProgressBar.inactive()
+    def _temp_prog_bar_creation()->prints.ProgressBar:
+        if config.visuals.progress_bars:
+            return prints.ProgressBar(num_repeats, print_prefix=f"Per delta-t...         ")
+        else:
+            return prints.ProgressBar.inactive()
+
+
     ## Perform ITE for all repetitions of this delta_t: 
     at_least_one_successful_run : bool = False
     for i in range(num_repeats):
-        _print_or_log_ite_segment_msg(config, tracker, logger, delta_t, i, num_repeats)
+        delta_t_prog_bar.clear()
+        logger_method = print_or_log_ite_segment_progress(config, tracker, logger, delta_t, i, num_repeats, segment_stats, overall_prog_bar)
+        delta_t_prog_bar = _temp_prog_bar_creation()
+        delta_t_prog_bar.next(increment=i+1, extra_str=f"delta-t={delta_t}")
 
         ## Preform ITE segment:
-        try:
-            unit_cell, messages, tn_stable, step_stats = ite_segment(
-                unit_cell, messages, delta_t, logger=logger, config_in=config, prev_stats=step_stats
-            )
-        except ITEError as e:
-            logger.warn(str(e))
-            if DEBUG_MODE:
-                raise e
-            num_errors = tracker.log_error(e)
-            if num_errors>config.ite.num_errors_threshold:
-                raise ITEError(f"ITE Algo experienced {num_errors} errors.")
-            elif config.ite.segment_error_cause_state_revert:
-                try:
-                    _, energy, step_stats, _, unit_cell, messages = tracker.revert_back(1)
-                except ITEError:
-                    raise e
-            continue
+        # try:
+        unit_cell, messages, segment_stats = ite_segment(
+            unit_cell, messages, delta_t, logger=logger, config_in=config, prev_stats=segment_stats
+        )
+        # except ITEError as e:
+        #     logger.warn(str(e))
+        #     if DEBUG_MODE:
+        #         raise e
+        #     num_errors = tracker.log_error(e)
+        #     if num_errors>config.ite.num_errors_threshold:
+        #         raise ITEError(f"ITE Algo experienced {num_errors} errors.")
+        #     elif config.ite.segment_error_cause_state_revert:
+        #         try:
+        #             _, energy, segment_stats, _, unit_cell, messages = tracker.revert_back(1)
+        #         except ITEError:
+        #             raise e
+        #     continue
 
         at_least_one_successful_run = True
         
         ## Calculate observables:
-        tn_stable_around_core = reduce_tn_to_core_and_environment(tn_stable, config.trunc_dim, method=config.reduce2core_method)
-        energies_per_site, rdms = measure_core_energies(tn_stable_around_core, config.ite.interaction_hamiltonian, config.trunc_dim)
-        energy = sum(energies_per_site)/len(energies_per_site) 
-        if config.live_plots:
-            expectation_values = measure_xyz_expectation_values_with_rdms(rdms)
-        else:
-            expectation_values = {}
+        energies, expectations, mean_energy = _calculate_crnt_observables(unit_cell, config, messages, segment_stats)
 
         ## Save data, print performance and plot graphs:
-        tracker.log_segment(delta_t=delta_t, energy=energy, unit_cell=unit_cell, messages=messages, expectation_values=expectation_values, stats=step_stats)
-        plots.update(energies_per_site, step_stats, delta_t, expectation_values)
-        logger.info(f"Mean energy after sequence = {energy}")
+        segment_stats.mean_energy = mean_energy
+        tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
+        plots.update(energies, segment_stats, delta_t, expectations)
+        logger_method(f"Mean energy after sequence = {mean_energy}")
 
         ## Check stopping criteria:
         if config.ite.check_converges and _check_converged(tracker.energies, tracker.delta_ts, delta_t):
             break
 
-    return unit_cell, messages, at_least_one_successful_run, step_stats
+    delta_t_prog_bar.clear()
+
+    return unit_cell, messages, at_least_one_successful_run, segment_stats
 
 
 def full_ite(
@@ -327,17 +387,20 @@ def full_ite(
     if config.visuals.live_plots: 
         _compute_and_plot_zero_iteration_(unit_cell_in, config, logger, ite_tracker, plots)
 
+    ## Progress Bar:
+    if config.visuals.progress_bars:
+        prog_bar = prints.ProgressBar(len(config.ite.time_steps), print_prefix=f"Executing ITE Full...  ")
+    else:
+        prog_bar = prints.ProgressBar.inactive()
+
     ## Repetitively perform ITE algo:
     unit_cell_out = unit_cell_in  # for output type check
     for delta_t, num_repeats in lists.repeated_items(config.ite.time_steps):
-        unit_cell_out, messages, success, step_stats = ite_per_delta_t(unit_cell_in, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)
-        if not success:  # One more try
-            unit_cell_out, messages, success, step_stats = ite_per_delta_t(unit_cell_in, None, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)
-            if not success:
-                raise ITEError(f"ITE didn't work on delte={delta_t}")
+        unit_cell_out, messages, success, step_stats = ite_per_delta_t(unit_cell_in, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats, prog_bar)
         unit_cell_in = unit_cell_out
-
+    
     ## Log finish:
+    prog_bar.clear()
     _log_and_print_finish_message(logger, config, ite_tracker, plots)  # Print and log valuable information: 
 
     return unit_cell_out, ite_tracker, logger
