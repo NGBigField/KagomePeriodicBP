@@ -36,7 +36,7 @@ def get_imaginary_time_evolution_operator(hamiltonian_call:HamiltonianFuncAndInp
     elif isinstance(args, Iterable):
         h = func(*args)
     else:
-        raise TypeError(f"args of type {type(args)!r} is not supported.")
+        h = func(args)
     
     g = g_from_exp_h(h, delta_t)
 

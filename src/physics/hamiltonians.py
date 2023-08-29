@@ -9,17 +9,7 @@ from typing import Callable, TypeAlias, Literal, TypeVar, Self
 _T = TypeVar("_T")
 
 
-class HamiltonianFuncAndInputs(tuple):
-
-	def __new__(cls, __iterable: Iterable = ...) -> Self:
-		assert len(__iterable)==2
-		func, args = __iterable 
-		if args is not None:
-			None
-		return super().__new__(__iterable)
-
-	Callable[[_T], np.ndarray],
-	_T    # args
+HamiltonianFuncAndInputs : TypeAlias =	tuple[ Callable[[_T], np.ndarray], _T|tuple[_T]|None ] 
 
 
 

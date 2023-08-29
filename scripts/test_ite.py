@@ -30,7 +30,7 @@ def test_full_ite(
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
-    config.ite.interaction_hamiltonian = (hamiltonians.ising_with_transverse_field, (0) )
+    config.ite.interaction_hamiltonian = (hamiltonians.ising_with_transverse_field, 0 )
 
     ## Run:
     unit_cell_out, ite_tracker, logger = full_ite(config=config)
