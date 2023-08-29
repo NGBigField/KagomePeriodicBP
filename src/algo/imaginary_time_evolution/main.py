@@ -14,8 +14,6 @@ from _config_reader import DEBUG_MODE, KEEP_LOGS, ALLOW_VISUALS
 
 # Import containers needed for ite:
 from containers.imaginary_time_evolution import ITEConfig, ITEProgressTracker, ITEPerModeStats, ITESegmentStats
-from containers.sizes_and_dimensions import TNDimensions
-from containers.density_matrices import MatrixMetrics
 from containers import Config
 
 # Import other needed types:
@@ -36,18 +34,30 @@ from utils import tuples, lists, assertions, saveload, logs, decorators, errors,
 from copy import deepcopy
 
 # Helper function and types for ITE:
-from algo.imaginary_time_evolution._logs_and_prints import _print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, print_or_log_ite_segment_progress, _fix_config_if_bp_struggled
+from algo.imaginary_time_evolution._logs_and_prints import print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, \
+                                                            print_or_log_ite_segment_progress, get_progress_bar
 from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
 from algo.imaginary_time_evolution._visualization import ITEPlots
 from algo.imaginary_time_evolution._tn_update import kagome_tn_from_unit_cell, update_unit_cell
 
 # Import belief propagation code:
-from algo.belief_propagation import robust_belief_propagation, belief_propagation
+from algo.belief_propagation import robust_belief_propagation, belief_propagation, BPStats
 
 # Other algorithms we need:
 from algo.measurements import derive_xyz_expectation_values_with_tn, measure_energies_and_observables_together
 from algo.tn_reduction import reduce_tn
 from libs import ITE as ite
+
+
+
+def _fix_config_if_bp_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger):
+    if bp_stats.attempts>1: 
+        config.bp.max_swallowing_dim = bp_stats.final_config.max_swallowing_dim
+        logger.debug(f"        config.bp.max_swallowing_dim updated to {config.bp.max_swallowing_dim}")
+        if bp_stats.final_config.max_swallowing_dim>=config.trunc_dim:
+            config.trunc_dim = int(bp_stats.final_config.max_swallowing_dim*1.5)
+            logger.debug(f"        config.bubblecon_trunc_dim updated to {config.trunc_dim}")
+    return config
 
 
 def _calculate_crnt_observables(
@@ -184,7 +194,7 @@ def ite_per_mode(
 
     ## Perform BlockBP:
     messages, bp_stats = robust_belief_propagation(full_tn, messages, config.bp, update_plots_between_steps=config.visuals.live_plots)
-    _print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
+    print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
     # If block-bp struggled and increased the virtual dimension, the following iterations must also use a higher dimension:
     config = _fix_config_if_bp_struggled(config, bp_stats, logger)
 
@@ -195,9 +205,8 @@ def ite_per_mode(
     edge_tuples = list(UpdateEdge.all_in_random_order())
     edge_energies = []
 
-    if config.visuals.progress_bars:    prog_bar = prints.ProgressBar(len(edge_tuples), print_prefix=f"Executing ITE per-mode:")
-    else:                               prog_bar = prints.ProgressBar.inactive()
 
+    prog_bar = get_progress_bar(config, len(edge_tuples), "Executing ITE per-mode:")
     for edge_tuple in edge_tuples:
         prog_bar.next(extra_str=f"{edge_tuple}")
 
@@ -290,12 +299,8 @@ def ite_per_delta_t(
 
     ## derive from input:    
     assert num_repeats>0, f"Got num_repeats={num_repeats}. We can't have ITE without repetitions"
-
     # Progress bar:
-    if config.visuals.progress_bars:
-        prog_bar = prints.ProgressBar(num_repeats, print_prefix=f"Per delta-t...         ")
-    else:
-        prog_bar = prints.ProgressBar.inactive()
+    prog_bar = get_progress_bar(config, num_repeats, f"Per delta-t...         ")
 
     ## Perform ITE for all repetitions of this delta_t: 
     at_least_one_successful_run : bool = False
@@ -383,14 +388,11 @@ def full_ite(
     if config.visuals.live_plots: 
         _compute_and_plot_zero_iteration_(unit_cell, config, logger, ite_tracker, plots)
 
-    ## Progress Bar:
-    delta_t_list_with_repetitions = list(lists.repeated_items(config.ite.time_steps))
-    if config.visuals.progress_bars:
-        prog_bar = prints.ProgressBar(len(delta_t_list_with_repetitions), print_prefix=f"Executing ITE Algo...  ")
-    else:
-        prog_bar = prints.ProgressBar.inactive()
-
     ## Repetitively perform ITE algo:
+    delta_t_list_with_repetitions = list(lists.repeated_items(config.ite.time_steps))
+    # Progress bar:
+    prog_bar = get_progress_bar(config, len(delta_t_list_with_repetitions), "Executing ITE Algo...  ")
+    # Main loop:
     for delta_t, num_repeats in delta_t_list_with_repetitions:
         prog_bar.next(extra_str=f"delta-t={delta_t}")
         unit_cell, messages, success, step_stats = ite_per_delta_t(unit_cell, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)

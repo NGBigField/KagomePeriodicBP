@@ -18,8 +18,14 @@ from utils import lists, logs, strings, prints
 # from algo.imaginary_time_evolution._visuals import ITEPlots  #TODO
 
 
+def get_progress_bar(config:Config, num_repeats:int, print_prefix:str)->prints.ProgressBar:
+    # Progress bar:
+    if config.visuals.progress_bars:
+        return prints.ProgressBar(num_repeats, print_prefix=print_prefix)
+    else:
+        return prints.ProgressBar.inactive()
 
-## ==== Helper Functions ==== ##
+
 def _common_logger_prints(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker)->None:
     logger.info(config)
     logger.info(f"ITE-Tracker saved at {ite_tracker.full_path!r}")
@@ -75,7 +81,7 @@ def print_or_log_ite_segment_progress(
     return logger_method
 
 
-def _print_or_log_bp_message(config:BPConfig, not_converged_causes_error:bool, stats:BPStats, logger:logs.Logger):
+def print_or_log_bp_message(config:BPConfig, not_converged_causes_error:bool, stats:BPStats, logger:logs.Logger):
     space = "        "
     _blue_text = lambda s: prints.add_color(s, prints.PrintColors.BLUE)
     if stats.final_error<config.target_msg_diff:
@@ -96,13 +102,3 @@ def _print_or_log_bp_message(config:BPConfig, not_converged_causes_error:bool, s
         else:
             logger.warn(space+_msg)
 
-
-
-def _fix_config_if_bp_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger):
-    if bp_stats.attempts>1: 
-        config.bp.max_swallowing_dim = bp_stats.final_config.max_swallowing_dim
-        logger.debug(f"        config.bp.max_swallowing_dim updated to {config.bp.max_swallowing_dim}")
-        if bp_stats.final_config.max_swallowing_dim>=config.trunc_dim:
-            config.trunc_dim = int(bp_stats.final_config.max_swallowing_dim*1.5)
-            logger.debug(f"        config.bubblecon_trunc_dim updated to {config.trunc_dim}")
-    return config
