@@ -49,6 +49,26 @@ from algo.tn_reduction import reduce_tn
 from libs import ITE as ite
 
 
+def _initial_full_ite_inputs(config, unit_cell, logger):
+        # Config:
+    if config is None:
+        config = Config.derive_from_physical_dim(DEFAULT_PHYSICAL_DIM)
+    # Unit-Cell:
+    if unit_cell is None:
+        unit_cell = UnitCell.random(d=config.dims.physical_dim, D=config.dims.virtual_dim)
+    elif isinstance(unit_cell, UnitCell):
+        unit_cell = unit_cell.copy()
+    else:
+        raise TypeError(f"Not an expected type for input 'initial_core' of type {type(unit_cell)!r}")
+    # Logger:
+    if logger is None:
+        logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=KEEP_LOGS)
+    elif not isinstance(logger, logs.Logger):
+        raise TypeError(f"Not an expected type for input 'logger' of type {type(logger)!r}")
+    
+    return config, unit_cell, logger
+    
+
 
 def _fix_config_if_bp_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger):
     if bp_stats.attempts>1: 
@@ -61,19 +81,22 @@ def _fix_config_if_bp_struggled(config:Config, bp_stats:BPStats, logger:logs.Log
 
 
 def _calculate_crnt_observables(
-    unit_cell:UnitCell, config:Config, messages:MessageDictType, stats:ITESegmentStats
+    unit_cell:UnitCell, config:Config, messages:MessageDictType, segment_stats:ITESegmentStats|None
 )->tuple[
     dict[tuple[str, str], float],
     dict[str, dict[str, float]],
     float
 ]:
     ## Unpack inputs:
-    last_bp_config = stats.ite_per_mode_stats[-1].bp_stats.final_config
+    if segment_stats is None:
+        bp_config = config.bp
+    else:
+        bp_config = segment_stats.ite_per_mode_stats[-1].bp_stats.final_config
     live_plots = config.visuals.live_plots
 
     ## Get a new fresh tn:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
-    messages, _ = belief_propagation(full_tn, messages, last_bp_config, live_plots)
+    messages, _ = belief_propagation(full_tn, messages, bp_config, live_plots)
 
     ## Calculate observables:
     return measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
@@ -83,23 +106,28 @@ def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:
     # Inputs:
     delta_t = 0.0
     messages = None
-    step_stats = ITESegmentStats()
+    segment_stats = ITESegmentStats()
 
     ## Get the state of the system at iteration 0:
     logger.info("Calculating measurements of initial core...")
-    full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
-    messages, bp_stats = belief_propagation(full_tn, messages, config)  # Perform BlockBP:
-    core_tn = reduce_tn(full_tn, CoreTN, config.trunc_dim)
 
-    ## Compute values:
-    energies_per_site, _ = measure_energies_and_observables_together(core_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
-    expectation_values = derive_xyz_expectation_values_with_tn(core_tn)
-    energy = sum(energies_per_site)/len(energies_per_site) 
+    ## Calculate observables:
+    energies, expectations, mean_energy = _calculate_crnt_observables(unit_cell, config, messages, None)
+
+
+    # full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
+    # messages, bp_stats = belief_propagation(full_tn, messages, config.bp)  # Perform BlockBP:
+    # core_tn = reduce_tn(full_tn, CoreTN, config.trunc_dim)
+
+    # ## Compute values:
+    # energies_per_site, _ = measure_energies_and_observables_together(core_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
+    # expectation_values = derive_xyz_expectation_values_with_tn(core_tn)
+    # energy = sum(energies_per_site)/len(energies_per_site) 
 
     ## Save data, print performance and plot graphs:
-    ite_tracker.log_segment(delta_t=delta_t, energy=energy, unit_cell=unit_cell, messages=messages, expectation_values=expectation_values, stats=step_stats)
-    plots.update(energies_per_site, step_stats, delta_t, expectation_values, _initial=True)
-    logger.info(f"Mean energy at iteration 0: {energy}")
+    ite_tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
+    plots.update(energies, segment_stats, delta_t, expectations, _initial=True)
+    logger.info(f"Mean energy at iteration 0: {mean_energy}")
 
 
 def _check_converged(energies_in:list[complex|None], delta_ts:list[float], crnt_delta_t:float)->bool:
@@ -358,22 +386,7 @@ def full_ite(
 ]:
 
     ## Initial Settings:
-    # Config:
-    if config is None:
-        config = Config.derive_from_physical_dim(DEFAULT_PHYSICAL_DIM)
-    # Unit-Cell:
-    if unit_cell is None:
-        unit_cell = UnitCell.random(d=config.dims.physical_dim, D=config.dims.virtual_dim)
-    elif isinstance(unit_cell, UnitCell):
-        unit_cell = unit_cell.copy()
-    else:
-        raise TypeError(f"Not an expected type for input 'initial_core' of type {type(unit_cell)!r}")
-    # Logger:
-    if logger is None:
-        logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=KEEP_LOGS)
-    elif not isinstance(logger, logs.Logger):
-        raise TypeError(f"Not an expected type for input 'logger' of type {type(logger)!r}")
-    
+    config, unit_cell, logger = _initial_full_ite_inputs(config, unit_cell, logger)
     
     ## Initial inputs for first iterations:
     step_stats = ITESegmentStats()  # initial step stats for the first iteration. used for randomized mode order

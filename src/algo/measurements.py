@@ -45,9 +45,11 @@ from utils import assertions, logs, errors, lists, parallel_exec, prints, string
 
 # A bit of OOP:
 from copy import deepcopy
-from typing import TypeVar
+from typing import TypeVar, TypeAlias
 
 _T = TypeVar('_T')
+
+UnitCellExpectationValuesDict : TypeAlias = dict[str, dict[str, float]]
 
 
 all_paulis = list(pauli.all_paulis(with_names=False))
@@ -112,6 +114,15 @@ def print_results_table(results:dict[str, dict[str, float]])->None:
 def _mean(list_:list[_T])->_T:
     return sum(list_)/len(list_)  #type: ignore
         
+def mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[str, float]:
+    mean_per_direction : dict[str, float] = dict(x=0, y=0, z=0)
+    # Add
+    for abc, xyz_dict in expectation.items():
+        for xyz, value in xyz_dict.items():
+            mean_per_direction[xyz] += value/3
+    return mean_per_direction
+
+
 
 def measure_energies_and_observables_together(
     tn:TensorNetwork, 
@@ -121,7 +132,7 @@ def measure_energies_and_observables_together(
     force_real:bool=True
 )->tuple[
     dict[tuple[str, str], float],
-    dict[str, dict[str, float]],
+    UnitCellExpectationValuesDict,
     float
 ]:
     ## Prepare outputs and check inputs:
@@ -129,7 +140,7 @@ def measure_energies_and_observables_together(
     if DEBUG_MODE: tn.validate()
     if mode is None:
         mode = UpdateMode.random()
-    h, g = get_imaginary_time_evolution_operator(hamiltonian, 0)
+    h, g = get_imaginary_time_evolution_operator(hamiltonian, (0))
     # outputs:
     energies = dict()
     expectations = {

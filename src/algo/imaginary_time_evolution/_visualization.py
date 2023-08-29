@@ -6,6 +6,8 @@ from dataclasses import dataclass, fields
 from typing import TypeVar, Generic, Generator
 _T = TypeVar('_T')
 
+from algo.measurements import mean_expectation_values, UnitCellExpectationValuesDict
+
 # Control flags:
 from _config_reader import ALLOW_VISUALS
 
@@ -29,7 +31,7 @@ class ITEPlots():
         self,
         active:bool,
         config:Config,
-        plots_to_show : list[bool] = [True, True, False]
+        plots_to_show : list[bool] = [False, False, True]
     )->None:
         
         ## Save data:
@@ -77,11 +79,15 @@ class ITEPlots():
             self.figs.env = fig_env
 
         if self.show.cores:
-            fig_core = plt.figure(figsize=(3, 3))
+            fig_core = plt.figure(figsize=(6, 7))
             fig_core.subplot_mosaic([
-                ['A', 'B'],
-                ['C', 'D']
-            ])
+                ['.', 'A', 'A', '.'],
+                ['.', 'A', 'A', '.'],
+                ['B', 'B', 'C', 'C'],
+                ['B', 'B', 'C', 'C']
+            ], 
+                subplot_kw=dict(projection='3d')  #, sharex=True, sharey=True
+            )
             fig_core.suptitle("Core")
             self.figs.cores = fig_core
 
@@ -140,9 +146,9 @@ class ITEPlots():
         ## Core plots:
         if self.show.cores:
             axes_core = {axis._label : axis for axis in fig_core.get_axes()}  # type: ignore
-            core_plots = {key:visuals.AppendablePlot(axis=value) for key, value in axes_core.items()}
+            core_plots = {key:visuals.BlockSphere(axis=value) for key, value in axes_core.items()}            
+            plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
             self.plots.cores = core_plots
-            
 
         # Better layout:
         for _, d in self.plots.items():
@@ -156,21 +162,20 @@ class ITEPlots():
         visuals.draw_now()
         visuals.ion()
 
-    def update(self, energies_per_site:list[complex], step_stats:ITESegmentStats, delta_t:float, expectation_values, _initial:bool=False):
+    def update(self, energies_per_site:list[complex], step_stats:ITESegmentStats, delta_t:float, expectations:UnitCellExpectationValuesDict, _initial:bool=False):
         if not self.active:
             return
         
         if not _initial:
             self._iteration += 1  # index beginning at 1 (not 0)
 
-        real_expectation_values = {key: np.real(value) for key, value in expectation_values.items()}
-        imag_expectation_values = {key: np.imag(value) for key, value in expectation_values.items()}
+        mean_expec_vals = mean_expectation_values(expectations)
 
         ## Main:
         if self.show.main:
             if not _initial:
                 self.plots.main["delta_t"].append(delta_t=delta_t, draw_now_=False)
-            self.plots.main["expectations"].append(**real_expectation_values, draw_now_=False)
+            self.plots.main["expectations"].append(**mean_expec_vals, draw_now_=False)
             # Energies:
             p_energies = self.plots.main["energies"]
             # per edge:
@@ -211,7 +216,19 @@ class ITEPlots():
                     self.plots.env["sum_eigenvalues"].append(sum_eigenvalues=(i, sum_eigenvalues), draw_now_=False)
                     self.plots.env["negativity"].append(negativity=(i, negativity), draw_now_=False)
                     self.plots.env["trace"].append(trace=(i, trace), draw_now_=False)
-            self.plots.env["expectations_imag"].append(**imag_expectation_values, draw_now_=False)
+            # self.plots.env["expectations_imag"].append(**imag_expectation_values, draw_now_=False)
+
+        ## Core
+        if self.show.cores:
+            for abc, xyz_dict in expectations.items():
+                vector = [0, 0, 0]
+                bloch_sphere = self.plots.cores[abc]
+                for xyz, value in xyz_dict.items():
+                    match xyz:
+                        case 'x': vector[0]=value
+                        case 'y': vector[1]=value
+                        case 'z': vector[2]=value
+                bloch_sphere.append(vector)
         
         visuals.draw_now()
 
