@@ -1,17 +1,26 @@
+from collections.abc import Iterable
 import numpy as np
 from numpy import tensordot, zeros
 from physics.pauli import x, y, z, id
 from functools import cache
 
 # For type hinting:
-from typing import Callable, TypeAlias, Literal, TypeVar
+from typing import Callable, TypeAlias, Literal, TypeVar, Self
 _T = TypeVar("_T")
 
 
-HamiltonianFuncAndInputs : TypeAlias = tuple[
+class HamiltonianFuncAndInputs(tuple):
+
+	def __new__(cls, __iterable: Iterable = ...) -> Self:
+		assert len(__iterable)==2
+		func, args = __iterable 
+		if args is not None:
+			None
+		return super().__new__(__iterable)
+
 	Callable[[_T], np.ndarray],
 	_T    # args
-]
+
 
 
 def _tensor_product(op1:np.ndarray, op2:np.ndarray)->np.ndarray:
