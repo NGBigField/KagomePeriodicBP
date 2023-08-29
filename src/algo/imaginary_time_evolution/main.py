@@ -282,7 +282,7 @@ def ite_segment(
 # @decorators.multiple_tries(3)
 def ite_per_delta_t(
     unit_cell:KagomeTN, messages:MessageDictType|None, delta_t:float, num_repeats:int, config:Config, 
-    plots:ITEPlots, logger:logs.Logger, tracker:ITEProgressTracker, segment_stats:ITESegmentStats, overall_prog_bar:prints.ProgressBar
+    plots:ITEPlots, logger:logs.Logger, tracker:ITEProgressTracker, segment_stats:ITESegmentStats
 ) -> tuple[
     KagomeTN, MessageDictType|None, bool, ITESegmentStats
     # core, messages, at_least_one_successful_run, step_stats
@@ -291,21 +291,17 @@ def ite_per_delta_t(
     ## derive from input:    
     assert num_repeats>0, f"Got num_repeats={num_repeats}. We can't have ITE without repetitions"
 
-    delta_t_prog_bar = prints.ProgressBar.inactive()
-    def _temp_prog_bar_creation()->prints.ProgressBar:
-        if config.visuals.progress_bars:
-            return prints.ProgressBar(num_repeats, print_prefix=f"Per delta-t...         ")
-        else:
-            return prints.ProgressBar.inactive()
-
+    # Progress bar:
+    if config.visuals.progress_bars:
+        prog_bar = prints.ProgressBar(num_repeats, print_prefix=f"Per delta-t...         ")
+    else:
+        prog_bar = prints.ProgressBar.inactive()
 
     ## Perform ITE for all repetitions of this delta_t: 
     at_least_one_successful_run : bool = False
     for i in range(num_repeats):
-        delta_t_prog_bar.clear()
-        logger_method = print_or_log_ite_segment_progress(config, tracker, logger, delta_t, i, num_repeats, segment_stats, overall_prog_bar)
-        delta_t_prog_bar = _temp_prog_bar_creation()
-        delta_t_prog_bar.next(increment=i+1, extra_str=f"delta-t={delta_t}")
+        prog_bar.next(extra_str=f"mean-energy={segment_stats.mean_energy}")
+        logger_method = print_or_log_ite_segment_progress(config, tracker, logger, delta_t, i, num_repeats, segment_stats)
 
         ## Preform ITE segment:
         # try:
@@ -341,7 +337,7 @@ def ite_per_delta_t(
         if config.ite.check_converges and _check_converged(tracker.energies, tracker.delta_ts, delta_t):
             break
 
-    delta_t_prog_bar.clear()
+    prog_bar.clear()
 
     return unit_cell, messages, at_least_one_successful_run, segment_stats
 
@@ -362,9 +358,9 @@ def full_ite(
         config = Config.derive_from_physical_dim(DEFAULT_PHYSICAL_DIM)
     # Unit-Cell:
     if unit_cell is None:
-        unit_cell_in = UnitCell.random(d=config.dims.physical_dim, D=config.dims.virtual_dim)
+        unit_cell = UnitCell.random(d=config.dims.physical_dim, D=config.dims.virtual_dim)
     elif isinstance(unit_cell, UnitCell):
-        unit_cell_in = unit_cell.copy()
+        unit_cell = unit_cell.copy()
     else:
         raise TypeError(f"Not an expected type for input 'initial_core' of type {type(unit_cell)!r}")
     # Logger:
@@ -379,31 +375,31 @@ def full_ite(
     messages = None
 
     ## Prepare tracking lists and plots:
-    ite_tracker = ITEProgressTracker(unit_cell=unit_cell_in, messages=messages, config=config)
+    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config)
     _log_and_print_starting_message(logger, config, ite_tracker)  # Print and log valuable information: 
     plots = ITEPlots(active=config.visuals.live_plots, config=config)
 
     ## Calculate observables of starting core:
     if config.visuals.live_plots: 
-        _compute_and_plot_zero_iteration_(unit_cell_in, config, logger, ite_tracker, plots)
+        _compute_and_plot_zero_iteration_(unit_cell, config, logger, ite_tracker, plots)
 
     ## Progress Bar:
+    delta_t_list_with_repetitions = list(lists.repeated_items(config.ite.time_steps))
     if config.visuals.progress_bars:
-        prog_bar = prints.ProgressBar(len(config.ite.time_steps), print_prefix=f"Executing ITE Full...  ")
+        prog_bar = prints.ProgressBar(len(delta_t_list_with_repetitions), print_prefix=f"Executing ITE Algo...  ")
     else:
         prog_bar = prints.ProgressBar.inactive()
 
     ## Repetitively perform ITE algo:
-    unit_cell_out = unit_cell_in  # for output type check
-    for delta_t, num_repeats in lists.repeated_items(config.ite.time_steps):
-        unit_cell_out, messages, success, step_stats = ite_per_delta_t(unit_cell_in, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats, prog_bar)
-        unit_cell_in = unit_cell_out
+    for delta_t, num_repeats in delta_t_list_with_repetitions:
+        prog_bar.next(extra_str=f"delta-t={delta_t}")
+        unit_cell, messages, success, step_stats = ite_per_delta_t(unit_cell, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)
     
     ## Log finish:
     prog_bar.clear()
     _log_and_print_finish_message(logger, config, ite_tracker, plots)  # Print and log valuable information: 
 
-    return unit_cell_out, ite_tracker, logger
+    return unit_cell, ite_tracker, logger
 
 
 def robust_full_ite(

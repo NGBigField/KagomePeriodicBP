@@ -50,7 +50,6 @@ def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker
 def print_or_log_ite_segment_progress(
     config:Config, tracker:ITEProgressTracker, logger:logs.Logger,
     delta_t:float, i:int, num_repeats:int, prev_stats:ITESegmentStats, 
-    prog_bar:prints.ProgressBar
 )->Callable[[str], None]:
     counter = 0
     for delta_t_, num_repeats_ in lists.repeated_items(config.ite.time_steps):
@@ -66,7 +65,6 @@ def print_or_log_ite_segment_progress(
 
     if config.visuals.progress_bars:
         logger_method = logger.debug
-        prog_bar.next(extra_str=f"mean_energy={prev_stats.mean_energy}")
     else:
         logger_method = logger.info
 
