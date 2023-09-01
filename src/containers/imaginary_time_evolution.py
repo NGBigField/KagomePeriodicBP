@@ -1,10 +1,13 @@
 import numpy as np
-from physics.hamiltonians import HamiltonianFuncAndInputs, zero
+from physics.hamiltonians import zero
 from dataclasses import dataclass, field, fields
 from utils import strings, saveload, assertions, lists
 from utils.arguments import Stats
-from typing import Generator, Union, Any, TypeAlias, NamedTuple
 from copy import deepcopy
+
+# For type hinting:
+from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Self, Iterable, Any
+_T = TypeVar("_T")
 
 # Other containers and enums:
 from enums.imaginary_time_evolution import UpdateMode
@@ -24,8 +27,45 @@ _NEXT_IN_ABC_ORDER = {
     UnitCellFlavor.C : UnitCellFlavor.A
 }
 
-def _default_hamiltonian():
-    return (zero, None)
+
+class HamiltonianFuncAndInputs(NamedTuple, Generic[_T]):
+    func: Callable[[_T], np.ndarray] 
+    args: _T|tuple[_T]|None
+
+    def __repr__(self) -> str:
+        return f"Hamiltonian function: {self.func.__name__!r} arguments: {self.args}"
+
+    @staticmethod
+    def default()->"HamiltonianFuncAndInputs":
+        return HamiltonianFuncAndInputs(func=zero, args=None)
+
+    @staticmethod
+    def standard(self_or_tuple:Self|tuple)->Self:
+        assert len(self_or_tuple)==2
+        assert callable(self_or_tuple[0])
+        if isinstance(self_or_tuple, HamiltonianFuncAndInputs):
+            assert callable(self_or_tuple.func)
+            return self_or_tuple
+        
+        if isinstance(self_or_tuple, tuple):
+            return HamiltonianFuncAndInputs(func=self_or_tuple[0], args=self_or_tuple[1])
+
+        raise ValueError(f"Not a valid input for class {HamiltonianFuncAndInputs.__name__!r}") 
+
+    def call(self)->np.ndarray:
+        assert len(self)==2
+        func   = self.func
+        args   = self.args
+
+        # call:
+        if args is None:
+            return func()
+        elif isinstance(args, Iterable):
+            return func(*args)
+        else:
+            return func(args)
+            
+
 
 class UpdateEdge(NamedTuple): 
     first : UnitCellFlavor
@@ -78,7 +118,7 @@ def DEFAULT_TIME_STEPS()->list[float]:
 @dataclass
 class ITEConfig():
     # hamiltonian:
-    interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=_default_hamiltonian)
+    interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
     _GT_energy : float|None = None  # Ground truth energy, if known
     # ITE time steps:
     time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
@@ -109,6 +149,9 @@ class ITEConfig():
                 value_str = str(value)
             s += f"    {field.name}: {value_str}"
         return s
+    
+    def __post_init__(self)->None:
+        self.interaction_hamiltonian = HamiltonianFuncAndInputs.standard(self.interaction_hamiltonian)
     
 
 class ITEPerModeStats(Stats):

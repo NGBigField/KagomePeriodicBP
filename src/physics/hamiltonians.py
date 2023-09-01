@@ -5,11 +5,7 @@ from physics.pauli import x, y, z, id
 from functools import cache
 
 # For type hinting:
-from typing import Callable, TypeAlias, Literal, TypeVar, Self
-_T = TypeVar("_T")
-
-
-HamiltonianFuncAndInputs : TypeAlias =	tuple[ Callable[[_T], np.ndarray], _T|tuple[_T]|None ] 
+from typing import Literal
 
 
 
