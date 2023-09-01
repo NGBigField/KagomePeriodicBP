@@ -13,20 +13,7 @@ if __name__ == "__main__":
 import numpy as np
 
 # for type hints:
-from typing import (
-    Optional,
-    Literal,
-    Any,
-    List,
-    Tuple,
-    Iterator,
-    Callable,
-    TypeVar,
-    ClassVar,
-    Generator,
-    TypeAlias,
-    ParamSpec,
-)
+from typing import Optional, Literal, Any, List, Tuple, Iterator, Callable, TypeVar, ClassVar, Generator, TypeAlias, ParamSpec
 
 from _config_reader import ALLOW_VISUALS
 
@@ -36,6 +23,7 @@ if ALLOW_VISUALS:
     from matplotlib.pyplot import Axes
     from matplotlib.figure import Figure
     from mpl_toolkits.mplot3d import Axes3D
+    from matplotlib.quiver import Quiver
 
     # For videos:
     try:
@@ -83,7 +71,7 @@ DEFAULT_PYPLOT_FIGSIZE = [6.4, 4.8]
 # ============================================================================ #
 _InputType = ParamSpec("_InputType")
 _OutputType = TypeVar("_OutputType")
-
+_XYZ : TypeAlias = tuple[float, float, float]
 
 # ============================================================================ #
 #|                           Declared Functions                               |#
@@ -256,55 +244,7 @@ class VideoRecorder():
         saveload.force_folder_exists(frames_dir)
         return frames_dir
 
-class BlockSphere():
-    def __init__(self, size_factor:float=1.0, axis:Optional[Axes3D]=None) -> None:
-        #
-        figsize = [v*size_factor for v in DEFAULT_PYPLOT_FIGSIZE]
-        #
-        if axis is None:
-            fig = plt.figure(figsize=figsize)
-            axis = plt.subplot(1,1,1)
-        else:
-            assert isinstance(axis, plt.Axes)           
-            fig = axis.figure
 
-        self.fig  = fig
-        self.axis = axis
-        self.axis.get_yaxis().get_major_formatter().set_useOffset(False)  # Stop the weird pyplot tendency to give a "string" offset to graphs
-
-        self._plot_bloch_sphere()
-
-
-    def append(self, vector:list[float, float, float])->None:
-        # Normalize:
-        x, y, z = vector
-        scale = np.sqrt( x**2 + y**2 + z**2 )
-        x /= scale
-        y /= scale
-        z /= scale
-
-        # Draw:
-        self.axis.quiver(0,0,0,x,y,z, length=1.0, color='red')
-
-
-
-    def _plot_bloch_sphere(self, r:float=1.0)->None:
-        # Sphere:
-        u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
-        x = r*np.cos(u)*np.sin(v)
-        y = r*np.sin(u)*np.sin(v)
-        z = r*np.cos(v)
-        self.axis.plot_wireframe(x, y, z, color="blue", alpha=0.2) # rstride=2, cstride=2
-
-        # Hide pyplot Axes:
-        self.axis.set_xticks([])
-        self.axis.set_yticks([])
-        self.axis.set_zticks([])
-        self.axis.grid(False)
-        self.axis.axis('off')
-
-
-        # bloch xyz Axes:
 class AppendablePlot():
     def __init__(self, size_factor:float=1.0, axis:Optional[Axes]=None, legend_on:bool=True) -> None:
         #

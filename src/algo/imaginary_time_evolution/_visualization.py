@@ -1,15 +1,90 @@
 
-from utils import visuals, strings, logs, prints
+from utils import visuals, strings, logs, prints, tuples
+from utils.visuals import Axes3D, Quiver, plt, DEFAULT_PYPLOT_FIGSIZE, _XYZ
+
 from containers import Config, ITESegmentStats
 import numpy as np
 from dataclasses import dataclass, fields
-from typing import TypeVar, Generic, Generator
+from typing import TypeVar, Generic, Generator, Optional
 _T = TypeVar('_T')
 
 from algo.measurements import mean_expectation_values, UnitCellExpectationValuesDict
 
 # Control flags:
 from _config_reader import ALLOW_VISUALS
+
+
+
+XYZ_ARROW_LEN = 1.2
+XYZ_ARROW_KWARGS = dict(capstyle='round', color='black')
+
+class BlockSpherePlot():
+    def __init__(self, size_factor:float=1.0, axis:Optional[Axes3D]=None) -> None:
+        #
+        figsize = [v*size_factor for v in DEFAULT_PYPLOT_FIGSIZE]
+        #
+        if axis is None:
+            fig = plt.figure(figsize=figsize)
+            axis = plt.subplot(1,1,1)
+        else:
+            assert isinstance(axis, plt.Axes)           
+            fig = axis.figure
+
+        # Figure variables:
+        self.fig  = fig
+        self.axis = axis
+        self.axis.get_yaxis().get_major_formatter().set_useOffset(False)  # Stop the weird pyplot tendency to give a "string" offset to graphs
+
+        # inner memory:
+        self._last_arrow : Quiver = None
+        self._track : list[_XYZ] = []
+
+        # First empty plot:
+        self._plot_bloch_sphere()
+
+    def append(self, vector:list[float, float, float])->None:
+        # Unpack:
+        assert len(vector)==3
+        x, y, z = vector
+        # Get and draw previous track:
+        self._plot_track()
+        # Draw arrow and keep in memory:
+        self._plot_vector(vector)
+        # Keep in memory current point
+        self._track.append((x, y, z))
+
+    def _plot_track(self)->None:
+        track = self._track
+        for (x, y, z), color in zip(track, visuals.color_gradient(len(track)) ):
+            self.axis.scatter(x, y, z, color)
+
+    def _plot_vector(self, vector:list[float, float, float])->None:
+        # Unpack:
+        x, y, z = vector
+        self._last_arrow = self.axis.quiver(0, 0, 0, x, y, z, length=1.0, color='red')
+    
+    def _plot_bloch_sphere(self, r:float=1.0)->None:
+        # Sphere:
+        u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
+        x = r*np.cos(u)*np.sin(v)
+        y = r*np.sin(u)*np.sin(v)
+        z = r*np.cos(v)
+        self.axis.plot_wireframe(x, y, z, color="blue", alpha=0.2) # rstride=2, cstride=2
+
+        # Hide pyplot Axes:
+        self.axis.set_xticks([])
+        self.axis.set_yticks([])
+        self.axis.set_zticks([])
+        self.axis.grid(False)
+        self.axis.axis('off')
+
+        # bloch xyz Axes:
+        for x,y,z,text in [(1,0,0,"X"), (0,1,0,"Y"), (0,0,1,"Z")]:
+            x,y,z = tuples.multiply((x,y,z), XYZ_ARROW_LEN)
+            self.axis.quiver(0, 0, 0, x, y, z, **XYZ_ARROW_KWARGS)
+            self.axis.text(x,y,z,text)
+
+    
 
 
 class ITEPlots():
@@ -146,7 +221,7 @@ class ITEPlots():
         ## Core plots:
         if self.show.cores:
             axes_core = {axis._label : axis for axis in fig_core.get_axes()}  # type: ignore
-            core_plots = {key:visuals.BlockSphere(axis=value) for key, value in axes_core.items()}            
+            core_plots = {key:BlockSpherePlot(axis=value) for key, value in axes_core.items()}            
             plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
             self.plots.cores = core_plots
 
