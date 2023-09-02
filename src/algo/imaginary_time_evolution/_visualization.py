@@ -138,7 +138,7 @@ class ITEPlots():
         self,
         active:bool,
         config:Config,
-        plots_to_show : list[bool] = [False, False, True]
+        plots_to_show : list[bool] = [True, True, True]
     )->None:
         
         ## Save data:
@@ -269,7 +269,7 @@ class ITEPlots():
         visuals.draw_now()
         visuals.ion()
 
-    def update(self, energies_per_site:list[complex], step_stats:ITESegmentStats, delta_t:float, expectations:UnitCellExpectationValuesDict, _initial:bool=False):
+    def update(self, energies:list[complex], step_stats:ITESegmentStats, delta_t:float, expectations:UnitCellExpectationValuesDict, _initial:bool=False):
         if not self.active:
             return
         
@@ -283,19 +283,20 @@ class ITEPlots():
             if not _initial:
                 self.plots.main["delta_t"].append(delta_t=delta_t, draw_now_=False)
             self.plots.main["expectations"].append(**mean_expec_vals, draw_now_=False)
+
             # Energies:
             p_energies = self.plots.main["energies"]
-            # per edge:
-            num_fractions = len(energies_per_site)
+            num_fractions = len(energies)
             frac = 1/num_fractions
             i = self._iteration-1
             energies4mean = []
-            for energy in energies_per_site:
+            for energy in energies:
                 i += frac
                 if energy is not None and isinstance(energy, complex):
                     energy = np.real(energy)
                 energies4mean.append(energy)
                 p_energies.append(per_edge=(i, energy), plt_kwargs={'linestyle':'dashed', 'marker':''}, draw_now_=False)
+                
             # Mean:
             energy = sum(energies4mean)/len(energies4mean)
             p_energies.append(mean=(i, energy), draw_now_=False)
