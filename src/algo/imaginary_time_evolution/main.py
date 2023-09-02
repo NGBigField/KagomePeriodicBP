@@ -114,16 +114,6 @@ def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:
     ## Calculate observables:
     energies, expectations, mean_energy = _calculate_crnt_observables(unit_cell, config, messages, None)
 
-
-    # full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
-    # messages, bp_stats = belief_propagation(full_tn, messages, config.bp)  # Perform BlockBP:
-    # core_tn = reduce_tn(full_tn, CoreTN, config.trunc_dim)
-
-    # ## Compute values:
-    # energies_per_site, _ = measure_energies_and_observables_together(core_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
-    # expectation_values = derive_xyz_expectation_values_with_tn(core_tn)
-    # energy = sum(energies_per_site)/len(energies_per_site) 
-
     ## Save data, print performance and plot graphs:
     ite_tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
     plots.update(energies, segment_stats, delta_t, expectations, _initial=True)

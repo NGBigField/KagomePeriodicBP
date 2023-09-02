@@ -1,6 +1,6 @@
 
-from utils import visuals, strings, logs, prints, tuples
-from utils.visuals import Axes3D, Quiver, plt, DEFAULT_PYPLOT_FIGSIZE, _XYZ
+from utils import visuals, strings, logs, prints, tuples, lists
+from utils.visuals import Axes3D, Quiver, Line3D, plt, DEFAULT_PYPLOT_FIGSIZE, _XYZ
 
 from containers import Config, ITESegmentStats
 import numpy as np
@@ -14,9 +14,11 @@ from algo.measurements import mean_expectation_values, UnitCellExpectationValues
 from _config_reader import ALLOW_VISUALS
 
 
-
 XYZ_ARROW_LEN = 1.2
 XYZ_ARROW_KWARGS = dict(capstyle='round', color='black')
+
+NEW_TRACK_POINT_THRESHOLD = 0.02
+
 
 class BlockSpherePlot():
     def __init__(self, size_factor:float=1.0, axis:Optional[Axes3D]=None) -> None:
@@ -36,32 +38,62 @@ class BlockSpherePlot():
         self.axis.get_yaxis().get_major_formatter().set_useOffset(False)  # Stop the weird pyplot tendency to give a "string" offset to graphs
 
         # inner memory:
-        self._last_arrow : Quiver = None
+        self._last_arrow_plot : Quiver = None
+        self._last_track_plots : list[Line3D] = []
         self._track : list[_XYZ] = []
 
         # First empty plot:
         self._plot_bloch_sphere()
 
     def append(self, vector:list[float, float, float])->None:
-        # Unpack:
         assert len(vector)==3
-        x, y, z = vector
+        # Add track to memovry (only if different the last point in track)
+        refresh_track = self._add_to_track(vector)
         # Get and draw previous track:
-        self._plot_track()
+        if refresh_track:
+            self._replot_track()
         # Draw arrow and keep in memory:
-        self._plot_vector(vector)
-        # Keep in memory current point
-        self._track.append((x, y, z))
+        self._replot_vector(vector)
 
-    def _plot_track(self)->None:
+    def _add_to_track(self, crnt_vector:list[float, float, float])->bool:
+        if len(self._track)==0:
+            new_point_added = True
+        else:
+            prev_vector = self._track[-1]
+            dx, dy, dz = tuples.sub(crnt_vector, prev_vector)
+            new_point_added = dx**2 + dy**2 + dz**2 > NEW_TRACK_POINT_THRESHOLD
+        if new_point_added:
+            self._track.append(tuple(crnt_vector))
+        return new_point_added
+
+    def _replot_track(self)->None:
+        # Delete previous plot:
+        for p in self._last_track_plots:
+            pass
+
+        ## Prepare iteartion varaibles:
         track = self._track
-        for (x, y, z), color in zip(track, visuals.color_gradient(len(track)) ):
-            self.axis.scatter(x, y, z, color)
+        n = len(track)-1
+        if n<0:
+            return
+        colors = visuals.color_gradient(n)
+        alphas = np.linspace(0.2, 0.9, n)
+        points = lists.iterate_with_periodic_prev_next_items(track, skip_first=True)
+        ## Plot and save:
+        for (xyz1, xyz2, _), color, alpha in zip(points, colors, alphas, strict=True):
+            x, y, z = zip(xyz1, xyz2)
+            _res = self.axis.plot(x, y, z, color=color, alpha=alpha)
+            assert isinstance((plot := _res[0]), Line3D)
+            self._last_track_plots.append(plot)
 
-    def _plot_vector(self, vector:list[float, float, float])->None:
+    def _replot_vector(self, vector:list[float, float, float])->None:
         # Unpack:
         x, y, z = vector
-        self._last_arrow = self.axis.quiver(0, 0, 0, x, y, z, length=1.0, color='red')
+        # Delete previous:
+        if self._last_arrow_plot is not None:
+            self._last_arrow_plot.remove()
+        # Plot and save:
+        self._last_arrow_plot = self.axis.quiver(0, 0, 0, x, y, z, length=1.0, color='red')
     
     def _plot_bloch_sphere(self, r:float=1.0)->None:
         # Sphere:
@@ -154,7 +186,7 @@ class ITEPlots():
             self.figs.env = fig_env
 
         if self.show.cores:
-            fig_core = plt.figure(figsize=(6, 7))
+            fig_core = plt.figure(figsize=(6, 6))
             fig_core.subplot_mosaic([
                 ['.', 'A', 'A', '.'],
                 ['.', 'A', 'A', '.'],

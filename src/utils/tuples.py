@@ -26,13 +26,11 @@ def _apply_pairwise(func:Callable[[_NumericType,_NumericType], _NumericType], t1
     list_ = [func(v1, v2) for v1, v2 in zip(t1, t2, strict=True)]
     return tuple(list_)
 
-
 def sub(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->Tuple[_NumericType,...]:
     return _apply_pairwise(operator.sub, t1, t2)
 
 def add(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->Tuple[_NumericType,...]:
     return _apply_pairwise(operator.add, t1, t2)
-
 
 def multiply(t:Tuple[_NumericType,...], scalar_or_t2:_NumericType|tuple[_NumericType,...])->Tuple[_NumericType,...]:
     if isinstance(scalar_or_t2, tuple):

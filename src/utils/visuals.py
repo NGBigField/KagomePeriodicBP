@@ -23,6 +23,7 @@ if ALLOW_VISUALS:
     from matplotlib.pyplot import Axes
     from matplotlib.figure import Figure
     from mpl_toolkits.mplot3d import Axes3D
+    from mpl_toolkits.mplot3d.art3d import Line3D
     from matplotlib.quiver import Quiver
 
     # For videos:
