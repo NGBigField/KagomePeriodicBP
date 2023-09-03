@@ -25,6 +25,7 @@ if ALLOW_VISUALS:
     from mpl_toolkits.mplot3d import Axes3D
     from mpl_toolkits.mplot3d.art3d import Line3D
     from matplotlib.quiver import Quiver
+    from matplotlib.text import Text
 
     # For videos:
     try:
@@ -79,16 +80,16 @@ _XYZ : TypeAlias = tuple[float, float, float]
 # ============================================================================ #
 
 
-active_ineractive : bool = False
+active_interactive : bool = False
 
 def ion():
-    global active_ineractive
-    active_ineractive = True
+    global active_interactive
+    active_interactive = True
     plt.ion()
 
 def refresh():
-    global active_ineractive
-    if active_ineractive:
+    global active_interactive
+    if active_interactive:
         plt.pause(0.001)
 
 

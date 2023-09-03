@@ -22,8 +22,6 @@ from utils import decorators, parallel_exec, lists, visuals, prints
 # OOP:
 from copy import deepcopy
 
-from time import perf_counter
-
 
 def _out_going_message(
     tn:KagomeTN, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool, hermitize:bool
@@ -160,10 +158,7 @@ def belief_propagation(
     for i in prog_bar:
                
         # Preform BP step:
-        t1 = perf_counter()
         messages, error = _belief_propagation_step(tn, error, config, prog_bar, allow_prog_bar)
-        t2 = perf_counter()
-        print(t2-t1)
         
         if update_plots_between_steps:
             visuals.refresh()
@@ -172,6 +167,8 @@ def belief_propagation(
         if error<target_error:
             success = True
             break
+
+        # Check if this message is better than the previois
         if error<min_error:
             min_error = error
             min_messages = deepcopy(messages)
@@ -229,7 +226,7 @@ def robust_belief_propagation(
         error = stats.final_error
         if error < min_error:
             min_error = error
-            min_messages = deepcopy(messages)
+            min_messages = deepcopy(messages_out)
 
         # Try again with better config:
         config.max_swallowing_dim *= 2
@@ -239,8 +236,8 @@ def robust_belief_propagation(
         stats.attempts += 1
         
     else:  # if never had success
-        messages = min_messages
-        tn.connect_messages(messages)
+        messages_out = min_messages
+        tn.connect_messages(min_messages)
 
     ## Return stats
     overall_stats = BPStats(

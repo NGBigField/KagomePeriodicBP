@@ -169,10 +169,10 @@ class TensorNetwork(ABC):
     # ================================================= #
     
     def nodes_connected_to_edge(self, edge:str)->list[TensorNode]:
-        iterat = (i for i, e_list in enumerate(self.edges_list) if edge in e_list)
-        i1 = next(iterat)
+        iterator_ = (i for i, e_list in enumerate(self.edges_list) if edge in e_list)
+        i1 = next(iterator_)
         try:
-            i2 = next(iterat)
+            i2 = next(iterator_)
         except StopIteration:
             # Only a single node is connected to this edge. i.e., open edge
             return [ self.nodes[i1] ]

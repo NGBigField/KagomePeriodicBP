@@ -1,7 +1,8 @@
 
 from utils import visuals, strings, logs, prints, tuples, lists
-from utils.visuals import Axes3D, Quiver, Line3D, plt, DEFAULT_PYPLOT_FIGSIZE, _XYZ
+from utils.visuals import Axes3D, Quiver, Line3D, Text, plt, DEFAULT_PYPLOT_FIGSIZE, _XYZ
 
+from tensor_networks import UnitCell
 from containers import Config, ITESegmentStats
 import numpy as np
 from dataclasses import dataclass, fields
@@ -42,9 +43,16 @@ class BlockSpherePlot():
         self._last_arrow_plot : Quiver = None
         self._last_track_plots : list[Line3D] = []
         self._track : list[_XYZ] = []
+        self._under_text : Text = None
 
         # First empty plot:
         self._plot_bloch_sphere()
+
+    def under_text(self, s:str)->None:
+        if self._under_text is not None:
+            assert isinstance(self._under_text, Text)
+            self._under_text.remove()
+        self._under_text = self.axis.text(0,0,-1.3, s)
 
     def append(self, vector:list[float, float, float])->None:
         assert len(vector)==3
@@ -257,6 +265,9 @@ class ITEPlots():
             axes_core = {axis._label : axis for axis in fig_core.get_axes()}  # type: ignore
             core_plots = {key:BlockSpherePlot(axis=value) for key, value in axes_core.items()}            
             plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
+            for key, plot in core_plots.items():
+                plot.axis.text(0,0, 1.5, key)
+            # save:
             self.plots.cores = core_plots
 
         # Better layout:
@@ -271,7 +282,14 @@ class ITEPlots():
         visuals.draw_now()
         visuals.ion()
 
-    def update(self, energies:list[complex], step_stats:ITESegmentStats, delta_t:float, expectations:UnitCellExpectationValuesDict, _initial:bool=False):
+    def update(self, 
+        energies:list[complex], 
+        step_stats:ITESegmentStats, 
+        delta_t:float, 
+        expectations:UnitCellExpectationValuesDict, 
+        unit_cell:UnitCell, 
+        _initial:bool=False
+    ):
         if not self.active:
             return
         
@@ -327,13 +345,18 @@ class ITEPlots():
         if self.show.cores:
             for abc, xyz_dict in expectations.items():
                 vector = [0, 0, 0]
-                bloch_sphere = self.plots.cores[abc]
+                plot : BlockSpherePlot = self.plots.cores[abc]
                 for xyz, value in xyz_dict.items():
                     match xyz:
                         case 'x': vector[0]=value
                         case 'y': vector[1]=value
                         case 'z': vector[2]=value
-                bloch_sphere.append(vector)
+                plot.append(vector)
+            
+            for abc, tensor in unit_cell.items():
+                plot : BlockSpherePlot = self.plots.cores[abc.name]
+                norm = np.linalg.norm(tensor)
+                plot.under_text(f"Norm={norm}")
         
         visuals.draw_now()
 
