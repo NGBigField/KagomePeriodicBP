@@ -285,25 +285,20 @@ class ITEPlots():
             self.plots.main["expectations"].append(**mean_expec_vals, draw_now_=False)
 
             # Energies:
-            p_energies = self.plots.main["energies"]
-            num_fractions = len(energies)
-            frac = 1/num_fractions
-            i = self._iteration-1
+            i = self._iteration
+            plot = self.plots.main["energies"]
             energies4mean = []
-            for energy in energies:
-                i += frac
-                if energy is not None and isinstance(energy, complex):
-                    energy = np.real(energy)
+            for edge_tuple, energy in energies.items():
                 energies4mean.append(energy)
-                p_energies.append(per_edge=(i, energy), plt_kwargs={'linestyle':'dashed', 'marker':''}, draw_now_=False)
+                plot.axis.scatter(x=i, y=energy, c="black", s=6)
                 
             # Mean:
             energy = sum(energies4mean)/len(energies4mean)
-            p_energies.append(mean=(i, energy), draw_now_=False)
+            plot.append(mean=(i, energy), draw_now_=False)
 
             # Ground-truth
             if self.config.ite._GT_energy is not None:
-                p_energies.append(ref=(self._iteration, self.config.ite._GT_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
+                plot.append(ref=(self._iteration, self.config.ite._GT_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
             
         ## Env:
         if self.show.env:

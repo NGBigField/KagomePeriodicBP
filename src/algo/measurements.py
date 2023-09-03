@@ -140,14 +140,14 @@ def measure_energies_and_observables_together(
     if DEBUG_MODE: tn.validate()
     if mode is None:
         mode = UpdateMode.random()
-    h, g = get_imaginary_time_evolution_operator(hamiltonian, (0))
+    h, _ = get_imaginary_time_evolution_operator(hamiltonian, None)
     # outputs:
     energies = dict()
     expectations = {
         abc : { xyz : [0.0, 0] for xyz in ['x', 'y', 'z'] } 
         for abc in ['A', 'B', 'C']
     }
-    mean_energies = []
+    energies4mean = []
     
     ## Contract to mode:
     mode_tn = reduce_tn(tn, ModeTN, trunc_dim, copy=True, mode=mode)
@@ -161,14 +161,15 @@ def measure_energies_and_observables_together(
         rdm = edge_tn.rdm
 
         # Calc energy:
-        edge_energy  = np.dot(rdm.flatten(),  h.flatten())
+        edge_energy  = np.dot(rdm.flatten(),  h.flatten()) 
+        edge_energy  /= 2  # Divide by 2 to get energy per site instead of per edge
         if DEBUG_MODE and force_real:
             edge_energy = assertions.real(edge_energy)
         elif force_real:
             edge_energy = float(np.real(edge_energy))
 
         # keep energies:
-        mean_energies.append(edge_energy/2)
+        energies4mean.append(edge_energy)
         energies[edge_tuple.as_strings] = edge_energy
 
         # Calc expectations:
@@ -189,7 +190,7 @@ def measure_energies_and_observables_together(
             expectations[abc][xyz] = sum_/count_
     
     # mean energy from all energies prt site:
-    mean_energy = sum(mean_energies)/len(mean_energies)
+    mean_energy = sum(energies4mean)/len(energies4mean)
 
     return energies, expectations, mean_energy
 

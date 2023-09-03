@@ -291,7 +291,7 @@ class AppendablePlot():
 
     def _clear_plots(self)->list[str]:
         old_colors = []
-        for artist in self.axis.lines + self.axis.collections:
+        for artist in self.axis.lines:  # + self.axis.collections
             color = artist.get_color()
             artist.remove()
             old_colors.append(color)
@@ -331,6 +331,9 @@ class AppendablePlot():
         
         if draw_now_:
             draw_now()
+
+    # def scatter(self, x, y, draw_now_:bool=True, plt_kwargs:dict=dict())->None:
+    #     pass
 
     def append(self, draw_now_:bool=True, plt_kwargs:dict=dict(), **kwargs:tuple[float,float]|float|None)->None:
         ## append to values
