@@ -14,14 +14,14 @@ def _tensor_product(op1:np.ndarray, op2:np.ndarray)->np.ndarray:
 
 
 def ferromagnetic_with_transverse_field(direction:Literal['x', 'y', 'z'], strength:float=0.0)->np.ndarray:
-	return -1*heisenberg_2d() + transverse_field_in_direction(direction, strength)
+	return -1*heisenberg_2d() - transverse_field_in_direction(direction, strength)
 
 
 def transverse_field_in_direction(direction:Literal['x', 'y', 'z'], strength:float=0.0)->np.ndarray:
 	match direction:
-		case 'x': op = x
-		case 'y': op = y
-		case 'z': op = z
+		case 'x'|'X': op = x
+		case 'y'|'Y': op = y
+		case 'z'|'Z': op = z
 		case _:
 			raise ValueError(f"Not an option {direction!r}")
 	return strength*_tensor_product(op, id) + strength*_tensor_product(id, op)

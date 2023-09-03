@@ -49,10 +49,12 @@ from algo.tn_reduction import reduce_tn
 from libs import ITE as ite
 
 
-def _initial_full_ite_inputs(config, unit_cell, logger):
-        # Config:
+def _initial_full_ite_inputs(config:Config, unit_cell:UnitCell, logger:logs.Logger):
+    # Config:
     if config is None:
         config = Config.derive_from_physical_dim(DEFAULT_PHYSICAL_DIM)
+    config.post_creation_fix()
+    
     # Unit-Cell:
     if unit_cell is None:
         unit_cell = UnitCell.random(d=config.dims.physical_dim, D=config.dims.virtual_dim)
@@ -60,6 +62,7 @@ def _initial_full_ite_inputs(config, unit_cell, logger):
         unit_cell = unit_cell.copy()
     else:
         raise TypeError(f"Not an expected type for input 'initial_core' of type {type(unit_cell)!r}")
+    
     # Logger:
     if logger is None:
         logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=KEEP_LOGS)
@@ -279,16 +282,16 @@ def ite_segment(
 
     if use_prog_bar:  
         prog_bar = prints.ProgressBar(len(modes_order), print_prefix=f"Executing ITE Segment  ")
-        log_method = "debug"
+        log_method = logger.debug
     else:             
         prog_bar = prints.ProgressBar.inactive()
-        log_method = "info"
+        log_method = logger.info
 
 
     for update_mode in modes_order:
         _mode_str = f"update_mode={update_mode.name: <4}"
         prog_bar.next(extra_str=_mode_str)
-        getattr(logger, log_method)(f"    {_mode_str}")
+        log_method(f"    {_mode_str}")
 
         ## Run:
         unit_cell, messages, edge_energies, ite_per_mode_stats = ite_per_mode(

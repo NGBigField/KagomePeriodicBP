@@ -24,13 +24,13 @@ import numpy as np
 def test_full_ite(
     D = 2,
     N = 3,
-    live_plots:bool = True
+    live_plots:bool = 1
 ):
     ## Config:
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
-    config.ite.interaction_hamiltonian = (hamiltonians.ising_with_transverse_field, 1)
+    config.ite.interaction_hamiltonian = (hamiltonians.ferromagnetic_with_transverse_field, ('z', 1))
 
     ## Run:
     unit_cell_out, ite_tracker, logger = full_ite(config=config)

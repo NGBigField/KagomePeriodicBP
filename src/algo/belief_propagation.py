@@ -67,7 +67,7 @@ def _belief_propagation_step(
 ]:
 
     ## Keep old messages for comparison (error calculation):
-    prev_messages = tn.messages
+    prev_messages = deepcopy(tn.messages)
 
     ## Compute out-going message for all possible sizes:
     # prepare inputs:
@@ -95,8 +95,8 @@ def _belief_propagation_step(
     ## Check error between messages:
     # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:
     distances = [ 
-        MPS.l2_distance(prev_messages[dir].mps, next_messages[dir].mps) 
-        for dir in BlockSide.all_in_counter_clockwise_order() 
+        MPS.l2_distance(prev_messages[direction].mps, next_messages[direction].mps) 
+        for direction in BlockSide.all_in_counter_clockwise_order() 
     ]
     if config.msg_diff_squared:
         next_error = sum(distances)/len(distances)

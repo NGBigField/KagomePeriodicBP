@@ -27,7 +27,6 @@ class Config(_ConfigClassWithSubClasses):
     visuals : VisualsConfig
     trunc_dim : int
 
-
     @staticmethod
     def derive_from_physical_dim(D:int)->"Config":
         return Config(
@@ -38,16 +37,13 @@ class Config(_ConfigClassWithSubClasses):
             trunc_dim=2*D**2
         )
 
-    def strengthen(self, _harder_target:bool=True):
-        if isinstance(self.bp.max_iterations, int):
-            self.bp.max_iterations *= 2
-        # self.bp.max_swallowing_dim *= 2
-        # self.bp.allowed_retries += 1
-        self.trunc_dim *= 4
-        if _harder_target:
-            self.bp.target_msg_diff /= 10
-
+    def post_creation_fix(self):
+        self.__post_init__()
+        
     def __post_init__(self)->None:
+        # other post inits:
+        self.ite.__post_init__()
+        # specials:
         trunc_d_bp = self.bp.max_swallowing_dim
         trunc_d_all_other = self.trunc_dim
         if trunc_d_bp > trunc_d_all_other:
@@ -57,6 +53,14 @@ class Config(_ConfigClassWithSubClasses):
         if not ALLOW_VISUALS:
             self.visuals.live_plots = False
 
+    def strengthen(self, _harder_target:bool=True):
+        if isinstance(self.bp.max_iterations, int):
+            self.bp.max_iterations *= 2
+        # self.bp.max_swallowing_dim *= 2
+        # self.bp.allowed_retries += 1
+        self.trunc_dim *= 4
+        if _harder_target:
+            self.bp.target_msg_diff /= 10
 
     def __repr__(self) -> str:        
         s = f"{self.__class__.__name__}:"
@@ -65,7 +69,6 @@ class Config(_ConfigClassWithSubClasses):
             value = getattr(self, field.name)
             s += f"{field.name}: {value}"
         return s
-    
 
     def copy(self)->"Config":
         return deepcopy(self)

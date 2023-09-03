@@ -33,7 +33,7 @@ class HamiltonianFuncAndInputs(NamedTuple, Generic[_T]):
     args: _T|tuple[_T]|None
 
     def __repr__(self) -> str:
-        return f"Hamiltonian function: {self.func.__name__!r} arguments: {self.args}"
+        return f"Hamiltonian function {self.func.__name__!r} with arguments: {self.args}"
 
     @staticmethod
     def default()->"HamiltonianFuncAndInputs":

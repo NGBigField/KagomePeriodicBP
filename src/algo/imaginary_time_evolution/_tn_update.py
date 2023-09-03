@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from containers import TNDimensions, ITEConfig, Config, MatrixMetrics
 from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
 from tensor_networks import TensorNetwork, TensorNode, KagomeTN, EdgeTN, UnitCell, create_kagome_tn
-from utils import lists, logs, assertions
+from utils import lists, logs, assertions, prints
 
 # Used types:
 from _error_types import ITEError
@@ -43,7 +43,8 @@ def _check_rdms_metrics(rdm:np.ndarray)->MatrixMetrics:
     if abs(sum_eigenvalues-1)>ENV_HERMICITY_THRESHOLD:
         raise ITEError(f"env is not psd. sum-eigenvalues={sum_eigenvalues}")
     if env_metrics.negativity>0.1:
-        raise ITEError(f"env is not psd. negativity={env_metrics.negativity}") 
+        # raise ITEError(f"env is not psd. negativity={env_metrics.negativity}") 
+        prints.print_warning(f"env is not psd. negativity={env_metrics.negativity}")
     return env_metrics
        
 

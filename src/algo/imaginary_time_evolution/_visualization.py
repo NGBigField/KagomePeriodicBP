@@ -14,10 +14,11 @@ from algo.measurements import mean_expectation_values, UnitCellExpectationValues
 from _config_reader import ALLOW_VISUALS
 
 
-XYZ_ARROW_LEN = 1.2
-XYZ_ARROW_KWARGS = dict(capstyle='round', color='black')
+XYZ_ARROW_LEN = 1.25
+XYZ_ARROW_KWARGS = dict(capstyle='round', color='black', arrow_length_ratio=0.15)
 
 NEW_TRACK_POINT_THRESHOLD = 0.02
+TRACK_COLOR = 'tomato'
 
 
 class BlockSpherePlot():
@@ -47,7 +48,7 @@ class BlockSpherePlot():
 
     def append(self, vector:list[float, float, float])->None:
         assert len(vector)==3
-        # Add track to memovry (only if different the last point in track)
+        # Add track to memory (only if different the last point in track)
         refresh_track = self._add_to_track(vector)
         # Get and draw previous track:
         if refresh_track:
@@ -68,21 +69,22 @@ class BlockSpherePlot():
 
     def _replot_track(self)->None:
         # Delete previous plot:
-        for p in self._last_track_plots:
-            pass
+        while len(self._last_track_plots)>0:
+            p = self._last_track_plots.pop()  # remove from list
+            p.remove()  # remove from plot
+            
 
         ## Prepare iteartion varaibles:
         track = self._track
         n = len(track)-1
         if n<0:
             return
-        colors = visuals.color_gradient(n)
-        alphas = np.linspace(0.2, 0.9, n)
+        alphas = np.linspace(0.3, 0.8, n)
         points = lists.iterate_with_periodic_prev_next_items(track, skip_first=True)
         ## Plot and save:
-        for (xyz1, xyz2, _), color, alpha in zip(points, colors, alphas, strict=True):
+        for (xyz1, xyz2, _), alpha in zip(points, alphas, strict=True):
             x, y, z = zip(xyz1, xyz2)
-            _res = self.axis.plot(x, y, z, color=color, alpha=alpha)
+            _res = self.axis.plot(x, y, z, color=TRACK_COLOR, alpha=alpha)
             assert isinstance((plot := _res[0]), Line3D)
             self._last_track_plots.append(plot)
 
