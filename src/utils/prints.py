@@ -5,8 +5,7 @@ from typing import Any, Literal, Optional, TextIO, List
 # For defining print std_out or other:
 import sys
 
-# For manipulating methods of existing objects
-import types
+from numpy import inf
 
 
 class StaticPrinter():
@@ -126,10 +125,11 @@ class ProgressBar(StaticNumOutOfNum):
 
     @staticmethod
     def inactive()->"ProgressBar":
-        inactive_prog_bar : ProgressBar = type('obj', (object,), {"next":0, "clear":0})  # type: ignore		
-        inactive_prog_bar.next = lambda increment=0, extra_str="s", every=0: 0
-        inactive_prog_bar.clear = lambda: None
-        return inactive_prog_bar
+        # inactive_prog_bar : ProgressBar = type('obj', (object,), {"next":0, "clear":0})  # type: ignore		
+        # inactive_prog_bar.next = lambda increment=0, extra_str="s", every=0: 0
+        # inactive_prog_bar.clear = lambda: None
+        # return inactive_prog_bar
+        return InactiveProgressBar()
 
     @staticmethod
     def unlimited(print_prefix:str="", print_suffix:str="", print_length:int=60, print_out:TextIO=sys.stdout, in_place:bool=False)->"ProgressBar":
@@ -154,6 +154,32 @@ class ProgressBar(StaticNumOutOfNum):
 
         # Print:
         self._print(s)
+
+
+class InactiveProgressBar(ProgressBar):
+    def __init__(self):
+        print_prefix=""
+        print_suffix=""
+        print_length=60 
+        print_out=sys.stdout
+        in_place=False
+        expected_end=-1
+        super().__init__(expected_end, print_prefix, print_suffix, print_length, print_out, in_place)
+
+    def next(self, *args, **kwargs)->None:
+        return None
+
+    def __next__(self)->None:
+        return None
+
+    def __iter__(self):
+        i = 0
+        while True:
+            yield i
+            i += 1
+
+    def _show(self, *args, **kwargs)->None:
+        return None
 
 
 class UnlimitedProgressBar(ProgressBar):

@@ -96,10 +96,11 @@ def _calculate_crnt_observables(
     else:
         bp_config = segment_stats.ite_per_mode_stats[-1].bp_stats.final_config
     live_plots = config.visuals.live_plots
+    allow_prog_bar = config.visuals.progress_bars
 
     ## Get a new fresh tn:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
-    messages, _ = belief_propagation(full_tn, messages, bp_config, live_plots)
+    messages, _ = belief_propagation(full_tn, messages, bp_config, live_plots, allow_prog_bar)
 
     ## Calculate observables:
     return measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
@@ -214,7 +215,11 @@ def ite_per_mode(
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
 
     ## Perform BlockBP:
-    messages, bp_stats = robust_belief_propagation(full_tn, messages, config.bp, update_plots_between_steps=config.visuals.live_plots)
+    messages, bp_stats = robust_belief_propagation(
+        full_tn, messages, config.bp, 
+        update_plots_between_steps=config.visuals.live_plots, 
+        progressbar=config.visuals.progress_bars
+    )
     print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
     # If block-bp struggled and increased the virtual dimension, the following iterations must also use a higher dimension:
     config = _fix_config_if_bp_struggled(config, bp_stats, logger)

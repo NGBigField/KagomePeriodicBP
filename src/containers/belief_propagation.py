@@ -20,7 +20,7 @@ class BPConfig:
     allowed_retries : int = 2
     hermitize_messages_between_iterations : bool = True
     times_to_deem_failure_when_diff_increases  : int = 3
-    parallel_computing : bool = False
+    parallel_msgs : bool = False
 
     def __repr__(self) -> str:
         return container_repr(self)
