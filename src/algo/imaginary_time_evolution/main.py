@@ -20,6 +20,7 @@ from containers import Config
 from enums import UpdateMode, NodeFunctionality
 from containers import MessageDictType, UpdateEdge
 from tensor_networks import KagomeTN, CoreTN, ModeTN, EdgeTN, TensorNode, UnitCell
+from tensor_networks.construction import kagome_tn_from_unit_cell
 from _error_types import BPNotConvergedError, ITEError
 from lattices.directions import Direction
 
@@ -38,7 +39,7 @@ from algo.imaginary_time_evolution._logs_and_prints import print_or_log_bp_messa
                                                             print_or_log_ite_segment_progress, get_progress_bar
 from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
 from algo.imaginary_time_evolution._visualization import ITEPlots
-from algo.imaginary_time_evolution._tn_update import kagome_tn_from_unit_cell, update_unit_cell
+from algo.imaginary_time_evolution._tn_update import update_unit_cell
 
 # Import belief propagation code:
 from algo.belief_propagation import robust_belief_propagation, belief_propagation, BPStats

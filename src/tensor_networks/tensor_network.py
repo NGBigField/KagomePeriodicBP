@@ -181,7 +181,7 @@ class TensorNetwork(ABC):
 
     def _find_neighbor_by_edge(self, node:TensorNode, edge:EdgeIndicatorType)->TensorNode:
         nodes = self.nodes_connected_to_edge(edge)
-        assert len(nodes)==2, f"Only tensor '{node.index}' is connected to edge '{edge}' in direction '{str(dir)}'  "
+        assert len(nodes)==2, f"Only tensor '{node.index}' is connected to edge '{edge}'."
         if nodes[0] is node:
             return nodes[1]
         elif nodes[1] is node:
@@ -294,6 +294,11 @@ class KagomeTN(TensorNetwork):
     # ================================================= #
     #|                    messages                     |#
     # ================================================= #
+
+    @property
+    def has_messages(self)->bool:
+        return len(self.messages)==6
+
     def connect_messages(self, messages:MessageDictType) -> None:   
         # Fuse:
         for block_side, message in messages.items():
@@ -738,7 +743,6 @@ def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
 
     return nodes
 
-
 def _replace_items(s:set[_T]|list[_T], old:_T, new:_T)->None:
     if isinstance(s, set):
         s.remove(old)
@@ -747,6 +751,8 @@ def _replace_items(s:set[_T]|list[_T], old:_T, new:_T)->None:
         i = s.index(old)
         s.insert(i, new)
         s.pop(i+1)
+
+
 
 
 def _fuse_double_legs(n1:TensorNode, n2:TensorNode, changed_leg_index:None|int)->None:

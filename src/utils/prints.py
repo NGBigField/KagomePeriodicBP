@@ -50,6 +50,8 @@ class StaticPrinter():
         self.printed_lines_lengths = []
                 
     def print(self, s:str) -> None:
+        if self.print_out is None:
+            return
         self.clear()
         print_lines = s.split(SpecialChars.NewLine)
         self.printed_lines_lengths = [len(line) for line in print_lines]
