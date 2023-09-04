@@ -1,3 +1,12 @@
+# For allowing tests and scripts to run while debugging this module
+if __name__ == "__main__":
+    import sys, pathlib
+    sys.path.append(
+        pathlib.Path(__file__).parent.parent.__str__()
+    )
+    from project_paths import add_scripts; add_scripts()
+
+
 # Get Global-Config:
 from _config_reader import DEBUG_MODE
 
@@ -27,6 +36,7 @@ def _out_going_message(
     tn:KagomeTN, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool, hermitize:bool
 ) -> Message:
     
+
     ## use bubble con to compute outgoing message:
     mps, _, mps_direction = contract_tensor_network(
         tn, 
@@ -251,3 +261,9 @@ def robust_belief_propagation(
     )  
 
     return messages_out, overall_stats
+
+
+
+if __name__ == "__main__":
+    from scripts.test_bp import main_test
+    main_test()

@@ -122,8 +122,8 @@ class TensorNetwork(ABC):
         d = dict()
         d["tensors"] = self.tensors
         d["is_ket"] = self.kets
-        d["edgs"] = self.edges_list
-        d["edgs_dict"] = self.edges_dict
+        d["edges"] = self.edges_list
+        d["edges_dict"] = self.edges_dict
         d["angles"] = self.angles
         d["positions"] = self.positions
         return d

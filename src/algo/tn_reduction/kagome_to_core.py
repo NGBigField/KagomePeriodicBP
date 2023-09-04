@@ -4,10 +4,7 @@ if __name__ == "__main__":
     sys.path.append(
         pathlib.Path(__file__).parent.parent.parent.__str__()
     )
-    from project_paths import add_src, add_base, add_scripts
-    add_src()
-    add_base()
-    add_scripts()
+    from project_paths import add_scripts; add_scripts()
 
 # Control flags:
 from _config_reader import DEBUG_MODE

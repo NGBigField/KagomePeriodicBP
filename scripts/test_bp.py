@@ -188,8 +188,8 @@ def growing_tn_bp_test(
 
 def single_bp_test(
     d = 2,
-    D = 2,
-    N = 3
+    D = 5,
+    N = 10
 ):
 
     ## Config:
@@ -201,8 +201,8 @@ def single_bp_test(
     tn = create_kagome_tn(d=d, D=D, N=N)
 
     ## BP:
-    tn, messages, stats = belief_propagation(tn, messages=None, bp_config=bp_config)
-    tn, messages, _ = belief_propagation(tn, messages=messages, bp_config=bp_config)
+    messages, stats = belief_propagation(tn, messages=None, config=bp_config)
+    messages, _ = belief_propagation(tn, messages=messages, config=bp_config)
 
     print(stats)
 
