@@ -25,20 +25,26 @@ RESULT_KEYS_DICT = dict(
 )
 
 ## all values:
-vals = {}
-vals['N'] = range(2, 11, 1)
-vals['D'] = [2, 3, 4, 5, 6, 7]
-vals['method'] = [0, 1]
-vals['seed'] = range(5)
+DEFAULT_VALS = {}
+DEFAULT_VALS['N'] = range(2, 11, 1)
+DEFAULT_VALS['D'] = [2, 3, 4, 5, 6, 7]
+DEFAULT_VALS['method'] = [0, 1]
+DEFAULT_VALS['seed'] = range(5)
 
-_max_str_per_key = {key:max((len(str(val)) for val in lis)) for key, lis in vals.items()}
 
 def main(
     job_type="parallel_timings",  # "ite_it" / ite_it_all_h / "bp" / "parallel_timings"
     request_cpus:int=12,
-    request_memory_gb=8
+    request_memory_gb:int=16,
+    vals:dict=DEFAULT_VALS,
+    result_file_name:str|None=None
 ):
-    
+
+    ## Check inputs and 
+    _max_str_per_key = {key:max((len(str(val)) for val in lis)) for key, lis in vals.items()}
+    if result_file_name is None:
+        result_file_name="results_"+job_type
+
     ## Get from job type:
     result_keys = RESULT_KEYS_DICT[job_type]
 
@@ -47,7 +53,7 @@ def main(
     this_folder_path = pathlib.Path(__file__).parent.__str__()
     #
     worker_script_fullpath  = this_folder_path+sep+"worker.py"
-    results_fullpath        = results_dir+sep+"results_"+job_type+".csv"
+    results_fullpath        = results_dir+sep+result_file_name+".csv"
     output_files_prefix     = "kagome-bp-"+job_type
     #
     print(f"script_fullpath={worker_script_fullpath!r}")
@@ -78,7 +84,7 @@ def main(
     for params in job_params:
         params2print = deepcopy(params)
         params2print.pop("outfile")
-        _print_inputs(params2print)
+        _print_inputs(params2print, _max_str_per_key)
 
     ## Prepare output file:    
     with open( results_fullpath ,'a') as f:        
@@ -108,7 +114,8 @@ def _encode_list_as_str(lis:list)->str:
     s = s[:-1]+']'
     return s
 
-def _print_inputs(inputs:dict[str, str])->None:
+
+def _print_inputs(inputs:dict[str, str], _max_str_per_key:dict[str, int])->None:
     total_string = ""
     for key, value in inputs.items():
         s = f"{value}"
