@@ -59,3 +59,9 @@ def same(d1:dict[_T, _T2], d2:dict[_T, _T2])->bool:
     
     return True
         
+def statistics_along_key(dictionaries:list[dict[str, Any]], key)->tuple[float, float]:
+    values = [dict_[key] for dict_ in dictionaries]
+    std = np.std(values)
+    mean = np.mean(values)
+
+    return mean, std

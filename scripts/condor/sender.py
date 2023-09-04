@@ -35,13 +35,12 @@ _max_str_per_key = {key:max((len(str(val)) for val in lis)) for key, lis in vals
 
 def main(
     job_type="parallel_timings",  # "ite_it" / ite_it_all_h / "bp" / "parallel_timings"
-    request_cpus:int=8,
-    request_memory_gb=2
+    request_cpus:int=12,
+    request_memory_gb=8
 ):
     
     ## Get from job type:
     result_keys = RESULT_KEYS_DICT[job_type]
-
 
     ## Define paths and names:
     sep = os.sep
