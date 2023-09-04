@@ -48,7 +48,7 @@ from libs.ITE import rho_ij
 
 # For OOP:
 from abc import ABC, abstractmethod, abstractproperty
-from typing import Any, Self, Final
+from typing import Any, Final
 
 _T = TypeVar("_T")
 
@@ -69,7 +69,7 @@ class TensorNetwork(ABC):
     nodes : list[TensorNode] = None
 
     @abstractmethod
-    def copy(self)->Self: ...
+    def copy(self)->"TensorNetwork": ...
 
     # ================================================= #
     #|              Basic Derived Properties           |#
@@ -267,7 +267,7 @@ class KagomeTN(TensorNetwork):
     def nodes(self)->list[TensorNode]:
         return _derive_nodes_kagome_tn(self)
 
-    def copy(self, with_messages:bool=True)->Self:
+    def copy(self, with_messages:bool=True)->"KagomeTN":
         new = KagomeTN(
             lattice=self.lattice,
             unit_cell=self.unit_cell.copy(),
@@ -357,7 +357,7 @@ class ArbitraryTN(TensorNetwork):
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
     # ================================================= #
-    def copy(self)->Self:
+    def copy(self)->"ArbitraryTN":
         return ArbitraryTN(nodes=self.nodes)
 
 
@@ -427,7 +427,7 @@ class _FrozenSpecificNetwork(TensorNetwork):
         self._nodes = nodes
 
     @classmethod
-    def from_arbitrary_tn(cls, tn:ArbitraryTN, **kwargs) -> Self:
+    def from_arbitrary_tn(cls, tn:ArbitraryTN, **kwargs) -> "_FrozenSpecificNetwork":
         new = cls(tn.nodes, copy=False, **kwargs)
         return new
     
@@ -437,7 +437,7 @@ class _FrozenSpecificNetwork(TensorNetwork):
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
     # ================================================= #
-    def copy(self, **kwargs)->Self:
+    def copy(self, **kwargs)->"_FrozenSpecificNetwork":
         return type(self)(nodes=self.nodes, copy=True, **kwargs)
     
     # ================================================= #
@@ -518,7 +518,7 @@ class ModeTN(_FrozenSpecificNetwork):
     def from_arbitrary_tn(cls, tn:ArbitraryTN, mode:UpdateMode) -> "ModeTN":
         return super().from_arbitrary_tn(tn, mode=mode)
     
-    def copy(self) -> Self:
+    def copy(self) -> "ModeTN":
         return super().copy(mode=self.mode)
         
     # ================================================= #

@@ -1,3 +1,4 @@
+# For allowing 'Self' import
 import numpy as np
 from physics.hamiltonians import zero
 from dataclasses import dataclass, field, fields
@@ -6,7 +7,7 @@ from utils.arguments import Stats
 from copy import deepcopy
 
 # For type hinting:
-from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Self, Iterable, Any
+from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Iterable, Any
 _T = TypeVar("_T")
 
 # Other containers and enums:
@@ -28,7 +29,7 @@ _NEXT_IN_ABC_ORDER = {
 }
 
 
-class HamiltonianFuncAndInputs(NamedTuple, Generic[_T]):
+class HamiltonianFuncAndInputs(NamedTuple):
     func: Callable[[_T], np.ndarray] 
     args: _T|tuple[_T]|None
 
@@ -40,7 +41,7 @@ class HamiltonianFuncAndInputs(NamedTuple, Generic[_T]):
         return HamiltonianFuncAndInputs(func=zero, args=None)
 
     @staticmethod
-    def standard(self_or_tuple:Self|tuple)->Self:
+    def standard(self_or_tuple)->"HamiltonianFuncAndInputs":
         assert len(self_or_tuple)==2
         assert callable(self_or_tuple[0])
         if isinstance(self_or_tuple, HamiltonianFuncAndInputs):
