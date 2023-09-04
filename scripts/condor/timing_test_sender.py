@@ -25,8 +25,10 @@ def main():
         for N in [LOW, HIGH]:
             for par in [False, True]:
 
+                method = int(par)
+
                 vals = deepcopy(BASE_VALS)
-                vals['method'] = [par]
+                vals['method'] = [method]
 
                 if D==LOW:  vals['D'] = [2, 3, 4]
                 else:       vals['D'] = [5, 6, 7]

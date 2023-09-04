@@ -31,6 +31,8 @@ DEFAULT_VALS['D'] = [2, 3, 4, 5, 6, 7]
 DEFAULT_VALS['method'] = [0, 1]
 DEFAULT_VALS['seed'] = range(5)
 
+Arguments = '$(outfile) $(seed) $(method) $(D) $(N) $(job_type) $(result_keys)'
+
 
 def main(
     job_type="parallel_timings",  # "ite_it" / ite_it_all_h / "bp" / "parallel_timings"
@@ -93,6 +95,12 @@ def main(
         f.close()
 
     ## Call condor:
+    print(f"Calling condor with shared inputs:")
+    print(f"    output_files_prefix={output_files_prefix}")
+    print(f"    request_cpus={request_cpus}")
+    print(f"    requestMemory={request_memory_gb}gb")
+    print(f"    Arguments={Arguments}")
+
     import CondorJobSender
     CondorJobSender.send_batch_of_jobs_to_condor(
         worker_script_fullpath,
@@ -100,7 +108,7 @@ def main(
         job_params,
         request_cpus=f"{request_cpus}",
         requestMemory=f"{request_memory_gb}gb",
-        Arguments='$(outfile) $(seed) $(method) $(D) $(N) $(job_type) $(result_keys)'
+        Arguments=Arguments
     )
 
     print("Called condor successfully")
