@@ -22,8 +22,8 @@ import numpy as np
 
 
 def test_full_ite(
-    D = 3,
-    N = 2,
+    D = 4,
+    N = 3,
     live_plots:bool = 1,
     parallel:bool = 0
 ):
@@ -36,7 +36,7 @@ def test_full_ite(
     config.bp.parallel_msgs = parallel
     config.visuals.progress_bars = 1
     # delta-t's:
-    config.ite.time_steps = [0.1]*10 + [0.01]*20 + [0.001]*20 + [0.0001]*20 + [0.00001]*20
+    config.ite.time_steps = [0.1]*20 + [0.01]*50 + [0.001]*50 + [0.0001]*50 + [0.00001]*100
     config.ite.bp_every_edge = True
 
     ## Run:

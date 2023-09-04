@@ -154,8 +154,5 @@ cython_debug/
 ## Avoid those types:
 *.dat
 *.csv
-
-## Exceptions to the rules:
-!data/unit_cells/*
 *.png
-*.dat
+
