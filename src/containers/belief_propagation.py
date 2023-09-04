@@ -7,6 +7,7 @@ from typing import NamedTuple, TypeAlias
 from lattices.directions import LatticeDirection
 from libs.bmpslib import mps as MPS
 from lattices.directions import BlockSide
+from copy import deepcopy
 
 
 @dataclass
@@ -16,20 +17,25 @@ class BPConfig:
     target_msg_diff : float = 1e-5
     msg_diff_squared : bool = True  # True is easier to get to 
     init_msg: MessageModel = MessageModel.RANDOM_QUANTUM
-    allowed_retries : int = 2
+    allowed_retries : int = 3
     hermitize_messages_between_iterations : bool = True
     times_to_deem_failure_when_diff_increases  : int = 3
-    parallel_computing : bool = False
+    parallel_msgs : bool = False
 
     def __repr__(self) -> str:
         return container_repr(self)
+    
+    def copy(self)->"BPConfig":
+        return deepcopy(self)
+
 
 @dataclass
 class BPStats(Stats):
     iterations      : int   = -1
-    final_error     : float = -1.0  
     attempts        : int   = 1
+    final_error     : float = -1.0  
     final_config    : BPConfig = field(default_factory=BPConfig)
+    success         : bool = False
 
 
 class Message(NamedTuple):

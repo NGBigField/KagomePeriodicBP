@@ -1,16 +1,13 @@
 # ============================================================================ #
 #|                                  Imports                                   |#
 # ============================================================================ #
+from collections.abc import Mapping
 import sys, os
 
-if __name__ == "__main__":
-    import pathlib
-    sys.path.append(pathlib.Path(__file__).parent.parent.__str__())
-       
 import logging
 from logging import Logger
-from typing import Final, Mapping
-from utils import strings, saveload
+from typing import Any, Final, Mapping
+from utils import strings, saveload, prints
 from enum import Enum, auto
 import types
 
@@ -63,29 +60,29 @@ def _get_fullpath(filename:str)->str:
 #|                               Inner Classes                                |#
 # ============================================================================ #           
 
-class _MyCFormatter(logging.Formatter):
+class _MyStdoutFormatter(logging.Formatter):
 
     def format(self, record)->str:
         s = super().format(record)
         level_value = record.levelno
 
         if level_value in [LoggerLevels.CRITICAL.value, LoggerLevels.ERROR.value]:
-            color = strings.PrintColors.RED
-            s = strings.add_color(s, color)
+            color = prints.PrintColors.RED
+            s = prints.add_color(s, color)
         elif level_value == LoggerLevels.WARNING.value:
-            warn1color = strings.PrintColors.HIGHLIGHTED_YELLOW
-            warn2color = strings.PrintColors.YELLOW_DARK
-            s = strings.add_color("Warning:", warn1color) + strings.add_color(s, warn2color)
+            warn1color = prints.PrintColors.HIGHLIGHTED_YELLOW
+            warn2color = prints.PrintColors.YELLOW_DARK
+            s = prints.add_color("Warning:", warn1color) + prints.add_color(s, warn2color)
 
         return s
     
-class _MyFFormatter(logging.Formatter):
+class _MyFileFormatter(logging.Formatter):
 
     def format(self, record)->str:
         s = super().format(record)
         
         # Remove coloring strings from message:
-        for color in strings.PrintColors:
+        for color in prints.PrintColors:
             color_s = f"{color}"
             s = s.replace(color_s, '')
 
@@ -115,76 +112,47 @@ def inactive_logger()->FakeLogger:
 
 
 
-def _to_file(logger:Logger, msg: object, *args: object, **kwargs) -> None:
-    raise NotImplementedError("Not yet")
-    for hdlr in c.handlers:
-        if record.levelno >= hdlr.level:
-            hdlr.handle(record)
-    self._log(LoggerLevels.ONLYFILE.value, msg, args, **kwargs)
-
 def get_logger(
-    level:LoggerLevels|None=None,
+    verbose:bool=False,
+    write_to_file:bool=True,
     filename:str|None=None
     )->Logger:
 
     # Define default arguments:
-    if level is None:
-        if VERBOSE_MODE:
-            level = LoggerLevels.DEBUG
-        else:
-            level = LoggerLevels.INFO
     if filename is None:
         filename = strings.time_stamp()+" "+strings.random(6)
+
+    # Define logger level:
+    if verbose:
+        level = LoggerLevels.DEBUG
+    else:
+        level = LoggerLevels.INFO
 
     # Get logger obj:
     logger = logging.getLogger(filename)
     logger.propagate = False
     logger.setLevel(LoggerLevels.LOWEST.value)
     
-    # Derive fullpath:
-    filename = _force_log_file_extension(filename)
-    fullpath = _get_fullpath(filename)
-    
-    ## Configuration:
-    f_formatter = _MyFFormatter(fmt=DEFAULT_PRINT_FORMAT, datefmt=DEFAULT_DATE_TIME_FORMAT)
-    c_formatter = _MyCFormatter(fmt="%(message)s")
-    #
-    f_handler = logging.FileHandler(fullpath)
+    ## Stdout (usually print to screen) handler:
+    c_formatter = _MyStdoutFormatter(fmt="%(message)s")    
     c_handler = logging.StreamHandler(sys.stdout)
-    #
-    f_handler.setFormatter(f_formatter)
     c_handler.setFormatter(c_formatter)
-    #
-    f_handler.setLevel(logging.DEBUG)  # Write all logs to file
-    c_handler.setLevel(level.value)    # Print only logs above level
-    
-    ## set handlers:        
-    logger.addHandler(f_handler)      
+    c_handler.setLevel(level.value)    # Print only logs above this level
     logger.addHandler(c_handler)   
 
-    ## add to_file function to object:
-    logger.to_file = types.MethodType( _to_file, logger )  #type: ignore
+    ## Write to file handler:
+    if write_to_file:
+        # Path:
+        filename = _force_log_file_extension(filename)
+        fullpath = _get_fullpath(filename)
+        # Formatting:
+        f_formatter = _MyFileFormatter(fmt=DEFAULT_PRINT_FORMAT, datefmt=DEFAULT_DATE_TIME_FORMAT)
+        f_handler = logging.FileHandler(fullpath)
+        f_handler.setFormatter(f_formatter)
+        f_handler.setLevel(logging.DEBUG)   # Write all logs to file 
+        logger.addHandler(f_handler)      
+    
 
     return logger
 
 
-# ============================================================================ #
-#|                       Scripts to analyze saved logs:                       |#
-# ============================================================================ #
-
-
-        
-        
-        
-
-     
-
-# ============================================================================ #
-#|                                    Test                                    |#
-# ============================================================================ #     
-
-
-
-if __name__ == "__main__":
-    # _main_test()
-    pass

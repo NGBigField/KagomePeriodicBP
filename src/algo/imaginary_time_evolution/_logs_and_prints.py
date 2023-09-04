@@ -1,28 +1,31 @@
-
-## Get config:
-from utils.config import DEBUG_MODE, ALLOW_VISUALS, VERBOSE_MODE
-
-from lib.ncon import ncon
+# For type hints
+from typing import Callable
 
 # Import belief propagation code:
 from algo.belief_propagation import BPConfig, BPStats
 
 # Import containers of ite:
-from containers.imaginary_time_evolution import ITEProgressTracker
+from containers.imaginary_time_evolution import ITEProgressTracker, ITESegmentStats
 from containers import Config
 
 # Common errors:
 from _error_types import BPNotConvergedError
 
 # Import our shared utilities
-from utils import lists, logs, strings
+from utils import lists, logs, strings, prints
 
 # For useful tracking plots:
-from visualizations.ite import ITEPlots
+# from algo.imaginary_time_evolution._visuals import ITEPlots  #TODO
 
 
+def get_progress_bar(config:Config, num_repeats:int, print_prefix:str)->prints.ProgressBar:
+    # Progress bar:
+    if config.visuals.progress_bars:
+        return prints.ProgressBar(num_repeats, print_prefix=print_prefix)
+    else:
+        return prints.ProgressBar.inactive()
 
-## ==== Helper Functions ==== ##
+
 def _common_logger_prints(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker)->None:
     logger.info(config)
     logger.info(f"ITE-Tracker saved at {ite_tracker.full_path!r}")
@@ -37,7 +40,7 @@ def _log_and_print_starting_message(logger:logs.Logger, config:Config, ite_track
     logger.info(" ")
 
 
-def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker, plots:ITEPlots)->None:
+def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker, plots:None="ITEPlots")->None: #TODO ITEPlots
     logger.info("\n")
     _common_logger_prints(logger, config, ite_tracker)
     plots.save(logger)
@@ -50,13 +53,13 @@ def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker
     logger.info("\n")
 
 
-def _print_or_log_ite_segment_msg(
+def print_or_log_ite_segment_progress(
     config:Config, tracker:ITEProgressTracker, logger:logs.Logger,
-    delta_t:float, i:int, num_repeats:int
-)->None:
+    delta_t:float, i:int, num_repeats:int, prev_stats:ITESegmentStats, 
+)->Callable[[str], None]:
     counter = 0
-    for delte_t_, num_repeats_ in lists.repeated_items(config.ite.time_steps):
-        if abs(delte_t_-delta_t)<1e-10 and num_repeats_==num_repeats:
+    for delta_t_, num_repeats_ in lists.repeated_items(config.ite.time_steps):
+        if abs(delta_t_-delta_t)<1e-10 and num_repeats_==num_repeats:
             counter += i 
             break
         else:
@@ -65,14 +68,22 @@ def _print_or_log_ite_segment_msg(
         raise ValueError(f"Bug: delta_t={delta_t} was not found in config.ite.time_steps.")
 
     num_segments = len(config.ite.time_steps)
-    logger.info(" ")
-    logger.info("segment: "+strings.num_out_of_num(counter+1, num_segments)+f" ; delta_t={delta_t}: "+strings.num_out_of_num(i+1, num_repeats))
-    logger.info("------------------------------")
+
+    if config.visuals.progress_bars:
+        logger_method = logger.debug
+    else:
+        logger_method = logger.info
+
+    logger_method(" ")
+    logger_method("segment: "+strings.num_out_of_num(counter+1, num_segments)+f" ; delta_t={delta_t}: "+strings.num_out_of_num(i+1, num_repeats))
+    logger_method("------------------------------")
+    
+    return logger_method
 
 
-def _print_or_log_bp_message(config:BPConfig, not_converged_causes_error:bool, stats:BPStats, logger:logs.Logger):
+def print_or_log_bp_message(config:BPConfig, not_converged_causes_error:bool, stats:BPStats, logger:logs.Logger):
     space = "        "
-    _blue_text = lambda s: strings.add_color(s, strings.PrintColors.BLUE)
+    _blue_text = lambda s: prints.add_color(s, prints.PrintColors.BLUE)
     if stats.final_error<config.target_msg_diff:
         if stats.attempts==1:
             _attempt_msg = f"Block-BP Converged at "\
@@ -91,13 +102,3 @@ def _print_or_log_bp_message(config:BPConfig, not_converged_causes_error:bool, s
         else:
             logger.warn(space+_msg)
 
-
-
-def _fix_config_if_bp_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger):
-    if bp_stats.attempts>1: 
-        config.bp.max_swallowing_dim = bp_stats.final_config.max_swallowing_dim
-        logger.debug(f"        config.bp.max_swallowing_dim updated to {config.bp.max_swallowing_dim}")
-        if bp_stats.final_config.max_swallowing_dim>=config.bubblecon_trunc_dim:
-            config.bubblecon_trunc_dim = int(bp_stats.final_config.max_swallowing_dim*1.5)
-            logger.debug(f"        config.bubblecon_trunc_dim updated to {config.bubblecon_trunc_dim}")
-    return config

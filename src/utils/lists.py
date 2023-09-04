@@ -155,9 +155,10 @@ def common_super_class(lis:List[Any]) -> type:
         if all(x in mro for mro in classes):
             return x
 
-def iterate_with_periodic_prev_next_items(l:List[_T]) -> Generator[Tuple[_T, _T, _T], None, None]:
+def iterate_with_periodic_prev_next_items(l:List[_T], skip_first:bool=False) -> Generator[Tuple[_T, _T, _T], None, None]:
     for i, (is_first, is_last, crnt) in enumerate(iterate_with_edge_indicators(l)):
         prev, next = None, None
+        if is_first and skip_first: continue
         if is_first:        prev = l[-1]
         if is_last:         next = l[0]
         if prev is None:    prev = l[i-1]
@@ -213,6 +214,7 @@ def shuffle(lis:list[_T])->list[_T]:
     new_order = indices.tolist()
     res = rearrange(lis, order=new_order)
     return res
+
 
 def convert_whole_numbers_to_int(lis:List[float|int])->List[float|int]:
     lis_copy : list[int|float] = lis.copy()

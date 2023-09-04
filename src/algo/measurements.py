@@ -21,20 +21,21 @@ import numpy as np
 from libs.ITE import rho_ij
 
 # Common types in the code:
-from containers import Config, BubbleConConfig
+from containers import Config, BubbleConConfig, UpdateEdge
+from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
 from tensor_networks import KagomeTN, TensorNetwork, ModeTN, EdgeTN, TensorNode, MPS
 from lattices.directions import BlockSide
 from _error_types import TensorNetworkError, BPNotConvergedError
-from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor
+from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor, UpdateMode
 from physics import pauli
 from tensor_networks.unit_cell import UnitCell
 from containers.results import Measurements, Expectations
 
 ## Algos we need:
-from tensor_networks.construction import repeat_core
-from algo.tn_reduction import reduce_full_kagome_to_core
+from algo.tn_reduction import reduce_full_kagome_to_core, reduce_tn
 from algo.belief_propagation import belief_propagation
 from algo.contract_tensor_network import contract_tensor_network
+from algo.imaginary_time_evolution._tn_update import get_imaginary_time_evolution_operator
 
 # For energy estimation:
 from libs.ITE import rho_ij
@@ -44,9 +45,11 @@ from utils import assertions, logs, errors, lists, parallel_exec, prints, string
 
 # A bit of OOP:
 from copy import deepcopy
-from typing import TypeVar
+from typing import TypeVar, TypeAlias
 
 _T = TypeVar('_T')
+
+UnitCellExpectationValuesDict : TypeAlias = dict[str, dict[str, float]]
 
 
 all_paulis = list(pauli.all_paulis(with_names=False))
@@ -111,33 +114,85 @@ def print_results_table(results:dict[str, dict[str, float]])->None:
 def _mean(list_:list[_T])->_T:
     return sum(list_)/len(list_)  #type: ignore
         
+def mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[str, float]:
+    mean_per_direction : dict[str, float] = dict(x=0, y=0, z=0)
+    # Add
+    for abc, xyz_dict in expectation.items():
+        for xyz, value in xyz_dict.items():
+            mean_per_direction[xyz] += value/3
+    return mean_per_direction
 
-def measure_core_energies(
-    tn_stable_around_core:KagomeTN, hamiltonian:np.ndarray, bubblecon_trunc_dim:int
+
+
+def measure_energies_and_observables_together(
+    tn:TensorNetwork, 
+    hamiltonian:HamiltonianFuncAndInputs, 
+    trunc_dim:int,
+    mode:UpdateMode|None=None,
+    force_real:bool=True
 )->tuple[
-    list[complex],
-    list[np.ndarray]
+    dict[tuple[str, str], float],
+    UnitCellExpectationValuesDict,
+    float
 ]:
-    energies_per_site = []
-    # Reduce to small square of core:    
-    if DEBUG_MODE: tn_stable_around_core.validate()
+    ## Prepare outputs and check inputs:
+    # inputs:
+    if DEBUG_MODE: tn.validate()
+    if mode is None:
+        mode = UpdateMode.random()
+    h, _ = get_imaginary_time_evolution_operator(hamiltonian, None)
+    # outputs:
+    energies = dict()
+    expectations = {
+        abc : { xyz : [0.0, 0] for xyz in ['x', 'y', 'z'] } 
+        for abc in ['A', 'B', 'C']
+    }
+    energies4mean = []
+    
+    ## Contract to mode:
+    mode_tn = reduce_tn(tn, ModeTN, trunc_dim, copy=True, mode=mode)
+
     ## For each edge, reduce a bit more and calc energy:
-    rdms = []
-    for side in BlockSide.all_in_counter_clockwise_order():
+    for edge_tuple in UpdateEdge.all_options():
         # do the final needed contraction for this specific edge:
-        core1, core2, environment_tensors, tn_env = calc_edge_environment(tn_stable_around_core, side, bubblecon_trunc_dim, already_reduced_to_core=True)
-        # Get physical core tensors:
-        ti = core1.physical_tensor
-        tj = core2.physical_tensor
-        ## Get metrics
-        rdm = rho_ij(ti, tj, mps_env=environment_tensors)
-        edge_energy  = np.dot(rdm.flatten(),  hamiltonian.flatten())
-        if DEBUG_MODE:
+        edge_tn = reduce_tn(mode_tn, target_type=EdgeTN, trunc_dim=trunc_dim, copy=True, edge_tuple=edge_tuple)
+
+        # Compute Reduce-Density-Matrix (RDM)
+        rdm = edge_tn.rdm
+
+        # Calc energy:
+        edge_energy  = np.dot(rdm.flatten(),  h.flatten()) 
+        edge_energy  /= 2  # Divide by 2 to get energy per site instead of per edge
+        if DEBUG_MODE and force_real:
             edge_energy = assertions.real(edge_energy)
-        energies_per_site.append(edge_energy/2)
-        # keep rdm:
-        rdms.append(rdm)
-    return energies_per_site, rdms
+        elif force_real:
+            edge_energy = float(np.real(edge_energy))
+
+        # keep energies:
+        energies4mean.append(edge_energy)
+        energies[edge_tuple.as_strings] = edge_energy
+
+        # Calc expectations:
+        per_edge_results = expectation_values_with_rdm(rdm, force_real=force_real)
+
+        # Sort expectation values:
+        f1, f2 = edge_tn.unit_cell_flavors
+        for xyz, tuple_ in per_edge_results.items():
+            for value, abc_flavor in zip(tuple_, [f1, f2]):
+                abc = abc_flavor.name
+                expectations[abc][xyz][0] += value # accumulate values
+                expectations[abc][xyz][1] += 1     # count appearances
+
+    # mean expectation values from all appearances :
+    for abc in ['A', 'B', 'C']:
+        for xyz in ['x', 'y', 'z']:
+            sum_, count_ = expectations[abc][xyz]
+            expectations[abc][xyz] = sum_/count_
+    
+    # mean energy from all energies prt site:
+    mean_energy = sum(energies4mean)/len(energies4mean)
+
+    return energies, expectations, mean_energy
 
 
 def _measurements_everything_on_duplicated_core_specific_size(
@@ -149,7 +204,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
     use_rdms_for_xyz:bool=True
 )->Measurements:
     ## Parse commonly used inputs:
-    chi = config.bubblecon_trunc_dim
+    chi = config.trunc_dim
 
     ## Get small stable network:
     tn_open = repeat_core(core, repeats)
@@ -161,7 +216,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
 
     ## Calc 
     # Energies:
-    energies_per_site, rdms = measure_core_energies(tn_stable_around_core, config.ite.interaction_hamiltonain, chi)    
+    energies_per_site, rdms = measure_energies_and_observables_together(tn_stable_around_core, config.ite.interaction_hamiltonian, chi)    
     # XYZ
     if use_rdms_for_xyz:
         expectation_values = measure_xyz_expectation_values_with_rdms(rdms)
@@ -250,7 +305,7 @@ def _sandwich_fused_tensors_with_expectation_values(tn_in:TensorNetworkType, mat
         name            = node.name,
         boundaries      = node.boundaries,
         functionality   = node.functionality,
-        unit_cell_flavor= node.unit_cell_flavor
+        cell_flavor= node.cell_flavor
     )
     if DEBUG_MODE: tn_out.validate()
 
@@ -368,7 +423,6 @@ def calc_unit_cell_expectation_values_from_tn(
     bubblecon_trunc_dim:int, 
     direction:BlockSide|None=None, 
     force_real:bool=False, 
-    reduce:bool=True,
     print_progress:bool=True,
     parallel:bool=False
 ) -> list[UnitCell]:
@@ -390,19 +444,14 @@ def calc_unit_cell_expectation_values_from_tn(
     else:
         assert isinstance(direction, BlockSide)
 
-    ## Perform all common actions:
-    if reduce:
-        assert isinstance(tn, KagomeTN)
-        tn_reduced = reduce_full_kagome_to_core(tn, bubblecon_trunc_dim, parallel)
-    else:
-        tn_reduced = tn
-    denominator, _, _ = contract_tensor_network(tn_reduced, direction=direction, depth=ContractionDepth.Full, bubblecon_trunc_dim=bubblecon_trunc_dim)
+    ## Find nodes to sandwich with observables:
+    denominator, _, _ = contract_tensor_network(tn, direction=direction, depth=ContractionDepth.Full, bubblecon_trunc_dim=bubblecon_trunc_dim)
     assert not isinstance(denominator, MPS), "Full contraction should result in a number, not an MPS"
-    center_nodes = tn_reduced.get_center_core_nodes()
+    center_nodes = tn.get_center_core_nodes()
     unit_cell_indices = UnitCell(
-        A = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.A),
-        B = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.B),
-        C = next(n.index for n in center_nodes if n.unit_cell_flavor is UnitCellFlavor.C)
+        A = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.A),
+        B = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.B),
+        C = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.C)
     )
 
     ## Prepare progress-bar:
@@ -418,7 +467,7 @@ def calc_unit_cell_expectation_values_from_tn(
             prog_bar.next()
             index = unit_cell_indices[key]
             value = _calc_mean_value_by_bracket_tn(
-                tn_reduced, [index], operator, bubblecon_trunc_dim=bubblecon_trunc_dim, 
+                tn, [index], operator, bubblecon_trunc_dim=bubblecon_trunc_dim, 
                 direction=direction, denominator=denominator, force_real=force_real,
                 print_progress=print_progress
             )
@@ -516,11 +565,10 @@ def _calc_rdm_projection_in_axis(rho:np.matrix, pauli_name:str, force_real:bool=
 
 def derive_xyz_expectation_values_with_tn(
     tn:TensorNetwork, 
-    reduce:bool=False, 
     bubblecon_trunc_dim:int=18,
     force_real:bool=True
 )->dict[str, float|complex]:
-    res = calc_unit_cell_expectation_values_from_tn(tn, operators=all_paulis, bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=force_real, reduce=reduce)
+    res = calc_unit_cell_expectation_values_from_tn(tn, operators=all_paulis, bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=force_real)
     return dict(x=res[0], y=res[1], z=res[2])
 
 
@@ -537,8 +585,8 @@ def derive_xyz_expectation_values_using_rdm(
     per_ij_results = expectation_values_with_rdm(rdm, force_real=force_real)
 
     ## Rearrange:
-    type1 = edge_tn.core1.unit_cell_flavor
-    type2 = edge_tn.core2.unit_cell_flavor
+    type1 = edge_tn.core1.cell_flavor
+    type2 = edge_tn.core2.cell_flavor
     res = {}
     for key, values in per_ij_results.items():
         crnt_res = dict(A=None, B=None, C=None)
@@ -549,9 +597,9 @@ def derive_xyz_expectation_values_using_rdm(
 
 
 if __name__ == "__main__":
-    from project_paths import add_scripts; 
+    from project_paths import add_scripts
     add_scripts()
-    from scripts import bp_test
-    bp_test.main_test()
+    from scripts import test_ite
+    test_ite.main_test()
 
 

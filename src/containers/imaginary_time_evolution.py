@@ -1,23 +1,24 @@
 import numpy as np
-from physics.hamiltonians import HamiltonianFuncType, zero
+from physics.hamiltonians import zero
 from dataclasses import dataclass, field, fields
-from utils import strings, saveload, assertions
+from utils import strings, saveload, assertions, lists
 from utils.arguments import Stats
-from typing import Generator, Union, Any, TypeAlias, NamedTuple
 from copy import deepcopy
+
+# For type hinting:
+from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Self, Iterable, Any
+_T = TypeVar("_T")
 
 # Other containers and enums:
 from enums.imaginary_time_evolution import UpdateMode
 from enums.tensor_networks import UnitCellFlavor
 from containers.belief_propagation import BPStats
 from containers.density_matrices import MatrixMetrics 
+from tensor_networks import UnitCell
 from _error_types import ITEError
 
 # For smart iterations:
 import itertools
-
-
-KagomeTensorNetwork = None  #TODO fix
 
 
 _NEXT_IN_ABC_ORDER = {
@@ -25,6 +26,46 @@ _NEXT_IN_ABC_ORDER = {
     UnitCellFlavor.B : UnitCellFlavor.C,
     UnitCellFlavor.C : UnitCellFlavor.A
 }
+
+
+class HamiltonianFuncAndInputs(NamedTuple, Generic[_T]):
+    func: Callable[[_T], np.ndarray] 
+    args: _T|tuple[_T]|None
+
+    def __repr__(self) -> str:
+        return f"Hamiltonian function {self.func.__name__!r} with arguments: {self.args}"
+
+    @staticmethod
+    def default()->"HamiltonianFuncAndInputs":
+        return HamiltonianFuncAndInputs(func=zero, args=None)
+
+    @staticmethod
+    def standard(self_or_tuple:Self|tuple)->Self:
+        assert len(self_or_tuple)==2
+        assert callable(self_or_tuple[0])
+        if isinstance(self_or_tuple, HamiltonianFuncAndInputs):
+            assert callable(self_or_tuple.func)
+            return self_or_tuple
+        
+        if isinstance(self_or_tuple, tuple):
+            return HamiltonianFuncAndInputs(func=self_or_tuple[0], args=self_or_tuple[1])
+
+        raise ValueError(f"Not a valid input for class {HamiltonianFuncAndInputs.__name__!r}") 
+
+    def call(self)->np.ndarray:
+        assert len(self)==2
+        func   = self.func
+        args   = self.args
+
+        # call:
+        if args is None:
+            return func()
+        elif isinstance(args, Iterable):
+            return func(*args)
+        else:
+            return func(args)
+            
+
 
 class UpdateEdge(NamedTuple): 
     first : UnitCellFlavor
@@ -39,12 +80,21 @@ class UpdateEdge(NamedTuple):
     
     def __str__(self) -> str:
         return f"({self.first}, {self.second})"
+    
+    @property
+    def as_strings(self)->tuple[str, str]:
+        return (self.first.name, self.second.name)
 
     @staticmethod
     def all_options()->Generator["UpdateEdge", None, None]:
         flavors = [UnitCellFlavor.A, UnitCellFlavor.B, UnitCellFlavor.C]
         for a, b in itertools.permutations(flavors, 2):
             yield UpdateEdge(a, b)
+
+    @staticmethod
+    def all_in_random_order()->Generator["UpdateEdge", None, None]:
+        random_order = lists.shuffle(list(UpdateEdge.all_options()))
+        return (mode for mode in random_order)
 
 
 
@@ -68,7 +118,7 @@ def DEFAULT_TIME_STEPS()->list[float]:
 @dataclass
 class ITEConfig():
     # hamiltonian:
-    interaction_hamiltonain : np.ndarray = field(default_factory=zero)
+    interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
     _GT_energy : float|None = None  # Ground truth energy, if known
     # ITE time steps:
     time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
@@ -79,7 +129,7 @@ class ITEConfig():
     random_mode_order : bool = True
     start_segment_with_new_bp_message : bool = True
     bp_not_converged_raises_error : bool = True
-    check_converges : bool = False  # If sevral steps didn't improve the lowest energy, go to next delta_t
+    check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
     segment_error_cause_state_revert : bool = False
     # Control numbers:
     num_errors_threshold : int = 10
@@ -100,6 +150,9 @@ class ITEConfig():
             s += f"    {field.name}: {value_str}"
         return s
     
+    def __post_init__(self)->None:
+        self.interaction_hamiltonian = HamiltonianFuncAndInputs.standard(self.interaction_hamiltonian)
+    
 
 class ITEPerModeStats(Stats):
     bp_stats : BPStats = BPStats()
@@ -110,21 +163,29 @@ class ITESegmentStats(Stats):
     ite_per_mode_stats : list[ITEPerModeStats] = None # type: ignore
     modes_order : list[UpdateMode] = None  # type: ignore
     delta_t : float = None  # type: ignore
+    mean_energy : float = None
 
     def __post_init__(self):
         self.ite_per_mode_stats = list()  # Avoid python's infamous immutable lists problem
 
 
 
-
-_TrackerStepOutputs = tuple[float, complex|None, ITESegmentStats, dict, KagomeTensorNetwork, dict]  # delta_t, energy, env_hermicity, expectation, value, core, messages
+                        
+_TrackerStepOutputs = tuple[
+    float,              # delta_t
+    complex|None,       # energy    
+    ITESegmentStats,    # env_hermicity      
+    dict,               # expectation-value
+    UnitCell,           # core
+    dict                # messages
+]  
 
 
 class ITEProgressTracker():
 
-    def __init__(self, core:KagomeTensorNetwork, messages:dict|None, config:Any):
+    def __init__(self, unit_cell:UnitCell, messages:dict|None, config:Any):
         # From input:
-        self.last_core : KagomeTensorNetwork = core.copy()
+        self.last_unit_cell : UnitCell = unit_cell.copy()
         self.last_messages : dict = deepcopy(messages)  #type: ignore
         self.config = config
         # Fresh variables:
@@ -135,24 +196,24 @@ class ITEProgressTracker():
         self.delta_ts : list[float] = []
         self.energies : list[complex|None] = []
         self.expectation_values : list[dict] = []
-        self.cores : list[KagomeTensorNetwork] = []
+        self.unit_cells : list[UnitCell] = []
         self.messages : list[dict] = []
         self.stats : list[ITESegmentStats] = []
     
-    def log_segment(self, delta_t:float, core:KagomeTensorNetwork, messages:dict, expectation_values:dict, energy:complex, stats:ITESegmentStats )->None:
+    def log_segment(self, delta_t:float, unit_cell:UnitCell, messages:dict, expectation_values:dict, energy:complex, stats:ITESegmentStats )->None:
         # Get a solid copy
-        _core = core.copy()
+        _unit_cell = unit_cell.copy()
         messages = deepcopy(messages)
         expectation_values = deepcopy(expectation_values)
         ## Lists:
         self.delta_ts.append(delta_t)
         self.energies.append(energy)
-        self.cores.append(_core)
+        self.unit_cells.append(_unit_cell)
         self.messages.append(messages)
         self.expectation_values.append(expectation_values)
         self.stats.append(stats)
         ## Up_to_date memory:
-        self.last_core = _core
+        self.last_unit_cell = _unit_cell
         self.last_messages = messages
         self.last_iter += 1
         ## Save to file
@@ -189,12 +250,12 @@ class ITEProgressTracker():
         for _ in range(num_iter):
             delta_t = self.delta_ts.pop()
             energy = self.energies.pop()
-            core = self.cores.pop()
+            core = self.unit_cells.pop()
             messages = self.messages.pop()
             exepectation_values = self.expectation_values.pop()
             step_stats = self.stats.pop()
         # Up to date memory:
-        self.last_core = core  #type: ignore
+        self.last_unit_cell = core  #type: ignore
         self.last_messages = messages  #type: ignore
         self.last_iter -= num_iter
         # Return:

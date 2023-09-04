@@ -13,20 +13,7 @@ if __name__ == "__main__":
 import numpy as np
 
 # for type hints:
-from typing import (
-    Optional,
-    Literal,
-    Any,
-    List,
-    Tuple,
-    Iterator,
-    Callable,
-    TypeVar,
-    ClassVar,
-    Generator,
-    TypeAlias,
-    ParamSpec,
-)
+from typing import Optional, Literal, Any, List, Tuple, Iterator, Callable, TypeVar, ClassVar, Generator, TypeAlias, ParamSpec
 
 from _config_reader import ALLOW_VISUALS
 
@@ -35,6 +22,10 @@ if ALLOW_VISUALS:
     import matplotlib.pyplot as plt
     from matplotlib.pyplot import Axes
     from matplotlib.figure import Figure
+    from mpl_toolkits.mplot3d import Axes3D
+    from mpl_toolkits.mplot3d.art3d import Line3D
+    from matplotlib.quiver import Quiver
+    from matplotlib.text import Text
 
     # For videos:
     try:
@@ -75,30 +66,30 @@ import time
 # ============================================================================ #
 VIDEOS_FOLDER = os.getcwd()+os.sep+"videos"+os.sep
 RGB_VALUE_IN_RANGE_1_0 : bool = True  #  else in range (0, 255)
-DEFAULT_PYPLOY_FIGSIZE = [6.4, 4.8]
+DEFAULT_PYPLOT_FIGSIZE = [6.4, 4.8]
 
 # ============================================================================ #
 #|                             Helper Types                                   |#
 # ============================================================================ #
 _InputType = ParamSpec("_InputType")
 _OutputType = TypeVar("_OutputType")
-
+_XYZ : TypeAlias = tuple[float, float, float]
 
 # ============================================================================ #
 #|                           Declared Functions                               |#
 # ============================================================================ #
 
 
-active_ineractive : bool = False
+active_interactive : bool = False
 
 def ion():
-    global active_ineractive
-    active_ineractive = True
+    global active_interactive
+    active_interactive = True
     plt.ion()
 
 def refresh():
-    global active_ineractive
-    if active_ineractive:
+    global active_interactive
+    if active_interactive:
         plt.pause(0.001)
 
 
@@ -259,7 +250,7 @@ class VideoRecorder():
 class AppendablePlot():
     def __init__(self, size_factor:float=1.0, axis:Optional[Axes]=None, legend_on:bool=True) -> None:
         #
-        figsize = [v*size_factor for v in DEFAULT_PYPLOY_FIGSIZE]
+        figsize = [v*size_factor for v in DEFAULT_PYPLOT_FIGSIZE]
         #
         if axis is None:
             fig = plt.figure(figsize=figsize)
@@ -271,7 +262,7 @@ class AppendablePlot():
         self.fig  = fig
         self.axis = axis
         self.values : dict[str, tuple[list[float], list[float], dict] ] = dict()
-        self.axis.get_yaxis().get_major_formatter().set_useOffset(False)  # Stop the weird pyplot tendancy to give a "string" offset to graphs
+        self.axis.get_yaxis().get_major_formatter().set_useOffset(False)  # Stop the weird pyplot tendency to give a "string" offset to graphs
         self.legend_on : bool = legend_on
         self._update()        
 
@@ -301,7 +292,7 @@ class AppendablePlot():
 
     def _clear_plots(self)->list[str]:
         old_colors = []
-        for artist in self.axis.lines + self.axis.collections:
+        for artist in self.axis.lines:  # + self.axis.collections
             color = artist.get_color()
             artist.remove()
             old_colors.append(color)
@@ -341,6 +332,9 @@ class AppendablePlot():
         
         if draw_now_:
             draw_now()
+
+    # def scatter(self, x, y, draw_now_:bool=True, plt_kwargs:dict=dict())->None:
+    #     pass
 
     def append(self, draw_now_:bool=True, plt_kwargs:dict=dict(), **kwargs:tuple[float,float]|float|None)->None:
         ## append to values

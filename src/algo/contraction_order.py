@@ -657,7 +657,7 @@ def _plot_con_order(tn, con_order, detailed:bool=False, with_arrows:bool=True)->
 if __name__ == "__main__":
     from project_paths import add_scripts; 
     add_scripts()
-    from scripts import bp_test, contraction_test
+    from scripts import test_contraction
     # bp_test.main_test()
-    contraction_test.main_test()
+    test_contraction.main_test()
 

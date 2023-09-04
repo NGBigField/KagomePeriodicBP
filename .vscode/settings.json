@@ -5,12 +5,19 @@
         "bmpslib",
         "bubblecon",
         "decomp",
+        "Dmax",
+        "expec",
+        "hamiltonians",
         "hermicity",
+        "hermitize",
+        "ising",
         "kagome",
         "ketbra",
+        "kets",
         "mpss",
         "paulis",
-        "rdms"
+        "rdms",
+        "suptitle"
     ],
     "cSpell.ignoreWords": [
         "arange"

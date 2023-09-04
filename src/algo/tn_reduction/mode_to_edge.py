@@ -134,7 +134,7 @@ def _derive_edge_and_nodes(
         options = mode_tn.get_nodes_by_functionality(NodeFunctionality.CenterCore)
     else:
         options = mode_tn.get_nodes_by_functionality(NodeFunctionality.AroundCore)
-    node1 = next((node for node in options if node.unit_cell_flavor in edge_tuple))
+    node1 = next((node for node in options if node.cell_flavor in edge_tuple))
 
     ## 
     valid_neighbors = [node for node in mode_tn.get_core_nodes() if node is not node1 and mode_tn.are_neighbors(node1, node)]
@@ -144,7 +144,7 @@ def _derive_edge_and_nodes(
         options = [node for node in valid_neighbors if node.functionality==NodeFunctionality.AroundCore]
     if is_center_included:
         options.append(mode_tn.center_node)
-    node2 = next((node for node in options if node.unit_cell_flavor in edge_tuple))
+    node2 = next((node for node in options if node.cell_flavor in edge_tuple))
 
     edge = get_common_edge(node1, node2)
     return edge, node1.index, node2.index, is_center_included     
@@ -347,6 +347,7 @@ def reduce_mode_to_edge(
     edge_tn = EdgeTN.from_arbitrary_tn(tn)
     if DEBUG_MODE:
         edge_tn.validate()
+        assert tuples.equal(edge_tn.unit_cell_flavors, edge_tuple, allow_permutation=True)
 
     return edge_tn
 
@@ -354,5 +355,5 @@ def reduce_mode_to_edge(
 
 
 if __name__ == "__main__":
-    from scripts.contraction_test import main_test
+    from scripts.test_contraction import main_test
     main_test()

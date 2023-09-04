@@ -43,11 +43,11 @@ class TensorNode():
     edges : list[EdgeIndicatorType]
     directions : list[LatticeDirection] 
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
-    unit_cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
+    cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
     boundaries : set[BlockSide] = field(default_factory=set) 
 
     def __hash__(self)->int:
-        return hash((self.name, self.pos, self.functionality, self.unit_cell_flavor))
+        return hash((self.name, self.pos, self.functionality, self.cell_flavor))
 
     @property
     def physical_tensor(self) -> np_ndarray:
