@@ -308,7 +308,7 @@ class ITEPlots():
                 self.plots.main["delta_t"].append(delta_t=delta_t, draw_now_=False)
             self.plots.main["expectations"].append(**mean_expec_vals, draw_now_=False)
 
-            # Energies:
+            # Energies per edge:
             i = self._iteration
             plot = self.plots.main["energies"]
             energies4mean = []
@@ -321,8 +321,8 @@ class ITEPlots():
             plot.append(mean=(i, energy), draw_now_=False)
 
             # Ground-truth
-            if self.config.ite._GT_energy is not None:
-                plot.append(ref=(self._iteration, self.config.ite._GT_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
+            if self.config.ite.reference_ground_energy is not None:
+                plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
             
         ## Env:
         if self.show.env:

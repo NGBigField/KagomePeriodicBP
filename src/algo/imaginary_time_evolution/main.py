@@ -188,6 +188,30 @@ def _mode_order_without_repetitions(prev_order:list[UpdateMode], ite_config:ITEC
     return new_order
 
 
+def _from_unit_cell_to_stable_mode(
+    unit_cell:UnitCell, messages:MessageDictType, config:Config, logger:logs.Logger, mode:UpdateMode
+)->tuple[
+    ModeTN, MessageDictType, BPStats
+]:
+    ## Duplicate core into a big tensor-network:
+    full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
+
+    ## Perform BlockBP:
+    messages, bp_stats = robust_belief_propagation(
+        full_tn, messages, config.bp, 
+        update_plots_between_steps=config.visuals.live_plots, 
+        allow_prog_bar=config.visuals.progress_bars
+    )
+    print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
+
+    # If block-bp struggled and increased the virtual dimension, the following iterations must also use a higher dimension:
+    config = _fix_config_if_bp_struggled(config, bp_stats, logger)
+
+    ## Contract to mode:
+    mode_tn = reduce_tn(full_tn, ModeTN, trunc_dim=config.trunc_dim, mode=mode)
+    return mode_tn, messages, bp_stats
+
+
 def get_imaginary_time_evolution_operator(h:np.ndarray, delta_t:float)->tuple[np.ndarray, np.ndarray]:
     # h = ite_config.interaction_hamiltonian
     g = ite.g_from_exp_h(h, delta_t)
@@ -212,34 +236,21 @@ def ite_per_mode(
     ITEPerModeStats         # Stats
 ]:
 
-    ## Duplicate core into a big tensor-network:
-    full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
-
-    ## Perform BlockBP:
-    messages, bp_stats = robust_belief_propagation(
-        full_tn, messages, config.bp, 
-        update_plots_between_steps=config.visuals.live_plots, 
-        progressbar=config.visuals.progress_bars
-    )
-    print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
-
-    # If block-bp struggled and increased the virtual dimension, the following iterations must also use a higher dimension:
-    config = _fix_config_if_bp_struggled(config, bp_stats, logger)
-
-    ## Contract to mode:
-    mode_tn = reduce_tn(full_tn, ModeTN, trunc_dim=config.trunc_dim, mode=mode)
+    mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
 
     ## for each edge in the mode, update the tensors
     edge_tuples = list(UpdateEdge.all_in_random_order())
     edge_energies = []
 
-
     prog_bar = get_progress_bar(config, len(edge_tuples), "Executing ITE per-mode:")
-    for edge_tuple in edge_tuples:
+    for is_first, is_last, edge_tuple in lists.iterate_with_edge_indicators(edge_tuples):
         prog_bar.next(extra_str=f"{edge_tuple}")
 
         if config.visuals.live_plots:
             visuals.refresh()
+
+        if config.ite.bp_every_edge and not is_last and not is_first:
+            mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
 
         edge_tn = reduce_tn(mode_tn, EdgeTN, trunc_dim=config.trunc_dim, edge_tuple=edge_tuple)
 

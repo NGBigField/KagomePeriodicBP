@@ -22,8 +22,8 @@ import numpy as np
 
 
 def test_full_ite(
-    D = 2,
-    N = 3,
+    D = 3,
+    N = 2,
     live_plots:bool = 1,
     parallel:bool = 0
 ):
@@ -31,12 +31,13 @@ def test_full_ite(
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
-    config.ite.interaction_hamiltonian = (hamiltonians.ferromagnetic_with_transverse_field, ('z', 5))
+    config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_2d, None)
     # Parallel:
     config.bp.parallel_msgs = parallel
     config.visuals.progress_bars = 1
     # delta-t's:
-    config.ite.time_steps = [0.1]*5 + [0.01]*5 + [0.001]*5 + [0.0001]*10
+    config.ite.time_steps = [0.1]*10 + [0.01]*20 + [0.001]*20 + [0.0001]*20 + [0.00001]*20
+    config.ite.bp_every_edge = True
 
     ## Run:
     unit_cell_out, ite_tracker, logger = full_ite(config=config)

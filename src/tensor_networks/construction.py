@@ -12,7 +12,7 @@ from tensor_networks.unit_cell import UnitCell
 from lattices.kagome import KagomeLattice
 
 # Common types in code:
-from containers import TNDimensions
+from containers.sizes_and_dimensions import TNDimensions
 
 
 

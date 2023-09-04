@@ -120,21 +120,30 @@ def DEFAULT_TIME_STEPS()->list[float]:
 class ITEConfig():
     # hamiltonian:
     interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
-    _GT_energy : float|None = None  # Ground truth energy, if known
     # ITE time steps:
     time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
-    num_mode_repetitions_per_segment : int = 1    
+    num_mode_repetitions_per_segment : int = 1        
     # File:
     backup_file_name : str = "ite_backup"+strings.time_stamp()+" "+strings.random(6)
     # Control flags:
     random_mode_order : bool = True
     start_segment_with_new_bp_message : bool = True
-    bp_not_converged_raises_error : bool = True
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
     segment_error_cause_state_revert : bool = False
     # Control numbers:
-    num_errors_threshold : int = 10
+    num_errors_threshold : int = 10    
+    # Belief-Propagation on full tn:
+    bp_not_converged_raises_error : bool = True
+    bp_every_edge : bool = False
 
+
+    @property
+    def reference_ground_energy(self)->float|None:  
+        """Ground truth energy, if known
+        """
+        func = self.interaction_hamiltonian.func
+        if hasattr(func, "reference"):
+            return func.reference
 
     def __repr__(self) -> str:
         obj = self

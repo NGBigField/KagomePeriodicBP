@@ -29,6 +29,7 @@ def transverse_field_in_direction(direction:Literal['x', 'y', 'z'], strength:flo
 
 def heisenberg_2d()->np.ndarray:
 	return _tensor_product(x,x) + _tensor_product(y,y) + _tensor_product(z,z) 
+heisenberg_2d.reference = -0.4379
 
 
 def ising_with_transverse_field(B:float)->np.ndarray:

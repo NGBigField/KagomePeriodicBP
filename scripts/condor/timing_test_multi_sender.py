@@ -36,7 +36,7 @@ def main():
                 if N==LOW:  vals['N'] = [2, 3, 4]
                 else:       vals['N'] = [5, 6, 7]
 
-                if par:     cpu=14
+                if par:     cpu=22
                 else:       cpu=4
 
                 if D==HIGH and N==HIGH:     mem=64
