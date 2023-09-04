@@ -158,3 +158,4 @@ cython_debug/
 ## Exceptions to the rules:
 !data/unit_cells/*
 *.png
+*.dat
