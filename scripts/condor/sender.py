@@ -18,23 +18,30 @@ results_dir = results_dir.__str__()
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
 
-# result_keys = ["seed", "method", "D", "h", "x", "y", "z", "e", "exec_time"]
-result_keys = ["with_bp", 'D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z']
+
+RESULT_KEYS_DICT = dict(
+    bp = ["with_bp", 'D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'],
+    parallel_timings = ["parallel", 'D', 'N', 'seed', 'bp-step', 'reduction']
+)
 
 ## all values:
 vals = {}
-vals['N'] = range(2, 20, 2)
-vals['D'] = [2, 3, 4]
+vals['N'] = range(2, 11, 1)
+vals['D'] = [2, 3, 4, 5, 6, 7]
 vals['method'] = [0, 1]
-vals['seed'] = [0]
+vals['seed'] = range(5)
 
 _max_str_per_key = {key:max((len(str(val)) for val in lis)) for key, lis in vals.items()}
 
 def main(
-    num_seeds:int=1, 
-    job_type="bp",  # "ite_it" / ite_it_all_h / "bp"
-    request_cpus:int=4
+    job_type="parallel_timings",  # "ite_it" / ite_it_all_h / "bp" / "parallel_timings"
+    request_cpus:int=8,
+    request_memory_gb=2
 ):
+    
+    ## Get from job type:
+    result_keys = RESULT_KEYS_DICT[job_type]
+
 
     ## Define paths and names:
     sep = os.sep
@@ -68,6 +75,7 @@ def main(
             result_keys=_encode_list_as_str(result_keys)
         ))
 
+    ## Print:
     for params in job_params:
         params2print = deepcopy(params)
         params2print.pop("outfile")
@@ -86,7 +94,7 @@ def main(
         output_files_prefix,
         job_params,
         request_cpus=f"{request_cpus}",
-        requestMemory='4gb',
+        requestMemory=f"{request_memory_gb}gb",
         Arguments='$(outfile) $(seed) $(method) $(D) $(N) $(job_type) $(result_keys)'
     )
 

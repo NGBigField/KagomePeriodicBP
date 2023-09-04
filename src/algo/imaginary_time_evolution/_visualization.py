@@ -1,6 +1,5 @@
 
 from utils import visuals, strings, logs, prints, tuples, lists
-from utils.visuals import Axes3D, Quiver, Line3D, Text, plt, DEFAULT_PYPLOT_FIGSIZE, _XYZ
 
 from tensor_networks import UnitCell
 from containers import Config, ITESegmentStats
@@ -13,6 +12,11 @@ from algo.measurements import mean_expectation_values, UnitCellExpectationValues
 
 # Control flags:
 from _config_reader import ALLOW_VISUALS
+
+if ALLOW_VISUALS:
+    from utils.visuals import Axes3D, Quiver, Line3D, Text, plt, DEFAULT_PYPLOT_FIGSIZE, _XYZ
+else:
+    Axes3D, Quiver, Line3D, Text = None, None, None, None
 
 
 XYZ_ARROW_LEN = 1.25

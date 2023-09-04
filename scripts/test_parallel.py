@@ -22,12 +22,14 @@ from matplotlib import pyplot as plt
 # Useful for math:
 import numpy as np
 
+
 d=2
 
-def test_parallel_execution(
+
+def test_parallel_execution_time(
     D = 3,
-    N = 3,
-    parallel : bool = True
+    N = 6,
+    parallel : bool = 1
 )->tuple[float, float]:
     
     print(f"Inputs: D={D} N={N} parallel={parallel!r}")
@@ -61,9 +63,8 @@ def test_parallel_execution(
     return bp_step_time, reduction_step_time
 
 
-
 def main_test():
-    test_parallel_execution()
+    test_parallel_execution_time()
 
 
 if __name__ == "__main__":

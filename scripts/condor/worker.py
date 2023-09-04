@@ -1,6 +1,7 @@
 if __name__ == "__main__":
     import pathlib, sys 
     sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
+    sys.path.append(str(pathlib.Path(__file__).parent.parent.parent/"src"))
 
 from sys import argv
 
@@ -12,8 +13,11 @@ from time import perf_counter
 from csv import DictWriter
 from typing import Any
 
+from src.utils import errors
+
 # Import the possible job types:
-from scripts.condor.job_bp import main as run_job_bp
+from scripts.condor import job_bp
+from scripts.condor import job_parallel_timing 
 
 
 NUM_EXPECTED_ARGS = 8
@@ -65,13 +69,16 @@ def main():
     results : dict[str, Any]
     t1 = perf_counter()
     try:
-        if job_type=="bp":
-            results = run_job_bp(D=D, N=N, method=method)
-        else: 
-            raise ValueError(f"Not an expected job_type={job_type!r}")
+        match job_type:
+            case "bp":  
+                results = job_bp.main(D=D, N=N, method=method)
+            case "parallel_timings":             
+                results = job_parallel_timing.main(D=D, N=N, method=method)
+            case _:
+                raise ValueError(f"Not an expected job_type={job_type!r}")
     except Exception as e:
         results = dict(
-            e=e
+            e=errors.get_traceback(e)
         )
     t2 = perf_counter()
 
@@ -95,10 +102,9 @@ def main():
     with open( output_file ,'a') as f:
         dict_writer = DictWriter(f, fieldnames=result_keys )
         dict_writer.writerow(row_to_write)
-        f.close()
 
     ## End
-    print("Resulsts are written into:")
+    print("Results are written into:")
     print(f"{output_file!r}")
 
 
