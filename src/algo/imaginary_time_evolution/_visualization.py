@@ -1,5 +1,5 @@
 
-from utils import visuals, strings, logs, prints, tuples, lists
+from utils import visuals, strings, logs, prints, tuples, lists, saveload
 
 from tensor_networks import UnitCell
 from containers import Config, ITESegmentStats
@@ -152,7 +152,7 @@ class ITEPlots():
         self,
         active:bool,
         config:Config,
-        plots_to_show : list[bool] = [True, True, True]
+        plots_to_show : list[bool] = [True, False, False]
     )->None:
         
         ## Save data:
@@ -314,7 +314,7 @@ class ITEPlots():
             energies4mean = []
             for edge_tuple, energy in energies.items():
                 energies4mean.append(energy)
-                plot.axis.scatter(x=i, y=energy, c="black", s=6)
+                plot.axis.scatter(x=i, y=energy, c="black", s=4, alpha=0.6)
                 
             # Mean:
             energy = sum(energies4mean)/len(energies4mean)
@@ -372,6 +372,7 @@ class ITEPlots():
         for i, (fig_name, fig) in enumerate(self.figs.items()):
             visuals.save_figure(fig, file_name=file_name+f"{i}"+" "+fig_name)
         if logger is not None and isinstance(logger, logs.Logger):
-            path = str(visuals.get_saved_figures_folder())+" "+file_name
-            logger.info(f"Plots saved in       {path!r}")
+            path = visuals.get_saved_figures_folder()/file_name
+            p_str = path.__str__()
+            logger.info(f"Plots saved in       {p_str!r}")
 

@@ -20,7 +20,7 @@ class _ConfigClassWithSubClasses:
 
 @dataclass
 class Config(_ConfigClassWithSubClasses): 
-    # The actuall stored data:
+    # The actual stored data:
     bp : BPConfig 
     ite : ITEConfig 
     dims : TNDimensions
