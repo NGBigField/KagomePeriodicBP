@@ -11,7 +11,7 @@ BASE_VALS = {}
 BASE_VALS['N'] = range(2, 11, 1)
 BASE_VALS['D'] = [2, 3, 4, 5, 6, 7]
 BASE_VALS['method'] = [0, 1]
-BASE_VALS['seed'] = range(5)
+BASE_VALS['seed'] = range(3)
 
 
 LOW  = 0
@@ -36,10 +36,10 @@ def main():
                 if N==LOW:  vals['N'] = [2, 3, 4]
                 else:       vals['N'] = [5, 6, 7]
 
-                if par:     cpu=22
+                if par:     cpu=16
                 else:       cpu=4
 
-                if D==HIGH and N==HIGH:     mem=64
+                if D==HIGH and N==HIGH:     mem=32
                 elif D==HIGH or N==HIGH:    mem=16
                 else:                       mem=8
 

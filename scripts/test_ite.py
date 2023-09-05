@@ -22,7 +22,7 @@ import numpy as np
 
 
 def test_full_ite(
-    D = 4,
+    D = 3,
     N = 3,
     live_plots:bool = 1,
     parallel:bool = 0
