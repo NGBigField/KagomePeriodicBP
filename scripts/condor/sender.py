@@ -67,17 +67,19 @@ def main(
 
     ## Define job params:
     job_params : list[dict] = []
-    for N, D, method, seed in product(vals['N'], vals['D'], vals['method'], vals['seed']):
+    for N, D, method, seed, chi in product(vals['N'], vals['D'], vals['method'], vals['seed'], vals['chi'] ):
         # To strings:
         N = f"{N}"
         D = f"{D}"
         method = f"{method}"
         seed = f"{seed}"
+        chi = f"{chi}"
 
         job_params.append( dict(
             outfile=results_fullpath,
             D=D,
             N=N,
+            chi=chi,
             method=method,
             seed=seed,
             job_type=job_type,
