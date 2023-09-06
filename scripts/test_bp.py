@@ -7,7 +7,7 @@ import project_paths
 from tensor_networks.construction import create_kagome_tn, UnitCell
 
 # BP:
-from algo.belief_propagation import belief_propagation
+from algo.belief_propagation import belief_propagation, robust_belief_propagation
 
 # Config and containers:
 from containers import BPConfig
@@ -191,8 +191,8 @@ def growing_tn_bp_test(
 
 
 def test_single_bp_vs_growing_TN(
-    Ds = [2, 3],
-    bp_N = 3
+    Ds = [2, 3, 4],
+    bp_N = 4
 ):
     
     fig1 = plt.figure()
@@ -209,26 +209,27 @@ def test_single_bp_vs_growing_TN(
     
     csv_fullpath = project_paths.data/"condor"/"results_bp_convergence.csv"
     table = csvs.read_csv_table(csv_fullpath)
-    markers = ["x", "+", "*"]
+    # markers = ["x", "+", "*"]
 
 
-    for D, marker_style in zip(Ds, markers, strict=True):
+    for i, D in enumerate(Ds):
+        marker_style = "*"
         
-        chi = 2*D**2 + 20
-        bp_chi = D**2 + 10
+        chi = 2*D**2 + 40
+        bp_chi = D**2 + 20
         unit_cell = UnitCell.load(f"best_heisenberg_AFM_D{D}")
         hamiltonian = hamiltonians.heisenberg_afm()
 
         bp_config = BPConfig(
             max_iterations=60,
             max_swallowing_dim=bp_chi,
-            target_msg_diff=1e-6
+            target_msg_diff=1e-7
         )
 
         tn = create_kagome_tn(d, D, bp_N, unit_cell)
         bp_num_tensors = tn.size
 
-        _, _ = belief_propagation(tn, None, bp_config)
+        _, _ = robust_belief_propagation(tn, None, bp_config)
 
         core = reduce_tn(tn, CoreTN, chi)
         _, _, mean_energy = measure_energies_and_observables_together(core, hamiltonian, trunc_dim=chi)
@@ -261,7 +262,6 @@ def test_single_bp_vs_growing_TN(
         
         assert len(num_tensors)==len(times)==len(delta_energies)
 
-        p : mpl.lines.Line2D
         p, *_ = plt.plot(num_tensors, delta_energies, label=f"D={D}", linewidth=3, marker=marker_style)
         
 
