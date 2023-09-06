@@ -23,11 +23,12 @@ def main(
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     afm_or_fm:str = "AFM"  # Anti-Ferro-Magnetic or Ferro-Magnetic
 )->tuple[float, str]:
+    
     unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}"
     unit_cell = UnitCell.load(unit_cell_file_name)
     if unit_cell is None:
         unit_cell = UnitCell.random(d=d, D=D)
-    unit_cell._file_name = unit_cell_file_name
+    unit_cell._file_name = results_filename
 
     ## Config:
     config = Config.derive_from_physical_dim(D)
@@ -47,7 +48,7 @@ def main(
     config.bp.parallel_msgs = parallel
     config.visuals.progress_bars = 1
     # delta-t's:
-    config.ite.time_steps =  [0.0001]*1
+    config.ite.time_steps = [0.2]*5 + [0.1]*20 + [0.01]*50 + [0.001]*100 + [0.05]*20 + [0.001]*100 + [1e-4]*100 + [1e-5]*200 + [1e-6]*200 + [1e-7]*300
     config.ite.bp_every_edge = False
     # BP:
     # config.bp.target_msg_diff = 1e-6
@@ -55,7 +56,7 @@ def main(
 
     ## Run:
     energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)
-    fullpath = unit_cell_out.save(results_filename)
+    fullpath = unit_cell_out.save(results_filename+"_final")
     print("Done")
 
     return energy, fullpath
