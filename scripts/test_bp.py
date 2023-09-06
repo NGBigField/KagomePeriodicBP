@@ -1,5 +1,8 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 
+
+import project_paths
+
 # Tensor-Networks creation:
 from tensor_networks.construction import create_kagome_tn, UnitCell
 
@@ -19,8 +22,9 @@ from physics import hamiltonians
 import numpy as np
 
 # useful utils:
-from utils import visuals, saveload, csvs
+from utils import visuals, saveload, csvs, dicts
 from matplotlib import pyplot as plt
+import matplotlib as mpl
 
 d=2
 
@@ -187,23 +191,80 @@ def growing_tn_bp_test(
 
 
 def single_bp_test(
-    D = 5,
-    N = 10
+    Ds = [2, 3, 4],
+    bp_N = 2
 ):
-
-    ## Config:
-    bp_config = BPConfig(
-        max_swallowing_dim=18        
-    )
     
-    ## first network:
-    tn = create_kagome_tn(d=d, D=D, N=N)
+    visuals.draw_now()
+    plt.figure()
 
-    ## BP:
-    messages, stats = belief_propagation(tn, messages=None, config=bp_config)
-    messages, _ = belief_propagation(tn, messages=messages, config=bp_config)
+    for D in Ds:
+        
+        chi = 2*D**2 + 10
+        bp_chi = D**2
+        unit_cell = UnitCell.load("best_heisenberg_AFM_D2")
+        hamiltonian = hamiltonians.heisenberg_afm()
 
-    print(stats)
+        bp_config = BPConfig(
+            max_iterations=40,
+            max_swallowing_dim=bp_chi,
+            target_msg_diff=1e-9
+        )
+
+        tn = create_kagome_tn(d, D, bp_N, unit_cell)
+        bp_num_tensors = tn.size
+
+        _, _ = belief_propagation(tn, None, bp_config)
+
+        core = reduce_tn(tn, CoreTN, chi)
+        _, _, mean_energy = measure_energies_and_observables_together(core, hamiltonian, trunc_dim=chi)
+
+        print(f"mean_energy={mean_energy}") 
+        print(f"num_tensors={bp_num_tensors}") 
+        print(f"chi={chi}") 
+
+
+        csv_fullpath = project_paths.data/"condor"/"results_bp_convergence.csv"
+        table = csvs.read_csv_table(csv_fullpath)
+
+        delta_energies = []
+        times = []
+        num_tensors = []
+
+        Ns = list(set(table["N"]))
+        Ns.sort()
+        for N in Ns:
+            matching_rows = csvs.get_matching_table_element(table, N=N)
+
+            mean, std = dicts.statistics_along_key(matching_rows, "energy")
+            d_e = abs(mean-mean_energy)
+            delta_energies.append(d_e)
+
+            mean, std = dicts.statistics_along_key(matching_rows, "exec_time")
+            times.append(mean)
+
+            n_t = matching_rows[0]["num_tensors"]
+            num_tensors.append(n_t)
+
+            
+        
+        assert len(Ns)==len(times)==len(delta_energies)
+
+        p : mpl.lines.Line2D
+        p, *_ = plt.plot(num_tensors, delta_energies, label=f"D={D}", linewidth=4)
+        
+        plt.yscale("log")
+        plt.xlabel("# tensors in lattice")
+        plt.ylabel("energy error")
+        # plt.title(f"Error between Block-BP on {bp_num_tensors} tensors and random environment tensors")
+        plt.grid("on")
+        plt.legend()
+        
+        visuals.draw_now()
+
+        print("Done")
+
+    return mean_energy, num_tensors, chi
 
 
 
@@ -254,7 +315,7 @@ def test_bp_convergence_steps_single_run(
 ):
     
     chi = 2*D**2 + 10
-    unit_cell = UnitCell.load("best_heisenberg_AFM_D2")
+    unit_cell = UnitCell.load(f"best_heisenberg_AFM_D{D}")
     hamiltonian = hamiltonians.heisenberg_afm()
 
     tn = create_kagome_tn(d, D, N, unit_cell)
@@ -268,11 +329,11 @@ def test_bp_convergence_steps_single_run(
                 
 
 def main_test():
-    # single_bp_test()
+    single_bp_test()
     # growing_tn_bp_test()
     # growing_tn_bp_test2()
     # load_results()
-    test_bp_convergence_steps_single_run()
+    # test_bp_convergence_steps_single_run()
 
 
 if __name__ == "__main__":

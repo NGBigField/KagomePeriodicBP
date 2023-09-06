@@ -14,11 +14,11 @@ d = 2
 
 
 def run_ite(
-    D = 2,
-    N = 4,
+    D = 4,
+    N = 2,
     live_plots:bool = 1,
-    parallel:bool = 1,
-    afm_or_fm:str = "AFM"  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    parallel:bool = 0,
+    afm_or_fm:str = "FM"  # Anti-Ferro-Magnetic or Ferro-Magnetic
 ):
     unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}"
     unit_cell = UnitCell.load(unit_cell_file_name)
@@ -44,7 +44,7 @@ def run_ite(
     config.bp.parallel_msgs = parallel
     config.visuals.progress_bars = 1
     # delta-t's:
-    config.ite.time_steps =  [0.0001]*50
+    # config.ite.time_steps =  [0.0001]*50
     config.ite.bp_every_edge = False
     # BP:
     # config.bp.target_msg_diff = 1e-6

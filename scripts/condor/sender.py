@@ -29,7 +29,7 @@ RESULT_KEYS_DICT = dict(
 DEFAULT_VALS = {}
 DEFAULT_VALS['N'] = range(2, 11, 1)
 DEFAULT_VALS['D'] = [2, 3, 4]
-DEFAULT_VALS['chi'] = [None]
+DEFAULT_VALS['chi'] = [-1]
 DEFAULT_VALS['method'] = [1]
 DEFAULT_VALS['seed'] = range(5)
 
