@@ -19,6 +19,7 @@ from src.utils import errors
 from scripts.condor import job_bp
 from scripts.condor import job_parallel_timing 
 from scripts.condor import job_bp_convergence 
+from scripts.condor import job_ite_afm
 
 
 NUM_EXPECTED_ARGS = 9
@@ -81,6 +82,8 @@ def main():
                 results = job_parallel_timing.main(D=D, N=N, method=method)
             case "bp_convergence":
                 results = job_bp_convergence.main(D=D, N=N)
+            case "ite_afm":
+                results = job_ite_afm.main(D=D, N=N)
             case _:
                 raise ValueError(f"Not an expected job_type={job_type!r}")
     except Exception as e:

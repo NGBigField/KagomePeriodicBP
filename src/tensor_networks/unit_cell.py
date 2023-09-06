@@ -66,7 +66,7 @@ class UnitCell:
 
     def save(self, file_name:str|None=None)->None:
         file_name = self._derive_file_name(file_name)
-        saveload.save(self, name=file_name, sub_folder=UNIT_CELL_SUBFOLDER)
+        return saveload.save(self, name=file_name, sub_folder=UNIT_CELL_SUBFOLDER)
 
     @staticmethod
     def load(file_name:str, if_exist:bool=True)->"UnitCell":

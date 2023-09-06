@@ -190,25 +190,39 @@ def growing_tn_bp_test(
                 
 
 
-def single_bp_test(
+def test_single_bp_vs_growing_TN(
     Ds = [2, 3, 4],
     bp_N = 2
 ):
     
-    visuals.draw_now()
-    plt.figure()
+    fig1 = plt.figure()
+    plt.yscale("log")
+    plt.xlabel("# tensors in lattice")
+    plt.ylabel("energy error")
+    # plt.title(f"Error between Block-BP on {bp_num_tensors} tensors and random environment tensors")
+    plt.grid("on")
+    plt.legend()
 
-    for D in Ds:
+    visuals.draw_now()
+
+
+    
+    csv_fullpath = project_paths.data/"condor"/"results_bp_convergence.csv"
+    table = csvs.read_csv_table(csv_fullpath)
+    markers = ["x", "+", "*"]
+
+
+    for D, marker_style in zip(Ds, markers, strict=True):
         
         chi = 2*D**2 + 10
         bp_chi = D**2
-        unit_cell = UnitCell.load("best_heisenberg_AFM_D2")
+        unit_cell = UnitCell.load(f"best_heisenberg_AFM_D{D}")
         hamiltonian = hamiltonians.heisenberg_afm()
 
         bp_config = BPConfig(
-            max_iterations=40,
+            max_iterations=50,
             max_swallowing_dim=bp_chi,
-            target_msg_diff=1e-9
+            target_msg_diff=1e-8
         )
 
         tn = create_kagome_tn(d, D, bp_N, unit_cell)
@@ -224,9 +238,6 @@ def single_bp_test(
         print(f"chi={chi}") 
 
 
-        csv_fullpath = project_paths.data/"condor"/"results_bp_convergence.csv"
-        table = csvs.read_csv_table(csv_fullpath)
-
         delta_energies = []
         times = []
         num_tensors = []
@@ -234,7 +245,7 @@ def single_bp_test(
         Ns = list(set(table["N"]))
         Ns.sort()
         for N in Ns:
-            matching_rows = csvs.get_matching_table_element(table, N=N)
+            matching_rows = csvs.get_matching_table_element(table, N=N, D=D)
 
             mean, std = dicts.statistics_along_key(matching_rows, "energy")
             d_e = abs(mean-mean_energy)
@@ -248,21 +259,16 @@ def single_bp_test(
 
             
         
-        assert len(Ns)==len(times)==len(delta_energies)
+        assert len(num_tensors)==len(times)==len(delta_energies)
 
         p : mpl.lines.Line2D
-        p, *_ = plt.plot(num_tensors, delta_energies, label=f"D={D}", linewidth=4)
+        p, *_ = plt.plot(num_tensors, delta_energies, label=f"D={D}", linewidth=3, marker=marker_style)
         
-        plt.yscale("log")
-        plt.xlabel("# tensors in lattice")
-        plt.ylabel("energy error")
-        # plt.title(f"Error between Block-BP on {bp_num_tensors} tensors and random environment tensors")
-        plt.grid("on")
-        plt.legend()
-        
-        visuals.draw_now()
 
-        print("Done")
+    
+    visuals.draw_now()
+
+    print("Done")
 
     return mean_energy, num_tensors, chi
 
@@ -329,7 +335,7 @@ def test_bp_convergence_steps_single_run(
                 
 
 def main_test():
-    single_bp_test()
+    test_single_bp_vs_growing_TN()
     # growing_tn_bp_test()
     # growing_tn_bp_test2()
     # load_results()

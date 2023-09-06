@@ -4,6 +4,8 @@ import _import_src  ## Needed to import src folders when scripts are called from
 from containers import Config
 from tensor_networks import UnitCell
 
+from utils import strings
+
 
 # Algos we test here:
 from algo.imaginary_time_evolution import full_ite
@@ -13,13 +15,14 @@ from physics import hamiltonians
 d = 2
 
 
-def run_ite(
-    D = 4,
+def main(
+    D = 2,
     N = 2,
     live_plots:bool = 1,
     parallel:bool = 0,
-    afm_or_fm:str = "FM"  # Anti-Ferro-Magnetic or Ferro-Magnetic
-):
+    results_filename:str = strings.time_stamp()+"_"+strings.random(4),
+    afm_or_fm:str = "AFM"  # Anti-Ferro-Magnetic or Ferro-Magnetic
+)->tuple[float, str]:
     unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}"
     unit_cell = UnitCell.load(unit_cell_file_name)
     if unit_cell is None:
@@ -44,23 +47,19 @@ def run_ite(
     config.bp.parallel_msgs = parallel
     config.visuals.progress_bars = 1
     # delta-t's:
-    # config.ite.time_steps =  [0.0001]*50
+    config.ite.time_steps =  [0.0001]*1
     config.ite.bp_every_edge = False
     # BP:
     # config.bp.target_msg_diff = 1e-6
 
 
     ## Run:
-    unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)
+    energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)
+    fullpath = unit_cell_out.save(results_filename)
     print("Done")
 
+    return energy, fullpath
 
-
-
-
-
-def main():
-    run_ite()
 
 
 if __name__ == "__main__":

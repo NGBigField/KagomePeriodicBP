@@ -399,7 +399,7 @@ def ite_per_delta_t(
 
     prog_bar.clear()
 
-    return unit_cell, messages, at_least_one_successful_run, segment_stats
+    return mean_energy, unit_cell, messages, at_least_one_successful_run, segment_stats
 
 
 def full_ite(
@@ -407,7 +407,8 @@ def full_ite(
     config:Config|None=None,
     logger:logs.Logger|None=None
 )->tuple[
-    KagomeTN,          # core
+    float,                  # energy
+    UnitCell,               # core
     ITEProgressTracker,     # ITE-Tracker
     logs.Logger             # Logger
 ]:
@@ -435,13 +436,13 @@ def full_ite(
     # Main loop:
     for delta_t, num_repeats in delta_t_list_with_repetitions:
         prog_bar.next(extra_str=f"delta-t={delta_t}")
-        unit_cell, messages, success, step_stats = ite_per_delta_t(unit_cell, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)
+        mean_energy, unit_cell, messages, success, step_stats = ite_per_delta_t(unit_cell, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)
     
     ## Log finish:
     prog_bar.clear()
     _log_and_print_finish_message(logger, config, ite_tracker, plots)  # Print and log valuable information: 
 
-    return unit_cell, ite_tracker, logger
+    return mean_energy, unit_cell, ite_tracker, logger
 
 
 def robust_full_ite(

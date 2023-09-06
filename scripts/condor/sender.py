@@ -22,22 +22,23 @@ if not os.path.exists(results_dir):
 RESULT_KEYS_DICT = dict(
     bp = ["with_bp", 'D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'],
     parallel_timings = ["parallel", 'D', 'N', 'seed', 'bp-step', 'reduction'],
-    bp_convergence = ['seed', 'D', 'N', 'chi', 'iterations', 'num_tensors', 'energy', 'exec_time']
+    bp_convergence = ['seed', 'D', 'N', 'chi', 'iterations', 'num_tensors', 'energy', 'exec_time'],
+    ite_afm = ["seed","D", "N", "energy", "path"]
 )
 
 ## all values:
 DEFAULT_VALS = {}
-DEFAULT_VALS['N'] = range(2, 11, 1)
+DEFAULT_VALS['N'] = [3] #range(2, 11, 1)
 DEFAULT_VALS['D'] = [2, 3, 4]
 DEFAULT_VALS['chi'] = [-1]
 DEFAULT_VALS['method'] = [1]
-DEFAULT_VALS['seed'] = range(5)
+DEFAULT_VALS['seed'] = range(1)
 
 Arguments = '$(outfile) $(seed) $(method) $(D) $(N) $(chi) $(job_type) $(result_keys)'
 
 
 def main(
-    job_type="bp_convergence",  # "ite_it" / ite_it_all_h / "bp" / "parallel_timings" / "bp_convergence"
+    job_type="ite_afm",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
     request_cpus:int=2,
     request_memory_gb:int=4,
     vals:dict=DEFAULT_VALS,
