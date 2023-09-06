@@ -191,8 +191,8 @@ def growing_tn_bp_test(
 
 
 def test_single_bp_vs_growing_TN(
-    Ds = [2, 3, 4],
-    bp_N = 2
+    Ds = [2, 3],
+    bp_N = 3
 ):
     
     fig1 = plt.figure()
@@ -214,15 +214,15 @@ def test_single_bp_vs_growing_TN(
 
     for D, marker_style in zip(Ds, markers, strict=True):
         
-        chi = 2*D**2 + 10
+        chi = 2*D**2 + 20
         bp_chi = D**2 + 10
         unit_cell = UnitCell.load(f"best_heisenberg_AFM_D{D}")
         hamiltonian = hamiltonians.heisenberg_afm()
 
         bp_config = BPConfig(
-            max_iterations=50,
+            max_iterations=60,
             max_swallowing_dim=bp_chi,
-            target_msg_diff=1e-5
+            target_msg_diff=1e-6
         )
 
         tn = create_kagome_tn(d, D, bp_N, unit_cell)
@@ -266,6 +266,7 @@ def test_single_bp_vs_growing_TN(
         
 
     
+    plt.legend()
     visuals.draw_now()
     visuals.save_figure()
 
