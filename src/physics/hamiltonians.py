@@ -14,7 +14,7 @@ def _tensor_product(op1:np.ndarray, op2:np.ndarray)->np.ndarray:
 
 
 def ferromagnetic_with_transverse_field(direction:Literal['x', 'y', 'z'], strength:float=0.0)->np.ndarray:
-	return -1*heisenberg_2d() - transverse_field_in_direction(direction, strength)
+	return heisenberg_fm() - transverse_field_in_direction(direction, strength)
 
 
 def transverse_field_in_direction(direction:Literal['x', 'y', 'z'], strength:float=0.0)->np.ndarray:
@@ -27,9 +27,15 @@ def transverse_field_in_direction(direction:Literal['x', 'y', 'z'], strength:flo
 	return strength*_tensor_product(op, id) + strength*_tensor_product(id, op)
 
 
-def heisenberg_2d()->np.ndarray:
+def heisenberg_fm()->np.ndarray:
+	return -1*heisenberg_afm()
+heisenberg_fm.reference = -5.0
+
+
+def heisenberg_afm()->np.ndarray:
 	return _tensor_product(x,x) + _tensor_product(y,y) + _tensor_product(z,z) 
-heisenberg_2d.reference = -0.4379
+# heisenberg_afm.reference = -0.438703897456
+heisenberg_afm.reference = -0.38620
 
 
 def ising_with_transverse_field(B:float)->np.ndarray:
@@ -47,54 +53,3 @@ def zero() -> np.ndarray:
 
 def identity() -> np.ndarray:
 	return _tensor_product(id, id)
-
-
-
-
-
-
-
-## Old index dependant functions ##
-# =============================== #
-
-
-def get_su_d_heisenberg(d=2):
-	return lambda n, i1, j1, i2, j2: SU_Heisenberg(n, i1, j1, i2, j2, d=d)
-
-
-def SU_Heisenberg(n, i1, j1, i2, j2, d=2) -> np.ndarray:
-	"""
-	
-	The Hamiltonian that we simulate.
-	
-	Input Parameters:
-	----------------
-	edge --- the edge of the Hamiltonian term we output.
-	
-	
-	OUTPUT:
-	-------
-	
-	A rank-4 tensor defining the Hamiltonian term on the given edge.
-	
-	If the edge is (i,j) particles, then its Hamiltonian tensor is given
-	by:
-	
-	   <i-ket|<j-ket| h |i-bra>|j-bra>  =  h[i-ket, i-bra, j-ket, j-bra]
-	
-	"""
-
-	H = None
-	for flavorA in range(d):
-		for flavorB in range(d):
-			T_AB = zeros([d, d])
-			T_AB[flavorA, flavorB] = 1.0
-
-			if H is None:
-				H = tensordot(T_AB, T_AB.T, 0)
-			else:
-				H += tensordot(T_AB, T_AB.T, 0)
-
-
-	return H
-

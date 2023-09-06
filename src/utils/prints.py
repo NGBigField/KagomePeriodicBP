@@ -126,11 +126,7 @@ class ProgressBar(StaticNumOutOfNum):
         super().__init__(expected_end, print_prefix, print_suffix, print_out, in_place)
 
     @staticmethod
-    def inactive()->"ProgressBar":
-        # inactive_prog_bar : ProgressBar = type('obj', (object,), {"next":0, "clear":0})  # type: ignore		
-        # inactive_prog_bar.next = lambda increment=0, extra_str="s", every=0: 0
-        # inactive_prog_bar.clear = lambda: None
-        # return inactive_prog_bar
+    def inactive()->"InactiveProgressBar":
         return InactiveProgressBar()
 
     @staticmethod

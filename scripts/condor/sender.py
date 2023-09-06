@@ -21,13 +21,15 @@ if not os.path.exists(results_dir):
 
 RESULT_KEYS_DICT = dict(
     bp = ["with_bp", 'D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'],
-    parallel_timings = ["parallel", 'D', 'N', 'seed', 'bp-step', 'reduction']
+    parallel_timings = ["parallel", 'D', 'N', 'seed', 'bp-step', 'reduction'],
+    bp_convergence = ['seed', 'D', 'N', 'chi', 'iterations']
 )
 
 ## all values:
 DEFAULT_VALS = {}
 DEFAULT_VALS['N'] = range(2, 11, 1)
-DEFAULT_VALS['D'] = [2, 3, 4, 5, 6, 7]
+DEFAULT_VALS['D'] = [2]
+DEFAULT_VALS['chi'] = [2, 4, 8, 16, 32]
 DEFAULT_VALS['method'] = [0, 1]
 DEFAULT_VALS['seed'] = range(5)
 
@@ -35,9 +37,9 @@ Arguments = '$(outfile) $(seed) $(method) $(D) $(N) $(job_type) $(result_keys)'
 
 
 def main(
-    job_type="parallel_timings",  # "ite_it" / ite_it_all_h / "bp" / "parallel_timings"
-    request_cpus:int=12,
-    request_memory_gb:int=16,
+    job_type="bp_convergence",  # "ite_it" / ite_it_all_h / "bp" / "parallel_timings" / "bp_convergence"
+    request_cpus:int=2,
+    request_memory_gb:int=4,
     vals:dict=DEFAULT_VALS,
     result_file_name:str|None=None
 ):

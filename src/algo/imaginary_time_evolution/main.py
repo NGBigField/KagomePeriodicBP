@@ -323,7 +323,8 @@ def ite_segment(
                 unit_cell, messages, delta_t, logger, config, update_mode
             )
         except BPNotConvergedError as e:
-            prints.print_warning(errors.get_traceback(e))
+            # prints.print_warning(errors.get_traceback(e))
+            raise ITEError(*e.args)
         ## Track results:
         stats.ite_per_mode_stats.append(ite_per_mode_stats)
         logger.debug(f"        Hermicity of environment={ite_per_mode_stats.env_metrics.hermicity!r}")
@@ -471,5 +472,5 @@ def robust_full_ite(
 
 
 if __name__ == "__main__":
-    from scripts.test_ite import main_test
-    main_test()
+    from scripts.run_heisenberg import main
+    main()

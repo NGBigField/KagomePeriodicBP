@@ -15,10 +15,11 @@ from algo.measurements import derive_xyz_expectation_values_with_tn, calc_unit_c
 # Numpy for math stuff:
 import numpy as np
 
-# usefull utils:
+# useful utils:
 from utils import visuals, saveload, csvs
 from matplotlib import pyplot as plt
 
+d=2
 
 def _standard_row_from_results(D:int, N:int, results:list[UnitCell])->None:
     row = [D, N]
@@ -40,7 +41,6 @@ def load_results(
     print("Done")
 
 def bp_single_call(
-    d : int = 2,
     D : int = 3,
     N : int = 2,
     with_bp : bool = True        
@@ -68,7 +68,6 @@ def bp_single_call(
 
 
 def growing_tn_bp_test2(
-    d = 2,
     D = 2,
     min_N = 2,
     max_N = 4,
@@ -123,13 +122,11 @@ def growing_tn_bp_test2(
         row = _standard_row_from_results(D, N, results)
         # csv.append(row)
         
-
     ## End:
     print("Done")
                 
 
 def growing_tn_bp_test(
-    d = 2,
     D = 2,
     bp_N = 2,
     min_N = 2,
@@ -187,7 +184,6 @@ def growing_tn_bp_test(
 
 
 def single_bp_test(
-    d = 2,
     D = 5,
     N = 10
 ):
@@ -207,11 +203,75 @@ def single_bp_test(
     print(stats)
 
 
+
+def test_bp_convergence_steps(
+    D = 2,
+    N_vals   = [2, 3, 4, 5, 6, 7, 8, 9, 10],
+    chi_vals = [2, 4, 8, 16]
+):
+    
+    unit_cell = UnitCell.random(d, D)
+
+    plot = visuals.AppendablePlot()
+    plt.xlabel("N")
+    plt.ylabel("#Iterations")
+    plt.title(f"#Iteration for Block-BP convergence")
+    plt.grid("on")
+    plt.legend()
+
+    visuals.draw_now()
+    
+    for chi in chi_vals:
+
+        ## Config:
+        bp_config = BPConfig(
+            max_swallowing_dim=chi,
+            target_msg_diff=1e-5
+        )
+
+
+        for N in N_vals:
+            tn = create_kagome_tn(d, D, N, unit_cell)
+            messages, stats = belief_propagation(tn, None, bp_config)
+
+            x = N
+            y = stats.iterations
+
+            dict_ = {f"chi={chi}" : (x, y)}
+            plot.append(**dict_)
+
+
+    print("Done")
+                
+
+
+def test_bp_convergence_steps_single_run(
+    N:int,
+    chi:int,
+    D = 2,
+):
+    
+    unit_cell = UnitCell.random(d, D)
+
+    ## Config:
+    bp_config = BPConfig(
+        max_swallowing_dim=chi,
+        target_msg_diff=1e-5
+    )
+
+    tn = create_kagome_tn(d, D, N, unit_cell)
+    messages, stats = belief_propagation(tn, None, bp_config)
+    iterations = stats.iterations
+
+    return iterations
+                
+
 def main_test():
-    single_bp_test()
+    # single_bp_test()
     # growing_tn_bp_test()
     # growing_tn_bp_test2()
     # load_results()
+    test_bp_convergence_steps()
 
 
 if __name__ == "__main__":

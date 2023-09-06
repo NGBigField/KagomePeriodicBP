@@ -130,7 +130,7 @@ def update_unit_cell(
     unit_cell[f2] = t2_new
 
     ## Keep copy 
-    unit_cell.save("last_unit_cell")
+    unit_cell.save()
 
     return unit_cell, energy_after, env_metrics
 

@@ -100,19 +100,19 @@ class UpdateEdge(NamedTuple):
 
 
 SUB_FOLDER = "ite_trackers"
-# DEFAULT_TIME_STEPS = lambda:  [0.1]*20 + [0.01]*50 + [0.001]*50 + [0.0001]*50
-def DEFAULT_TIME_STEPS()->list[float]:
-    dts = []
-    for exp in [-1, -2, -3, -4]:
-        for mantissa in [5, 2, 1]:
-            if exp==-1 and mantissa in [5, 2]:
-                continue
-            elif exp==-1 and mantissa==1:
-                repeats = 20
-            else:
-                repeats = 50
-            dts += [mantissa*10**exp]*repeats
-    return dts
+DEFAULT_TIME_STEPS = lambda:  [0.5]*5 + [0.1]*30 + [0.01]*10 + [0.001]*10 + [0.01]*20 + [0.001]*20 + [0.001]*50 + [0.0001]*50
+# def DEFAULT_TIME_STEPS()->list[float]:
+#     dts = []
+#     for exp in [-1, -2, -3, -4]:
+#         for mantissa in [5, 2, 1]:
+#             if exp==-1 and mantissa in [5, 2]:
+#                 continue
+#             elif exp==-1 and mantissa==1:
+#                 repeats = 20
+#             else:
+#                 repeats = 50
+#             dts += [mantissa*10**exp]*repeats
+#     return dts
 
 
 
@@ -262,14 +262,14 @@ class ITEProgressTracker():
             energy = self.energies.pop()
             core = self.unit_cells.pop()
             messages = self.messages.pop()
-            exepectation_values = self.expectation_values.pop()
+            expectation_values = self.expectation_values.pop()
             step_stats = self.stats.pop()
         # Up to date memory:
         self.last_unit_cell = core  #type: ignore
         self.last_messages = messages  #type: ignore
         self.last_iter -= num_iter
         # Return:
-        return delta_t, energy, step_stats, exepectation_values, core, messages  #type: ignore
+        return delta_t, energy, step_stats, expectation_values, core, messages  #type: ignore
 
 
     @staticmethod
