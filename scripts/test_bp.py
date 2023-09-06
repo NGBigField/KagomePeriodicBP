@@ -8,9 +8,12 @@ from algo.belief_propagation import belief_propagation
 
 # Config and containers:
 from containers import BPConfig
+from tensor_networks import CoreTN
 
 # Measure core data
-from algo.measurements import derive_xyz_expectation_values_with_tn, calc_unit_cell_expectation_values_from_tn, pauli
+from algo.measurements import derive_xyz_expectation_values_with_tn, calc_unit_cell_expectation_values_from_tn, pauli, measure_energies_and_observables_together
+from algo.tn_reduction import reduce_tn
+from physics import hamiltonians
 
 # Numpy for math stuff:
 import numpy as np
@@ -246,24 +249,22 @@ def test_bp_convergence_steps(
 
 
 def test_bp_convergence_steps_single_run(
-    N:int,
-    chi:int,
-    D = 2,
+    N:int=2,
+    D:int=2,
 ):
     
-    unit_cell = UnitCell.random(d, D)
-
-    ## Config:
-    bp_config = BPConfig(
-        max_swallowing_dim=chi,
-        target_msg_diff=1e-5
-    )
+    chi = 2*D**2 + 10
+    unit_cell = UnitCell.load("best_heisenberg_AFM_D2")
+    hamiltonian = hamiltonians.heisenberg_afm()
 
     tn = create_kagome_tn(d, D, N, unit_cell)
-    messages, stats = belief_propagation(tn, None, bp_config)
-    iterations = stats.iterations
+    num_tensors = tn.size
 
-    return iterations
+    tn.connect_random_messages()
+    core = reduce_tn(tn, CoreTN, chi)
+    _, _, mean_energy = measure_energies_and_observables_together(core, hamiltonian, trunc_dim=chi)
+
+    return mean_energy, num_tensors, chi
                 
 
 def main_test():
@@ -271,7 +272,7 @@ def main_test():
     # growing_tn_bp_test()
     # growing_tn_bp_test2()
     # load_results()
-    test_bp_convergence_steps()
+    test_bp_convergence_steps_single_run()
 
 
 if __name__ == "__main__":

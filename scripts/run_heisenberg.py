@@ -15,12 +15,12 @@ d = 2
 
 def run_ite(
     D = 2,
-    N = 5,
+    N = 4,
     live_plots:bool = 1,
     parallel:bool = 1,
     afm_or_fm:str = "AFM"  # Anti-Ferro-Magnetic or Ferro-Magnetic
 ):
-    unit_cell_file_name = f"best_heisenberg_{afm_or_fm}_D{D}"
+    unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}"
     unit_cell = UnitCell.load(unit_cell_file_name)
     if unit_cell is None:
         unit_cell = UnitCell.random(d=d, D=D)
@@ -37,14 +37,14 @@ def run_ite(
     else:
         raise ValueError("not matching any option.")
     #
-    factor = 16
+    factor = 1
     config.trunc_dim *= factor
     config.bp.max_swallowing_dim *= factor
     # Parallel:
     config.bp.parallel_msgs = parallel
     config.visuals.progress_bars = 1
     # delta-t's:
-    config.ite.time_steps = [0.01]*50 + [0.001]*20 + [0.001]*50 + [0.0001]*50
+    config.ite.time_steps =  [0.0001]*50
     config.ite.bp_every_edge = False
     # BP:
     # config.bp.target_msg_diff = 1e-6

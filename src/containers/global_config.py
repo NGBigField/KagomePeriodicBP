@@ -34,7 +34,7 @@ class Config(_ConfigClassWithSubClasses):
             ite=ITEConfig(),
             dims=TNDimensions(virtual_dim=D),
             visuals=VisualsConfig(),
-            trunc_dim=2*D**2
+            trunc_dim=2*D**2+10
         )
 
     def post_creation_fix(self):

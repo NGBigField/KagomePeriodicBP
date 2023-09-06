@@ -18,9 +18,10 @@ from src.utils import errors
 # Import the possible job types:
 from scripts.condor import job_bp
 from scripts.condor import job_parallel_timing 
+from scripts.condor import job_bp_convergence 
 
 
-NUM_EXPECTED_ARGS = 8
+NUM_EXPECTED_ARGS = 9
 
 
 # A main function to parse inputs:
@@ -56,6 +57,10 @@ def main():
     N = int(argv[i])
     print(f"{i}: N={N}")
 
+    i += 1
+    chi = int(argv[i])
+    print(f"{i}: chi={chi}")
+
     i += 1  # 6
     job_type = argv[i]
     print(f"{i}: job_type={job_type}")
@@ -74,6 +79,8 @@ def main():
                 results = job_bp.main(D=D, N=N, method=method)
             case "parallel_timings":             
                 results = job_parallel_timing.main(D=D, N=N, method=method)
+            case "bp_convergence":
+                results = job_bp_convergence.main(D=D, N=N)
             case _:
                 raise ValueError(f"Not an expected job_type={job_type!r}")
     except Exception as e:

@@ -126,7 +126,7 @@ def mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[str
 
 def measure_energies_and_observables_together(
     tn:TensorNetwork, 
-    hamiltonian:HamiltonianFuncAndInputs, 
+    hamiltonian:HamiltonianFuncAndInputs|np.ndarray, 
     trunc_dim:int,
     mode:UpdateMode|None=None,
     force_real:bool=True
@@ -138,9 +138,19 @@ def measure_energies_and_observables_together(
     ## Prepare outputs and check inputs:
     # inputs:
     if DEBUG_MODE: tn.validate()
+
     if mode is None:
         mode = UpdateMode.random()
-    h, _ = get_imaginary_time_evolution_operator(hamiltonian, None)
+
+    if isinstance(hamiltonian, np.ndarray):
+        h = hamiltonian
+    elif callable(hamiltonian):
+        h = hamiltonian()
+    elif isinstance(hamiltonian, tuple|HamiltonianFuncAndInputs):
+        h, _ = get_imaginary_time_evolution_operator(hamiltonian, None)
+    else:
+        raise TypeError(f"Not a valid type for input 'hamiltonian' of type {hamiltonian!r}")
+
     # outputs:
     energies = dict()
     expectations = {

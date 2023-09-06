@@ -26,8 +26,9 @@
                 "0",  //method
                 "2",  //D
                 "3",  //N
-                "parallel_timings",  //job_type
-                "[with_bp,D,N,A_X,A_Y,A_Z,B_X,B_Y,B_Z,C_X,C_Y,C_Z]",  //result_keys
+                "8",  //chi
+                "bp_convergence",  //job_type
+                "[seed,D,N,chi,iterations,num_tensors,energy,exec_time]",  //result_keys
             ]
         }
     ]

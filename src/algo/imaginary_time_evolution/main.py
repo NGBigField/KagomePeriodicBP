@@ -271,7 +271,7 @@ def ite_per_mode(
 
 
 @decorators.add_stats()
-# @decorators.multiple_tries(3)
+@decorators.multiple_tries(3)
 def ite_segment(
     unit_cell:UnitCell,
     messages:MessageDictType|None,
@@ -323,7 +323,8 @@ def ite_segment(
                 unit_cell, messages, delta_t, logger, config, update_mode
             )
         except BPNotConvergedError as e:
-            # prints.print_warning(errors.get_traceback(e))
+            prog_bar.clear()
+            logger.warn(errors.get_traceback(e))
             raise ITEError(*e.args)
         ## Track results:
         stats.ite_per_mode_stats.append(ite_per_mode_stats)
