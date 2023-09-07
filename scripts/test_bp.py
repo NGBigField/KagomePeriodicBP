@@ -31,6 +31,7 @@ import numpy as np
 from utils import visuals, saveload, csvs, dicts
 from matplotlib import pyplot as plt
 import matplotlib as mpl
+import matplotlib.transforms as mtransforms
 
 
 from libs import TenQI
@@ -336,7 +337,7 @@ def test_bp_convergence_steps_single_run(
     chi = 2*D**2 + 10
     update_mode = UpdateMode.A
     update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
-    bp_chi = D**2
+    bp_chi = D**2 
 
     def _get_rho_i(tn:KagomeTN)->np.ndarray:
         edge_tn = reduce_tn(tn , EdgeTN, trunc_dim=chi, mode=update_mode, edge_tuple=update_edge)
@@ -367,14 +368,26 @@ def test_bp_convergence_steps_single_run(
     t2 = perf_counter()
     time_none = t2-t1
 
+
+    diff_random = TenQI.op_norm(rho_no_bp - ref_rdm, ntype='tr')
+        time_bp = None
+        diff_bp = None
+
+    if N>4:
     t1 = perf_counter()
-    bp_config = BPConfig(max_iterations=50, max_swallowing_dim=bp_chi, target_msg_diff=1e-5, parallel_msgs=parallel_bp)
+    bp_config = BPConfig(max_iterations=50, max_swallowing_dim=bp_chi, target_msg_diff=1e-7, parallel_msgs=parallel_bp)
     _, stats = belief_propagation(tn, None, config=bp_config)
-    rho_with_bp = _get_rho_i(tn)
     t2 = perf_counter()
     time_bp = t2-t1
+    if not parallel_bp:
+        time_bp /= 4
+
+    t1 = perf_counter()
+    rho_with_bp = _get_rho_i(tn)
+    t2 = perf_counter()
+    time_bp += t2-t1
+
     
-    diff_random = TenQI.op_norm(rho_no_bp - ref_rdm, ntype='tr')
     diff_bp     = TenQI.op_norm(rho_with_bp - ref_rdm, ntype='tr')
 
     z_random = np.trace(pauli.z @ rho_no_bp)
@@ -388,14 +401,14 @@ def test_bp_convergence_steps_single_run(
 
 
 def test_bp_convergence_all_runs(
-    parallel_bp=True
+    parallel_bp=False
 ):
 
-    N_inf = 10
+    N_inf = 14
     update_mode = UpdateMode.A
     update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 
-    def _get_rho_i(tn:KagomeTN)->np.ndarray:
+    def _get_rho_i(tn:KagomeTN, chi:int)->np.ndarray:
         edge_tn = reduce_tn(tn , EdgeTN, trunc_dim=chi, mode=update_mode, edge_tuple=update_edge)
         rdm = edge_tn.rdm
         return np.trace(rdm, axis1=2, axis2=3)
@@ -403,7 +416,7 @@ def test_bp_convergence_all_runs(
 
     plot_values = visuals.AppendablePlot()
     plt.xlabel("linear system size", fontsize=12)
-    plt.ylabel("$Trace distance between \\rho_{A} and \\rho_{A\infty}$", fontsize=12)
+    plt.ylabel("Trace distance between $\\rho_{A}$ and $\\rho_{A\infty}$", fontsize=12)
     plot_values.axis.set_yscale('log')
 
 
@@ -415,11 +428,30 @@ def test_bp_convergence_all_runs(
 
 
     colors_D = {2: 'blue', 3: 'red', 4: 'green'}
-    line_styles = {'bp': "--", 'random': '-'}
+    line_styles = {'bp': "-", 'random': '--'}
+    marker_styles = {'bp': "X", 'random': 'o'}
 
-    for D in [3, 4]:
+    Ds = [3, 4]
+
+    def _legend_key(D:int, data:str)->str:
+        ## diff bp:
+        if len(Ds)==1:
+            legend_key = ""
+        else:
+            legend_key = f"D={D} " 
+
+        if data=="bp":
+            legend_key += "BlockBP"
+        elif data=="none":
+            legend_key += "random env"
+        return legend_key
+
+
+    for D in Ds:
 
         chi = 2*D**2 + 10
+
+        chi_inf = 2*D**2 + 40 
         unit_cell = UnitCell.load(f"best_heisenberg_AFM_D{D}")
         tn = create_kagome_tn(d, D, N_inf, unit_cell)
         tn.connect_random_messages()
@@ -428,39 +460,48 @@ def test_bp_convergence_all_runs(
         if saveload.exist(fname):
             ref_rdm = saveload.load(fname)
         else:
-            ref_rdm = _get_rho_i(tn)
+            ref_rdm = _get_rho_i(tn, chi_inf)
             saveload.save(ref_rdm, fname)
 
 
         for N in range(2, 9):
             iterations, chi, time_none, time_bp, z_none, z_bp, diff_none, diff_bp = test_bp_convergence_steps_single_run(D=D, N=N, parallel_bp=parallel_bp, ref_rdm=ref_rdm)
-            if not parallel_bp:
-                time_bp /= 5
 
-            ## diff bp:
-            dict_ = { f"D={D} BlockBP"  : (N, diff_bp) }
-            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'])
+
+            dict_ = { _legend_key(D, 'bp')  : (N, diff_bp) }
+            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'], marker=marker_styles['bp'])
             plot_values.append(plt_kwargs=plt_kwargs ,**dict_)
 
             ## diff random:
-            dict_ = { f"D={D} random env" : (N, diff_none) }
-            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'])
+            dict_ = { _legend_key(D, 'none') : (N, diff_none) }
+            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'], marker=marker_styles['random'])
             plot_values.append(plt_kwargs=plt_kwargs ,**dict_)
 
             ## Time bp:
-            dict_ = { f"D={D} BlockBP"  : (N, time_bp) }
-            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'])
+            dict_ = { _legend_key(D, 'bp')  : (N, time_bp) }
+            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'], marker=marker_styles['bp'])
             plot_times.append(plt_kwargs=plt_kwargs ,**dict_)
 
             ## Time random:
-            dict_ = { f"D={D} random env" : (N, time_none) }
-            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'])
+            dict_ = { _legend_key(D, 'none') : (N, time_none) }
+            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'], marker=marker_styles['random'])
             plot_times.append(plt_kwargs=plt_kwargs ,**dict_)
 
-
+            plot_values._update()
+            plot_times._update()
 
     visuals.draw_now()
-    visuals.save_figure()
+
+    for plot in [plot_values, plot_times]:
+        points = [[0.17, 0.06], [0.90, 0.98]]
+        box = mtransforms.Bbox(points)
+        plot.fig.set_size_inches((4.5, 8))
+        plot.axis.set_position(box)
+
+
+
+    plot_values.axis.set_ylim(bottom=1e-8*2)
+    
     print("Done")    
 
     
