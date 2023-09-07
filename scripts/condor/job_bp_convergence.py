@@ -19,7 +19,7 @@ def main(
 ) -> dict:
     
     ## Run:
-    iterations, chi, time_random, time_bp, z_none, z_bp, diff_random, diff_bp = test_bp_convergence_steps_single_run(N=N, D=D)
+    iterations, chi, time_random, time_bp, z_none, z_bp, diff_random, diff_bp = test_bp_convergence_steps_single_run(N=N, D=D, parallel_bp=True)
     
     # Expected outputs: 
     # ['seed', 'D', 'N', 'chi', 'iterations', 'rdm_diff_bp', 'rdm_diff_random', 'z_bp', 'z_random', 'time_bp', 'time_random']
