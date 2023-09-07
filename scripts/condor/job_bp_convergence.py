@@ -19,17 +19,21 @@ def main(
 ) -> dict:
     
     ## Run:
-    mean_energy, num_tensors, chi = test_bp_convergence_steps_single_run(N=N, D=D)
+    iterations, chi, time_random, time_bp, z_none, z_bp, diff_random, diff_bp = test_bp_convergence_steps_single_run(N=N, D=D)
     
     # Expected outputs: 
-    # ['seed', 'D', 'N', 'chi', 'iterations', 'num_tensors', 'energy', 'exec_time']
+    # ['seed', 'D', 'N', 'chi', 'iterations', 'rdm_diff_bp', 'rdm_diff_random', 'z_bp', 'z_random', 'time_bp', 'time_random']
     results = dict(
         D=D,
         N=N,
         chi=chi,
-        iterations=0,
-        num_tensors=num_tensors,
-        energy=mean_energy
+        iterations=iterations,
+        rdm_diff_random=diff_random,
+        rdm_diff_bp=diff_bp,
+        z_random=z_none,
+        z_bp=z_bp,
+        time_bp=time_bp,
+        time_random=time_random
     )
     
     return results

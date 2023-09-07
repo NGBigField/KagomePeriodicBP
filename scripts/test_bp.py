@@ -11,12 +11,18 @@ from algo.belief_propagation import belief_propagation, robust_belief_propagatio
 
 # Config and containers:
 from containers import BPConfig
-from tensor_networks import CoreTN
+from tensor_networks import KagomeTN, CoreTN, ModeTN, EdgeTN
+
+# update config
+from enums import UpdateMode, UnitCellFlavor
+from containers import UpdateEdge
 
 # Measure core data
 from algo.measurements import derive_xyz_expectation_values_with_tn, calc_unit_cell_expectation_values_from_tn, pauli, measure_energies_and_observables_together
 from algo.tn_reduction import reduce_tn
 from physics import hamiltonians
+
+from time import perf_counter
 
 # Numpy for math stuff:
 import numpy as np
@@ -25,6 +31,9 @@ import numpy as np
 from utils import visuals, saveload, csvs, dicts
 from matplotlib import pyplot as plt
 import matplotlib as mpl
+
+
+from libs import TenQI
 
 d=2
 
@@ -320,28 +329,149 @@ def test_bp_convergence_steps(
 def test_bp_convergence_steps_single_run(
     N:int=2,
     D:int=2,
+    parallel_bp:bool=True,
+    ref_rdm : np.ndarray|None = None
 ):
     
     chi = 2*D**2 + 10
+    update_mode = UpdateMode.A
+    update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
+    bp_chi = D**2
+
+    def _get_rho_i(tn:KagomeTN)->np.ndarray:
+        edge_tn = reduce_tn(tn , EdgeTN, trunc_dim=chi, mode=update_mode, edge_tuple=update_edge)
+        rdm = edge_tn.rdm
+        return np.trace(rdm, axis1=2, axis2=3)
+
     unit_cell = UnitCell.load(f"best_heisenberg_AFM_D{D}")
-    hamiltonian = hamiltonians.heisenberg_afm()
+
+
+    if ref_rdm is None:
+        N_inf = 10
+        fname = f"ref_rdm_D{D}_N{N_inf}"
+        
+        if saveload.exist(fname):
+            ref_rdm = saveload.load(fname)
+        else:
+            tn_inf = create_kagome_tn(d, D, N_inf, unit_cell)
+            tn_inf.connect_random_messages()
+            ref_rdm = _get_rho_i(tn_inf)
+            saveload.save(ref_rdm, fname)
+
 
     tn = create_kagome_tn(d, D, N, unit_cell)
-    num_tensors = tn.size
-
     tn.connect_random_messages()
-    core = reduce_tn(tn, CoreTN, chi)
-    _, _, mean_energy = measure_energies_and_observables_together(core, hamiltonian, trunc_dim=chi)
 
-    return mean_energy, num_tensors, chi
-                
+    t1 = perf_counter()
+    rho_no_bp = _get_rho_i(tn)
+    t2 = perf_counter()
+    time_none = t2-t1
+
+    t1 = perf_counter()
+    bp_config = BPConfig(max_iterations=50, max_swallowing_dim=bp_chi, target_msg_diff=1e-5, parallel_msgs=parallel_bp)
+    _, stats = belief_propagation(tn, None, config=bp_config)
+    rho_with_bp = _get_rho_i(tn)
+    t2 = perf_counter()
+    time_bp = t2-t1
+    
+    diff_random = TenQI.op_norm(rho_no_bp - ref_rdm, ntype='tr')
+    diff_bp     = TenQI.op_norm(rho_with_bp - ref_rdm, ntype='tr')
+
+    z_random = np.trace(pauli.z @ rho_no_bp)
+    z_bp     = np.trace(pauli.z @ rho_with_bp)
+    z_random = np.real(z_random)
+    z_bp     = np.real(z_bp)
+
+    iterations = stats.iterations
+
+    return iterations, chi, time_none, time_bp, z_random, z_bp, diff_random, diff_bp
+
+
+def test_bp_convergence_all_runs(
+    parallel_bp=True
+):
+
+    N_inf = 10
+    update_mode = UpdateMode.A
+    update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
+
+    def _get_rho_i(tn:KagomeTN)->np.ndarray:
+        edge_tn = reduce_tn(tn , EdgeTN, trunc_dim=chi, mode=update_mode, edge_tuple=update_edge)
+        rdm = edge_tn.rdm
+        return np.trace(rdm, axis1=2, axis2=3)
+
+
+    plot_values = visuals.AppendablePlot()
+    plt.xlabel("linear system size", fontsize=12)
+    plt.ylabel("$Trace distance between \\rho_{A} and \\rho_{A\infty}$", fontsize=12)
+    plot_values.axis.set_yscale('log')
+
+
+    plot_times  = visuals.AppendablePlot()
+    plt.xlabel("linear system size", fontsize=12)
+    plt.ylabel("Computation time [sec]", fontsize=12)
+
+    visuals.draw_now()
+
+
+    colors_D = {2: 'blue', 3: 'red', 4: 'green'}
+    line_styles = {'bp': "--", 'random': '-'}
+
+    for D in [3, 4]:
+
+        chi = 2*D**2 + 10
+        unit_cell = UnitCell.load(f"best_heisenberg_AFM_D{D}")
+        tn = create_kagome_tn(d, D, N_inf, unit_cell)
+        tn.connect_random_messages()
+
+        fname = f"ref_rdm_D{D}_N{N_inf}"
+        if saveload.exist(fname):
+            ref_rdm = saveload.load(fname)
+        else:
+            ref_rdm = _get_rho_i(tn)
+            saveload.save(ref_rdm, fname)
+
+
+        for N in range(2, 9):
+            iterations, chi, time_none, time_bp, z_none, z_bp, diff_none, diff_bp = test_bp_convergence_steps_single_run(D=D, N=N, parallel_bp=parallel_bp, ref_rdm=ref_rdm)
+            if not parallel_bp:
+                time_bp /= 5
+
+            ## diff bp:
+            dict_ = { f"D={D} BlockBP"  : (N, diff_bp) }
+            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'])
+            plot_values.append(plt_kwargs=plt_kwargs ,**dict_)
+
+            ## diff random:
+            dict_ = { f"D={D} random env" : (N, diff_none) }
+            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'])
+            plot_values.append(plt_kwargs=plt_kwargs ,**dict_)
+
+            ## Time bp:
+            dict_ = { f"D={D} BlockBP"  : (N, time_bp) }
+            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'])
+            plot_times.append(plt_kwargs=plt_kwargs ,**dict_)
+
+            ## Time random:
+            dict_ = { f"D={D} random env" : (N, time_none) }
+            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'])
+            plot_times.append(plt_kwargs=plt_kwargs ,**dict_)
+
+
+
+    visuals.draw_now()
+    visuals.save_figure()
+    print("Done")    
+
+    
 
 def main_test():
-    test_single_bp_vs_growing_TN()
+    # test_single_bp_vs_growing_TN()
     # growing_tn_bp_test()
     # growing_tn_bp_test2()
     # load_results()
     # test_bp_convergence_steps_single_run()
+    test_bp_convergence_all_runs()
 
 
 if __name__ == "__main__":

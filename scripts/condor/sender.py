@@ -22,8 +22,8 @@ if not os.path.exists(results_dir):
 RESULT_KEYS_DICT = dict(
     bp = ["with_bp", 'D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'],
     parallel_timings = ["parallel", 'D', 'N', 'seed', 'bp-step', 'reduction'],
-    bp_convergence = ['seed', 'D', 'N', 'chi', 'iterations', 'num_tensors', 'energy', 'exec_time'],
-    ite_afm = ["seed","D", "N", "energy", "path"]
+    ite_afm = ["seed","D", "N", "energy", "path"],
+    bp_convergence = ['seed', 'D', 'N', 'chi', 'iterations', 'rdm_diff_bp', 'rdm_diff_random', 'z_bp', 'z_random', 'time_bp', 'time_random']
 )
 
 ## all values:
@@ -38,7 +38,7 @@ Arguments = '$(outfile) $(seed) $(method) $(D) $(N) $(chi) $(job_type) $(result_
 
 
 def main(
-    job_type="ite_afm",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
+    job_type="bp_convergence",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
     request_cpus:int=2,
     request_memory_gb:int=4,
     vals:dict=DEFAULT_VALS,
