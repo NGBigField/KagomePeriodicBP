@@ -11,6 +11,11 @@ if __name__ == "__main__":
 # for smart iterations:
 from itertools import product
 
+
+import string
+import random
+
+
 from src import project_paths
 
 results_dir = project_paths.data/"condor"
@@ -59,7 +64,7 @@ def main(
     #
     worker_script_fullpath  = this_folder_path+sep+"worker.py"
     results_fullpath        = results_dir+sep+result_file_name+".csv"
-    output_files_prefix     = "kagome-bp-"+job_type
+    output_files_prefix     = "kagome-bp-"+job_type+"-"+_random_letters(3)
     #
     print(f"script_fullpath={worker_script_fullpath!r}")
     print(f"results_fullpath={results_fullpath!r}")
@@ -143,6 +148,11 @@ def _print_inputs(inputs:dict[str, str], _max_str_per_key:dict[str, int])->None:
     print(total_string)
         
 
+def _random_letters(num:int)->str:
+    s = ""
+    for _ in range(num):
+        s += random.choice(string.ascii_letters)
+    return s
 
 if __name__=="__main__":
     main()
