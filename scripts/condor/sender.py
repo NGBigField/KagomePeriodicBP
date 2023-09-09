@@ -38,7 +38,7 @@ Arguments = '$(outfile) $(seed) $(method) $(D) $(N) $(chi) $(job_type) $(result_
 
 
 def main(
-    job_type="bp_convergence",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
+    job_type="ite_afm",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
     request_cpus:int=2,
     request_memory_gb:int=4,
     vals:dict=DEFAULT_VALS,

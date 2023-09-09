@@ -49,7 +49,7 @@ def main(
     config.visuals.progress_bars = 1
     # delta-t's:
     config.ite.time_steps = [0.2]*5 + [0.1]*20 + [0.01]*50 + [0.001]*100 + [0.05]*20 + [0.001]*100 + [1e-4]*100 + [1e-5]*200 + [1e-6]*200 + [1e-7]*300
-    config.ite.bp_every_edge = False
+    config.ite.bp_every_edge = True
     # BP:
     # config.bp.target_msg_diff = 1e-6
 

@@ -43,5 +43,5 @@ def main(
 
 
 if __name__ == "__main__":    
-    main(h=2.2, method=2)
+    main()
 
