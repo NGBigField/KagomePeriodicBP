@@ -370,30 +370,32 @@ def test_bp_convergence_steps_single_run(
 
 
     diff_random = TenQI.op_norm(rho_no_bp - ref_rdm, ntype='tr')
-        time_bp = None
-        diff_bp = None
+    time_bp = None
+    diff_bp = None
+    z_bp    = None
 
     if N>4:
-    t1 = perf_counter()
-    bp_config = BPConfig(max_iterations=50, max_swallowing_dim=bp_chi, target_msg_diff=1e-7, parallel_msgs=parallel_bp)
-    _, stats = belief_propagation(tn, None, config=bp_config)
-    t2 = perf_counter()
-    time_bp = t2-t1
-    if not parallel_bp:
-        time_bp /= 4
+        t1 = perf_counter()
+        bp_config = BPConfig(max_iterations=50, max_swallowing_dim=bp_chi, target_msg_diff=1e-7, parallel_msgs=parallel_bp)
+        _, stats = belief_propagation(tn, None, config=bp_config)
+        t2 = perf_counter()
+        time_bp = t2-t1
+            
+        if not parallel_bp:
+            time_bp /= 4
 
-    t1 = perf_counter()
-    rho_with_bp = _get_rho_i(tn)
-    t2 = perf_counter()
-    time_bp += t2-t1
+        t1 = perf_counter()
+        rho_with_bp = _get_rho_i(tn)
+        t2 = perf_counter()
+        time_bp += t2-t1
 
     
-    diff_bp     = TenQI.op_norm(rho_with_bp - ref_rdm, ntype='tr')
+        diff_bp     = TenQI.op_norm(rho_with_bp - ref_rdm, ntype='tr')
 
-    z_random = np.trace(pauli.z @ rho_no_bp)
-    z_bp     = np.trace(pauli.z @ rho_with_bp)
-    z_random = np.real(z_random)
-    z_bp     = np.real(z_bp)
+        z_random = np.trace(pauli.z @ rho_no_bp)
+        z_bp     = np.trace(pauli.z @ rho_with_bp)
+        z_random = np.real(z_random)
+        z_bp     = np.real(z_bp)
 
     iterations = stats.iterations
 
