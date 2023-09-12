@@ -17,6 +17,7 @@ from scripts.run_heisenberg import main as run_ite
 def main(
     D : int = 2,
     N : int = 2,
+    chi_factor : int = 1,
     seed : int = -1
 ) -> dict:
     
@@ -28,7 +29,7 @@ def main(
         results_filename += f"_{seed}"
 
     ## Run:
-    energy, unit_cell_file_path = run_ite(N=N, D=D, live_plots=False, parallel=False, results_filename=results_filename)
+    energy, unit_cell_file_path = run_ite(N=N, D=D, chi_factor=chi_factor, live_plots=False, parallel=False, results_filename=results_filename)
     
     # Expected outputs: 
     # ["seed","D", "N", "energy", "path"]

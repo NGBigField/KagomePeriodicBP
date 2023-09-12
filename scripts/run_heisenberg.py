@@ -20,6 +20,7 @@ def main(
     N = 2,
     live_plots:bool = 1,
     parallel:bool = 0,
+    chi_factor : int = 1,
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     afm_or_fm:str = "AFM"  # Anti-Ferro-Magnetic or Ferro-Magnetic
 )->tuple[float, str]:
@@ -41,14 +42,14 @@ def main(
     else:
         raise ValueError("not matching any option.")
     #
-    factor = 1
-    config.trunc_dim *= factor
-    config.bp.max_swallowing_dim *= factor
+    config.trunc_dim *= chi_factor
+    config.bp.max_swallowing_dim *= chi_factor
     # Parallel:
     config.bp.parallel_msgs = parallel
     config.visuals.progress_bars = 1
     # delta-t's:
-    config.ite.time_steps = [0.2]*5 + [0.1]*20 + [0.01]*50 + [0.001]*100 + [0.05]*20 + [0.001]*100 + [1e-4]*100 + [1e-5]*200 + [1e-6]*200 + [1e-7]*300
+    config.ite.time_steps = [0.2]*5 + [0.1]*20 + [0.01]*50 + [0.001]*100 + [0.05]*20 + [0.001]*100 \
+        + [1e-4]*100 + [1e-5]*100 + [1e-6]*100 + [1e-7]*100 + [1e-8]*100 + [1e-9]*100 
     config.ite.bp_every_edge = True
     # BP:
     # config.bp.target_msg_diff = 1e-6
