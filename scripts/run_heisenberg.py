@@ -46,7 +46,9 @@ def main(
     config.bp.max_swallowing_dim *= chi_factor
     # Parallel:
     config.bp.parallel_msgs = parallel
-    config.visuals.progress_bars = 1
+    if N>10:
+        config.bp.max_iterations *= 2 
+    config.visuals.progress_bars = True
     # delta-t's:
     config.ite.time_steps = [0.2]*5 + [0.1]*20 + [0.01]*50 + [0.001]*100 + [0.05]*20 + [0.001]*100 \
         + [1e-4]*100 + [1e-5]*100 + [1e-6]*100 + [1e-7]*100 + [1e-8]*100 + [1e-9]*100 
