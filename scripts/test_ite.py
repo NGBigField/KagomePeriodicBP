@@ -24,9 +24,9 @@ import numpy as np
 
 def test_full_ite(
     D = 2,
-    N = 12,
+    N = 2,
     live_plots:bool = 1,
-    parallel:bool = 1
+    parallel:bool = 0
 ):
     
     unit_cell = UnitCell.load(f"best_heisenberg_D{D}")

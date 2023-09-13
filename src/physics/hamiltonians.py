@@ -29,7 +29,7 @@ def transverse_field_in_direction(direction:Literal['x', 'y', 'z'], strength:flo
 
 def heisenberg_fm()->np.ndarray:
 	return -1*heisenberg_afm()
-heisenberg_fm.reference = -5.0
+heisenberg_fm.reference = -0.5
 
 
 def heisenberg_afm()->np.ndarray:

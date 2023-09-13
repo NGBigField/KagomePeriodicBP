@@ -151,9 +151,10 @@ class ITEPlots():
     def __init__(
         self,
         active:bool,
-        config:Config,
-        plots_to_show : list[bool] = [True, False, False]
+        config:Config
     )->None:
+        
+        plots_to_show = config.visuals._what_plots
         
         ## Save data:
         self.config = config
