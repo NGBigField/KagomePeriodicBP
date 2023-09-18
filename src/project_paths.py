@@ -23,9 +23,12 @@ def add_base()->None:
     _add_path(base)
 
 
-def add_scripts()->None:
-    _add_path(scripts)
-
-
 def add_src()->None:
     _add_path(src)
+
+
+def add_scripts(add_necessary_imports_for_scripts:bool=True)->None:
+    _add_path(scripts)
+    if add_necessary_imports_for_scripts:
+        add_base()
+        add_src()

@@ -1,3 +1,4 @@
+# For allowing 'Self' import
 import numpy as np
 from physics.hamiltonians import zero
 from dataclasses import dataclass, field, fields
@@ -6,7 +7,7 @@ from utils.arguments import Stats
 from copy import deepcopy
 
 # For type hinting:
-from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Self, Iterable, Any
+from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Iterable, Any
 _T = TypeVar("_T")
 
 # Other containers and enums:
@@ -28,7 +29,7 @@ _NEXT_IN_ABC_ORDER = {
 }
 
 
-class HamiltonianFuncAndInputs(NamedTuple, Generic[_T]):
+class HamiltonianFuncAndInputs(NamedTuple):
     func: Callable[[_T], np.ndarray] 
     args: _T|tuple[_T]|None
 
@@ -40,7 +41,7 @@ class HamiltonianFuncAndInputs(NamedTuple, Generic[_T]):
         return HamiltonianFuncAndInputs(func=zero, args=None)
 
     @staticmethod
-    def standard(self_or_tuple:Self|tuple)->Self:
+    def standard(self_or_tuple)->"HamiltonianFuncAndInputs":
         assert len(self_or_tuple)==2
         assert callable(self_or_tuple[0])
         if isinstance(self_or_tuple, HamiltonianFuncAndInputs):
@@ -99,19 +100,19 @@ class UpdateEdge(NamedTuple):
 
 
 SUB_FOLDER = "ite_trackers"
-# DEFAULT_TIME_STEPS = lambda:  [0.1]*20 + [0.01]*50 + [0.001]*50 + [0.0001]*50
-def DEFAULT_TIME_STEPS()->list[float]:
-    dts = []
-    for exp in [-1, -2, -3, -4]:
-        for mantissa in [5, 2, 1]:
-            if exp==-1 and mantissa in [5, 2]:
-                continue
-            elif exp==-1 and mantissa==1:
-                repeats = 20
-            else:
-                repeats = 50
-            dts += [mantissa*10**exp]*repeats
-    return dts
+DEFAULT_TIME_STEPS = lambda:  [0.5]*5 + [0.1]*30 + [0.01]*10 + [0.001]*10 + [0.01]*20 + [0.001]*20 + [0.001]*50 + [0.0001]*50
+# def DEFAULT_TIME_STEPS()->list[float]:
+#     dts = []
+#     for exp in [-1, -2, -3, -4]:
+#         for mantissa in [5, 2, 1]:
+#             if exp==-1 and mantissa in [5, 2]:
+#                 continue
+#             elif exp==-1 and mantissa==1:
+#                 repeats = 20
+#             else:
+#                 repeats = 50
+#             dts += [mantissa*10**exp]*repeats
+#     return dts
 
 
 
@@ -119,21 +120,30 @@ def DEFAULT_TIME_STEPS()->list[float]:
 class ITEConfig():
     # hamiltonian:
     interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
-    _GT_energy : float|None = None  # Ground truth energy, if known
     # ITE time steps:
     time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
-    num_mode_repetitions_per_segment : int = 1    
+    num_mode_repetitions_per_segment : int = 1        
     # File:
     backup_file_name : str = "ite_backup"+strings.time_stamp()+" "+strings.random(6)
     # Control flags:
     random_mode_order : bool = True
     start_segment_with_new_bp_message : bool = True
-    bp_not_converged_raises_error : bool = True
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
     segment_error_cause_state_revert : bool = False
     # Control numbers:
-    num_errors_threshold : int = 10
+    num_errors_threshold : int = 10    
+    # Belief-Propagation on full tn:
+    bp_not_converged_raises_error : bool = True
+    bp_every_edge : bool = False
 
+
+    @property
+    def reference_ground_energy(self)->float|None:  
+        """Ground truth energy, if known
+        """
+        func = self.interaction_hamiltonian.func
+        if hasattr(func, "reference"):
+            return func.reference
 
     def __repr__(self) -> str:
         obj = self
@@ -252,14 +262,14 @@ class ITEProgressTracker():
             energy = self.energies.pop()
             core = self.unit_cells.pop()
             messages = self.messages.pop()
-            exepectation_values = self.expectation_values.pop()
+            expectation_values = self.expectation_values.pop()
             step_stats = self.stats.pop()
         # Up to date memory:
         self.last_unit_cell = core  #type: ignore
         self.last_messages = messages  #type: ignore
         self.last_iter -= num_iter
         # Return:
-        return delta_t, energy, step_stats, exepectation_values, core, messages  #type: ignore
+        return delta_t, energy, step_stats, expectation_values, core, messages  #type: ignore
 
 
     @staticmethod

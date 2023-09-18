@@ -3,6 +3,7 @@ import _import_src  ## Needed to import src folders when scripts are called from
 # Types in the code:
 from enums import UpdateMode, UnitCellFlavor
 from containers import ITEConfig, Config
+from tensor_networks import UnitCell
 
 
 # Algos we test here:
@@ -23,23 +24,34 @@ import numpy as np
 
 def test_full_ite(
     D = 2,
-    N = 3,
+    N = 2,
     live_plots:bool = 1,
     parallel:bool = 0
 ):
+    
+    unit_cell = UnitCell.load(f"best_heisenberg_D{D}")
+
     ## Config:
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
-    config.ite.interaction_hamiltonian = (hamiltonians.ferromagnetic_with_transverse_field, ('z', 5))
+    config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None)
+    #
+    factor = 4
+    config.trunc_dim *= factor
+    config.bp.max_swallowing_dim *= factor
     # Parallel:
     config.bp.parallel_msgs = parallel
     config.visuals.progress_bars = 1
     # delta-t's:
-    config.ite.time_steps = [0.1]*5 + [0.01]*5 + [0.001]*5 + [0.0001]*10
+    config.ite.time_steps =  [1e-7]*200
+    config.ite.bp_every_edge = False
+    # BP:
+    config.bp.target_msg_diff = 1e-7
+
 
     ## Run:
-    unit_cell_out, ite_tracker, logger = full_ite(config=config)
+    unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)
     print("Done")
 
 

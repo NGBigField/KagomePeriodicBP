@@ -50,6 +50,8 @@ class StaticPrinter():
         self.printed_lines_lengths = []
                 
     def print(self, s:str) -> None:
+        if self.print_out is None:
+            return
         self.clear()
         print_lines = s.split(SpecialChars.NewLine)
         self.printed_lines_lengths = [len(line) for line in print_lines]
@@ -124,11 +126,7 @@ class ProgressBar(StaticNumOutOfNum):
         super().__init__(expected_end, print_prefix, print_suffix, print_out, in_place)
 
     @staticmethod
-    def inactive()->"ProgressBar":
-        # inactive_prog_bar : ProgressBar = type('obj', (object,), {"next":0, "clear":0})  # type: ignore		
-        # inactive_prog_bar.next = lambda increment=0, extra_str="s", every=0: 0
-        # inactive_prog_bar.clear = lambda: None
-        # return inactive_prog_bar
+    def inactive()->"InactiveProgressBar":
         return InactiveProgressBar()
 
     @staticmethod

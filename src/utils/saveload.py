@@ -113,7 +113,7 @@ def all_saved_data() -> Generator[Tuple[str, Any], None, None]:
             yield name, data
 
 
-def save(var:Any, name:Optional[str]=None, sub_folder:Optional[str]=None, if_not_exist:bool=False, print_:bool=False) -> None:
+def save(var:Any, name:Optional[str]=None, sub_folder:Optional[str]=None, if_not_exist:bool=False, print_:bool=False) -> str:
     if if_not_exist and exist(name=name, sub_folder=sub_folder):
         return
     # Complete missing inputs:
@@ -128,6 +128,7 @@ def save(var:Any, name:Optional[str]=None, sub_folder:Optional[str]=None, if_not
     # print:
     if print_:
         print(f"Saved file of type {type(var)!r} in path {fullpath!r}")
+    return fullpath
 
 
 def load(name:str, sub_folder:Optional[str]=None, if_exist:bool=False) -> Any:
@@ -140,6 +141,14 @@ def load(name:str, sub_folder:Optional[str]=None, if_exist:bool=False) -> Any:
     file = _open(fullpath, mode)
     # Load:
     return pickle.load(file)
+
+
+def delete(name:str, sub_folder:Optional[str]=None, if_exist:bool=False)->None:
+    if if_exist and not exist(name=name, sub_folder=sub_folder):
+        return None 
+    # fullpath:
+    fullpath = _fullpath(name, sub_folder)   
+    os.remove(fullpath)
 
 
 def force_subfolder_exists(folder_name:str) -> None:

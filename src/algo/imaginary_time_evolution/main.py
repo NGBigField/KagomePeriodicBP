@@ -20,6 +20,7 @@ from containers import Config
 from enums import UpdateMode, NodeFunctionality
 from containers import MessageDictType, UpdateEdge
 from tensor_networks import KagomeTN, CoreTN, ModeTN, EdgeTN, TensorNode, UnitCell
+from tensor_networks.construction import kagome_tn_from_unit_cell
 from _error_types import BPNotConvergedError, ITEError
 from lattices.directions import Direction
 
@@ -38,7 +39,7 @@ from algo.imaginary_time_evolution._logs_and_prints import print_or_log_bp_messa
                                                             print_or_log_ite_segment_progress, get_progress_bar
 from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
 from algo.imaginary_time_evolution._visualization import ITEPlots
-from algo.imaginary_time_evolution._tn_update import kagome_tn_from_unit_cell, update_unit_cell
+from algo.imaginary_time_evolution._tn_update import update_unit_cell
 
 # Import belief propagation code:
 from algo.belief_propagation import robust_belief_propagation, belief_propagation, BPStats
@@ -187,6 +188,30 @@ def _mode_order_without_repetitions(prev_order:list[UpdateMode], ite_config:ITEC
     return new_order
 
 
+def _from_unit_cell_to_stable_mode(
+    unit_cell:UnitCell, messages:MessageDictType, config:Config, logger:logs.Logger, mode:UpdateMode
+)->tuple[
+    ModeTN, MessageDictType, BPStats
+]:
+    ## Duplicate core into a big tensor-network:
+    full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
+
+    ## Perform BlockBP:
+    messages, bp_stats = robust_belief_propagation(
+        full_tn, messages, config.bp, 
+        update_plots_between_steps=config.visuals.live_plots, 
+        allow_prog_bar=config.visuals.progress_bars
+    )
+    print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
+
+    # If block-bp struggled and increased the virtual dimension, the following iterations must also use a higher dimension:
+    config = _fix_config_if_bp_struggled(config, bp_stats, logger)
+
+    ## Contract to mode:
+    mode_tn = reduce_tn(full_tn, ModeTN, trunc_dim=config.trunc_dim, mode=mode)
+    return mode_tn, messages, bp_stats
+
+
 def get_imaginary_time_evolution_operator(h:np.ndarray, delta_t:float)->tuple[np.ndarray, np.ndarray]:
     # h = ite_config.interaction_hamiltonian
     g = ite.g_from_exp_h(h, delta_t)
@@ -211,34 +236,21 @@ def ite_per_mode(
     ITEPerModeStats         # Stats
 ]:
 
-    ## Duplicate core into a big tensor-network:
-    full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
-
-    ## Perform BlockBP:
-    messages, bp_stats = robust_belief_propagation(
-        full_tn, messages, config.bp, 
-        update_plots_between_steps=config.visuals.live_plots, 
-        progressbar=config.visuals.progress_bars
-    )
-    print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
-
-    # If block-bp struggled and increased the virtual dimension, the following iterations must also use a higher dimension:
-    config = _fix_config_if_bp_struggled(config, bp_stats, logger)
-
-    ## Contract to mode:
-    mode_tn = reduce_tn(full_tn, ModeTN, trunc_dim=config.trunc_dim, mode=mode)
+    mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
 
     ## for each edge in the mode, update the tensors
     edge_tuples = list(UpdateEdge.all_in_random_order())
     edge_energies = []
 
-
     prog_bar = get_progress_bar(config, len(edge_tuples), "Executing ITE per-mode:")
-    for edge_tuple in edge_tuples:
+    for is_first, is_last, edge_tuple in lists.iterate_with_edge_indicators(edge_tuples):
         prog_bar.next(extra_str=f"{edge_tuple}")
 
         if config.visuals.live_plots:
             visuals.refresh()
+
+        if config.ite.bp_every_edge and not is_last and not is_first:
+            mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
 
         edge_tn = reduce_tn(mode_tn, EdgeTN, trunc_dim=config.trunc_dim, edge_tuple=edge_tuple)
 
@@ -259,7 +271,7 @@ def ite_per_mode(
 
 
 @decorators.add_stats()
-# @decorators.multiple_tries(3)
+@decorators.multiple_tries(3)
 def ite_segment(
     unit_cell:UnitCell,
     messages:MessageDictType|None,
@@ -311,7 +323,9 @@ def ite_segment(
                 unit_cell, messages, delta_t, logger, config, update_mode
             )
         except BPNotConvergedError as e:
-            prints.print_warning(errors.get_traceback(e))
+            prog_bar.clear()
+            logger.warn(errors.get_traceback(e))
+            raise ITEError(*e.args)
         ## Track results:
         stats.ite_per_mode_stats.append(ite_per_mode_stats)
         logger.debug(f"        Hermicity of environment={ite_per_mode_stats.env_metrics.hermicity!r}")
@@ -385,7 +399,7 @@ def ite_per_delta_t(
 
     prog_bar.clear()
 
-    return unit_cell, messages, at_least_one_successful_run, segment_stats
+    return mean_energy, unit_cell, messages, at_least_one_successful_run, segment_stats
 
 
 def full_ite(
@@ -393,7 +407,8 @@ def full_ite(
     config:Config|None=None,
     logger:logs.Logger|None=None
 )->tuple[
-    KagomeTN,          # core
+    float,                  # energy
+    UnitCell,               # core
     ITEProgressTracker,     # ITE-Tracker
     logs.Logger             # Logger
 ]:
@@ -421,13 +436,13 @@ def full_ite(
     # Main loop:
     for delta_t, num_repeats in delta_t_list_with_repetitions:
         prog_bar.next(extra_str=f"delta-t={delta_t}")
-        unit_cell, messages, success, step_stats = ite_per_delta_t(unit_cell, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)
+        mean_energy, unit_cell, messages, success, step_stats = ite_per_delta_t(unit_cell, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)
     
     ## Log finish:
     prog_bar.clear()
     _log_and_print_finish_message(logger, config, ite_tracker, plots)  # Print and log valuable information: 
 
-    return unit_cell, ite_tracker, logger
+    return mean_energy, unit_cell, ite_tracker, logger
 
 
 def robust_full_ite(
@@ -459,5 +474,5 @@ def robust_full_ite(
 
 
 if __name__ == "__main__":
-    from scripts.test_ite import main_test
-    main_test()
+    from scripts.run_heisenberg import main
+    main()

@@ -14,6 +14,7 @@ class UnitCell:
     A : np_ndarray
     B : np_ndarray
     C : np_ndarray
+    _file_name : str|None = None
 
     def __getitem__(self, key:str)->np_ndarray:
         match key:
@@ -51,7 +52,8 @@ class UnitCell:
         return UnitCell(
             A=self.A.copy(),
             B=self.B.copy(),
-            C=self.C.copy()
+            C=self.C.copy(),
+            _file_name=self._file_name
         )
     
     @staticmethod
@@ -62,12 +64,25 @@ class UnitCell:
              C = _random_tensor(d, D)
         )
 
-    def save(self, file_name:str=strings.time_stamp())->None:
-        saveload.save(self, name=file_name, sub_folder=UNIT_CELL_SUBFOLDER)
+    def save(self, file_name:str|None=None)->None:
+        file_name = self._derive_file_name(file_name)
+        return saveload.save(self, name=file_name, sub_folder=UNIT_CELL_SUBFOLDER)
 
     @staticmethod
     def load(file_name:str, if_exist:bool=True)->"UnitCell":
         return saveload.load(file_name, sub_folder=UNIT_CELL_SUBFOLDER, if_exist=if_exist)
+    
+    def _derive_file_name(self, given_name:str|None)->str:
+        if given_name is not None:
+            assert isinstance(given_name, str)
+            return given_name
+        
+        if self._file_name is not None:
+            assert isinstance(self._file_name, str)
+            return self._file_name
+
+        return strings.time_stamp()
+        
 
 
 

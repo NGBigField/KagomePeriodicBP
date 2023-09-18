@@ -1,3 +1,11 @@
+# For allowing tests and scripts to run while debugging this module
+if __name__ == "__main__":
+    import sys, pathlib
+    sys.path.append(
+        pathlib.Path(__file__).parent.parent.parent.__str__()
+    )
+    from project_paths import add_scripts; add_scripts()
+
 # Control flags:
 from _config_reader import DEBUG_MODE
 
@@ -93,6 +101,20 @@ class _PerSide(Generic[_T]):
             raise KeyError(f"No a valid option {key!r}")
 
 
+def _contract_half(
+    side_key:str, 
+    tn:KagomeTN,
+    directions:_PerSide[BlockSide],
+    bubblecon_trunc_dim:int,
+    print_progress:bool
+)->tuple[MPS|complex|tuple, list[int], MPSOrientation]:        
+    """Contraction function that contracts half TN:
+    """
+    direction = directions[side_key]
+    mps, con_order, orientation = contract_tensor_network(
+        tn, direction, depth=ContractionDepth.ToCore, bubblecon_trunc_dim=bubblecon_trunc_dim, print_progress=print_progress
+    )
+    return mps, con_order, orientation
 
 
 def _contract_tn_from_sides_and_create_mpss(
@@ -105,24 +127,26 @@ def _contract_tn_from_sides_and_create_mpss(
     _PerSide[list[int]],
     _PerSide[MPSOrientation]
 ]:
-    # Decide control vars:
-    print_progress = not parallel
-    if parallel:
-        prints.print_warning(f"Parallel=True not supported yet")
+    
+    ## Run in parallel or sequential:
+    fixed_arguments = dict(
+        tn = tn,
+        directions = directions,
+        bubblecon_trunc_dim = bubblecon_trunc_dim,
+        print_progress = not parallel
+    )
+    values = list(_PerSide.side_names())
+    res = parallel_exec.concurrent_or_parallel(_contract_half, values=values, value_name="side_key", in_parallel=parallel, fixed_arguments=fixed_arguments)
 
-    # Prepare containers for each side of the zipping contraction:
-    mpss : _PerSide[MPS] = _PerSide()
-    con_orders : _PerSide[list[int]] = _PerSide()
+    ## Unpack Results:
+    mpss         : _PerSide[MPS]            = _PerSide()
+    con_orders   : _PerSide[list[int]]      = _PerSide()
     orientations : _PerSide[MPSOrientation] = _PerSide()
-    # Contract:
-    for side, direction in directions.items():
-        mps, con_order, orientation = contract_tensor_network(
-            tn, direction, depth=ContractionDepth.ToCore, bubblecon_trunc_dim=bubblecon_trunc_dim, print_progress=print_progress
-        )
-        mpss[side] = mps
-        con_orders[side] = con_order
-        orientations[side] = orientation
-
+    for key, (mps, con_order, orientation) in res.items():
+        mpss[key] = mps
+        con_orders[key] = con_order
+        orientations[key] = orientation 
+    
     return mpss, con_orders, orientations
 
 def _basic_data(
@@ -196,8 +220,8 @@ def _verification(con_orders, core_nodes, mpss, orientations, num_core_connectio
     ## check resulting MPS orientations:
     check.is_opposite(orientations.bottom_up.open_towards, orientations.top_down.open_towards) 
     check.is_opposite(orientations.bottom_up.ordered,      orientations.top_down.ordered) 
-    assert orientations.bottom_up.open_towards is directions.bottom_up
-    assert orientations.top_down.open_towards is directions.top_down
+    assert orientations.bottom_up.open_towards == directions.bottom_up
+    assert orientations.top_down.open_towards == directions.top_down
     ## Check MPS sizes and overlaps:
     assert num_side_overlap_connections > 0
     assertions.integer(num_side_overlap_connections)
@@ -293,6 +317,10 @@ def _add_env_tensors_to_open_core(small_tn:ArbitraryTN, env_tensors:list[TensorN
 
 
 def reduce_full_kagome_to_core(tn:KagomeTN, trunc_dim:int, parallel:bool=False, direction:BlockSide|None=None) -> CoreTN:
+    ## 0: Check inputs:
+    if DEBUG_MODE:
+        tn.validate()
+    assert tn.has_messages, "To reduce to core, KagomeTN must have mps messages."
 
     ## I. Parse and derive data
     core_nodes, num_core_connections, num_side_overlap_connections, directions = _basic_data(tn, parallel, direction)
@@ -326,3 +354,9 @@ def reduce_full_kagome_to_core(tn:KagomeTN, trunc_dim:int, parallel:bool=False, 
 
     return core_tn 
 
+
+
+
+if __name__ == "__main__":
+    from scripts.test_parallel import main_test
+    main_test()

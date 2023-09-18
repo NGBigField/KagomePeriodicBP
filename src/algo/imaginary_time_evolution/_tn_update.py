@@ -89,15 +89,6 @@ def _calc_environment_equivalent_matrix(environment_tensors:list[np.ndarray]) ->
     return m
 
 
-def kagome_tn_from_unit_cell(unit_cell:UnitCell, dims:TNDimensions) -> KagomeTN:
-    return create_kagome_tn(
-        d = dims.physical_dim,
-        D = dims.virtual_dim,
-        N = dims.big_lattice_size,
-        unit_cell = unit_cell
-    )
-
-
 def update_unit_cell(
     edge_tn:EdgeTN,
     unit_cell:UnitCell,
@@ -139,7 +130,7 @@ def update_unit_cell(
     unit_cell[f2] = t2_new
 
     ## Keep copy 
-    unit_cell.save("last_unit_cell")
+    unit_cell.save()
 
     return unit_cell, energy_after, env_metrics
 

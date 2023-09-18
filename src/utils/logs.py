@@ -89,7 +89,6 @@ class _MyFileFormatter(logging.Formatter):
         return s
 
 
-
 class FakeLogger(Logger):
     def to_file( self, msg: object, *args: object, **kwargs) -> None: ...
     def debug(   self, msg: object, *args: object, **kwargs) -> None: ...

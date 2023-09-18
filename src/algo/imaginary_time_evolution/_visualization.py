@@ -1,6 +1,5 @@
 
-from utils import visuals, strings, logs, prints, tuples, lists
-from utils.visuals import Axes3D, Quiver, Line3D, Text, plt, DEFAULT_PYPLOT_FIGSIZE, _XYZ
+from utils import visuals, strings, logs, prints, tuples, lists, saveload
 
 from tensor_networks import UnitCell
 from containers import Config, ITESegmentStats
@@ -13,6 +12,11 @@ from algo.measurements import mean_expectation_values, UnitCellExpectationValues
 
 # Control flags:
 from _config_reader import ALLOW_VISUALS
+
+if ALLOW_VISUALS:
+    from utils.visuals import Axes3D, Quiver, Line3D, Text, plt, DEFAULT_PYPLOT_FIGSIZE, _XYZ
+else:
+    Axes3D, Quiver, Line3D, Text = None, None, None, None
 
 
 XYZ_ARROW_LEN = 1.25
@@ -147,9 +151,10 @@ class ITEPlots():
     def __init__(
         self,
         active:bool,
-        config:Config,
-        plots_to_show : list[bool] = [True, True, True]
+        config:Config
     )->None:
+        
+        plots_to_show = config.visuals._what_plots
         
         ## Save data:
         self.config = config
@@ -304,21 +309,21 @@ class ITEPlots():
                 self.plots.main["delta_t"].append(delta_t=delta_t, draw_now_=False)
             self.plots.main["expectations"].append(**mean_expec_vals, draw_now_=False)
 
-            # Energies:
+            # Energies per edge:
             i = self._iteration
             plot = self.plots.main["energies"]
             energies4mean = []
             for edge_tuple, energy in energies.items():
                 energies4mean.append(energy)
-                plot.axis.scatter(x=i, y=energy, c="black", s=6)
+                plot.axis.scatter(x=i, y=energy, c="black", s=4, alpha=0.6)
                 
             # Mean:
             energy = sum(energies4mean)/len(energies4mean)
             plot.append(mean=(i, energy), draw_now_=False)
 
             # Ground-truth
-            if self.config.ite._GT_energy is not None:
-                plot.append(ref=(self._iteration, self.config.ite._GT_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
+            if self.config.ite.reference_ground_energy is not None:
+                plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
             
         ## Env:
         if self.show.env:
@@ -368,6 +373,7 @@ class ITEPlots():
         for i, (fig_name, fig) in enumerate(self.figs.items()):
             visuals.save_figure(fig, file_name=file_name+f"{i}"+" "+fig_name)
         if logger is not None and isinstance(logger, logs.Logger):
-            path = str(visuals.get_saved_figures_folder())+" "+file_name
-            logger.info(f"Plots saved in       {path!r}")
+            path = visuals.get_saved_figures_folder()/file_name
+            p_str = path.__str__()
+            logger.info(f"Plots saved in       {p_str!r}")
 

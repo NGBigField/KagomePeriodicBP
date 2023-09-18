@@ -193,7 +193,6 @@ class TensorNode():
             assert check.all_same(directions), f"Only supports leg fusion when legs are in the same direction"
         except Exception as e:
             check.is_equal(directions[0], directions[1])
-            pass
 
         ## Collect some data:
         old_dimes = self.dims

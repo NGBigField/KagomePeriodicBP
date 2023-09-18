@@ -48,7 +48,7 @@ from libs.ITE import rho_ij
 
 # For OOP:
 from abc import ABC, abstractmethod, abstractproperty
-from typing import Any, Self, Final
+from typing import Any, Final
 
 _T = TypeVar("_T")
 
@@ -69,7 +69,7 @@ class TensorNetwork(ABC):
     nodes : list[TensorNode] = None
 
     @abstractmethod
-    def copy(self)->Self: ...
+    def copy(self)->"TensorNetwork": ...
 
     # ================================================= #
     #|              Basic Derived Properties           |#
@@ -122,8 +122,8 @@ class TensorNetwork(ABC):
         d = dict()
         d["tensors"] = self.tensors
         d["is_ket"] = self.kets
-        d["edgs"] = self.edges_list
-        d["edgs_dict"] = self.edges_dict
+        d["edges"] = self.edges_list
+        d["edges_dict"] = self.edges_dict
         d["angles"] = self.angles
         d["positions"] = self.positions
         return d
@@ -181,7 +181,7 @@ class TensorNetwork(ABC):
 
     def _find_neighbor_by_edge(self, node:TensorNode, edge:EdgeIndicatorType)->TensorNode:
         nodes = self.nodes_connected_to_edge(edge)
-        assert len(nodes)==2, f"Only tensor '{node.index}' is connected to edge '{edge}' in direction '{str(dir)}'  "
+        assert len(nodes)==2, f"Only tensor '{node.index}' is connected to edge '{edge}'."
         if nodes[0] is node:
             return nodes[1]
         elif nodes[1] is node:
@@ -267,7 +267,7 @@ class KagomeTN(TensorNetwork):
     def nodes(self)->list[TensorNode]:
         return _derive_nodes_kagome_tn(self)
 
-    def copy(self, with_messages:bool=True)->Self:
+    def copy(self, with_messages:bool=True)->"KagomeTN":
         new = KagomeTN(
             lattice=self.lattice,
             unit_cell=self.unit_cell.copy(),
@@ -294,6 +294,11 @@ class KagomeTN(TensorNetwork):
     # ================================================= #
     #|                    messages                     |#
     # ================================================= #
+
+    @property
+    def has_messages(self)->bool:
+        return len(self.messages)==6
+
     def connect_messages(self, messages:MessageDictType) -> None:   
         # Fuse:
         for block_side, message in messages.items():
@@ -352,7 +357,7 @@ class ArbitraryTN(TensorNetwork):
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
     # ================================================= #
-    def copy(self)->Self:
+    def copy(self)->"ArbitraryTN":
         return ArbitraryTN(nodes=self.nodes)
 
 
@@ -422,7 +427,7 @@ class _FrozenSpecificNetwork(TensorNetwork):
         self._nodes = nodes
 
     @classmethod
-    def from_arbitrary_tn(cls, tn:ArbitraryTN, **kwargs) -> Self:
+    def from_arbitrary_tn(cls, tn:ArbitraryTN, **kwargs) -> "_FrozenSpecificNetwork":
         new = cls(tn.nodes, copy=False, **kwargs)
         return new
     
@@ -432,7 +437,7 @@ class _FrozenSpecificNetwork(TensorNetwork):
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
     # ================================================= #
-    def copy(self, **kwargs)->Self:
+    def copy(self, **kwargs)->"_FrozenSpecificNetwork":
         return type(self)(nodes=self.nodes, copy=True, **kwargs)
     
     # ================================================= #
@@ -513,7 +518,7 @@ class ModeTN(_FrozenSpecificNetwork):
     def from_arbitrary_tn(cls, tn:ArbitraryTN, mode:UpdateMode) -> "ModeTN":
         return super().from_arbitrary_tn(tn, mode=mode)
     
-    def copy(self) -> Self:
+    def copy(self) -> "ModeTN":
         return super().copy(mode=self.mode)
         
     # ================================================= #
@@ -738,7 +743,6 @@ def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
 
     return nodes
 
-
 def _replace_items(s:set[_T]|list[_T], old:_T, new:_T)->None:
     if isinstance(s, set):
         s.remove(old)
@@ -747,6 +751,8 @@ def _replace_items(s:set[_T]|list[_T], old:_T, new:_T)->None:
         i = s.index(old)
         s.insert(i, new)
         s.pop(i+1)
+
+
 
 
 def _fuse_double_legs(n1:TensorNode, n2:TensorNode, changed_leg_index:None|int)->None:

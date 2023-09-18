@@ -1,5 +1,5 @@
 from typing import Callable, Any, ParamSpec, TypeVar, List, Tuple, Generic
-from utils import tuples, strings, errors
+from utils import tuples, strings, errors, prints
 from utils.arguments import Stats
 import time
 from numpy import ndarray as np_ndarray
@@ -21,7 +21,7 @@ def when_fails_do(func_secondary:Callable[_In, _Out])->Callable[[Callable[_In, _
             try:
                 results = func_primary(*args, **kwargs)
             except Exception as e:
-                strings.print_warning(
+                prints.print_warning(
                     f"Function {func_primary.__name__!r} failed because of error:"+
                     f"\n{errors.get_traceback(e)}"+
                     f"\nRunning {func_secondary.__name__!r} in its stead."

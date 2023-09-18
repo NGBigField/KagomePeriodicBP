@@ -1,3 +1,12 @@
+# For allowing tests and scripts to run while debugging this module
+if __name__ == "__main__":
+    import sys, pathlib
+    sys.path.append(
+        pathlib.Path(__file__).parent.parent.__str__()
+    )
+    from project_paths import add_scripts; add_scripts()
+
+
 # Get Global-Config:
 from _config_reader import DEBUG_MODE
 
@@ -27,6 +36,7 @@ def _out_going_message(
     tn:KagomeTN, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool, hermitize:bool
 ) -> Message:
     
+
     ## use bubble con to compute outgoing message:
     mps, _, mps_direction = contract_tensor_network(
         tn, 
@@ -137,10 +147,12 @@ def belief_propagation(
 
     ## Visualizations:
     if allow_prog_bar:
-        if max_iterations is None:  prog_bar = prints.ProgressBar.unlimited( "Performing BlockBP...  ")
-        else:                       prog_bar = prints.ProgressBar(max_iterations, "Performing BlockBP...  ")
+        if max_iterations is None:  steps_iterator = prints.ProgressBar.unlimited( "Performing BlockBP...  ")
+        else:                       steps_iterator = prints.ProgressBar(max_iterations, "Performing BlockBP...  ")
     else:
-        prog_bar = prints.ProgressBar.inactive()
+        if max_iterations is None:  steps_iterator = prints.ProgressBar.inactive()
+        else:                       steps_iterator = prints.ProgressBar(max_iterations, print_out=None)
+        
 
     ## Initial values (In case no iteration will perform, these are the default values)
     error = None  
@@ -155,10 +167,10 @@ def belief_propagation(
     min_messages = messages
  
     ## Compute outgoing messages until max_iterations or max_error:
-    for i in prog_bar:
+    for i in steps_iterator:
                
         # Preform BP step:
-        messages, error = _belief_propagation_step(tn, error, config, prog_bar, allow_prog_bar)
+        messages, error = _belief_propagation_step(tn, error, config, steps_iterator, allow_prog_bar)
         
         if update_plots_between_steps:
             visuals.refresh()
@@ -178,7 +190,7 @@ def belief_propagation(
         if len(errors)>n_failure_check_len and lists.is_sorted(errors[-n_failure_check_len:]):  # Check if all last 3 items are in increasing order
             break
     
-    prog_bar.clear()
+    steps_iterator.clear()
     assert isinstance(error, float)
 
     ## Check success:         
@@ -198,7 +210,7 @@ def robust_belief_propagation(
     messages:MessageDictType|None=None, # initial messages
     config:BPConfig=BPConfig(),
     update_plots_between_steps:bool=False,
-    progressbar:bool=True
+    allow_prog_bar:bool=True
 ) -> tuple[ 
     MessageDictType, # final messages
     BPStats
@@ -215,7 +227,7 @@ def robust_belief_propagation(
     ## For each attempt, run and check success:    
     for attempt_ind in range(config.allowed_retries):
         # Run:
-        messages_out, stats = belief_propagation(tn, messages_in, config, update_plots_between_steps, progressbar)
+        messages_out, stats = belief_propagation(tn, messages_in, config, update_plots_between_steps, allow_prog_bar)
 
         # Check success:
         success = stats.final_error < target_error
@@ -249,3 +261,9 @@ def robust_belief_propagation(
     )  
 
     return messages_out, overall_stats
+
+
+
+if __name__ == "__main__":
+    from scripts.test_bp import main_test
+    main_test()
