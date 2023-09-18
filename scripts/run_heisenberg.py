@@ -17,18 +17,18 @@ d = 2
 
 def main(
     D = 2,
-    N = 3,
+    N = 6,
     live_plots:bool = 1,
     parallel:bool = 0,
-    chi_factor : int = 1,
+    chi_factor : int = 2,
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     afm_or_fm:str = "AFM"  # Anti-Ferro-Magnetic or Ferro-Magnetic
 )->tuple[float, str]:
     
-    unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}"
-    unit_cell = UnitCell.load(unit_cell_file_name)
-    if unit_cell is None:
-        unit_cell = UnitCell.random(d=d, D=D)
+    unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}_chi{chi_factor}_"+strings.random(3)
+    # unit_cell = UnitCell.load(unit_cell_file_name)
+    # if unit_cell is None:
+    unit_cell = UnitCell.random(d=d, D=D)
     unit_cell._file_name = results_filename
 
     ## Config:
