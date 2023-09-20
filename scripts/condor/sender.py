@@ -33,9 +33,9 @@ RESULT_KEYS_DICT = dict(
 
 ## all values:
 DEFAULT_VALS = {}
-DEFAULT_VALS['N'] = [6, 10] 
+DEFAULT_VALS['N'] = [8, 12] 
 DEFAULT_VALS['D'] = [2, 3]
-DEFAULT_VALS['chi'] = [1, 2, 4, 8, 16, 32]
+DEFAULT_VALS['chi'] = [1, 2, 4, 8, 16]
 DEFAULT_VALS['method'] = [1]
 DEFAULT_VALS['seed'] = range(1)
 
@@ -45,7 +45,7 @@ Arguments = '$(outfile) $(seed) $(method) $(D) $(N) $(chi) $(job_type) $(result_
 def main(
     job_type="ite_afm",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
     request_cpus:int=2,
-    request_memory_gb:int=4,
+    request_memory_gb:int=32,
     vals:dict=DEFAULT_VALS,
     result_file_name:str|None=None
 ):
