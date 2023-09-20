@@ -7,7 +7,7 @@ from _config_reader import DEBUG_MODE
 
 # For common lattice function and classes:
 from tensor_networks.tensor_network import KagomeTN, TensorDims
-from tensor_networks.unit_cell import UnitCell
+from unit_cell import UnitCell
 
 from lattices.kagome import KagomeLattice
 
@@ -49,3 +49,9 @@ def kagome_tn_from_unit_cell(unit_cell:UnitCell, dims:TNDimensions) -> KagomeTN:
         N = dims.big_lattice_size,
         unit_cell = unit_cell
     )
+
+
+
+
+
+
