@@ -22,11 +22,47 @@ from _error_types import ITEError
 import itertools
 
 
+DEFAULT_ITE_TRACKER_MEMORY_LENGTH : int = 5
+
+
 _NEXT_IN_ABC_ORDER = {
     UnitCellFlavor.A : UnitCellFlavor.B,
     UnitCellFlavor.B : UnitCellFlavor.C,
     UnitCellFlavor.C : UnitCellFlavor.A
 }
+
+
+
+class _LimitedLengthList(Generic[_T]):
+    __slots__ = ("length", "_list")
+
+    def __init__(self, length:int) -> None:
+        self.length : int = length
+        self._list : list[_T] = []
+
+    def pop_oldest(self)->_T:
+        return self.pop(0)
+    
+    def pop(self, index:int|None=None)->_T:
+        if index is None:
+            return self._list.pop()
+        else:
+            return self._list.pop(index)
+
+    def append(self, item:_T)->None:
+        self._list.append(item)
+        if len(self._list)>self.length:
+            self.pop_oldest()
+
+    def __setitem__(self, key, value)->None:
+        return self._list.__setitem__(key, value)
+    
+    def __getitem__(self, key)->_T:
+        return self._list.__getitem__(key)
+    
+    def __delitem__(self, key)->_T:
+        return self._list.__delitem__(key)
+
 
 
 class HamiltonianFuncAndInputs(NamedTuple):
@@ -100,7 +136,10 @@ class UpdateEdge(NamedTuple):
 
 
 SUB_FOLDER = "ite_trackers"
-DEFAULT_TIME_STEPS = lambda:  [0.5]*5 + [0.1]*30 + [0.01]*10 + [0.001]*10 + [0.01]*20 + [0.001]*20 + [0.001]*50 + [0.0001]*50
+DEFAULT_TIME_STEPS = lambda:  [0.2]*5 + [0.1]*30 + [0.01]*10 + [0.001]*10 + \
+    [0.01]*100 + [0.001]*100 + [1e-4]*100 + [1e-5]*100 + [1e-6]*100 + [1e-7]*100 + \
+    [1e-8]*100 + [1e-9]*100 + [1e-10]*100 + [1e-11]*100 + [1e-12]*100 + [1e-13]*100 + [1e-15]*200
+
 # def DEFAULT_TIME_STEPS()->list[float]:
 #     dts = []
 #     for exp in [-1, -2, -3, -4]:
@@ -193,7 +232,7 @@ _TrackerStepOutputs = tuple[
 
 class ITEProgressTracker():
 
-    def __init__(self, unit_cell:UnitCell, messages:dict|None, config:Any):
+    def __init__(self, unit_cell:UnitCell, messages:dict|None, config:Any, mem_length:int=DEFAULT_ITE_TRACKER_MEMORY_LENGTH):
         # From input:
         self.last_unit_cell : UnitCell = unit_cell.copy()
         self.last_messages : dict = deepcopy(messages)  #type: ignore
@@ -203,12 +242,12 @@ class ITEProgressTracker():
         self.error_counters : dict[type, int] = {}
         self.file_name : str = "ite-tracker_"+strings.time_stamp()+" "+strings.random(5)
         # Lists memory:
-        self.delta_ts : list[float] = []
-        self.energies : list[complex|None] = []
-        self.expectation_values : list[dict] = []
-        self.unit_cells : list[UnitCell] = []
-        self.messages : list[dict] = []
-        self.stats : list[ITESegmentStats] = []
+        self.delta_ts           : _LimitedLengthList[float]             = _LimitedLengthList[float](mem_length) 
+        self.energies           : _LimitedLengthList[complex|None]      = _LimitedLengthList[complex|None](mem_length)     
+        self.expectation_values : _LimitedLengthList[dict]              = _LimitedLengthList[dict](mem_length) 
+        self.unit_cells         : _LimitedLengthList[UnitCell]          = _LimitedLengthList[UnitCell](mem_length) 
+        self.messages           : _LimitedLengthList[dict]              = _LimitedLengthList[dict](mem_length) 
+        self.stats              : _LimitedLengthList[ITESegmentStats]   = _LimitedLengthList[ITESegmentStats](mem_length)            
     
     def log_segment(self, delta_t:float, unit_cell:UnitCell, messages:dict, expectation_values:dict, energy:complex, stats:ITESegmentStats )->None:
         # Get a solid copy
@@ -278,7 +317,7 @@ class ITEProgressTracker():
         return ite_tracker
 
     def save(self)->None:
-        saveload.save(self, self.file_name, sub_folder=SUB_FOLDER)        
+        return saveload.save(self, self.file_name, sub_folder=SUB_FOLDER)        
 
     @property
     def full_path(self) -> str:

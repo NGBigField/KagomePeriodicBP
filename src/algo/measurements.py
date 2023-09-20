@@ -28,7 +28,7 @@ from lattices.directions import BlockSide
 from _error_types import TensorNetworkError, BPNotConvergedError
 from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor, UpdateMode
 from physics import pauli
-from tensor_networks.unit_cell import UnitCell
+from unit_cell import UnitCell
 from containers.results import Measurements, Expectations
 
 ## Algos we need:
