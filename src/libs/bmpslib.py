@@ -106,6 +106,18 @@
 #
 #                 
 #  12-Apr-2023 --- Added the add_two_MPSs function that adds two MPSs
+#
+#  23-Oct-2023 --- Made the SVD operation in left_canonical() and 
+#                  right_canonical() more resiliant to error using
+#                  try: and except:
+#
+#  27-Dec-2023 --- in update_A0_norm and right_canonical: when 
+#                  normalizing A0 using set_site then preserve its
+#                  canonical order.
+#
+#  13-Jan-2004 --- Copy the mantissa info in the copy() and reverse()
+#                  methods, and take it into account in the functions
+#                  mps_inner_product, mps_sandwitch
 #              
 #----------------------------------------------------------
 #
@@ -159,7 +171,7 @@ class mps:
 	def __init__(self,N):
 
 		self.N = N
-		self.A : list[np.ndarray] = [None]*N 
+		self.A = [None]*N
 		
 		self.Corder = [None]*N  # Canonical order of each element
 		
@@ -174,7 +186,7 @@ class mps:
 	def update_A0_norm(self):
 		
 		nr_A0 = norm(self.A[0])
-		self.set_site(self.A[0]/nr_A0, 0)
+		self.set_site(self.A[0]/nr_A0, 0, self.Corder[0])
 		
 		A0_exp = fexp(nr_A0)
 		A0_mantissa = fman(nr_A0)
@@ -217,16 +229,16 @@ class mps:
 	#
 	#
 	
-	def copy(self, full:bool=False):
+	def copy(self):
 		
 		new_mps = mps(self.N)
 		
 		new_mps.A = self.A.copy()
 		new_mps.Corder = self.Corder.copy()
+		
+		new_mps.nr_mantissa = self.nr_mantissa
+		new_mps.nr_exp = self.nr_exp
 
-		if full:
-			new_mps.nr_exp      = self.nr_exp
-			new_mps.nr_mantissa = self.nr_mantissa
 		
 		return new_mps
 		
@@ -240,7 +252,10 @@ class mps:
 	def reverse(self):
 		
 		new_mps = mps(self.N)
-
+		
+		new_mps.nr_mantissa = self.nr_mantissa
+		new_mps.nr_exp = self.nr_exp
+		
 		for i in range(self.N):
 			A = self.A[self.N-1-i]
 			
@@ -257,28 +272,7 @@ class mps:
 			new_mps.set_site(new_A, i, new_Corder)
 			
 		return new_mps
-	
-	def l2_distance(self, other:"mps") -> float:
-		"""l2_distance(A, B) -> float:
-		Where A is `self` and B is `other`:
-		Compute || <A|A> - <B|B> ||^2_2
-
-		Args:
-			self (MPS)
-			othher (MPS)
-		"""
-		# Compute:
-		conjB = True
-		overlap = mps_inner_product(self, other, conjB)
-		distance2 = 2 - 2*overlap.real
-		# Validate:
-		error_msg = f"L2 Distance should always be a real & positive value. Instead got {distance2}"
-		assert np.imag(distance2)==0, error_msg
-		if distance2<0:  # If it's a negative value.. it better be very close to zero
-			assert abs(distance2)<EPSILON , error_msg
-			return 0.0
-		# return:
-		return distance2
+		
 
 	#--------------------------  set_site   ---------------------------
 	#
@@ -408,8 +402,14 @@ class mps:
 			D2 = self.A[i].shape[2]
 
 			M = self.A[i].reshape(D1*d, D2)
+				
+			try:
+				U,S,V = svd(M, full_matrices=False)
+			except:
+				M = M + np.random.randn(*M.shape)*norm(M)*1e-12
+				U,S,V = svd(M, full_matrices=False)
 
-			U,S,V = svd(M, full_matrices=False)
+
 
 
 			if eps is not None:
@@ -510,7 +510,11 @@ class mps:
 				# Use SVD for truncation
 				#
 				
-				U,S,V = svd(M, full_matrices=False)
+				try:
+					U,S,V = svd(M, full_matrices=False)
+				except:
+					M = M + np.random.randn(*M.shape)*norm(M)*1e-12
+					U,S,V = svd(M, full_matrices=False)
 				
 				if nr_bulk:
 					nrS = norm(S)
@@ -578,7 +582,7 @@ class mps:
 		#
 		
 		if nr_bulk:
-			self.set_site(self.A[0]*overall_norm, 0)
+			self.set_site(self.A[0]*overall_norm, 0, self.Corder[0])
 			self.update_A0_norm()
 
 		return
@@ -1032,12 +1036,7 @@ class mpo:
 
 
 def fexp(f):
-	if f==0:
-		return 0
-	elif np.isinf(f):
-		raise FloatingPointError(f"f={f}")
-	else:
-		return int(floor(log10(abs(f)))) 
+    return int(floor(log10(abs(f)))) if f != 0 else 0
 
 def fman(f):
     return f/10**fexp(f)
@@ -1472,15 +1471,18 @@ def updateCRight(C, A, B, conjB=False):
 #  mps_inner_product - return the inner product <A|B>
 #
 
-def mps_inner_product(A, B, conjB=False):
+def mps_inner_product(A,B,conjB=False):
 
 	leftC = None
 
 	for i in range(A.N):
 
-		leftC = updateCLeft(leftC, A.A[i], B.A[i], conjB)
+		leftC = updateCLeft(leftC,A.A[i],B.A[i], conjB)
 
-	return leftC[0,0]
+	if conjB:
+		return leftC[0,0]*A.overall_factor()*conj(B.overall_factor())
+	else:
+		return leftC[0,0]*A.overall_factor()*B.overall_factor()
 
 # ---------------------------------------------------------
 #  mps_sandwitch - return the expression <A|O|B>
@@ -1498,7 +1500,11 @@ def mps_sandwitch(A,Op,B,conjB=False):
 		else:
 			leftCO = updateCOLeft(leftCO,A.A[i],Op.A[i],B.A[i])
 
-	return leftCO[0,0,0]
+
+	if conjB:
+		return leftCO[0,0,0]*A.overall_factor()*conj(B.overall_factor())
+	else:
+		return leftCO[0,0,0]*A.overall_factor()*B.overall_factor()
 
 
 
