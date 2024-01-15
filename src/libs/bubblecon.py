@@ -74,7 +74,7 @@ import scipy as sp
 from scipy.linalg import sqrtm, polar, expm
 
 from numpy.linalg import norm
-from numpy import sqrt, tensordot, array, eye, zeros, ones, pi, conj
+from numpy import sqrt, tensordot, array, eye, zeros, ones, pi, conj, trace
 
 from libs import bmpslib
 
@@ -1321,7 +1321,7 @@ def swallow_T(mp, T, i0, i1, in_legs, out_legs, D_trunc=None, eps=None):
 
 def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 	swallow_order, D_trunc=None, D_trunc2=None, eps=None, opt='high', \
-	break_points=[], ket_tensors=None, separate_exp=False):
+	break_points=[], ket_tensors=None, separate_exp=False, progress_bar:bool=False):
 
 	"""
 	
@@ -1593,7 +1593,14 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 	
 	mp_list = []
 
+
+	if progress_bar:
+		prog_bar = ProgressBar(len(swallow_order)-mp.N, "buublecon contracting: " )
+	else:
+		prog_bar = ProgressBar.inactive()
+
 	while more_tensors_to_swallow:
+		prog_bar.next(every=8)
 		
 		#
 		# See if we reached a break point, and in such case add the 
@@ -1796,7 +1803,8 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 		mp_edges_list = mp_edges_list[:i0] + v_out_edges_list \
 			+ mp_edges_list[(i1+1):]
 			
-	
+			
+	prog_bar.clear()
 
 
 	if log:
