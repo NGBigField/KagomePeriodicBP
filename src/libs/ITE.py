@@ -72,7 +72,7 @@ import pickle
 from numpy.linalg import norm, svd, qr
 
 from numpy import zeros, ones, array, tensordot, sqrt, diag, conj, \
-	eye, trace, pi, exp
+	eye, trace, pi, exp, isnan
 	
 from scipy.linalg import expm
 
@@ -84,7 +84,8 @@ from libs.ncon import ncon
 
 
 HERMICITY_ERR = 1e-5
-
+PINV_THRESH = 1e-8
+ROBUST_THRESH = 1e8
 
 
 
