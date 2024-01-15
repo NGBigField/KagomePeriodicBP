@@ -106,7 +106,7 @@ def list_tries(list_:list)->Callable[[Callable], Callable]: # function that retu
     # Return decorator:
     def decorator(func:Callable)->Callable: # decorator that returns a wrapper:
         @wraps(func)
-        def wrapper(*args, **kwargs)->Any: # wrapeer that cals the function            
+        def wrapper(*args, **kwargs)->Any: # wrapper that calls the function            
             last_error = Exception("Temp Exception")
             for val in list_:
                 try:
