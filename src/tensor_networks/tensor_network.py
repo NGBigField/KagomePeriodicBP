@@ -18,7 +18,7 @@ from lattices.directions import check, create
 
 # Other lattice structure:
 from tensor_networks.node import TensorNode
-from tensor_networks.unit_cell import UnitCell
+from unit_cell import UnitCell
 from lattices.edges import edges_dict_from_edges_list, same_dicts
 from lattices.kagome import KagomeLattice, Node, UpperTriangle
 import lattices.triangle as triangle_lattice

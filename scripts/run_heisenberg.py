@@ -17,7 +17,7 @@ d = 2
 
 def main(
     D = 2,
-    N = 3,
+    N = 2,
     live_plots:bool = 1,
     parallel:bool = 0,
     chi_factor : int = 1,
@@ -25,10 +25,10 @@ def main(
     afm_or_fm:str = "AFM"  # Anti-Ferro-Magnetic or Ferro-Magnetic
 )->tuple[float, str]:
     
-    unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}"
-    unit_cell = UnitCell.load(unit_cell_file_name)
-    if unit_cell is None:
-        unit_cell = UnitCell.random(d=d, D=D)
+    unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}_chi{chi_factor}_"+strings.random(3)
+    # unit_cell = UnitCell.load(unit_cell_file_name)
+    # if unit_cell is None:
+    unit_cell = UnitCell.random(d=d, D=D)
     unit_cell._file_name = results_filename
 
     ## Config:
@@ -50,13 +50,9 @@ def main(
         config.bp.max_iterations *= 2 
     config.visuals.progress_bars = True
     # delta-t's:
-    t = 3
-    config.ite.time_steps = [1e-1]*20 + [1e-2]*10 + [1e-3]*t + [1e-4]*t + [1e-5]*t + [1e-6]*t + [1e-7]*t + [1e-8]*t + [1e-9]*t + [1e-10]*t + [1e-11]*t + [1e-12]*t + [1e-16]*t + [0]*t    
-    # config.ite.time_steps = [0.2]*5 + [0.1]*20 + [0.01]*50 + [0.001]*100 + [0.05]*20 + [0.001]*100 \
-    #     + [1e-4]*100 + [1e-5]*100 + [1e-6]*100 + [1e-7]*100 + [1e-8]*100 + [1e-9]*100 
     config.ite.bp_every_edge = False
     # BP:
-    # config.bp.target_msg_diff = 1e-6
+    config.bp.target_msg_diff = 1e-7
 
 
     ## Run:
