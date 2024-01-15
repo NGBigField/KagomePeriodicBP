@@ -155,3 +155,4 @@ cython_debug/
 *.dat
 *.csv
 *.png
+*.dat
