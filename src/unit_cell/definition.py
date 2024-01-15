@@ -72,6 +72,9 @@ class UnitCell:
     def load(file_name:str, if_exist:bool=True)->"UnitCell":
         return saveload.load(file_name, sub_folder=UNIT_CELL_SUBFOLDER, if_exist=if_exist)
     
+    def set_filename(self, filename:str)->None:
+        self._file_name = filename
+
     def _derive_file_name(self, given_name:str|None)->str:
         if given_name is not None:
             assert isinstance(given_name, str)

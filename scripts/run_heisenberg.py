@@ -29,7 +29,7 @@ def main(
     # unit_cell = UnitCell.load(unit_cell_file_name)
     # if unit_cell is None:
     unit_cell = UnitCell.random(d=d, D=D)
-    unit_cell._file_name = results_filename
+    unit_cell.set_filename(results_filename) 
 
     ## Config:
     config = Config.derive_from_physical_dim(D)
