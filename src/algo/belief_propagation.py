@@ -14,7 +14,7 @@ from _config_reader import DEBUG_MODE
 import numpy as np
 
 # other used types in our code:
-from tensor_networks import KagomeTN, MPS
+from tensor_networks import KagomeTN, MPS, mps_l2_distance
 from lattices.directions import BlockSide
 from enums import ContractionDepth
 from containers import BPStats, BPConfig, MessageDictType, Message
@@ -110,7 +110,7 @@ def _belief_propagation_step(
     ## Check error between messages:
     # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:
     distances = [ 
-        MPS.l2_distance(prev_messages[direction].mps, next_messages[direction].mps) 
+        mps_l2_distance(prev_messages[direction].mps, next_messages[direction].mps) 
         for direction in BlockSide.all_in_counter_clockwise_order() 
     ]
     if config.msg_diff_squared:
