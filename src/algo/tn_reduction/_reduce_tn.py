@@ -45,7 +45,7 @@ def _next_reduction_function(tn:TensorNetwork)->Callable[[TensorNetwork, dict], 
     raise TypeError(f"Input TN of type {type(tn)!r} didn't match one of the possible reduction functions")
 
 
-def _reduce_tn_on_step(tn:TensorNetwork, trunc_dim:int, copy:bool, **kwargs_in)->TensorNetwork:
+def _reduce_tn_one_step(tn:TensorNetwork, trunc_dim:int, copy:bool, **kwargs_in)->TensorNetwork:
 
     ## Choose correct function:
     func = _next_reduction_function(tn)
@@ -75,7 +75,7 @@ def reduce_tn(tn:TensorNetwork, target_type:Type[TensorNetworkOutput], trunc_dim
         >>> core_tn = reduce_tn(full_tn, CoreTN, 16)
     """
     while type(tn) is not target_type:
-        tn = _reduce_tn_on_step(tn, trunc_dim=trunc_dim, copy=copy, **kwargs)
+        tn = _reduce_tn_one_step(tn, trunc_dim=trunc_dim, copy=copy, **kwargs)
     return tn
 
 

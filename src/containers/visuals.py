@@ -4,7 +4,7 @@ from containers._meta import container_repr
 
 
 def _DEFAULT_PLOTS_TO_SHOW():
-    return [True, True, True]
+    return [True, True, False]
 
 
 

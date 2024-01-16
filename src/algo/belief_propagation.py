@@ -245,7 +245,6 @@ def robust_belief_propagation(
         if isinstance(config.max_iterations, int):
             config.max_iterations += 10
         messages_in = None
-        stats.attempts += 1
         
     else:  # if never had success
         messages_out = min_messages

@@ -16,13 +16,13 @@ d = 2
 
 
 def main(
-    D = 2,
-    N = 2,
+    D = 3,
+    N = 3,
     live_plots:bool = 1,
     parallel:bool = 0,
     chi_factor : int = 1,
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
-    afm_or_fm:str = "AFM"  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    afm_or_fm:str = "FM"  # Anti-Ferro-Magnetic or Ferro-Magnetic
 )->tuple[float, str]:
     
     unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}_chi{chi_factor}_"+strings.random(3)
@@ -46,13 +46,10 @@ def main(
     config.bp.max_swallowing_dim *= chi_factor
     # Parallel:
     config.bp.parallel_msgs = parallel
-    if N>10:
-        config.bp.max_iterations *= 2 
     config.visuals.progress_bars = True
-    # delta-t's:
     config.ite.bp_every_edge = False
     # BP:
-    config.bp.target_msg_diff = 1e-7
+    config.bp.target_msg_diff = 1e-6
 
 
     ## Run:

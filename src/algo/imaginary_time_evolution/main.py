@@ -74,7 +74,7 @@ def _initial_full_ite_inputs(config:Config, unit_cell:UnitCell, logger:logs.Logg
     
 
 
-def _fix_config_if_bp_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger):
+def _fix_config_if_bp_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger) -> Config:
     if bp_stats.attempts>1: 
         config.bp.max_swallowing_dim = bp_stats.final_config.max_swallowing_dim
         logger.debug(f"        config.bp.max_swallowing_dim updated to {config.bp.max_swallowing_dim}")
