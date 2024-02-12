@@ -154,7 +154,7 @@ class ITEPlots():
         config:Config
     )->None:
         
-        plots_to_show = config.visuals._what_plots
+        plots_to_show = config.visuals._plots_to_show
         
         ## Save data:
         self.config = config

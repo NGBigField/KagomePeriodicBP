@@ -5,6 +5,7 @@ from containers import Config
 from tensor_networks import UnitCell
 
 from utils import strings
+from typing import Iterable
 
 
 # Algos we test here:
@@ -16,9 +17,9 @@ d = 2
 
 
 def main(
-    D = 3,
-    N = 3,
-    live_plots:bool = 1,
+    D = 2,
+    N = 2,
+    live_plots:bool|Iterable[bool] = [1, 1, 0],
     parallel:bool = 0,
     chi_factor : int = 1,
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
