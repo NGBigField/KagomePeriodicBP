@@ -107,6 +107,30 @@ def _belief_propagation_step(
     ## Connect new incoming massages to tensor-network:
     tn.connect_messages(next_messages)
 
+
+    #TODO: add damping
+    # if damping is None:
+    #     combined_mps = mps_message
+    # else:
+        
+    #     if inP.real>0:
+    #         sign_inP = 1
+    #     else:
+    #         sign_inP = -1
+            
+    #     combined_mps = bmpslib.add_two_MPSs(mps_message, 1-damping, \
+    #         old_mps, sign_inP*damping)
+        
+    #     #
+    #     # normalize the combined messages and make them 
+    #     # right-canonical
+    #     #
+    #     combined_mps.left_canonical_QR()
+    #     combined_mps.right_canonical(maxD=D_trunc, nr_bulk=True)
+
+
+
+
     ## Check error between messages:
     # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:
     distances = [ 

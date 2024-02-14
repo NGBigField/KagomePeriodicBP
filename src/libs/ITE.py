@@ -1182,8 +1182,12 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 
 	trunc_pos_eps = 1e-12
 
-	wpos_idx = np.where(w>trunc_pos_eps/w[-1])
+	wpos_idx = np.where(w>trunc_pos_eps*w[-1])
 	pos_idx = wpos_idx[0][0]
+
+	## DEBUGGING with Itai:
+	print(f"pos_idx={pos_idx}/{w.shape[0]}")
+
 
 	wpos = w[pos_idx:]
 	U = U[:, pos_idx:]

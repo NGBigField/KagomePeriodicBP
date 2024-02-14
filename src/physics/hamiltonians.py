@@ -26,6 +26,10 @@ def transverse_field_in_direction(direction:Literal['x', 'y', 'z'], strength:flo
 			raise ValueError(f"Not an option {direction!r}")
 	return strength*_tensor_product(op, id) + strength*_tensor_product(id, op)
 
+def heisenberg_fm_with_trans_field()->np.ndarray:
+	return heisenberg_fm() + transverse_field_in_direction(direction="x", strength=0.1)
+heisenberg_fm_with_trans_field.reference = -0.6
+
 
 def heisenberg_fm()->np.ndarray:
 	return -1*heisenberg_afm()
