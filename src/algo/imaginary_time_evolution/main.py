@@ -242,6 +242,11 @@ def ite_per_mode(
     edge_tuples = list(UpdateEdge.all_in_random_order())
     edge_energies = []
 
+    ## prepare statistics and health for debugging:
+    stats = ITEPerModeStats()
+    stats.bp_stats = bp_stats
+    stats.env_metrics = []
+
     prog_bar = get_progress_bar(config, len(edge_tuples), "Executing ITE per-mode:")
     for is_first, is_last, edge_tuple in lists.iterate_with_edge_indicators(edge_tuples):
         prog_bar.next(extra_str=f"{edge_tuple}")
@@ -258,14 +263,13 @@ def ite_per_mode(
         unit_cell, energy, env_metrics = update_unit_cell(edge_tn, unit_cell, config.ite, delta_t, logger)
         edge_energies.append(energy)
 
+        stats.env_metrics.append(env_metrics)
+
         # Update mode_tn:
         mode_tn.update_unit_cell_tensors(unit_cell)
     prog_bar.clear()
 
-    ## Return results and statistics:
-    stats = ITEPerModeStats()
-    stats.bp_stats = bp_stats
-    stats.env_metrics = env_metrics
+    
 
     return unit_cell, messages, edge_energies, stats
 
@@ -328,8 +332,8 @@ def ite_segment(
             raise ITEError(*e.args)
         ## Track results:
         stats.ite_per_mode_stats.append(ite_per_mode_stats)
-        logger.debug(f"        Hermicity of environment={ite_per_mode_stats.env_metrics.hermicity!r}")
-        logger.debug(f"        Edge-Energies={edge_energies!r}")
+        logger.debug(f"        Hermicity of environment={[metric.hermicity for metric in ite_per_mode_stats.env_metrics]!r}")
+        logger.debug(f"        Edge-Energies={np.real(edge_energies)!r}")
         ## inputs for next iteration:
         config.bp = ite_per_mode_stats.bp_stats.final_config
 
@@ -440,6 +444,7 @@ def full_ite(
             mean_energy, unit_cell, messages, success, step_stats = ite_per_delta_t(unit_cell, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)  
         except Exception as e:
             _log_and_print_finish_message(logger, config, ite_tracker, plots)  # Print and log valuable information: 
+            raise e
     
     ## Log finish:
     prog_bar.clear()

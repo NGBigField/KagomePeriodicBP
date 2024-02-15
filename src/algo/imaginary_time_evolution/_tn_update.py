@@ -46,7 +46,15 @@ def _check_rdms_metrics(rdm:np.ndarray)->MatrixMetrics:
         # raise ITEError(f"env is not psd. negativity={env_metrics.negativity}") 
         prints.print_warning(f"env is not psd. negativity={env_metrics.negativity}")
     return env_metrics
-       
+
+
+def _calc_original_negativity_ratio(origin_eigen_vals:np.ndarray)->float:
+    positive = sum(origin_eigen_vals[origin_eigen_vals>0])
+    negative = sum(origin_eigen_vals[origin_eigen_vals<0])
+    negative = np.abs(negative)
+    ratio = negative / (negative + positive)
+    return ratio
+
 
 def _calc_environment_equivalent_matrix(environment_tensors:list[np.ndarray]) -> np.ndarray:
 
@@ -113,12 +121,13 @@ def update_unit_cell(
     assert (d_virtual := t1.shape[1]) == t1.shape[2] == t1.shape[3] == t1.shape[4]
 
     ## Perform ITE step on edge:
-    t1_new, t2_new = apply_2local_gate( g=g, Dmax=d_virtual, Ti=t1, Tj=t2, mps_env=mps_env )    
+    t1_new, t2_new, origin_eigen_vals = apply_2local_gate( g=g, Dmax=d_virtual, Ti=t1, Tj=t2, mps_env=mps_env )    
 
     ## Calc energy and updated env metrics:
     rdm_after = rho_ij(t1_new, t2_new, mps_env=mps_env)
     energy_after = np.dot(rdm_after.flatten(),  h.flatten())
-    env_metrics = _check_rdms_metrics(rdm_after)
+    metrics = _check_rdms_metrics(rdm_after)
+    metrics.other["original_negativity_ratio"] = _calc_original_negativity_ratio(origin_eigen_vals)
 
     ## normalize
     t1_new = t1_new / np.linalg.norm(t1_new)
@@ -132,6 +141,6 @@ def update_unit_cell(
     ## Keep copy 
     unit_cell.save()
 
-    return unit_cell, energy_after, env_metrics
+    return unit_cell, energy_after, metrics
 
 

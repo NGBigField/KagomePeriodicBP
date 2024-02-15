@@ -17,7 +17,7 @@ d = 2
 
 
 def main(
-    D = 1,
+    D = 5,
     N = 2,
     live_plots:bool|Iterable[bool] = [1, 1, 1],
     parallel:bool = 0,

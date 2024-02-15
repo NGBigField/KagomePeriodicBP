@@ -205,7 +205,7 @@ class ITEConfig():
 
 class ITEPerModeStats(Stats):
     bp_stats : BPStats = BPStats()
-    env_metrics : MatrixMetrics 
+    env_metrics : list[MatrixMetrics] = field(default_factory=list)
     
 
 class ITESegmentStats(Stats):

@@ -1193,10 +1193,6 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	
 	pos_idx = wpos_idx[0][0]
 
-	## DEBUGGING with Itai:
-	print(f"pos_idx={pos_idx}/{w.shape[0]}")
-
-
 	wpos = w[pos_idx:]
 	U = U[:, pos_idx:]
 
@@ -1290,7 +1286,7 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	# aj: [d, D, Dj_red]
 	#
 
-	return X, ai, aj, Ti_rest, Tj_rest
+	return X, ai, aj, Ti_rest, Tj_rest, w
 
 
 
@@ -1814,7 +1810,7 @@ def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, \
 	# Note: Ti = Ti_rest\cdot ai and similarly for j.
 	#
 
-	X, ai, aj, Ti_rest, Tj_rest = reduced_env(Ti, Tj, env_i, env_j, mps_env)
+	X, ai, aj, Ti_rest, Tj_rest, origin_eigen_vals = reduced_env(Ti, Tj, env_i, env_j, mps_env)
 
 	#
 	# The legs of the resultant tensors:
@@ -1888,7 +1884,7 @@ def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, \
 			print(f"    {Ti.shape}, {Tj.shape} => {new_Ti.shape}, {new_Tj.shape}")
 			print()
 
-	return new_Ti, new_Tj
+	return new_Ti, new_Tj, origin_eigen_vals
 	
 
 #
