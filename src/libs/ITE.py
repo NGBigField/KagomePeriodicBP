@@ -918,6 +918,8 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	Di_red = min(Di_rest, d*D)
 	Dj_red = min(Dj_rest, d*D)
 
+
+
 	#
 	# Number of external legs in Ti, Tj
 	#
@@ -1147,6 +1149,7 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 
 	Nred = tensordot(Ni, Nj, axes=([2,3],[2,3]))
 
+
 	#
 	# Resultant Nred is now of the form
 	#     [Di_red, Di_red*; Dj_red, Dj_red*]
@@ -1162,8 +1165,11 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	Hermicity = norm(Nred-conj(Nred.T))/norm(Nred)
 	
 	if Hermicity > HERMICITY_ERR:
-		print("    ITE.reduced_env: The reduced env tensor Nred is not hermitian")
-		print(f"                    It has hermicity {Hermicity} > {HERMICITY_ERR}.")
+		print("\n")
+		print("* * * ITE Warning: * * *")
+		print("ITE.reduced_env: The reduced env tensor Nred is not hermitian")
+		print(f"                 It has hermicity {Hermicity} > {HERMICITY_ERR}.")
+		print("\n\n")
 
 	#
 	# Making Nred 100% Hermitian 
@@ -1183,6 +1189,7 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	trunc_pos_eps = 1e-12
 
 	wpos_idx = np.where(w>trunc_pos_eps*w[-1])
+	
 	pos_idx = wpos_idx[0][0]
 
 	## DEBUGGING with Itai:
@@ -1209,24 +1216,31 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	DX_red = X.shape[1]
 
 	X = X.reshape([Di_red, Dj_red, DX_red])
-
+	
 	#
 	# Final step: gauge fix the Di_red, DX_red legs of X using QR.
 	#
 
 	X_tmp = X.reshape([Di_red, Dj_red*DX_red])
 	Q,Ri = qr(X_tmp.T)
-
 	Li = Ri.T
-
-	Li_inv = np.linalg.inv(Li)
+	
+	#
+	# We now invert Li, but use Penrose's pseudo inverse since Li 
+	# is not necessarily invertible (and might even not be square)
+	#
+	Li_inv = np.linalg.pinv(Li, rcond=PINV_THRESH)
+		
 
 	X_tmp = X.transpose([0,2,1])  # now its [Di_red, D_X, Dj_red]
 	X_tmp = X_tmp.reshape([Di_red*DX_red, Dj_red])
 	Q,Rj  = qr(X_tmp)
-
-	Rj_inv = np.linalg.inv(Rj)
-
+	
+	#
+	# Pseudo-invert Lj
+	#
+	Rj_inv = np.linalg.pinv(Rj, rcond=PINV_THRESH)
+	
 	#
 	# Now we have our(X) = Li X_new Rj  ==> X_new = Li^{-1} X Rj^{-1}
 	#
@@ -1239,6 +1253,7 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	#
 	# Recall: ai=[d, D, D_red], aj=[d, D, D_red]
 	#
+
 
 	X = tensordot(Li_inv, X, axes=([1],[0]))
 	Ti_rest = tensordot(Li_inv, Ti_rest, axes=([1],[0]))
@@ -1253,6 +1268,14 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	#
 	# Unfuse the external legs of Ti_rest, Tj_rest
 	#
+
+	#
+	# The dimensions of Di_red, and Dj_red might have changed during 
+	# the gause fixing, so we update them.
+	#
+	
+	Di_red = ai.shape[2]
+	Dj_red = aj.shape[2]
 
 	Ti_rest = Ti_rest.reshape([Di_red] + list(Ti.shape[2:]))
 	Tj_rest = Tj_rest.reshape([Dj_red] + list(Tj.shape[2:]))
