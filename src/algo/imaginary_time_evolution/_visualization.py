@@ -165,6 +165,11 @@ class ITEPlots():
         # Track state
         self._iteration = 0
 
+        figure_titles = ITEPlots._PlotVariations[str]()
+        figure_titles.main = "ITE convergence"
+        figure_titles.cores = "cores polarization"
+        figure_titles.env = "environment figure"
+
         ## Parse inputs:
         assert len(plots_to_show)==3
         self.show.main  = plots_to_show[0]
@@ -286,6 +291,31 @@ class ITEPlots():
         # interactive:
         visuals.draw_now()
         visuals.ion()
+
+
+        ## Window properties of figures:
+        # Get plots in needed order:
+        active_plots_in_order = []
+        for plot_name, show_plot in self.show.items():
+            if show_plot:
+                active_plots_in_order.append(plot_name)
+        # Title:
+        for plot_name in active_plots_in_order:
+            title = figure_titles.__getattribute__(plot_name)
+            window = self.figs.__getattribute__(plot_name).canvas.manager.window
+            window.setWindowTitle(title)
+    
+        # Position on screen
+        is_first = True
+        for plot_name in active_plots_in_order:
+            window = self.figs.__getattribute__(plot_name).canvas.manager.window
+            if not is_first:
+                window.move(x+dx, y)
+            (x, y) = (window.x(), window.y())
+            dx = window.width()
+            is_first = False
+
+        
 
     def update(self, 
         energies:list[complex], 

@@ -82,6 +82,7 @@ from libs import bmpslib
 from libs import bubblecon
 from libs.ncon import ncon
 
+from _error_types import ITEError
 
 HERMICITY_ERR = 1e-5
 PINV_THRESH = 1e-8
