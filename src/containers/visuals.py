@@ -11,7 +11,7 @@ _DEFAULT_PLOTS_TO_SHOW = (True, True, False)
 @dataclass
 class VisualsConfig(): 
 
-    progress_bars : bool = False  # Show progress bars to get a feel for expected execution time
+    progress_bars : bool = True  # Show progress bars to get a feel for expected execution time
     verbose : bool = False  # Print any tiny detail through the code execution 
     
     _plots_to_show : tuple[bool] = _DEFAULT_PLOTS_TO_SHOW

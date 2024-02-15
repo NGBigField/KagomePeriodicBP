@@ -436,7 +436,10 @@ def full_ite(
     # Main loop:
     for delta_t, num_repeats in delta_t_list_with_repetitions:
         prog_bar.next(extra_str=f"delta-t={delta_t}")
-        mean_energy, unit_cell, messages, success, step_stats = ite_per_delta_t(unit_cell, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)
+        try:
+            mean_energy, unit_cell, messages, success, step_stats = ite_per_delta_t(unit_cell, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)  
+        except Exception as e:
+            _log_and_print_finish_message(logger, config, ite_tracker, plots)  # Print and log valuable information: 
     
     ## Log finish:
     prog_bar.clear()
