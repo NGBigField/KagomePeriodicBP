@@ -26,6 +26,45 @@ NEW_TRACK_POINT_THRESHOLD = 0.02
 TRACK_COLOR = 'tomato'
 
 
+def _set_window_title(window, title:str)->None:
+    full_title="KagomePeriodicBP: "+title
+    if hasattr(window, "wm_title"):
+        window.wm_title(full_title)
+    elif hasattr(window, "setWindowTitle"):
+        window.setWindowTitle(full_title)
+    else:
+        pass  # Do nothing
+
+
+def _get_window_position_and_size(window)->tuple[int, ...]:
+    if hasattr(window, "x"):
+        x = window.x() 
+        y = window.y()
+        w = window.width()
+        h = window.height()
+    elif hasattr(window, "winfo_x"):
+        x = window.winfo_x()
+        y = window.winfo_y()
+        w = window.winfo_width()
+        h = window.winfo_height()
+    else:
+        x, y, w, h = None, None, None, None
+
+    return x, y, w, h
+
+
+def _set_window_position(window, x:int, y:int, w:int, h:int)->None:
+
+    if hasattr(window, "move"):
+        window.move(x, y)
+        window.width(w)
+        window.height(h)
+    elif hasattr(window, "geometry"):
+        window.geometry(f"{w}x{h}+{x}+{y}")
+    else:
+        pass
+
+
 class BlockSpherePlot():
     def __init__(self, size_factor:float=1.0, axis:Optional[Axes3D]=None) -> None:
         #
@@ -303,16 +342,17 @@ class ITEPlots():
         for plot_name in active_plots_in_order:
             title = figure_titles.__getattribute__(plot_name)
             window = self.figs.__getattribute__(plot_name).canvas.manager.window
-            window.setWindowTitle("KagomePeriodicBP: "+title)
+            _set_window_title(window, title)
+
     
         # Position on screen
         is_first = True
         for plot_name in active_plots_in_order:
             window = self.figs.__getattribute__(plot_name).canvas.manager.window
             if not is_first:
-                window.move(x+dx, y)
-            (x, y) = (window.x(), window.y())
-            dx = window.width()
+                _, this_y, this_w, this_h = _get_window_position_and_size(window)
+                _set_window_position(window, x+w, this_y, this_w, this_h)
+            x, y, w, h = _get_window_position_and_size(window)
             is_first = False
 
         
