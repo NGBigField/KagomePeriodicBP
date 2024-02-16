@@ -136,8 +136,7 @@ class UpdateEdge(NamedTuple):
 
 
 SUB_FOLDER = "ite_trackers"
-DEFAULT_TIME_STEPS = lambda:  [0.2]*5 + [0.1]*30 + [0.01]*10 + [0.001]*10 + \
-    [0.01]*100 + [0.001]*100 + [1e-4]*100 + [1e-5]*100 + [1e-6]*100 + [1e-7]*100 + \
+DEFAULT_TIME_STEPS = lambda: [0.1]*20 + [0.01]*100 + [0.001]*100 + [1e-4]*100 + [1e-5]*100 + [1e-6]*100 + [1e-7]*100 + \
     [1e-8]*100 + [1e-9]*100 + [1e-10]*100 + [1e-11]*100 + [1e-12]*100 + [1e-13]*100 + [1e-15]*200
 
 # def DEFAULT_TIME_STEPS()->list[float]:

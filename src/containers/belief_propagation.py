@@ -14,10 +14,10 @@ from copy import deepcopy
 class BPConfig: 
     max_iterations : int|None = 30   # None is used for unlimited number of iterations
     max_swallowing_dim : int = 9
-    target_msg_diff : float = 1e-5
+    target_msg_diff : float = 1e-6
     msg_diff_squared : bool = True  # True is easier to get to 
     init_msg: MessageModel = MessageModel.RANDOM_QUANTUM
-    allowed_retries : int = 3
+    allowed_retries : int = 4
     hermitize_messages_between_iterations : bool = True
     times_to_deem_failure_when_diff_increases  : int = 3
     parallel_msgs : bool = False

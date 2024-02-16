@@ -74,7 +74,7 @@ def _initial_full_ite_inputs(config:Config, unit_cell:UnitCell, logger:logs.Logg
     
 
 
-def _fix_config_if_bp_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger) -> Config:
+def _harden_bp_config_if_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger) -> Config:
     if bp_stats.attempts>1: 
         config.bp.max_swallowing_dim = bp_stats.final_config.max_swallowing_dim
         logger.debug(f"        config.bp.max_swallowing_dim updated to {config.bp.max_swallowing_dim}")
@@ -205,7 +205,7 @@ def _from_unit_cell_to_stable_mode(
     print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
 
     # If block-bp struggled and increased the virtual dimension, the following iterations must also use a higher dimension:
-    config = _fix_config_if_bp_struggled(config, bp_stats, logger)
+    config = _harden_bp_config_if_struggled(config, bp_stats, logger)
 
     ## Contract to mode:
     mode_tn = reduce_tn(full_tn, ModeTN, trunc_dim=config.trunc_dim, mode=mode)
@@ -254,19 +254,24 @@ def ite_per_mode(
         if config.visuals.live_plots:
             visuals.refresh()
 
-        if config.ite.bp_every_edge and not is_last and not is_first:
-            mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
+        if not is_first:
+            if config.ite.bp_every_edge:
+                # Perform BlockBP again, to get converged messages.
+                mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
+            else:
+                # Just update the tensors 
+                mode_tn.update_unit_cell_tensors(unit_cell)
 
         edge_tn = reduce_tn(mode_tn, EdgeTN, trunc_dim=config.trunc_dim, edge_tuple=edge_tuple)
 
         # Perform ITE update:
         unit_cell, energy, env_metrics = update_unit_cell(edge_tn, unit_cell, config.ite, delta_t, logger)
-        edge_energies.append(energy)
 
+        # keep stats:
+        edge_energies.append(energy)
         stats.env_metrics.append(env_metrics)
 
         # Update mode_tn:
-        mode_tn.update_unit_cell_tensors(unit_cell)
     prog_bar.clear()
 
     
@@ -275,8 +280,8 @@ def ite_per_mode(
 
 
 @decorators.add_stats()
-@decorators.multiple_tries(3)
-def ite_segment(
+# @decorators.multiple_tries(3)
+def ite_per_segment(
     unit_cell:UnitCell,
     messages:MessageDictType|None,
     delta_t:float,
@@ -333,7 +338,7 @@ def ite_segment(
         ## Track results:
         stats.ite_per_mode_stats.append(ite_per_mode_stats)
         logger.debug(f"        Hermicity of environment={[metric.hermicity for metric in ite_per_mode_stats.env_metrics]!r}")
-        logger.debug(f"        Edge-Energies={np.real(edge_energies)!r}")
+        logger.debug(f"        Edge-Energies={np.real(edge_energies).tolist()!r}")
         ## inputs for next iteration:
         config.bp = ite_per_mode_stats.bp_stats.final_config
 
@@ -366,7 +371,7 @@ def ite_per_delta_t(
 
         ## Preform ITE segment:
         try:
-            unit_cell, messages, segment_stats = ite_segment(
+            unit_cell, messages, segment_stats = ite_per_segment(
                 unit_cell, messages, delta_t, logger=logger, config_in=config, prev_stats=segment_stats
             )
         except ITEError as e:
