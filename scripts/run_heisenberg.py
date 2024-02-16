@@ -36,6 +36,7 @@ def main(
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
+    # Interaction:
     if afm_or_fm=="AFM":
         config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None)
     elif afm_or_fm=="FM":
@@ -44,14 +45,11 @@ def main(
         config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm_with_trans_field, None)
     else:
         raise ValueError("not matching any option.")
-    #
+    # chi
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    # Parallel:
+    # Comp
     config.bp.parallel_msgs = parallel
-    config.ite.bp_every_edge = False
-    # BP:
-    config.bp.target_msg_diff = 1e-6
 
     ## Run:
     energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)

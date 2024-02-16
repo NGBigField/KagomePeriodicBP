@@ -173,7 +173,7 @@ class ITEConfig():
     num_errors_threshold : int = 10    
     # Belief-Propagation on full tn:
     bp_not_converged_raises_error : bool = True
-    bp_every_edge : bool = False
+    bp_every_edge : bool = True
 
 
     @property

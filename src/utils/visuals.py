@@ -91,7 +91,7 @@ def ion():
 def refresh():
     global active_interactive
     if active_interactive:
-        plt.pause(0.001)
+        plt.pause(0.000001)
 
 
 def get_saved_figures_folder()->Path:
