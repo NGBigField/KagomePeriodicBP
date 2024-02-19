@@ -36,17 +36,16 @@ def main(
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
+
     # Interaction:
-    if afm_or_fm=="AFM":
-        config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None)
-    elif afm_or_fm=="FM":
-        config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm, None)
-    elif afm_or_fm=="FM-T":
-        config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm_with_field, None)
-    elif afm_or_fm=="Field":
-        config.ite.interaction_hamiltonian = (hamiltonians.field, None)
-    else:
-        raise ValueError("not matching any option.")
+    match afm_or_fm: 
+        case "AFM":   config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None)
+        case "FM":    config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm, None)
+        case "FM-T":  config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm_with_field, None)
+        case "Field": config.ite.interaction_hamiltonian = (hamiltonians.field, None)
+        case _:
+            raise ValueError("Not matching any option.")
+        
     # chi
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor

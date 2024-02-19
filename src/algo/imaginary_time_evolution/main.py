@@ -279,8 +279,6 @@ def ite_per_mode(
 
     prog_bar.clear()
 
-    
-
     return unit_cell, messages, edge_energies, stats
 
 

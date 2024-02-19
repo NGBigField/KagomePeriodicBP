@@ -24,12 +24,46 @@ from algo.contract_tensor_network import contract_tensor_network
 
 # for ite stuff:
 from libs import ITE as ite
+from libs import bmpslib
 
 # Common used utilities:
 from utils import decorators, parallel_exec, lists, visuals, prints
 
 # OOP:
 from copy import deepcopy
+
+
+def _mps_damping(old_mps:Message, new_mps:Message, damping:float, trunc_dim:int):
+    inner_prod = bmpslib.mps_inner_product(new_mps, old_mps, conjB=True)
+
+    if inner_prod.real>0:
+        sign_inP = 1
+    else:
+        sign_inP = -1
+        
+    next_mps = bmpslib.add_two_MPSs(new_mps, 1-damping, old_mps, sign_inP*damping)
+    
+    # normalize the combined messages and make them right-canonical
+    next_mps.left_canonical_QR()
+    next_mps.right_canonical(maxD=trunc_dim, nr_bulk=True)
+
+    return next_mps
+
+
+def _next_messages_with_or_without_damping(prev_messages:MessageDictType, out_messages:MessageDictType, damping:float|None, trunc_dim:int)->MessageDictType:
+    if damping is None or damping==0:
+        next_messages = {side.opposite() : message for side, message in out_messages.items() }
+    
+    else:
+        next_messages = {}
+        for side, new_message in out_messages.items():
+            input_side = side.opposite()
+            old_message = prev_messages[input_side]   
+            assert old_message.orientation == new_message.orientation
+            next_mps = _mps_damping(old_message.mps, new_message.mps, damping, trunc_dim)  # Apply damping per message
+            next_messages[input_side] = Message(next_mps, new_message.orientation)
+
+    return next_messages
 
 
 def _out_going_message(
@@ -74,7 +108,7 @@ def _belief_propagation_step(
     allow_prog_bar:bool=True
 )->tuple[
     MessageDictType,   # next_messages
-    float           # next_error
+    float              # next_error
 ]:
 
     ## Keep old messages for comparison (error calculation):
@@ -102,34 +136,10 @@ def _belief_propagation_step(
     ) 
 
     ## Next incoming messages are the outgoing messages after applying periodic boundaries:
-    next_messages = {direction.opposite() : message for direction, message in out_messages.items() }
+    next_messages = _next_messages_with_or_without_damping(prev_messages, out_messages, config.damping, config.max_swallowing_dim)
     
     ## Connect new incoming massages to tensor-network:
     tn.connect_messages(next_messages)
-
-
-    #TODO: add damping
-    # if damping is None:
-    #     combined_mps = mps_message
-    # else:
-        
-    #     if inP.real>0:
-    #         sign_inP = 1
-    #     else:
-    #         sign_inP = -1
-            
-    #     combined_mps = bmpslib.add_two_MPSs(mps_message, 1-damping, \
-    #         old_mps, sign_inP*damping)
-        
-    #     #
-    #     # normalize the combined messages and make them 
-    #     # right-canonical
-    #     #
-    #     combined_mps.left_canonical_QR()
-    #     combined_mps.right_canonical(maxD=D_trunc, nr_bulk=True)
-
-
-
 
     ## Check error between messages:
     # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:

@@ -21,6 +21,7 @@ class BPConfig:
     hermitize_messages_between_iterations : bool = True
     times_to_deem_failure_when_diff_increases  : int = 3
     parallel_msgs : bool = False
+    damping : float|None = 0.5  # The `learning-step` of the messages. damping=0 will take 100% the new message
 
     def __repr__(self) -> str:
         return container_repr(self)
@@ -47,5 +48,6 @@ class Message(NamedTuple):
             mps=self.mps.copy(full=True),
             orientation=self.orientation
         )
+    
 
 MessageDictType : TypeAlias = dict[BlockSide, Message]
