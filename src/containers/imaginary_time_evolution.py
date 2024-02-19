@@ -167,9 +167,9 @@ class ITEConfig():
     random_mode_order : bool = True
     start_segment_with_new_bp_message : bool = True
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
-    segment_error_cause_state_revert : bool = False
+    segment_error_cause_state_revert : bool = True
     # Control numbers:
-    num_errors_threshold : int = 10    
+    num_errors_threshold : int = 20    
     # Belief-Propagation on full tn:
     bp_not_converged_raises_error : bool = True
     bp_every_edge : bool = True

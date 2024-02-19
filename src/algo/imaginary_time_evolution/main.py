@@ -274,7 +274,9 @@ def ite_per_mode(
         edge_energies.append(energy)
         stats.env_metrics.append(env_metrics)
 
-        # Update mode_tn:
+        ## inputs for next iteration:
+        config.bp = bp_stats.final_config
+
     prog_bar.clear()
 
     
@@ -338,10 +340,12 @@ def ite_per_segment(
             prog_bar.clear()
             logger.warn(errors.get_traceback(e))
             raise ITEError(*e.args)
+        
         ## Track results:
         stats.ite_per_mode_stats.append(ite_per_mode_stats)
         logger.debug(f"        Hermicity of environment={[metric.hermicity for metric in ite_per_mode_stats.env_metrics]!r}")
         logger.debug(f"        Edge-Energies={np.real(edge_energies).tolist()!r}")
+
         ## inputs for next iteration:
         config.bp = ite_per_mode_stats.bp_stats.final_config
 
@@ -382,8 +386,8 @@ def ite_per_delta_t(
             # if DEBUG_MODE:
             #     raise e
             num_errors = tracker.log_error(e)
-            if num_errors>config.ite.num_errors_threshold:
-                raise ITEError(f"ITE Algo experienced {num_errors} errors.")
+            if num_errors >= config.ite.num_errors_threshold:
+                raise ITEError(f"ITE Algo experienced {num_errors} errors, and will terminate therefor.")
             elif config.ite.segment_error_cause_state_revert:
                 try:
                     _, energy, segment_stats, _, unit_cell, messages = tracker.revert_back(1)
