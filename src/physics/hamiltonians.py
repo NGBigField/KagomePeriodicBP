@@ -7,17 +7,17 @@ from functools import cache
 # For type hinting:
 from typing import Literal
 
-
+GLOBAL_FIELD_STRENGTH = 1.0
 
 def _tensor_product(op1:np.ndarray, op2:np.ndarray)->np.ndarray:
 	return tensordot(op1, op2, 0)
 
 
 def ferromagnetic_with_transverse_field(direction:Literal['x', 'y', 'z'], strength:float=0.0)->np.ndarray:
-	return heisenberg_fm() - transverse_field_in_direction(direction, strength)
+	return heisenberg_fm() - field_in_direction(direction, strength)
 
 
-def transverse_field_in_direction(direction:Literal['x', 'y', 'z'], strength:float=0.0)->np.ndarray:
+def field_in_direction(direction:Literal['x', 'y', 'z'], strength:float=0.0)->np.ndarray:
 	match direction:
 		case 'x'|'X': op = x
 		case 'y'|'Y': op = y
@@ -26,17 +26,33 @@ def transverse_field_in_direction(direction:Literal['x', 'y', 'z'], strength:flo
 			raise ValueError(f"Not an option {direction!r}")
 	return strength*_tensor_product(op, id) + strength*_tensor_product(id, op)
 
-def heisenberg_fm_with_trans_field()->np.ndarray:
-	return heisenberg_fm() + transverse_field_in_direction(direction="x", strength=0.1)
-heisenberg_fm_with_trans_field.reference = -0.6
+
 
 
 def heisenberg_fm()->np.ndarray:
+	"""Heisenberg FerroMagnetic model
+	"""
 	return -1*heisenberg_afm()
 heisenberg_fm.reference = -0.5
 
 
+def heisenberg_fm_with_field()->np.ndarray:
+	"""Heisenberg FerroMagnetic model with Global field in the x direction
+	"""
+	return heisenberg_fm() + field_in_direction(direction="x", strength=GLOBAL_FIELD_STRENGTH)
+heisenberg_fm_with_field.reference = heisenberg_fm.reference - GLOBAL_FIELD_STRENGTH
+
+
+def field()->np.ndarray:
+	"""Global field in the x direction
+	"""
+	return field_in_direction(direction="x", strength=GLOBAL_FIELD_STRENGTH)
+field.reference = - GLOBAL_FIELD_STRENGTH
+
+
 def heisenberg_afm()->np.ndarray:
+	"""Heisenberg Anti-FerroMagnetic model
+	"""
 	return _tensor_product(x,x) + _tensor_product(y,y) + _tensor_product(z,z) 
 # heisenberg_afm.reference = -0.438703897456
 heisenberg_afm.reference = -0.38620

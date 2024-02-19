@@ -57,8 +57,6 @@ def _set_window_position(window, x:int, y:int, w:int, h:int)->None:
 
     if hasattr(window, "move"):
         window.move(x, y)
-        window.width(w)
-        window.height(h)
     elif hasattr(window, "geometry"):
         window.geometry(f"{w}x{h}+{x}+{y}")
     else:
