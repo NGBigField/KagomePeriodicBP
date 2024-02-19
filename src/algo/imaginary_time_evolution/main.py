@@ -89,7 +89,8 @@ def _calculate_crnt_observables(
 )->tuple[
     dict[tuple[str, str], float],
     dict[str, dict[str, float]],
-    float
+    float,
+    MessageDictType
 ]:
     ## Unpack inputs:
     if segment_stats is None:
@@ -101,10 +102,12 @@ def _calculate_crnt_observables(
 
     ## Get a new fresh tn:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
-    messages, _ = belief_propagation(full_tn, messages, bp_config, live_plots, allow_prog_bar)
+    messages, _ = robust_belief_propagation(full_tn, messages, bp_config, live_plots, allow_prog_bar)
 
     ## Calculate observables:
-    return measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
+    energies, expectations, mean_energy = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
+
+    return energies, expectations, mean_energy, messages
 
 
 def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:logs.Logger, ite_tracker:ITEProgressTracker, plots:ITEPlots)->None:
@@ -117,7 +120,7 @@ def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:
     logger.info("Calculating measurements of initial core...")
 
     ## Calculate observables:
-    energies, expectations, mean_energy = _calculate_crnt_observables(unit_cell, config, messages, None)
+    energies, expectations, mean_energy, messages = _calculate_crnt_observables(unit_cell, config, messages, None)
 
     ## Save data, print performance and plot graphs:
     ite_tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
@@ -394,7 +397,7 @@ def ite_per_delta_t(
         config.bp = segment_stats.ite_per_mode_stats[-1].bp_stats.final_config
         
         ## Calculate observables:
-        energies, expectations, mean_energy = _calculate_crnt_observables(unit_cell, config, messages, segment_stats)
+        energies, expectations, mean_energy, messages = _calculate_crnt_observables(unit_cell, config, messages, segment_stats)
 
         ## Save data, print performance and plot graphs:
         segment_stats.mean_energy = mean_energy

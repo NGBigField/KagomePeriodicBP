@@ -18,7 +18,7 @@ d = 2
 
 def main(
     D = 2,
-    N = 3,
+    N = 2,
     live_plots:bool|Iterable[bool] = [1, 1, 1],
     parallel:bool = 0,
     chi_factor : int = 1,
