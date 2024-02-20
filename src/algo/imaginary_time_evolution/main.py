@@ -239,6 +239,7 @@ def ite_per_mode(
     ITEPerModeStats         # Stats
 ]:
 
+    # 
     mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
 
     ## for each edge in the mode, update the tensors

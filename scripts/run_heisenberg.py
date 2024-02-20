@@ -12,6 +12,7 @@ from typing import Iterable
 from algo.imaginary_time_evolution import full_ite
 from physics import hamiltonians
 
+import numpy as np
 
 d = 2
 
@@ -23,7 +24,8 @@ def main(
     parallel:bool = 0,
     chi_factor : int = 1,
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
-    afm_or_fm:str = "Field"  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    afm_or_fm:str = "Field",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    damping:float|None = None
 )->tuple[float, str]:
     
     unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}_chi{chi_factor}_"+strings.random(3)
@@ -32,10 +34,17 @@ def main(
     unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
+    # product state:
+    unit_cell.B = unit_cell.A.copy()
+    unit_cell.C = unit_cell.A.copy()
+
+
     ## Config:
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
+    config.bp.damping = damping
+    config.bp.hermitize_messages_between_iterations = False
 
     # Interaction:
     match afm_or_fm: 
