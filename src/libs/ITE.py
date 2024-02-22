@@ -61,6 +61,16 @@
 # 14-Dec-2023  Add a norm-0 normalization of new_Ti, new_Tj at the end
 #              of apply_2local_gate
 #
+#
+#
+# 12-Feb-2024  Add Yigal's hack for faster robust solve. Introduce
+#              a new constant NTHRESH such that if matrix dim > NTHRESH
+#              then solve the linear equation using scipy.linalg.lstsq
+#
+# 21-Feb-2024  In apply_2local_gate check first if g is (approximately) 
+#              a tensor product of two gates. If so, then no truncation 
+#              is needed; apply each gate seperately. 
+#
 #----------------------------------------------------------
 
 
@@ -88,7 +98,12 @@ HERMICITY_ERR = 1e-5
 PINV_THRESH = 1e-8
 ROBUST_THRESH = 1e8
 
+#
+# If the dimension is > NTHRESH, we run robust_solve using least-square.
+# Otherwise using the usual Guassian elimination.
+#
 
+NTHRESH = 1024
 
 #
 # ---------------------- hermitize_a_message  --------------------------
@@ -1457,10 +1472,18 @@ def robust_solve(N,b):
 	#
 
 	regularize = False
+	
+	Nsize = N.shape[0]
 
 	try:
-		x = np.linalg.solve(N, b)
-		
+
+		if Nsize<=NTHRESH:
+			x = np.linalg.solve(N, b)
+		else:
+			x_tuple = scipy.linalg.lstsq(N, b, cond=None, check_finite=False,\
+				lapack_driver='gelsy')
+			x = x_tuple[0]
+
 	except:
 		regularize=True
 
@@ -1476,7 +1499,13 @@ def robust_solve(N,b):
 
 	if regularize:
 		newN = N + eye(N.shape[0])*PINV_THRESH*norm(N, ord=2)
-		x = np.linalg.solve(newN, b)
+
+		if Nsize<=NTHRESH:
+			x = np.linalg.solve(newN, b)
+		else:
+			x_tuple = scipy.linalg.lstsq(newN, b, cond=None, check_finite=False,\
+				lapack_driver='gelsy')
+			x = x_tuple[0]
 
 		
 	return x
@@ -1543,7 +1572,18 @@ def ALS_optimization(Dmax, exact_ai, exact_aj, X, iter_max=10,
 	log=False
 	
 	D = exact_ai.shape[1]
+
+	if log:
+		print("\n\n")
+		print(f"ALS_optimization: D={D} Dmax={Dmax} "\
+			f"iter_max={iter_max} eps={eps}")
+
+
 	if D<= Dmax:
+
+		if log:
+			print(f"ALS_optimization: D<=Dmax --- nothong to do...")
+
 		new_ai = exact_ai.copy()
 		new_aj = exact_aj.copy()
 		return new_ai, new_aj
@@ -1571,6 +1611,9 @@ def ALS_optimization(Dmax, exact_ai, exact_aj, X, iter_max=10,
 	dist = 1e10
 	delta_dist = 1
 
+	if log:
+		print(f"ALS_optimization: starting optimization loop...")
+
 	while delta_dist>eps and iter_no < iter_max:
 
 		#
@@ -1589,12 +1632,19 @@ def ALS_optimization(Dmax, exact_ai, exact_aj, X, iter_max=10,
 		Nib = Ni_env(exact_aj, new_aj, X)
 		b = tensordot(Nib, exact_ai, axes=([0,1,2],[0,1,2]))
 		b = b.flatten()
-		
+
+
+		if log:
+			print(f"ALS_optimization: invoking robust_solve with mat-size "\
+				f"{Ni.shape[0]} x {Ni.shape[0]}")
 		#
 		# To solve the equation Ni ai = b, we use a "robust" alg, which
 		# pseudo inverts Ni when it is not invertible.
 		#
 		ai = robust_solve(Ni, b)
+
+		if log:
+			print(f"ALS_optimization: robust_solve done")
 
 		new_ai = ai.reshape(new_ai.shape)
 
@@ -1613,11 +1663,19 @@ def ALS_optimization(Dmax, exact_ai, exact_aj, X, iter_max=10,
 		b = tensordot(Njb, exact_aj, axes=([0,1,2],[0,1,2]))
 		b = b.flatten()
 
+		if log:
+			print(f"ALS_optimization: invoking robust_solve with mat-size "\
+				f"{Nj.shape[0]} x {Nj.shape[0]}")
+
 		#
 		# To solve the equation Nj aj = b, we use a "robust" alg, which
 		# pseudo inverts Nj when it is not invertible.
 		#
 		aj = robust_solve(Nj, b)
+
+		if log:
+			print(f"ALS_optimization: robust_solve done")
+
 
 		new_aj = aj.reshape(new_aj.shape)
 
@@ -1684,6 +1742,12 @@ def ALS_optimization(Dmax, exact_ai, exact_aj, X, iter_max=10,
 			print(f">> Iter {iter_no}: dist={dist}   delta={delta_dist}\n\n")
 
 		iter_no += 1
+
+	if log:
+		print(f"ALS_optimization: optimization loop done with "\
+			f"{iter_no} iterations and error={delta_dist}")
+		print("\n\n")
+
 
 	new_ai = new_ai/norm(new_ai)
 	new_aj = new_aj/norm(new_aj)
@@ -1797,6 +1861,70 @@ def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, \
 			print("apply_2local_gate: gate is trivial - nothing to do...")
 		
 		return Ti, Tj
+		
+	#
+	# Now check if the gate is a product of two single-site gates by 
+	# looking at its SVD. In such case, no truncation is needed. Just 
+	# apply each gate to its tensor.
+	#
+
+	g_mat = g.reshape(g.shape[0]*g.shape[1], g.shape[2]*g.shape[3])
+	
+	U, s, V = np.linalg.svd(g_mat, full_matrices=False)
+	
+	is_product = False
+	
+	if s.shape[0]==0:
+		is_product = True
+	else:
+		if s[1]/s[0]<1e-10:
+			is_product = True
+		
+
+	if is_product:
+		#
+		# In such case g = g_i \otimes g_j. So we extract the single-body
+		# gates g_i, g_j and apply them directly to T_i, T_j
+		#
+		if log:
+			print("apply_2local_gate: gate is a product of two local gates. "\
+				"No need for bond truncation.")
+				
+		# 
+		# Find the maximal entry in abs(g) --- use it to extrac 
+		# g_i, g_j
+		#
+		
+		maxind = np.unravel_index(abs(g).argmax(), g.shape)
+		
+		g_i = g[:, :, maxind[2], maxind[3]]
+		g_j = g[maxind[0], maxind[1], :, :]
+		
+		#
+		# we need to rescale g_i, g_j so that their tensor product gives g.
+		# There's a freedom here because its only the product that needs
+		# to be equal to g
+		#
+		
+		rescale = g[maxind[0], maxind[1], maxind[2], maxind[3]] \
+			/(g_i[maxind[0], maxind[1]]*g_j[maxind[2], maxind[2]])
+		
+		g_i_factor = sqrt(abs(rescale))
+		g_j_factor = rescale/g_i_factor
+		
+		g_i = g_i_factor * g_i
+		g_j = g_j_factor * g_j
+		
+		#
+		# Once we have g_i, g_j, we apply then to Ti, Tj and obtain the 
+		# updated tensors
+		#
+		
+		newTi = tensordot(g_i, Ti, axes=([1],[0]))
+		newTj = tensordot(g_j, Tj, axes=([1],[0]))
+		
+		return newTi, newTj
+			
 
 
 	#
@@ -1860,8 +1988,14 @@ def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, \
 	# Find the optimal approximation to exact_ai, exact_aj using
 	# ALS iterations
 	#
-	
+
+	if log:
+		print("apply_2local_gate: Entering ALS-optimization for new_ai, new_aj")
+
 	new_ai, new_aj = ALS_optimization(Dmax, exact_ai, exact_aj, X)
+
+	if log:
+		print("apply_2local_gate: ALS-optimization done")
 
 	#
 	# Fust the reduced tensors back to the rest of the tensors to get
@@ -1879,6 +2013,7 @@ def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, \
 	new_Tj = new_Tj/norm(new_Tj.flatten(), ord=np.inf)
 	
 	if log:
+		print("apply_2local_gate done.")
 		if new_Ti.shape[1]!=Ti.shape[1] or new_Tj.shape[1]!=Tj.shape[1]:
 			print(f"apply_2local_gate: tensors changed shape: ")
 			print(f"    {Ti.shape}, {Tj.shape} => {new_Ti.shape}, {new_Tj.shape}")
