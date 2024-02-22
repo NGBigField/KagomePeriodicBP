@@ -63,6 +63,16 @@ class UnitCell:
              B = _random_tensor(d, D),
              C = _random_tensor(d, D)
         )
+    
+    @staticmethod
+    def random_product_state(d:int, D:int)->"UnitCell":
+        tensor = _random_tensor(d, D)
+        return UnitCell(
+             A = tensor.copy(),
+             B = tensor.copy(),
+             C = tensor.copy()
+        )
+    
 
     def save(self, file_name:str|None=None)->None:
         file_name = self._derive_file_name(file_name)

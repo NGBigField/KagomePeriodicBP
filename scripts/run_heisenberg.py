@@ -31,20 +31,15 @@ def main(
     unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}_chi{chi_factor}_"+strings.random(3)
     # unit_cell = UnitCell.load(unit_cell_file_name)
     # if unit_cell is None:
-    unit_cell = UnitCell.random(d=d, D=D)
+    unit_cell = UnitCell.random_product_state(d=d, D=D)
     unit_cell.set_filename(results_filename) 
-
-    # product state:
-    unit_cell.B = unit_cell.A.copy()
-    unit_cell.C = unit_cell.A.copy()
-
 
     ## Config:
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
     config.bp.damping = damping
-    config.bp.hermitize_messages_between_iterations = False
+    # config.bp.hermitize_messages_between_iterations = False
 
     # Interaction:
     match afm_or_fm: 

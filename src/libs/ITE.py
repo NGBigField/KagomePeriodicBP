@@ -1860,7 +1860,7 @@ def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, \
 		if log:
 			print("apply_2local_gate: gate is trivial - nothing to do...")
 		
-		return Ti, Tj
+		return Ti, Tj, None
 		
 	#
 	# Now check if the gate is a product of two single-site gates by 
@@ -1923,7 +1923,7 @@ def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, \
 		newTi = tensordot(g_i, Ti, axes=([1],[0]))
 		newTj = tensordot(g_j, Tj, axes=([1],[0]))
 		
-		return newTi, newTj
+		return newTi, newTj, None
 			
 
 

@@ -48,7 +48,10 @@ def _check_rdms_metrics(rdm:np.ndarray)->MatrixMetrics:
     return env_metrics
 
 
-def _calc_original_negativity_ratio(origin_eigen_vals:np.ndarray)->float:
+def _calc_original_negativity_ratio(origin_eigen_vals:np.ndarray|None)->float:
+    if origin_eigen_vals is None:
+        return 0
+    
     positive = sum(origin_eigen_vals[origin_eigen_vals>0])
     negative = sum(origin_eigen_vals[origin_eigen_vals<0])
     negative = np.abs(negative)
