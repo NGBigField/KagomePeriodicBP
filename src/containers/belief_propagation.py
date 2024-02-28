@@ -18,7 +18,6 @@ class BPConfig:
     msg_diff_squared : bool = True  # True is easier to get to 
     init_msg: MessageModel = MessageModel.RANDOM_QUANTUM
     allowed_retries : int = 4
-    hermitize_messages_between_iterations : bool = True
     times_to_deem_failure_when_diff_increases  : int = 3
     parallel_msgs : bool = False
     damping : float|None = None  # The `learning-step` of the messages. 

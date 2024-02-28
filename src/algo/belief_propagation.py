@@ -50,24 +50,25 @@ def _mps_damping(old_mps:Message, new_mps:Message, damping:float, trunc_dim:int)
     return next_mps
 
 
-def _next_messages_with_or_without_damping(prev_messages:MessageDictType, out_messages:MessageDictType, damping:float|None, trunc_dim:int)->MessageDictType:
-    if damping is None or damping==0:
-        next_messages = {side.opposite() : message for side, message in out_messages.items() }
-    
-    else:
-        next_messages = {}
-        for side, new_message in out_messages.items():
-            input_side = side.opposite()
-            old_message = prev_messages[input_side]   
-            assert old_message.orientation == new_message.orientation
-            next_mps = _mps_damping(old_message.mps, new_message.mps, damping, trunc_dim)  # Apply damping per message
-            next_messages[input_side] = Message(next_mps, new_message.orientation)
+def _message_damping(prev_messages:MessageDictType, out_messages:MessageDictType, damping:float|None, trunc_dim:int)->MessageDictType:
+
+    next_messages = {}
+    for side, new_message in out_messages.items():
+        old_message = prev_messages[side]   
+        assert old_message.orientation == new_message.orientation 
+        assert old_message.orientation.open_towards == side.opposite()
+        next_mps = _mps_damping(old_message.mps, new_message.mps, damping, trunc_dim)  # Apply damping per message
+        next_messages[side] = Message(next_mps, new_message.orientation)
+
+        #TODO: DEBUG
+        mps_l2_distance(old_message.mps, new_message.mps)
+        mps_l2_distance(old_message.mps, next_mps)
 
     return next_messages
 
 
 def _out_going_message(
-    tn:KagomeTN, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool, hermitize:bool
+    tn:KagomeTN, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool
 ) -> Message:
     
 
@@ -82,15 +83,7 @@ def _out_going_message(
 
     assert isinstance(mps, MPS)
 
-    ## Force messages to be hermitian:
-    if hermitize:
-        mps = ite.hermitize_a_message(mps)
-
-    ## Make left canonical and normalize right-most tensor:
-    mps.left_canonical_QR()
-    n = mps.N
-    t = mps.A[n-1]
-    mps.set_site(t/np.linalg.norm(t), n-1)
+    mps.right_canonical(nr_bulk=True)
 
     ## Out message:
     return Message(mps, mps_direction)
@@ -116,7 +109,7 @@ def _belief_propagation_step(
 
     ## Compute out-going message for all possible sizes:
     # prepare inputs:
-    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=config.max_swallowing_dim, hermitize=config.hermitize_messages_between_iterations)
+    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=config.max_swallowing_dim)
     # The message going-out to the left returns from the right as the new incoming message:
     # multi_processing = config.parallel_msgs and (
     #     tn.dimensions.virtual_dim>2 or config.max_swallowing_dim>=16
@@ -136,7 +129,12 @@ def _belief_propagation_step(
     ) 
 
     ## Next incoming messages are the outgoing messages after applying periodic boundaries:
-    next_messages = _next_messages_with_or_without_damping(prev_messages, out_messages, config.damping, config.max_swallowing_dim)
+    out_messages = {side.opposite() : message for side, message in out_messages.items() }
+    # Apply damping
+    if config.damping is None or config.damping==0:
+        next_messages = out_messages
+    else:
+        next_messages = _message_damping(prev_messages, out_messages, config.damping, config.max_swallowing_dim)
     
     ## Connect new incoming massages to tensor-network:
     tn.connect_messages(next_messages)
@@ -144,7 +142,7 @@ def _belief_propagation_step(
     ## Check error between messages:
     # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:
     distances = [ 
-        mps_l2_distance(prev_messages[direction].mps, next_messages[direction].mps) 
+        mps_l2_distance(prev_messages[direction].mps, out_messages[direction].mps) 
         for direction in BlockSide.all_in_counter_clockwise_order() 
     ]
     if config.msg_diff_squared:
