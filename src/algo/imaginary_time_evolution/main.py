@@ -239,17 +239,12 @@ def ite_per_mode(
     ITEPerModeStats         # Stats
 ]:
 
-    # 
-    mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
-
     ## for each edge in the mode, update the tensors
     edge_tuples = list(UpdateEdge.all_in_random_order())
     edge_energies = []
 
     ## prepare statistics and health for debugging:
     stats = ITEPerModeStats()
-    stats.bp_stats = bp_stats
-    stats.env_metrics = []
 
     prog_bar = get_progress_bar(config, len(edge_tuples), "Executing ITE per-mode:")
     for is_first, is_last, edge_tuple in lists.iterate_with_edge_indicators(edge_tuples):
@@ -258,13 +253,12 @@ def ite_per_mode(
         if config.visuals.live_plots:
             visuals.refresh()
 
-        if not is_first:
-            if config.ite.bp_every_edge:
-                # Perform BlockBP again, to get converged messages.
-                mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
-            else:
-                # Just update the tensors 
-                mode_tn.update_unit_cell_tensors(unit_cell)
+        if config.ite.bp_every_edge or is_first:
+            # Perform BlockBP again, to get converged messages.
+            mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
+        else:
+            # Just update the tensors 
+            mode_tn.update_unit_cell_tensors(unit_cell)
 
         edge_tn = reduce_tn(mode_tn, EdgeTN, trunc_dim=config.trunc_dim, edge_tuple=edge_tuple)
 
@@ -279,6 +273,8 @@ def ite_per_mode(
         config.bp = bp_stats.final_config
 
     prog_bar.clear()
+
+    stats.bp_stats = bp_stats
 
     return unit_cell, messages, edge_energies, stats
 

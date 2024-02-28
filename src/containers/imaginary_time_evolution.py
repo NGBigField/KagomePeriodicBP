@@ -63,6 +63,8 @@ class _LimitedLengthList(Generic[_T]):
     def __delitem__(self, key)->_T:
         return self._list.__delitem__(key)
 
+    def __len__(self)->int:
+        return len(self._list)
 
 
 class HamiltonianFuncAndInputs(NamedTuple):
@@ -203,10 +205,13 @@ class ITEConfig():
     
 
 class ITEPerModeStats(Stats):
-    bp_stats : BPStats = BPStats()
-    env_metrics : list[MatrixMetrics] = field(default_factory=list)
-    
+    bp_stats : BPStats = None 
+    env_metrics : list[MatrixMetrics]
 
+    def __post_init__(self):
+        self.env_metrics = list()  # Avoid python's infamous immutable lists problem
+
+        
 class ITESegmentStats(Stats):
     ite_per_mode_stats : list[ITEPerModeStats] = None # type: ignore
     modes_order : list[UpdateMode] = None  # type: ignore
@@ -322,7 +327,9 @@ class ITEProgressTracker():
     def full_path(self) -> str:
         return saveload._fullpath(name=self.file_name, sub_folder=SUB_FOLDER)
         
-
+    def __len__(self)->int:
+        assert len(self.delta_ts) == len(self.energies) == len(self.expectation_values) ==  len(self.unit_cells) == len(self.messages) == len(self.stats)             
+        return len(self.delta_ts)
 
 def _time_steps_str(time_steps:list[float])->str:
     s = ""
