@@ -46,7 +46,7 @@ heisenberg_fm_with_field.reference = heisenberg_fm.reference - GLOBAL_FIELD_STRE
 def field()->np.ndarray:
 	"""Global field in the x direction
 	"""
-	return field_in_direction(direction="x", strength=GLOBAL_FIELD_STRENGTH)
+	return -field_in_direction(direction="z", strength=GLOBAL_FIELD_STRENGTH)
 field.reference = - GLOBAL_FIELD_STRENGTH
 
 

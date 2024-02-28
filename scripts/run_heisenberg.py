@@ -31,7 +31,7 @@ def main(
     unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}_chi{chi_factor}_"+strings.random(3)
     # unit_cell = UnitCell.load(unit_cell_file_name)
     # if unit_cell is None:
-    unit_cell = UnitCell.random_product_state(d=d, D=D)
+    unit_cell = UnitCell.zero_product_state(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
     ## Config:

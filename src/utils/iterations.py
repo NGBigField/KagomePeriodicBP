@@ -1,14 +1,10 @@
 import itertools
 
 from typing import (
-    Any,
-    List,
-    Sequence,
     Generator,
-    Iterator,
     TypeVar,
     Tuple,
-    Generic,
+    Iterable
 )
 
 _T = TypeVar("_T")
@@ -36,3 +32,6 @@ def swap_first_elements(it:Generator[_T, None, None]) -> Generator[_T, None, Non
             yield first_val
         else:
             yield item
+
+def iterator_over_multiple_indices(shape:Iterable[int]):
+    return itertools.product(*(range(n) for n in shape))
