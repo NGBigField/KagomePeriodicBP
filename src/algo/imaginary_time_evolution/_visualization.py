@@ -27,7 +27,7 @@ TRACK_COLOR = 'tomato'
 
 
 def _set_window_title(window, title:str)->None:
-    full_title="KagomePeriodicBP: "+title
+    full_title="KagomePeriodicBP - "+title
     if hasattr(window, "wm_title"):
         window.wm_title(full_title)
     elif hasattr(window, "setWindowTitle"):

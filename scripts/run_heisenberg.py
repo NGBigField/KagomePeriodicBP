@@ -24,14 +24,17 @@ def main(
     parallel:bool = 0,
     chi_factor : int = 1,
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
-    afm_or_fm:str = "Field",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = None
+    hamiltonian:str = "Field",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    damping:float|None = 0,
+    hermitize_messages_between_iterations:bool = True
 )->tuple[float, str]:
     
-    unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}_chi{chi_factor}_"+strings.random(3)
+    unit_cell_file_name = f"crnt_heisenberg_{hamiltonian}_D{D}_chi{chi_factor}_"+strings.random(3)
     # unit_cell = UnitCell.load(unit_cell_file_name)
     # if unit_cell is None:
+    # unit_cell = UnitCell.random(d=d, D=D)
     unit_cell = UnitCell.zero_product_state(d=d, D=D)
+    # unit_cell = UnitCell.random_product_state(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -39,10 +42,11 @@ def main(
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
     config.bp.damping = damping
+    config.bp.hermitize_messages_between_iterations = hermitize_messages_between_iterations
     # config.bp.hermitize_messages_between_iterations = False
 
     # Interaction:
-    match afm_or_fm: 
+    match hamiltonian: 
         case "AFM":   config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None)
         case "FM":    config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm, None)
         case "FM-T":  config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm_with_field, None)

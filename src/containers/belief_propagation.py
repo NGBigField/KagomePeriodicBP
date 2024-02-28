@@ -21,7 +21,8 @@ class BPConfig:
     hermitize_messages_between_iterations : bool = True
     times_to_deem_failure_when_diff_increases  : int = 3
     parallel_msgs : bool = False
-    damping : float|None = 0.5  # The `learning-step` of the messages. damping=0 will take 100% the new message
+    damping : float|None = None  # The `learning-step` of the messages. 
+    # damping=0 will take 100% the new message while damping=1 will keep the old message.
 
     def __repr__(self) -> str:
         return container_repr(self)
