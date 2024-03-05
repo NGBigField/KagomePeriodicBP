@@ -105,6 +105,10 @@ ROBUST_THRESH = 1e8
 
 NTHRESH = 1024
 
+from _error_types import ITEError
+
+class HermitizationError(ITEError): ...
+
 #
 # ---------------------- hermitize_a_message  --------------------------
 #
@@ -746,11 +750,9 @@ def rho_ij(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	
 	Hermicity = norm(rho - conj(rho.transpose([1,0,3,2])))/norm(rho)
 	if Hermicity > HERMICITY_ERR:
-		print("\n")
-		print("* * * ITE Warning: * * *")
-		print("ITE.rho_ij: The 2RDM rho_ij is not hermitian")
-		print(f"                 It has hermicity {Hermicity} > {HERMICITY_ERR}.")
-		print("\n\n")
+		error_msg = "ITE.rho_ij: The 2RDM rho_ij is not hermitian"
+		error_msg += f"\n                 It has hermicity {Hermicity} > {HERMICITY_ERR}."
+		raise HermitizationError(error_msg)
 
 #	rho = 0.5*(rho + conj(rho.transpose([1,0,3,2])))
 	tr = trace(trace(rho))

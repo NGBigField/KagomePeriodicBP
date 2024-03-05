@@ -24,12 +24,12 @@ def main(
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     chi_factor : int = 1,
-    hamiltonian:str = "FM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "Field",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0
 )->tuple[float, str]:
     
-    # unit_cell = UnitCell.random(d=d, D=D)
-    unit_cell = UnitCell.zero_product_state(d=d, D=D)
+    unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.zero_product_state(d=d, D=D)
     # unit_cell = UnitCell.random_product_state(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 

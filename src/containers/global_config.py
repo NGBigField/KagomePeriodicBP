@@ -30,7 +30,7 @@ class Config(_ConfigClassWithSubClasses):
     @staticmethod
     def derive_from_physical_dim(D:int)->"Config":
         return Config(
-            bp=BPConfig(max_swallowing_dim=D**2),
+            bp=BPConfig(max_swallowing_dim=4*D**2),
             ite=ITEConfig(),
             dims=TNDimensions(virtual_dim=D),
             visuals=VisualsConfig(),

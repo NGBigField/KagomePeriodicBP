@@ -14,7 +14,7 @@ from _config_reader import DEBUG_MODE
 import numpy as np
 
 # other used types in our code:
-from tensor_networks import KagomeTN, MPS, mps_l2_distance
+from tensor_networks import KagomeTN, MPS, mps_distance
 from lattices.directions import BlockSide
 from enums import ContractionDepth
 from containers import BPStats, BPConfig, MessageDictType, Message
@@ -61,8 +61,8 @@ def _message_damping(prev_messages:MessageDictType, out_messages:MessageDictType
         next_messages[side] = Message(next_mps, new_message.orientation)
 
         #TODO: DEBUG
-        mps_l2_distance(old_message.mps, new_message.mps)
-        mps_l2_distance(old_message.mps, next_mps)
+        mps_distance(old_message.mps, new_message.mps)
+        mps_distance(old_message.mps, next_mps)
 
     return next_messages
 
@@ -83,7 +83,9 @@ def _out_going_message(
 
     assert isinstance(mps, MPS)
 
+    ## right canonical and normalize mantissa and exponent kept in MPS :
     mps.right_canonical(nr_bulk=True)
+    mps.reset_nr()
 
     ## Out message:
     return Message(mps, mps_direction)
@@ -105,7 +107,7 @@ def _belief_propagation_step(
 ]:
 
     ## Keep old messages for comparison (error calculation):
-    prev_messages = deepcopy(tn.messages)
+    prev_messages : MessageDictType = deepcopy(tn.messages)
 
     ## Compute out-going message for all possible sizes:
     # prepare inputs:
@@ -142,7 +144,7 @@ def _belief_propagation_step(
     ## Check error between messages:
     # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:
     distances = [ 
-        mps_l2_distance(prev_messages[direction].mps, out_messages[direction].mps) 
+        mps_distance(prev_messages[direction].mps, out_messages[direction].mps) 
         for direction in BlockSide.all_in_counter_clockwise_order() 
     ]
     if config.msg_diff_squared:

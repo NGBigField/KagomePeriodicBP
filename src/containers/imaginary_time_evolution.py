@@ -167,12 +167,13 @@ class ITEConfig():
     backup_file_name : str = "ite_backup"+strings.time_stamp()+" "+strings.random(6)
     # Control flags:
     random_mode_order : bool = True
-    start_segment_with_new_bp_message : bool = True
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
     segment_error_cause_state_revert : bool = True
+    hermitize_msg_after_bp : bool = True
     # Control numbers:
     num_errors_threshold : int = 20    
-    # Belief-Propagation on full tn:
+    # Belief-Propagation flags:
+    start_segment_with_new_bp_message : bool = True
     bp_not_converged_raises_error : bool = True
     bp_every_edge : bool = True
 
