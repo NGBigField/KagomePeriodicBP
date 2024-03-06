@@ -191,15 +191,6 @@ def _mode_order_without_repetitions(prev_order:list[UpdateMode], ite_config:ITEC
     return new_order
 
 
-def _hermitize_messages(messages:MessageDictType) -> MessageDictType:
-    hermitized_dict = {}
-    for side, message in messages.items():
-        mps = ite.hermitize_a_message(message.mps)
-        hermitized_dict[side] = Message(mps=mps, orientation=messages.orientation)
-
-    return hermitized_dict
-
-
 def _from_unit_cell_to_stable_mode(
     unit_cell:UnitCell, messages:MessageDictType, config:Config, logger:logs.Logger, mode:UpdateMode
 )->tuple[
@@ -218,10 +209,6 @@ def _from_unit_cell_to_stable_mode(
 
     # If block-bp struggled and increased the virtual dimension, the following iterations must also use a higher dimension:
     config = _harden_bp_config_if_struggled(config, bp_stats, logger)
-
-    #TODO Hermitian:
-    if False:
-        messages = _hermitize_messages(messages)
 
     ## Contract to mode:
     mode_tn = reduce_tn(full_tn, ModeTN, trunc_dim=config.trunc_dim, mode=mode)
@@ -355,10 +342,6 @@ def ite_per_segment(
 
         ## inputs for next iteration:
         config.bp = ite_per_mode_stats.bp_stats.final_config
-
-        # Hermitize messages:
-        if config.ite.hermitize_msg_after_bp:
-            messages = _hermitize_messages(messages)
 
     prog_bar.clear()
 

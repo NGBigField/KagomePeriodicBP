@@ -33,6 +33,14 @@ from utils import decorators, parallel_exec, lists, visuals, prints
 from copy import deepcopy
 
 
+def _hermitize_messages(messages:MessageDictType) -> MessageDictType:
+    hermitized_dict = {}
+    for side, message in messages.items():
+        mps = ite.hermitize_a_message(message.mps)
+        hermitized_dict[side] = Message(mps=mps, orientation=message.orientation)
+
+    return hermitized_dict
+
 def _mps_damping(old_mps:Message, new_mps:Message, damping:float, trunc_dim:int):
     inner_prod = bmpslib.mps_inner_product(new_mps, old_mps, conjB=True)
 
@@ -227,13 +235,18 @@ def belief_propagation(
     steps_iterator.clear()
     assert isinstance(error, float)
 
-    ## Check success:         
+    ## Hermitize messages:
+    if config.hermitize_msgs:
+        messages = _hermitize_messages(messages)
+        
+    ## Check failure:         
     if not success:
         messages = min_messages     
         tn.connect_messages(messages)
 
     stats = BPStats(iterations=i+1, final_error=error, final_config=config, success=success)  
   
+
     # Check result and finish:
     return messages, stats
     

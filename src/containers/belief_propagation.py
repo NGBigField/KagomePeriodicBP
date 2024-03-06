@@ -21,6 +21,7 @@ class BPConfig:
     times_to_deem_failure_when_diff_increases  : int = 3
     parallel_msgs : bool = False
     damping : float|None = None  # The `learning-step` of the messages. 
+    hermitize_msgs : bool = True
     # damping=0 will take 100% the new message while damping=1 will keep the old message.
 
     def __repr__(self) -> str:

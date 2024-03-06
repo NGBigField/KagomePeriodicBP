@@ -138,7 +138,7 @@ class UpdateEdge(NamedTuple):
 
 
 SUB_FOLDER = "ite_trackers"
-DEFAULT_TIME_STEPS = lambda: [0.1]*20 + [0.01]*100 + [0.001]*100 + [1e-4]*100 + [1e-5]*100 + [1e-6]*100 + [1e-7]*100 + \
+DEFAULT_TIME_STEPS = lambda: [0.02]*5 + [0.01]*10 + [0.001]*100 + [1e-4]*100 + [1e-5]*100 + [1e-6]*100 + [1e-7]*100 + \
     [1e-8]*100 + [1e-9]*100 + [1e-10]*100 + [1e-11]*100 + [1e-12]*100 + [1e-13]*100 + [1e-15]*200
 
 # def DEFAULT_TIME_STEPS()->list[float]:
@@ -168,8 +168,7 @@ class ITEConfig():
     # Control flags:
     random_mode_order : bool = True
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
-    segment_error_cause_state_revert : bool = True
-    hermitize_msg_after_bp : bool = True
+    segment_error_cause_state_revert : bool = True    
     # Control numbers:
     num_errors_threshold : int = 20    
     # Belief-Propagation flags:
