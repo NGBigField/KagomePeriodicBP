@@ -34,8 +34,8 @@ class VisualsConfig():
                 _new_list.append(x)
             self._plots_to_show = tuple(_new_list)
 
-        elif isinstance(value, bool):
-            if value is True:
+        elif isinstance(value, bool) or value in [0, 1]:
+            if value is True or value==1:
                 self._plots_to_show = _DEFAULT_PLOTS_TO_SHOW
             else:
                 self._plots_to_show = (False, False, False)

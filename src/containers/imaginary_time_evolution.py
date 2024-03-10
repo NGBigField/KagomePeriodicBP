@@ -170,7 +170,8 @@ class ITEConfig():
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
     segment_error_cause_state_revert : bool = True    
     # Control numbers:
-    num_errors_threshold : int = 20    
+    num_total_errors_threshold : int = 20    
+    num_errors_per_delta_t_threshold : int = 5    
     # Belief-Propagation flags:
     start_segment_with_new_bp_message : bool = True
     bp_not_converged_raises_error : bool = True
@@ -298,7 +299,7 @@ class ITEProgressTracker():
         num_iter = assertions.integer(num_iter)
         assert num_iter >= 1
         if self.last_iter < num_iter:
-            raise ITEError(f"There are no more saved results to revert to.")
+            num_iter = self.last_iter  # There are no more saved results to revert to 
         # lists:
         for _ in range(num_iter):
             delta_t = self.delta_ts.pop()

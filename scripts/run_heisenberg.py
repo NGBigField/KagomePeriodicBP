@@ -20,12 +20,12 @@ d = 2
 def main(
     D = 2,
     N = 2,
-    live_plots:bool|Iterable[bool] = [1,1,0],
+    live_plots:bool|Iterable[bool] =  0, #[1,1,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     chi_factor : int = 1,
     hamiltonian:str = "Field",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0.1
+    damping:float|None = 0.3
 )->tuple[float, str]:
     
     unit_cell = UnitCell.load("2024.03.07_19.57.17- keep")
@@ -38,7 +38,7 @@ def main(
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
     config.bp.damping = damping
-    config.bp.max_swallowing_dim = 4*D**2
+    config.bp.max_swallowing_dim = 2*D**2
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor

@@ -332,7 +332,7 @@ def ite_per_segment(
             )
         except BPNotConvergedError as e:
             prog_bar.clear()
-            logger.warn(errors.get_traceback(e))
+            # logger.warn(errors.get_traceback(e))
             raise ITEError(*e.args)
         
         ## Track results:
@@ -363,9 +363,11 @@ def ite_per_delta_t(
     config = config_in.copy()
     # Progress bar:
     prog_bar = get_progress_bar(config, num_repeats, f"Per delta-t...         ")
+    # track sucess:
+    at_least_one_successful_run : bool = False
+    num_errors : int = 0
 
     ## Perform ITE for all repetitions of this delta_t: 
-    at_least_one_successful_run : bool = False
     for i in range(num_repeats):
         prog_bar.next(extra_str=f"mean-energy={segment_stats.mean_energy}")
         logger_method = print_or_log_ite_segment_progress(config, tracker, logger, delta_t, i, num_repeats, segment_stats)
@@ -377,14 +379,16 @@ def ite_per_delta_t(
             )
         except ITEError as e:
             logger.warn(str(e))
-            # if DEBUG_MODE:
-            #     raise e
-            num_errors = tracker.log_error(e)
-            if num_errors >= config.ite.num_errors_threshold:
-                raise ITEError(f"ITE Algo experienced {num_errors} errors, and will terminate therefor.")
+            total_num_errors = tracker.log_error(e)
+            if total_num_errors >= config.ite.num_total_errors_threshold:
+                raise ITEError(f"ITE Algo experienced {total_num_errors}, and will terminate therefor.")
+            num_errors += 1
+            if num_errors >= config_in.ite.num_errors_per_delta_t_threshold:
+                logger.warn(f"ITE Algo experienced {num_errors} errors for delta_t={delta_t}, and will continue with the next delta_t.")
+                break 
             elif config.ite.segment_error_cause_state_revert:
                 try:
-                    _, energy, segment_stats, _, unit_cell, messages = tracker.revert_back(1)
+                    _, energy, segment_stats, _, unit_cell, messages = tracker.revert_back(2)
                 except ITEError:
                     raise e
             continue

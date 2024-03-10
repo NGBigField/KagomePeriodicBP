@@ -36,8 +36,8 @@ class BPStats(Stats):
     iterations      : int   = -1
     attempts        : int   = 1
     final_error     : float = -1.0  
-    final_config    : BPConfig = field(default_factory=BPConfig)
     success         : bool = False
+    final_config    : BPConfig = field(default_factory=BPConfig)
 
 
 class Message(NamedTuple):
