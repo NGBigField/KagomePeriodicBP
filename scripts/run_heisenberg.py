@@ -23,7 +23,7 @@ def main(
     live_plots:bool|Iterable[bool] = [1,1,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    chi_factor : int = 3,
+    chi_factor : int = 1,
     hamiltonian:str = "Field",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1
 )->tuple[float, str]:
@@ -42,7 +42,7 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [0.001]*50 + [1e-4]*50 + [1e-5]*50
+    config.ite.time_steps = [0.01]*50 + [0.001]*50 + [1e-4]*50 + [1e-5]*50
 
     # Interaction:
     match hamiltonian: 

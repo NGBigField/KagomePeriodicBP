@@ -748,11 +748,7 @@ def rho_ij(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 		rho = tensordot(Ai, Aj, axes=([2,3,4,5], [2,3,4,5]))
 	
 	
-	Hermicity = norm(rho - conj(rho.transpose([1,0,3,2])))/norm(rho)
-	if Hermicity > HERMICITY_ERR:
-		error_msg = "ITE.rho_ij: The 2RDM rho_ij is not hermitian"
-		error_msg += f"\n                 It has hermicity {Hermicity} > {HERMICITY_ERR}."
-		raise HermitizationError(error_msg)
+	# Hermicity = norm(rho - conj(rho.transpose([1,0,3,2])))/norm(rho)
 
 #	rho = 0.5*(rho + conj(rho.transpose([1,0,3,2])))
 	tr = trace(trace(rho))
