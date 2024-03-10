@@ -23,12 +23,13 @@ def main(
     live_plots:bool|Iterable[bool] = [1,1,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    chi_factor : int = 1,
-    hamiltonian:str = "FM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0
+    chi_factor : int = 3,
+    hamiltonian:str = "Field",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.random(d=d, D=D)
+    unit_cell = UnitCell.load("2024.03.07_19.57.17- keep")
+    # unit_cell = UnitCell.random(d=d, D=D)
     # unit_cell = UnitCell.zero_product_state(d=d, D=D)
     # unit_cell.set_filename(results_filename) 
 
@@ -38,6 +39,10 @@ def main(
     config.visuals.live_plots = live_plots
     config.bp.damping = damping
     config.bp.max_swallowing_dim = 4*D**2
+    config.bp.parallel_msgs = parallel
+    config.trunc_dim *= chi_factor
+    config.bp.max_swallowing_dim *= chi_factor
+    config.ite.time_steps = [0.001]*50 + [1e-4]*50 + [1e-5]*50
 
     # Interaction:
     match hamiltonian: 
@@ -47,12 +52,7 @@ def main(
         case "Field": config.ite.interaction_hamiltonian = (hamiltonians.field, None)
         case _:
             raise ValueError("Not matching any option.")
-        
-    # chi
-    config.trunc_dim *= chi_factor
-    config.bp.max_swallowing_dim *= chi_factor
-    # Comp
-    config.bp.parallel_msgs = parallel
+    
 
     ## Run:
     energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)

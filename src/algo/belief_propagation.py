@@ -31,6 +31,7 @@ from utils import decorators, parallel_exec, lists, visuals, prints
 
 # OOP:
 from copy import deepcopy
+from typing import Generator
 
 
 def _hermitize_messages(messages:MessageDictType) -> MessageDictType:
@@ -41,7 +42,20 @@ def _hermitize_messages(messages:MessageDictType) -> MessageDictType:
 
     return hermitized_dict
 
-def _mps_damping(old_mps:Message, new_mps:Message, damping:float, trunc_dim:int):
+
+def _compute_error(prev_messages:MessageDictType, out_messages:MessageDictType, msg_diff_squared:bool)->float:
+    # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:
+    distances = [ 
+        mps_distance(prev_messages[direction].mps, out_messages[direction].mps) 
+        for direction in BlockSide.all_in_counter_clockwise_order() 
+    ]
+    if msg_diff_squared:
+        return sum(distances)/len(distances)
+    else:
+        return np.sqrt( sum(distances) )/len(distances)
+    
+
+def _single_mps_damping(old_mps:Message, new_mps:Message, damping:float, trunc_dim:int):
     inner_prod = bmpslib.mps_inner_product(new_mps, old_mps, conjB=True)
 
     if inner_prod.real>0:
@@ -65,17 +79,20 @@ def _message_damping(prev_messages:MessageDictType, out_messages:MessageDictType
         old_message = prev_messages[side]   
         assert old_message.orientation == new_message.orientation 
         assert old_message.orientation.open_towards == side.opposite()
-        next_mps = _mps_damping(old_message.mps, new_message.mps, damping, trunc_dim)  # Apply damping per message
+        next_mps = _single_mps_damping(old_message.mps, new_message.mps, damping, trunc_dim)  # Apply damping per message
         next_messages[side] = Message(next_mps, new_message.orientation)
 
-        #TODO: DEBUG
-        mps_distance(old_message.mps, new_message.mps)
-        mps_distance(old_message.mps, next_mps)
-
-    return next_messages
+    return MessageDictType(next_messages)
 
 
-def _out_going_message(
+def _outgoing_messages(directions_iter:Generator[BlockSide, None, None], multi_processing:bool, fixed_arguments:dict) -> MessageDictType:
+    out_messages = parallel_exec.concurrent_or_parallel(
+        func=_signle_outgoing_message, values=directions_iter, value_name="direction", in_parallel=multi_processing, fixed_arguments=fixed_arguments
+    ) 
+    return MessageDictType(out_messages)
+
+
+def _signle_outgoing_message(
     tn:KagomeTN, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool
 ) -> Message:
     
@@ -117,29 +134,26 @@ def _belief_propagation_step(
     ## Keep old messages for comparison (error calculation):
     prev_messages : MessageDictType = deepcopy(tn.messages)
 
-    ## Compute out-going message for all possible sizes:
+    ## Compute out-going message for all possible block-sides:
     # prepare inputs:
     fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=config.max_swallowing_dim)
-    # The message going-out to the left returns from the right as the new incoming message:
-    # multi_processing = config.parallel_msgs and (
-    #     tn.dimensions.virtual_dim>2 or config.max_swallowing_dim>=16
-    # )  #TODO stricter parallel settings
     multi_processing = config.parallel_msgs 
 
+    # Different behavior between parallel or concurrent comp:
     if not multi_processing and allow_prog_bar:
-        directions=BlockSide.iterator_with_str_output(lambda s: prog_bar_obj.append_extra_str(s+f" error={_bp_error_str(prev_error)}"))
+        str_func = lambda s: prog_bar_obj.append_extra_str(s+f" error={_bp_error_str(prev_error)}")
+        directions_iter=BlockSide.iterator_with_str_output(str_func)  # append prog-bar msg after each sub-step
         fixed_arguments["print_progress"] = allow_prog_bar
     else:
-        prog_bar_obj.append_extra_str(f" error={_bp_error_str(prev_error)}")
-        directions=BlockSide.all_in_counter_clockwise_order()
+        prog_bar_obj.append_extra_str(f" error={_bp_error_str(prev_error)}")  # append prog-bar msg now
+        directions_iter=BlockSide.all_in_counter_clockwise_order()
         fixed_arguments["print_progress"] = False
 
-    out_messages = parallel_exec.concurrent_or_parallel(
-        func=_out_going_message, values=directions, value_name="direction", in_parallel=multi_processing, fixed_arguments=fixed_arguments
-    ) 
+    # Compute outgoing messages:
+    out_messages = _outgoing_messages(directions_iter=directions_iter, multi_processing=multi_processing, fixed_arguments=fixed_arguments)
 
     ## Next incoming messages are the outgoing messages after applying periodic boundaries:
-    out_messages = {side.opposite() : message for side, message in out_messages.items() }
+    out_messages = MessageDictType({side.opposite() : message for side, message in out_messages.items()})
     # Apply damping
     if config.damping is None or config.damping==0:
         next_messages = out_messages
@@ -150,15 +164,7 @@ def _belief_propagation_step(
     tn.connect_messages(next_messages)
 
     ## Check error between messages:
-    # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:
-    distances = [ 
-        mps_distance(prev_messages[direction].mps, out_messages[direction].mps) 
-        for direction in BlockSide.all_in_counter_clockwise_order() 
-    ]
-    if config.msg_diff_squared:
-        next_error = sum(distances)/len(distances)
-    else:
-        next_error = np.sqrt( sum(distances) )/len(distances)
+    next_error = _compute_error(prev_messages, out_messages, config.msg_diff_squared)
 
     return next_messages, next_error
 

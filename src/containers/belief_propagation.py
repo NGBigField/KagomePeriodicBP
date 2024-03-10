@@ -51,4 +51,6 @@ class Message(NamedTuple):
         )
     
 
-MessageDictType : TypeAlias = dict[BlockSide, Message]
+class MessageDictType(dict[BlockSide, Message]):
+    def mpss(self)->list[MPS]:
+        return [msg.mps.A for side, msg in self.items()]
