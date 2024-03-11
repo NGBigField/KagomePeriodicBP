@@ -24,12 +24,12 @@ def main(
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     chi_factor : int = 1,
-    hamiltonian:str = "FM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "FM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.03.10_22.52.31_CKNZ")
-    # unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.load("2024.03.10_22.52.31_CKNZ")
+    unit_cell = UnitCell.random(d=d, D=D)
     # unit_cell = UnitCell.zero_product_state(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
@@ -42,7 +42,7 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [0.001]*50 + [1e-4]*50 + [1e-5]*50
+    config.ite.time_steps = [1e-1]*10 + [1e-2]*50 + [1e-3]*50 + [1e-4]*50 + [1e-5]*50
 
     # Interaction:
     match hamiltonian: 
