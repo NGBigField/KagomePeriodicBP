@@ -105,9 +105,9 @@ def print_or_log_bp_message(config:BPConfig, not_converged_causes_error:bool, st
         _iter_msg = f", Iteration "+ _blue_text(f"{stats.iterations+1} out of {stats.final_config.max_iterations}")
         logger.debug(space+_attempt_msg+_iter_msg)
     else:
-        _msg = f"BlockBP didn't converge to error {config.target_msg_diff}. error is now {stats.final_error}"
+        _msg = f"BlockBP didn't converge to error {config.target_msg_diff} after {stats.attempts} attempts. Error is now {stats.final_error}"
         if not_converged_causes_error:
             raise BPNotConvergedError(_msg)
         else:
-            logger.warn(space+_msg)
+            logger.warn(space+_msg+"\n"*4)
 

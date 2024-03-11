@@ -175,7 +175,7 @@ class ITEConfig():
     num_errors_per_delta_t_threshold : int = 5    
     # Belief-Propagation flags:
     start_segment_with_new_bp_message : bool = True
-    bp_not_converged_raises_error : bool = True
+    bp_not_converged_raises_error : bool = False
     bp_every_edge : bool = True
 
 
