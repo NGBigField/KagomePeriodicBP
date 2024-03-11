@@ -91,7 +91,7 @@ def ion():
 def refresh():
     global active_interactive
     if active_interactive:
-        plt.pause(0.001)
+        plt.pause(0.0001)
 
 
 def get_saved_figures_folder()->Path:
@@ -144,7 +144,7 @@ def close_all():
 
 def draw_now():
     plt.show(block=False)
-    plt.pause(0.0001)
+    plt.pause(0.01)
     
 
 def matplotlib_wrapper(on:bool=True) -> Callable[[Callable[_InputType, _OutputType]], Callable[_InputType, _OutputType]]:  # A function that return a decorator which depends on inputs

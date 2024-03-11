@@ -18,9 +18,11 @@ class BPConfig:
     msg_diff_squared : bool = True  # True is easier to get to 
     init_msg: MessageModel = MessageModel.RANDOM_QUANTUM
     allowed_retries : int = 3
-    hermitize_messages_between_iterations : bool = True
-    times_to_deem_failure_when_diff_increases  : int = 3
+    times_to_deem_failure_when_diff_increases  : int = 4
     parallel_msgs : bool = False
+    damping : float|None = None  # The `learning-step` of the messages. 
+    hermitize_msgs : bool = True
+    # damping=0 will take 100% the new message while damping=1 will keep the old message.
 
     def __repr__(self) -> str:
         return container_repr(self)
@@ -34,8 +36,8 @@ class BPStats(Stats):
     iterations      : int   = -1
     attempts        : int   = 1
     final_error     : float = -1.0  
-    final_config    : BPConfig = field(default_factory=BPConfig)
     success         : bool = False
+    final_config    : BPConfig = field(default_factory=BPConfig)
 
 
 class Message(NamedTuple):
@@ -47,5 +49,8 @@ class Message(NamedTuple):
             mps=self.mps.copy(full=True),
             orientation=self.orientation
         )
+    
 
-MessageDictType : TypeAlias = dict[BlockSide, Message]
+class MessageDictType(dict[BlockSide, Message]):
+    def mpss(self)->list[MPS]:
+        return [msg.mps.A for side, msg in self.items()]

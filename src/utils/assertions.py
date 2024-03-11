@@ -90,6 +90,18 @@ def odd(x:float|int, /, reason:Optional[str]=None ) -> int:
     x = even(x-1, reason=reason) + 1
     return x
 
+def logical(x:bool|int, /, reason:Optional[str]=None ) -> bool:
+    if isinstance(x, bool):
+        return x
+    else:
+        x = bit(x, reason=reason)  # also checks if 0 or 1
+        if x == 0:
+            return False
+        elif x == 1:
+            return True
+        else:
+            raise ValueError("bug: Not an expected option")
+
 def density_matrix(m:np.ndarray, /,*, reason:Optional[str]=None, robust_check:bool=True) -> np.ndarray:
     _assert( isinstance(m, (np.matrix, np.ndarray)), reason=reason, default_reason="Must be a matrix type" )
     if not isinstance(m, np.matrix):

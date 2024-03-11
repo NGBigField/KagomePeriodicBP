@@ -42,15 +42,23 @@ def _log_and_print_starting_message(logger:logs.Logger, config:Config, ite_track
 
 
 def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker, plots:ITEPlots)->None: #TODO ITEPlots
+
     logger.info("\n")
     _common_logger_prints(logger, config, ite_tracker)
     plots.save(logger)
     logger.info("")
-    expectation_values = ite_tracker.expectation_values[-1]
-    energy = ite_tracker.energies[-1]
-    logger.info(f"Last measurements are: \n  energy={energy} \n  expectation_values={expectation_values}")
-    logger.info("\n")
-    logger.info("=== Finished Full-ITE ===")
+    
+    if len(ite_tracker)<=0:
+        logger.info("\n")
+        logger.info("=== Unsuccessful run of Full-ITE ===")
+
+    else:
+        expectation_values = ite_tracker.expectation_values[-1]
+        energy = ite_tracker.energies[-1]
+        logger.info(f"Last measurements are: \n  energy={energy} \n  expectation_values={expectation_values}")
+        logger.info("\n")
+        logger.info("=== Finished Full-ITE ===")
+
     logger.info("\n")
 
 

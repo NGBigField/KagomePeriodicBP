@@ -5,12 +5,14 @@ from containers import Config
 from tensor_networks import UnitCell
 
 from utils import strings
+from typing import Iterable
 
 
 # Algos we test here:
 from algo.imaginary_time_evolution import full_ite
 from physics import hamiltonians
 
+import numpy as np
 
 d = 2
 
@@ -18,42 +20,39 @@ d = 2
 def main(
     D = 2,
     N = 2,
-    live_plots:bool = 1,
+    live_plots:bool|Iterable[bool] = 0, # [1,1,1],
+    results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     chi_factor : int = 1,
-    results_filename:str = strings.time_stamp()+"_"+strings.random(4),
-    afm_or_fm:str = "AFM"  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "FM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell_file_name = f"crnt_heisenberg_{afm_or_fm}_D{D}_chi{chi_factor}_"+strings.random(3)
-    # unit_cell = UnitCell.load(unit_cell_file_name)
-    # if unit_cell is None:
-    unit_cell = UnitCell.random(d=d, D=D)
-    unit_cell._file_name = results_filename
+    unit_cell = UnitCell.load("2024.03.10_22.52.31_CKNZ")
+    # unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.zero_product_state(d=d, D=D)
+    unit_cell.set_filename(results_filename) 
 
     ## Config:
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
-    if afm_or_fm=="AFM":
-        config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None)
-    elif afm_or_fm=="FM":
-        config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm, None)
-    else:
-        raise ValueError("not matching any option.")
-    #
+    config.bp.damping = damping
+    config.bp.max_swallowing_dim = 4*D**2
+    config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    # Parallel:
-    config.bp.parallel_msgs = parallel
-    if N>10:
-        config.bp.max_iterations *= 2 
-    config.visuals.progress_bars = True
-    # delta-t's:
-    config.ite.bp_every_edge = False
-    # BP:
-    config.bp.target_msg_diff = 1e-7
+    config.ite.time_steps = [0.001]*50 + [1e-4]*50 + [1e-5]*50
 
+    # Interaction:
+    match hamiltonian: 
+        case "AFM":   config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None)
+        case "FM":    config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm, None)
+        case "FM-T":  config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm_with_field, None)
+        case "Field": config.ite.interaction_hamiltonian = (hamiltonians.field, None)
+        case _:
+            raise ValueError("Not matching any option.")
+    
 
     ## Run:
     energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)

@@ -587,7 +587,8 @@ class EdgeTN(_FrozenSpecificNetwork):
         """Compute the Reduce-Density-Matrix (RDM) using the edge and environment
         """
         t1, t2, mps_env = self.edge_and_environment()
-        return rho_ij(t1, t2, mps_env=mps_env)
+        rho = rho_ij(t1, t2, mps_env=mps_env)
+        return rho
 
     
     # ================================================= #

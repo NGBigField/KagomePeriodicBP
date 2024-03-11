@@ -25,8 +25,53 @@
 #              tensors there are not sufficiently Hermitian (as 
 #              defined by the Hermicity thereshold HERMICITY_ERR)
 #
-#----------------------------------------------------------
+# 14-Nov-2023  Fixed a bug in rho_ij --- in the mps_env case, the Aj
+#              contraction had typo that used i instead of j
 #
+#
+# 6-Dec-2023   Used pseudo invert in calculating Li_inv, Lj_inv 
+#              in the reduced_env function (they might not be invertible)
+#              and also use it for solving Ni ai=b, Nj aj=b in the 
+#              ALS_optimization if Ni or Nj are not invertible. This is
+#              done via the new function robust_solve.
+#
+#              Finally, in ALS_optimization, explicitly do nothing 
+#              if D<= D_max
+#
+#
+# 6-Dec-2023   Yet another improvement to robust_solve: use pinv
+#              whenever the norm of x >> norm(N)*norm(b)
+#
+# 12-Dec-2023  1) Change robust_solve. No longer using pinv. Instead, 
+#                 whenever there's a problem simply regularize N by 
+#                 adding eps*ID to it.
+#
+#              2) Add a log flag to apply_2local_gate, together with
+#                 few log messages
+#
+#              3) Fixed a colossal bug in reduced_env:
+#                 for some reason, removing small e.v. was done by
+#
+#                    wpos_idx = np.where(w>trunc_pos_eps/w[-1])
+#                 
+#                 instead of:
+#
+#                    wpos_idx = np.where(w>trunc_pos_eps*w[-1])
+#                 
+# 14-Dec-2023  Add a norm-0 normalization of new_Ti, new_Tj at the end
+#              of apply_2local_gate
+#
+#
+#
+# 12-Feb-2024  Add Yigal's hack for faster robust solve. Introduce
+#              a new constant NTHRESH such that if matrix dim > NTHRESH
+#              then solve the linear equation using scipy.linalg.lstsq
+#
+# 21-Feb-2024  In apply_2local_gate check first if g is (approximately) 
+#              a tensor product of two gates. If so, then no truncation 
+#              is needed; apply each gate seperately. 
+#
+#----------------------------------------------------------
 
 
 import numpy as np
@@ -37,7 +82,7 @@ import pickle
 from numpy.linalg import norm, svd, qr
 
 from numpy import zeros, ones, array, tensordot, sqrt, diag, conj, \
-	eye, trace, pi, exp
+	eye, trace, pi, exp, isnan
 	
 from scipy.linalg import expm
 
@@ -47,34 +92,22 @@ from libs import bmpslib
 from libs import bubblecon
 from libs.ncon import ncon
 
+from _error_types import ITEError
 
 HERMICITY_ERR = 1e-5
+PINV_THRESH = 1e-8
+ROBUST_THRESH = 1e8
 
-def open_mps_env(mps_env):
-	"""
-	
-	Given an MPS env, which is simply a list of MPS tensors 
-	of the form [D_L, Dmid, D_R], which represent a periodic MPS,
-	we open up the mid leg to ket-bra legs.
-	
-	Specifically, we assume Dmid = D*D, and reshape every tensor in the 
-	list as:
-	
-	              [D_L, Dmid, D_R] ==> [D_L, D, D, D_R]
-	
-	"""
-	
-	
-	for i in range(len(mps_env)):
-		A = mps_env[i]
-		Ashape = A.shape
-		D2 = Ashape[1]
-		D = int(np.sqrt(D2))
-		assert D*D==D2, f"Fused-leg of dimension {D2} cannot be split"
-		mps_env[i] = A.reshape([Ashape[0], D, D, Ashape[2]])
+#
+# If the dimension is > NTHRESH, we run robust_solve using least-square.
+# Otherwise using the usual Guassian elimination.
+#
 
-	return mps_env
+NTHRESH = 1024
 
+from _error_types import ITEError
+
+class HermitizationError(ITEError): ...
 
 #
 # ---------------------- hermitize_a_message  --------------------------
@@ -155,9 +188,118 @@ def hermitize_a_message(mpA):
 	
 		
 	
+
+#
+# ----------------------- get_initial_mps_messages --------------------
+#
+
+def get_a_random_mps_message(N, D, mode='UQ'):
+
+	"""
+
+	Get an initial MPS message for the blockBP algorithm. MPS Messages 
+	can be either random PSD product states (mode='RQ') or an identity 
+	contraction of the ket-bra (mode='UQ')
+
+	Paramters:
+	-----------
+
+	N    --- Linear size of MPS 
+	D    --- bond dimension
+	mode --- either 'UQ' or 'RQ'
+
+	OUTPUT:
+	-------
+
+	An random MPS message 
+
+
+	"""
+
+	D2 = D*D
+
+	mp = bmpslib.mps(N)
+
+	for ell in range(N):
+
+		if mode == 'UQ':
+			#
+			# For mode 'UQ' we create a simple ket-bra contraction
+			#
+			Tketbra = np.eye(D)
+			
+		else:
+			#
+			# For mode 'RQ' we create random PSDs
+			#
+			A = np.random.normal(size=[D,D])
+			Tketbra = A@A.T
+			Tketbra = Tketbra/norm(Tketbra)
+
+		Tketbra = Tketbra.reshape([1,D2,1])
+
+		A = np.random.normal(size=[D*D*D,D*D*D])+ 1j*np.random.normal(size=[D*D*D,D*D*D])
+		Tketbra = A@conj(A.T)
+		Tketbra = Tketbra/norm(Tketbra)
+		Tketbra = Tketbra.reshape([D,D,D,D,D,D])
+		Tketbra = Tketbra.transpose([0,3, 1,4, 2,5])
+		Tketbra = Tketbra.reshape([D*D,D*D,D*D])
+
+		if ell==0:
+			Tketbra = Tketbra[0, :, :].reshape([1,D*D, D*D])
+
+		if ell==N-1:
+			Tketbra = Tketbra[:, :, 0].reshape([D*D,D*D,1])
+
+		mp.set_site(Tketbra, ell)
+
+	mp.left_canonical_QR()
+	
+	return mp
 	
 	
 	
+
+
+#
+# --------------------- invert_permutation  ------------------------
+#
+
+def invert_permutation(permutation):
+
+	"""
+
+	Given a permutation in the form of a list of integers, find its
+	inverse permutation. This is useful when permuting the indices
+	of a tensor T_i to prepare it for imaginary time update (using the
+	apply_2local_gate function) or for calculating the 2-body RDM using
+	rho_ij function.
+	
+	Input Parameters:
+	-------------------
+	
+	 permutation --- A list of n integers from 0-->n-1 that captures
+	                 a permutation of these numbers. So there are
+	                 exactly n numbers and every number between 0-->n-1
+	                 appears exactly once.
+	                 
+	                 
+	Output:
+	--------
+	
+	A list of integers giving its inverse
+	                 
+	                 
+	
+
+	"""
+
+	inv = np.zeros_like(array(permutation))
+	
+	inv[permutation] = np.arange(len(inv), dtype=inv.dtype)
+
+	return list(inv)
+
 
 
 
@@ -410,7 +552,7 @@ def get_2body_env(mps_i, i0, i1, mps_j, j0, j1, mode='LR'):
 # --------------------------- rho_ij  ----------------------------------
 #
 
-def rho_ij(Ti, Tj, env_i=None, env_j=None, mps_env=None)->np.ndarray:
+def rho_ij(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	"""
 
 	Given two neighboring tensors PEPS T_i,T_j, together with their
@@ -430,9 +572,9 @@ def rho_ij(Ti, Tj, env_i=None, env_j=None, mps_env=None)->np.ndarray:
 	              order, and j2, j3, ... are ordered from bottom in 
 	              counter-clockwise order.
 	             
-                i2           i6
-	         i3  |           |   j5
-	          \  |           |  /
+	              i2           i6
+	           i3  |           |   j5
+	            \  |           |  /
                \ |           | /
         i4 ----- O ========= O ----- j4
                / |           | \
@@ -587,29 +729,26 @@ def rho_ij(Ti, Tj, env_i=None, env_j=None, mps_env=None)->np.ndarray:
 				
 		Tj_legs = [-1,-3] + [2*i+1 for i in range(nj)]
 		conjTj_legs = [-2,-4] + [2*i+101 for i in range(nj)]
-				
+		
+		
 		e_list = [Tj_legs, conjTj_legs]
 		
-		for i in range(ni):
+		for i in range(nj):
 			#
 			# replace the iL and iR roles here to match the Ti contraction
 			#
 			iL = -6 if i==0 else 2*i
-			iR = -5 if i==ni-1 else 2*i+2
+			iR = -5 if i==nj-1 else 2*i+2
 				
 			e_list.append([iL, 2*i+1, 2*i+101, iR])
 				
-		
 		Aj = ncon(Tj_list, e_list)
 		
 		
 		rho = tensordot(Ai, Aj, axes=([2,3,4,5], [2,3,4,5]))
 	
 	
-	Hermicity = norm(rho - conj(rho.transpose([1,0,3,2])))/norm(rho)
-	if Hermicity > HERMICITY_ERR:
-		print("    ITE.rho_ij: The 2RDM rho_ij is not hermitian")
-		print(f"               It has hermicity {Hermicity} > {HERMICITY_ERR}.")
+	# Hermicity = norm(rho - conj(rho.transpose([1,0,3,2])))/norm(rho)
 
 #	rho = 0.5*(rho + conj(rho.transpose([1,0,3,2])))
 	tr = trace(trace(rho))
@@ -685,15 +824,20 @@ def fuse_tensor(T):
 
 	T2 = tensordot(T,conj(T), axes=([0],[0]))
 
+	#
 	# Permute the legs:
 	# [D1, D2, ..., D1^*, D2^*, ...] ==> [D1, D1^*, D2, D2^*, ...]
+	#
 	perm = []
 	for i in range(n-1):
 		perm = perm + [i, i+n-1]
 
 	T2 = T2.transpose(perm)
 
+	#
 	# Fuse the ket-bra pairs: [D1, D1^*, D2, D2^*, ...] ==> [D1^2, D2^2, ...]
+	#
+
 	dims = [T.shape[i]**2 for i in range(1,n)]
 
 	T2 = T2.reshape(dims)
@@ -787,6 +931,8 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	
 	Di_red = min(Di_rest, d*D)
 	Dj_red = min(Dj_rest, d*D)
+
+
 
 	#
 	# Number of external legs in Ti, Tj
@@ -1017,6 +1163,7 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 
 	Nred = tensordot(Ni, Nj, axes=([2,3],[2,3]))
 
+
 	#
 	# Resultant Nred is now of the form
 	#     [Di_red, Di_red*; Dj_red, Dj_red*]
@@ -1032,8 +1179,11 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	Hermicity = norm(Nred-conj(Nred.T))/norm(Nred)
 	
 	if Hermicity > HERMICITY_ERR:
-		print("    ITE.reduced_env: The reduced env tensor Nred is not hermitian")
-		print(f"                    It has hermicity {Hermicity} > {HERMICITY_ERR}.")
+		print("\n")
+		print("* * * ITE Warning: * * *")
+		print("ITE.reduced_env: The reduced env tensor Nred is not hermitian")
+		print(f"                 It has hermicity {Hermicity} > {HERMICITY_ERR}.")
+		print("\n\n")
 
 	#
 	# Making Nred 100% Hermitian 
@@ -1052,7 +1202,8 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 
 	trunc_pos_eps = 1e-12
 
-	wpos_idx = np.where(w>trunc_pos_eps/w[-1])
+	wpos_idx = np.where(w>trunc_pos_eps*w[-1])
+	
 	pos_idx = wpos_idx[0][0]
 
 	wpos = w[pos_idx:]
@@ -1075,24 +1226,31 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	DX_red = X.shape[1]
 
 	X = X.reshape([Di_red, Dj_red, DX_red])
-
+	
 	#
 	# Final step: gauge fix the Di_red, DX_red legs of X using QR.
 	#
 
 	X_tmp = X.reshape([Di_red, Dj_red*DX_red])
 	Q,Ri = qr(X_tmp.T)
-
 	Li = Ri.T
-
-	Li_inv = np.linalg.inv(Li)
+	
+	#
+	# We now invert Li, but use Penrose's pseudo inverse since Li 
+	# is not necessarily invertible (and might even not be square)
+	#
+	Li_inv = np.linalg.pinv(Li, rcond=PINV_THRESH)
+		
 
 	X_tmp = X.transpose([0,2,1])  # now its [Di_red, D_X, Dj_red]
 	X_tmp = X_tmp.reshape([Di_red*DX_red, Dj_red])
 	Q,Rj  = qr(X_tmp)
-
-	Rj_inv = np.linalg.inv(Rj)
-
+	
+	#
+	# Pseudo-invert Lj
+	#
+	Rj_inv = np.linalg.pinv(Rj, rcond=PINV_THRESH)
+	
 	#
 	# Now we have our(X) = Li X_new Rj  ==> X_new = Li^{-1} X Rj^{-1}
 	#
@@ -1105,6 +1263,7 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	#
 	# Recall: ai=[d, D, D_red], aj=[d, D, D_red]
 	#
+
 
 	X = tensordot(Li_inv, X, axes=([1],[0]))
 	Ti_rest = tensordot(Li_inv, Ti_rest, axes=([1],[0]))
@@ -1120,6 +1279,14 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	# Unfuse the external legs of Ti_rest, Tj_rest
 	#
 
+	#
+	# The dimensions of Di_red, and Dj_red might have changed during 
+	# the gause fixing, so we update them.
+	#
+	
+	Di_red = ai.shape[2]
+	Dj_red = aj.shape[2]
+
 	Ti_rest = Ti_rest.reshape([Di_red] + list(Ti.shape[2:]))
 	Tj_rest = Tj_rest.reshape([Dj_red] + list(Tj.shape[2:]))
 
@@ -1132,7 +1299,7 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	# aj: [d, D, Dj_red]
 	#
 
-	return X, ai, aj, Ti_rest, Tj_rest
+	return X, ai, aj, Ti_rest, Tj_rest, w
 
 
 
@@ -1186,6 +1353,39 @@ def truncation_distance(exact_ai, exact_aj, new_ai, new_aj, X):
 	dis = 2*(IP1 + IP2 - 2*IP3)/(IP1+IP2)
 
 	return dis.real
+
+
+#
+# ------------------------ open_mps_env ------------------------------
+#
+
+def open_mps_env(mps_env):
+	"""
+	
+	Given an MPS env, which is simply a list of MPS tensors 
+	of the form [D_L, Dmid, D_R], which represent a periodic MPS,
+	we open up the mid leg to ket-bra legs.
+	
+	Specifically, we assume Dmid = D*D, and reshape every tensor in the 
+	list as:
+	
+	              [D_L, Dmid, D_R] ==> [D_L, D, D, D_R]
+	
+	"""
+	
+	
+	for i in range(len(mps_env)):
+		A = mps_env[i]
+		Ashape = A.shape
+		D2 = Ashape[1]
+		D = int(np.sqrt(D2))
+		assert D*D==D2, f"Fused-leg of dimension {D2} cannot be split"
+		mps_env[i] = A.reshape([Ashape[0], D, D, Ashape[2]])
+
+	return mps_env
+
+
+
 
 #
 # ---------------------------- Ni_env ----------------------------------
@@ -1244,6 +1444,71 @@ def Nj_env(ai_ket, ai_bra, X):
 	Nj = Ni_env(ai_ket, ai_bra, Xt)
 
 	return Nj
+
+#
+# -------------------------  robust_solve  ---------------------------
+#
+
+def robust_solve(N,b):
+	
+	"""
+	
+	Solve the linear equation Nx = b, where N is a square matrix in 
+	a *robust* way. That is, if N turns out to be singular, or close
+	to singular, then we regularize N by adding it eps*ID, where 
+	eps = PINV_THRESH*norm(N) 
+	
+	
+	"""
+
+
+	#
+	# We will first try to solve Nx=b using the regular linalg.solve.
+	# If this doesn't work because of any error, or if we get nan as
+	# answer, or if the solution we get is insanely large --- we try
+	# again after regularizing N.
+	#
+
+	regularize = False
+	
+	Nsize = N.shape[0]
+
+	try:
+
+		if Nsize<=NTHRESH:
+			x = np.linalg.solve(N, b)
+		else:
+			x_tuple = scipy.linalg.lstsq(N, b, cond=None, check_finite=False,\
+				lapack_driver='gelsy')
+			x = x_tuple[0]
+
+	except:
+		regularize=True
+
+
+	if not regularize:
+		
+		if isnan(norm(x)):
+			regularize=True
+		
+		elif norm(x)>ROBUST_THRESH*norm(b)/norm(N):
+			regularize=True
+		
+
+	if regularize:
+		newN = N + eye(N.shape[0])*PINV_THRESH*norm(N, ord=2)
+
+		if Nsize<=NTHRESH:
+			x = np.linalg.solve(newN, b)
+		else:
+			x_tuple = scipy.linalg.lstsq(newN, b, cond=None, check_finite=False,\
+				lapack_driver='gelsy')
+			x = x_tuple[0]
+
+		
+	return x
+
+
 
 
 #
@@ -1304,6 +1569,23 @@ def ALS_optimization(Dmax, exact_ai, exact_aj, X, iter_max=10,
 		
 	log=False
 	
+	D = exact_ai.shape[1]
+
+	if log:
+		print("\n\n")
+		print(f"ALS_optimization: D={D} Dmax={Dmax} "\
+			f"iter_max={iter_max} eps={eps}")
+
+
+	if D<= Dmax:
+
+		if log:
+			print(f"ALS_optimization: D<=Dmax --- nothong to do...")
+
+		new_ai = exact_ai.copy()
+		new_aj = exact_aj.copy()
+		return new_ai, new_aj
+	
 
 	#
 	# Start with an initial guess for ai_new, aj_new.
@@ -1327,6 +1609,9 @@ def ALS_optimization(Dmax, exact_ai, exact_aj, X, iter_max=10,
 	dist = 1e10
 	delta_dist = 1
 
+	if log:
+		print(f"ALS_optimization: starting optimization loop...")
+
 	while delta_dist>eps and iter_no < iter_max:
 
 		#
@@ -1346,8 +1631,18 @@ def ALS_optimization(Dmax, exact_ai, exact_aj, X, iter_max=10,
 		b = tensordot(Nib, exact_ai, axes=([0,1,2],[0,1,2]))
 		b = b.flatten()
 
-		ai = np.linalg.solve(Ni, b)
 
+		if log:
+			print(f"ALS_optimization: invoking robust_solve with mat-size "\
+				f"{Ni.shape[0]} x {Ni.shape[0]}")
+		#
+		# To solve the equation Ni ai = b, we use a "robust" alg, which
+		# pseudo inverts Ni when it is not invertible.
+		#
+		ai = robust_solve(Ni, b)
+
+		if log:
+			print(f"ALS_optimization: robust_solve done")
 
 		new_ai = ai.reshape(new_ai.shape)
 
@@ -1366,7 +1661,19 @@ def ALS_optimization(Dmax, exact_ai, exact_aj, X, iter_max=10,
 		b = tensordot(Njb, exact_aj, axes=([0,1,2],[0,1,2]))
 		b = b.flatten()
 
-		aj = np.linalg.solve(Nj, b)
+		if log:
+			print(f"ALS_optimization: invoking robust_solve with mat-size "\
+				f"{Nj.shape[0]} x {Nj.shape[0]}")
+
+		#
+		# To solve the equation Nj aj = b, we use a "robust" alg, which
+		# pseudo inverts Nj when it is not invertible.
+		#
+		aj = robust_solve(Nj, b)
+
+		if log:
+			print(f"ALS_optimization: robust_solve done")
+
 
 		new_aj = aj.reshape(new_aj.shape)
 
@@ -1434,131 +1741,16 @@ def ALS_optimization(Dmax, exact_ai, exact_aj, X, iter_max=10,
 
 		iter_no += 1
 
+	if log:
+		print(f"ALS_optimization: optimization loop done with "\
+			f"{iter_no} iterations and error={delta_dist}")
+		print("\n\n")
 
+
+	new_ai = new_ai/norm(new_ai)
+	new_aj = new_aj/norm(new_aj)
 
 	return new_ai, new_aj
-
-
-	
-
-#
-# ----------------------- get_initial_mps_messages --------------------
-#
-
-def get_a_random_mps_message(N, D, mode='UQ'):
-
-	"""
-
-	Get an initial MPS message for the blockBP algorithm. MPS Messages 
-	can be either random PSD product states (mode='RQ') or an identity 
-	contraction of the ket-bra (mode='UQ')
-
-	Paramters:
-	-----------
-
-	N    --- Linear size of MPS 
-	D    --- bond dimension
-	mode --- either 'UQ' or 'RQ'
-
-	OUTPUT:
-	-------
-
-	An random MPS message 
-
-
-	"""
-
-	D2 = D*D
-
-	mp = bmpslib.mps(N)
-
-	for ell in range(N):
-
-		if mode == 'UQ':
-			#
-			# For mode 'UQ' we create a simple ket-bra contraction
-			#
-			Tketbra = np.eye(D)
-			
-		else:
-			#
-			# For mode 'RQ' we create random PSDs
-			#
-			A = np.random.normal(size=[D,D])
-			Tketbra = A@A.T
-			Tketbra = Tketbra/norm(Tketbra)
-
-		Tketbra = Tketbra.reshape([1,D2,1])
-
-		A = np.random.normal(size=[D*D*D,D*D*D])+ 1j*np.random.normal(size=[D*D*D,D*D*D])
-		Tketbra = A@conj(A.T)
-		Tketbra = Tketbra/norm(Tketbra)
-
-		from numpy.linalg import eigvals
-		_s = sum(eigvals(Tketbra))
-		# print(_s)
-		# assert abs(_s-1)<1e-5, f"Must be a physical state"
-
-		Tketbra = Tketbra.reshape([D,D,D,D,D,D])
-		Tketbra = Tketbra.transpose([0,3, 1,4, 2,5])
-		Tketbra = Tketbra.reshape([D*D,D*D,D*D])
-
-		if ell==0:
-			Tketbra = Tketbra[0, :, :].reshape([1,D*D, D*D])
-
-		if ell==N-1:
-			Tketbra = Tketbra[:, :, 0].reshape([D*D,D*D,1])
-
-		mp.set_site(Tketbra, ell)
-
-	mp.left_canonical_QR()
-	
-	return mp
-	
-	
-	
-
-
-#
-# --------------------- invert_permutation  ------------------------
-#
-
-def invert_permutation(permutation):
-
-	"""
-
-	Given a permutation in the form of a list of integers, find its
-	inverse permutation. This is useful when permuting the indices
-	of a tensor T_i to prepare it for imaginary time update (using the
-	apply_2local_gate function) or for calculating the 2-body RDM using
-	rho_ij function.
-	
-	Input Parameters:
-	-------------------
-	
-	 permutation --- A list of n integers from 0-->n-1 that captures
-	                 a permutation of these numbers. So there are
-	                 exactly n numbers and every number between 0-->n-1
-	                 appears exactly once.
-	                 
-	                 
-	Output:
-	--------
-	
-	A list of integers giving its inverse
-	                 
-	                 
-	
-
-	"""
-
-	inv = np.zeros_like(array(permutation))
-	
-	inv[permutation] = np.arange(len(inv), dtype=inv.dtype)
-
-	return list(inv)
-
-
 
 
 
@@ -1566,7 +1758,8 @@ def invert_permutation(permutation):
 # ---------------------- apply_2local_gate  ----------------------------
 #
 
-def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, mps_env=None):
+def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, \
+	mps_env=None):
 	
 	"""
 	
@@ -1625,7 +1818,11 @@ def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, mps_env=None):
 
 	
 	"""
+	
+	log = False
 
+	if log:
+		print(f"Entering apply_2local_gate with D={Ti.shape[1]} and Dmax={Dmax}")
 
 	if mps_env is None and env_i is None and env_j is None:
 		print("Error in ITE.apply_2local_gate: either env_i, env_j or mps_env should")
@@ -1652,11 +1849,80 @@ def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	if sc<1e-15:
 		print(f"Error: trying to apply a gate with operator norm={sc}")
 		exit(1)
+
+	#
+	# If the gate is close to Identity --- then do nothing
+	#
+	if norm(g_mat-g_mat[0,0]*eye(g_mat.shape[0]))/sc < 1e-10:
+		
+		if log:
+			print("apply_2local_gate: gate is trivial - nothing to do...")
+		
+		return Ti, Tj, None
+		
+	#
+	# Now check if the gate is a product of two single-site gates by 
+	# looking at its SVD. In such case, no truncation is needed. Just 
+	# apply each gate to its tensor.
+	#
+
+	g_mat = g.reshape(g.shape[0]*g.shape[1], g.shape[2]*g.shape[3])
 	
-	if norm(g_mat-sc*eye(g_mat.shape[0]))/sc < 1e-10:
-		return Ti, Tj
+	U, s, V = np.linalg.svd(g_mat, full_matrices=False)
+	
+	is_product = False
+	
+	if s.shape[0]==0:
+		is_product = True
+	else:
+		if s[1]/s[0]<1e-10:
+			is_product = True
 		
 
+	if is_product:
+		#
+		# In such case g = g_i \otimes g_j. So we extract the single-body
+		# gates g_i, g_j and apply them directly to T_i, T_j
+		#
+		if log:
+			print("apply_2local_gate: gate is a product of two local gates. "\
+				"No need for bond truncation.")
+				
+		# 
+		# Find the maximal entry in abs(g) --- use it to extrac 
+		# g_i, g_j
+		#
+		
+		maxind = np.unravel_index(abs(g).argmax(), g.shape)
+		
+		g_i = g[:, :, maxind[2], maxind[3]]
+		g_j = g[maxind[0], maxind[1], :, :]
+		
+		#
+		# we need to rescale g_i, g_j so that their tensor product gives g.
+		# There's a freedom here because its only the product that needs
+		# to be equal to g
+		#
+		
+		rescale = g[maxind[0], maxind[1], maxind[2], maxind[3]] \
+			/(g_i[maxind[0], maxind[1]]*g_j[maxind[2], maxind[2]])
+		
+		g_i_factor = sqrt(abs(rescale))
+		g_j_factor = rescale/g_i_factor
+		
+		g_i = g_i_factor * g_i
+		g_j = g_j_factor * g_j
+		
+		#
+		# Once we have g_i, g_j, we apply then to Ti, Tj and obtain the 
+		# updated tensors
+		#
+		
+		newTi = tensordot(g_i, Ti, axes=([1],[0]))
+		newTj = tensordot(g_j, Tj, axes=([1],[0]))
+		
+		return newTi, newTj, None
+			
 
 
 	#
@@ -1670,7 +1936,7 @@ def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	# Note: Ti = Ti_rest\cdot ai and similarly for j.
 	#
 
-	X, ai, aj, Ti_rest, Tj_rest = reduced_env(Ti, Tj, env_i, env_j, mps_env)
+	X, ai, aj, Ti_rest, Tj_rest, origin_eigen_vals = reduced_env(Ti, Tj, env_i, env_j, mps_env)
 
 	#
 	# The legs of the resultant tensors:
@@ -1700,7 +1966,7 @@ def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	exact_aiaj = exact_aiaj.transpose([0,2,1,3])
 	# exact_aiaj: [d_i, D_red(i); d_j, D_red(j)]
 	exact_aiaj = exact_aiaj.reshape([d*Di_red, d*Dj_red])
-
+	
 	U,S,V = svd(exact_aiaj, full_matrices=False)
 
 	sqrtS = diag(sqrt(S))
@@ -1720,8 +1986,14 @@ def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	# Find the optimal approximation to exact_ai, exact_aj using
 	# ALS iterations
 	#
-	
+
+	if log:
+		print("apply_2local_gate: Entering ALS-optimization for new_ai, new_aj")
+
 	new_ai, new_aj = ALS_optimization(Dmax, exact_ai, exact_aj, X)
+
+	if log:
+		print("apply_2local_gate: ALS-optimization done")
 
 	#
 	# Fust the reduced tensors back to the rest of the tensors to get
@@ -1731,8 +2003,21 @@ def apply_2local_gate(g, Dmax, Ti, Tj, env_i=None, env_j=None, mps_env=None):
 	new_Ti = tensordot(new_ai, Ti_rest, axes=([2],[0]))
 	new_Tj = tensordot(new_aj, Tj_rest, axes=([2],[0]))
 	
+	#
+	# Noramlize new_Ti, new_Tj so that their larget entry in abs is 1
+	#
 
-	return new_Ti, new_Tj
+	new_Ti = new_Ti/norm(new_Ti.flatten(), ord=np.inf)
+	new_Tj = new_Tj/norm(new_Tj.flatten(), ord=np.inf)
+	
+	if log:
+		print("apply_2local_gate done.")
+		if new_Ti.shape[1]!=Ti.shape[1] or new_Tj.shape[1]!=Tj.shape[1]:
+			print(f"apply_2local_gate: tensors changed shape: ")
+			print(f"    {Ti.shape}, {Tj.shape} => {new_Ti.shape}, {new_Tj.shape}")
+			print()
+
+	return new_Ti, new_Tj, origin_eigen_vals
 	
 
 #

@@ -14,6 +14,7 @@ from numpy.linalg import norm, eigvals
 
 # MPS Object:
 from libs.bmpslib import mps as MPS
+from libs.bmpslib import mps_inner_product
 
 # Control:
 from _config_reader import DEBUG_MODE
@@ -31,6 +32,7 @@ from enums import MessageModel
 # ============================================================================ #
 
 ComplexRandom : bool = True
+EPSILON = 0.000001
 
 # ============================================================================ #
 #                               Inner Functions                                #
@@ -42,6 +44,35 @@ def _rand_mat(d:int)->np.ndarray:
 # ============================================================================ #
 #                             Declared Functions                               #
 # ============================================================================ #
+
+def mps_distance(mps1:MPS, mps2:MPS) -> float:
+	"""l2_distance(A, B) -> float:
+	Where A is `self` and B is `other`:
+	Compute 1 - |<A|B>|
+
+	Args:
+		self (MPS)
+		other (MPS)
+	"""
+	# Compute:
+	conjB = True
+	ip = mps_inner_product(mps1, mps2, conjB)
+
+	# old version:
+	distance2 = 2 - 2*ip.real
+
+	# New version:
+	distance2 = 1 - abs(ip)
+
+	# Validate:
+	error_msg = f"L2 Distance should always be a real & positive value. Instead got {distance2}"
+	assert np.imag(distance2)==0, error_msg
+	if distance2<0:  # If it's a negative value.. it better be very close to zero
+		assert abs(distance2)<EPSILON , error_msg
+		return 0.0
+	# return:
+	return distance2
+
 
 def init_mps_quantum(D_list, random=False) -> MPS:
 	"""

@@ -26,6 +26,43 @@ NEW_TRACK_POINT_THRESHOLD = 0.02
 TRACK_COLOR = 'tomato'
 
 
+def _set_window_title(window, title:str)->None:
+    full_title="KagomePeriodicBP - "+title
+    if hasattr(window, "wm_title"):
+        window.wm_title(full_title)
+    elif hasattr(window, "setWindowTitle"):
+        window.setWindowTitle(full_title)
+    else:
+        pass  # Do nothing
+
+
+def _get_window_position_and_size(window)->tuple[int, ...]:
+    if hasattr(window, "x"):
+        x = window.x() 
+        y = window.y()
+        w = window.width()
+        h = window.height()
+    elif hasattr(window, "winfo_x"):
+        x = window.winfo_x()
+        y = window.winfo_y()
+        w = window.winfo_width()
+        h = window.winfo_height()
+    else:
+        x, y, w, h = None, None, None, None
+
+    return x, y, w, h
+
+
+def _set_window_position(window, x:int, y:int, w:int, h:int)->None:
+
+    if hasattr(window, "move"):
+        window.move(x, y)
+    elif hasattr(window, "geometry"):
+        window.geometry(f"{w}x{h}+{x}+{y}")
+    else:
+        pass
+
+
 class BlockSpherePlot():
     def __init__(self, size_factor:float=1.0, axis:Optional[Axes3D]=None) -> None:
         #
@@ -137,9 +174,9 @@ class ITEPlots():
 
     @dataclass
     class _PlotVariations(Generic[_T]):
-        main  : _T = None  #type: ignore
-        env   : _T = None  #type: ignore
-        cores : _T = None  #type: ignore
+        main   : _T = None  #type: ignore
+        health : _T = None  #type: ignore
+        cores  : _T = None  #type: ignore
 
         def items(self) -> Generator[ tuple[str, _T], None, None]:
             for field in fields(self):
@@ -154,7 +191,7 @@ class ITEPlots():
         config:Config
     )->None:
         
-        plots_to_show = config.visuals._what_plots
+        plots_to_show = config.visuals._plots_to_show
         
         ## Save data:
         self.config = config
@@ -165,10 +202,15 @@ class ITEPlots():
         # Track state
         self._iteration = 0
 
+        figure_titles = ITEPlots._PlotVariations[str]()
+        figure_titles.main = "ITE convergence"
+        figure_titles.cores = "cores polarization"
+        figure_titles.health = "environment and state health"
+
         ## Parse inputs:
         assert len(plots_to_show)==3
         self.show.main  = plots_to_show[0]
-        self.show.env   = plots_to_show[1]
+        self.show.health   = plots_to_show[1]
         self.show.cores = plots_to_show[2]
 
         if not active:
@@ -191,14 +233,14 @@ class ITEPlots():
             ])            
             self.figs.main = fig_main
         
-        if self.show.env:
-            fig_env = plt.figure(figsize=(4, 4))
+        if self.show.health:
+            fig_env = plt.figure(figsize=(4, 5))
             fig_env.subplot_mosaic([
                 ['A', 'B', 'C'],
                 ['D', 'E', 'F']
             ])
-            fig_env.suptitle("Environment")
-            self.figs.env = fig_env
+            fig_env.suptitle("Environment and State Health")
+            self.figs.health = fig_env
 
         if self.show.cores:
             fig_core = plt.figure(figsize=(6, 6))
@@ -234,7 +276,7 @@ class ITEPlots():
             )
 
         ## Env plots:        
-        if self.show.env:
+        if self.show.health:
             axes_env = {axis._label : axis for axis in fig_env.get_axes()}  # type: ignore
             #
             p_hermicity = visuals.AppendablePlot(axis=axes_env["A"])
@@ -251,18 +293,18 @@ class ITEPlots():
             p_sum_eigenvalues.axis.set_title("sum-eigenvalues")
             #
             p_negativity = visuals.AppendablePlot(axis=axes_env["E"])
-            p_negativity.axis.set_title("negativity")
+            p_negativity.axis.set_title("state\nnegativity")
             #
-            p_expectations_imag = visuals.AppendablePlot(axis=axes_env["F"], legend_on=False)
-            p_expectations_imag.axis.set_title("imag(expectations)")
+            p_negativity_before = visuals.AppendablePlot(axis=axes_env["F"], legend_on=False)
+            p_negativity_before.axis.set_title("\nnegativity\nratio")
             #
-            self.plots.env = dict(
+            self.plots.health = dict(
                 hermicity = p_hermicity,
                 norm = p_norm,
                 trace = p_trace,
                 sum_eigenvalues = p_sum_eigenvalues,
                 negativity = p_negativity,
-                expectations_imag=p_expectations_imag
+                negativity_before=p_negativity_before
             )
 
         ## Core plots:
@@ -287,6 +329,32 @@ class ITEPlots():
         visuals.draw_now()
         visuals.ion()
 
+
+        ## Window properties of figures:
+        # Get plots in needed order:
+        active_plots_in_order = []
+        for plot_name, show_plot in self.show.items():
+            if show_plot:
+                active_plots_in_order.append(plot_name)
+        # Title:
+        for plot_name in active_plots_in_order:
+            title = figure_titles.__getattribute__(plot_name)
+            window = self.figs.__getattribute__(plot_name).canvas.manager.window
+            _set_window_title(window, title)
+
+    
+        # Position on screen
+        is_first = True
+        for plot_name in active_plots_in_order:
+            window = self.figs.__getattribute__(plot_name).canvas.manager.window
+            if not is_first:
+                _, this_y, this_w, this_h = _get_window_position_and_size(window)
+                _set_window_position(window, x+w, this_y, this_w, this_h)
+            x, y, w, h = _get_window_position_and_size(window)
+            is_first = False
+
+        
+
     def update(self, 
         energies:list[complex], 
         step_stats:ITESegmentStats, 
@@ -303,6 +371,11 @@ class ITEPlots():
 
         mean_expec_vals = mean_expectation_values(expectations)
 
+        def _small_scatter(plot:visuals.AppendablePlot, x:float, y:float, c="blue", alpha=1.0)->None:
+            plot.axis.scatter(x=x, y=y, c=c, s=4, alpha=alpha)
+
+            
+
         ## Main:
         if self.show.main:
             if not _initial:
@@ -315,7 +388,7 @@ class ITEPlots():
             energies4mean = []
             for edge_tuple, energy in energies.items():
                 energies4mean.append(energy)
-                plot.axis.scatter(x=i, y=energy, c="black", s=4, alpha=0.6)
+                _small_scatter(plot, i, energy, c="black", alpha=0.6)
                 
             # Mean:
             energy = sum(energies4mean)/len(energies4mean)
@@ -325,26 +398,30 @@ class ITEPlots():
             if self.config.ite.reference_ground_energy is not None:
                 plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
             
-        ## Env:
-        if self.show.env:
+        ## Env Health:
+        if self.show.health:
             num_fractions = len(step_stats.ite_per_mode_stats)
             if num_fractions>0:
                 frac = 1/num_fractions
                 i = self._iteration-1
                 for mode_stat in step_stats.ite_per_mode_stats:
                     i += frac
-                    hermicity = mode_stat.env_metrics.hermicity
-                    norm = mode_stat.env_metrics.norm
-                    sum_eigenvalues = np.real( mode_stat.env_metrics.sum_eigenvalues )
-                    negativity = mode_stat.env_metrics.negativity
-                    trace = np.real(mode_stat.env_metrics.trace)
 
-                    self.plots.env["hermicity"].append(hermicity=(i, hermicity), draw_now_=False)
-                    self.plots.env["norm"].append(norm=(i, norm), draw_now_=False)
-                    self.plots.env["sum_eigenvalues"].append(sum_eigenvalues=(i, sum_eigenvalues), draw_now_=False)
-                    self.plots.env["negativity"].append(negativity=(i, negativity), draw_now_=False)
-                    self.plots.env["trace"].append(trace=(i, trace), draw_now_=False)
-            # self.plots.env["expectations_imag"].append(**imag_expectation_values, draw_now_=False)
+                    for metric in mode_stat.env_metrics:
+                        hermicity = metric.hermicity
+                        norm = metric.norm
+                        sum_eigenvalues = np.real( metric.sum_eigenvalues )
+                        negativity = metric.negativity
+                        trace = np.real(metric.trace)
+                        negativity_ratio = metric.other['original_negativity_ratio']
+
+                        _small_scatter(self.plots.health["hermicity"], i, hermicity)
+                        _small_scatter(self.plots.health["norm"], i, norm)
+                        _small_scatter(self.plots.health["sum_eigenvalues"], i, sum_eigenvalues)
+                        _small_scatter(self.plots.health["negativity"], i, negativity)
+                        _small_scatter(self.plots.health["trace"], i, trace)
+                        _small_scatter(self.plots.health["negativity_before"], i, negativity_ratio)
+
 
         ## Core
         if self.show.cores:
@@ -361,7 +438,7 @@ class ITEPlots():
             for abc, tensor in unit_cell.items():
                 plot : BlockSpherePlot = self.plots.cores[abc.name]
                 norm = np.linalg.norm(tensor)
-                plot.under_text(f"Norm={norm}")
+                # plot.under_text(f"Norm={norm}")
         
         visuals.draw_now()
 

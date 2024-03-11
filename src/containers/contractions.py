@@ -21,4 +21,5 @@ class MPSOrientation:
             open_towards = main_direction,
             ordered = main_direction.orthogonal_clockwise_lattice_direction() 
         )
+    
 

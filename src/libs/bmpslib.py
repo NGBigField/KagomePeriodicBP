@@ -106,6 +106,40 @@
 #
 #                 
 #  12-Apr-2023 --- Added the add_two_MPSs function that adds two MPSs
+#
+#  23-Oct-2023 --- Made the SVD operation in left_canonical() and 
+#                  right_canonical() more resiliant to error using
+#                  try: and except:
+#
+#  27-Dec-2023 --- in update_A0_norm and right_canonical: when 
+#                  normalizing A0 using set_site then preserve its
+#                  canonical order.
+#
+#  13-Jan-2024 --- Copy the mantissa info in the copy() and reverse()
+#                  methods, and take it into account in the functions
+#                  mps_inner_product, mps_sandwitch
+#
+#  20-Jan-2024 --- 
+#  (-) Introduced the PMPS (Purification MPS) framework:
+#     1. Introduced a variable mtype that can be either 'PMPS' or 'MPS'
+#     2. Introduced a list of integers Ps to hold the local purification 
+#        dim
+#     3. Additional methods: get_P, set_P, set_mtype
+#     4. Updated the mps_shape() function to include the P dim
+#
+#
+#  (-) General methods:
+#      1. set_mps_lists, get_mps_lists (for the 3 lists self.A, 
+#         self.Corder, self.Ps)
+#      2. resize_mps
+#      3. PMPS_to_MPS
+#
+#  (-) In reduceD, enlarge the region where truncation is performed, 
+#      by including also sites with D<=maxD, but which can yet be 
+#      truncated (DL*d<DR or DL>d*DR)
+#
+#
+#  5-Mar-2024: added the method reset_nr() to the mps class
 #              
 #----------------------------------------------------------
 #
@@ -124,12 +158,6 @@ from numpy import zeros, ones, array, tensordot, sqrt, diag, dot, \
 	reshape, transpose, conj, eye, trace, floor, log10
 from sys import exit
 from copy import deepcopy
-
-
-
-
-EPSILON = 0.000001
-
 
 
 ############################ CLASS MPS #################################
@@ -155,17 +183,141 @@ class mps:
 	#
 	# --- init
 	#
+	def __init__(self,N, mtype='MPS'):
 
-	def __init__(self,N):
 
 		self.N = N
-		self.A : list[np.ndarray] = [None]*N 
 		
+		self.A = [None]*N
 		self.Corder = [None]*N  # Canonical order of each element
+		self.Ps = [1]*N
 		
 		self.nr_mantissa = 1.0
 		self.nr_exp = 0
 		
+		self.set_mtype(mtype)
+	
+	
+	#
+	# --- get_mps_lists
+	#
+	def get_mps_lists(self):
+		
+		return self.A, self.Corder, self.Ps
+	
+		
+	#
+	# --- set_mps_lists
+	#
+	def set_mps_lists(self, A=None, Corder=None, Ps=None):
+		
+		"""
+		
+		Set the 3 arrays that contain the MPS information:
+		(*) A       --- The tensors of the MPS
+		(*) Corder  --- The canonical order of each tensor
+		(*) Ps      --- The purification leg dim (for PMPS)
+		
+		Once updated, we also adjust the N (which forces all 
+		lists to have the same length)
+		
+		"""
+		
+		if A is not None:
+			self.A = A.copy()
+
+		if Corder is not None:
+			self.Corder = Corder.copy()
+			
+		if Ps is not None:
+			self.Ps = Ps.copy()
+			
+		#
+		# Now resize the MPS to have the size of A
+		#
+			
+		N = len(self.A)
+		
+		self.resize_mps(N)
+		
+
+	#
+	# --- get_Ps
+	#
+	def get_Ps(self):
+		
+		return self.Ps
+
+	#
+	# --- get_P
+	#
+	def get_P(self,i):
+		
+		return self.Ps[i]
+		
+
+	#
+	# --- set_P
+	#
+	def set_P(self,P,i):
+		
+		self.Ps[i] = P
+		
+
+
+
+	#
+	# --- resize_mps
+	#
+	def resize_mps(self, N):
+		
+		"""
+		
+		Resizes an MPS. This means that we need to change the size of the
+		3 lists: self.A, self.Corder, self.Ps
+		
+		If the lists are longer than the new N --- we just cut them at N.
+		
+		If they are shorter --- we pad them
+		
+		"""
+		
+		self.N = N
+		
+		A_len = len(self.A)
+		if  A_len > N:
+			self.A = self.A[:N]
+		else:
+			self.A = self.A + [None]*(N-A_len)
+		
+		Corder_len = len(self.Corder)
+		if  Corder_len > N:
+			self.Corder = self.Corder[:N]
+		else:
+			self.Corder = self.Corder + [None]*(N-Corder_len)
+		
+		Ps_len = len(self.Ps)
+		if  Ps_len > N:
+			self.Ps = self.Ps[:N]
+		else:
+			self.Ps = self.Ps + [1]*(N-Ps_len)
+		
+
+
+
+
+		
+	#
+	# --- set_mtype
+	#
+	
+	def set_mtype(self, mtype):
+	
+		if mtype not in ['MPS', 'PMPS']:
+			print("bmpslib error: mps object type can be either 'MPS' or 'PMPS'")
+			exit(1)
+
+		self.mtype = mtype
 		
 	#
 	# ------------ update_A0
@@ -174,7 +326,7 @@ class mps:
 	def update_A0_norm(self):
 		
 		nr_A0 = norm(self.A[0])
-		self.set_site(self.A[0]/nr_A0, 0)
+		self.set_site(self.A[0]/nr_A0, 0, self.Corder[0])
 		
 		A0_exp = fexp(nr_A0)
 		A0_mantissa = fman(nr_A0)
@@ -197,6 +349,22 @@ class mps:
 		return self.nr_mantissa * 10**self.nr_exp
 		
 
+
+	#
+	# ------------ reset_nr
+	#
+	
+	def reset_nr(self):
+		"""
+		
+		Set the overall normalization factor of the MPS to 1
+		
+		"""
+		
+		self.nr_mantissa = 1
+		self.nr_exp = 0
+		
+
 	#--------------------------   maxD   ---------------------------
 	#
 	# Returns the max bond dimension of the MPS
@@ -217,16 +385,19 @@ class mps:
 	#
 	#
 	
-	def copy(self, full:bool=False):
+	def copy(self):
 		
-		new_mps = mps(self.N)
+		new_mps = mps(self.N, self.mtype)
 		
 		new_mps.A = self.A.copy()
 		new_mps.Corder = self.Corder.copy()
+		
+		if self.mtype=='PMPS':
+			new_mps.Ps = self.Ps.copy()
+		
+		new_mps.nr_mantissa = self.nr_mantissa
+		new_mps.nr_exp = self.nr_exp
 
-		if full:
-			new_mps.nr_exp      = self.nr_exp
-			new_mps.nr_mantissa = self.nr_mantissa
 		
 		return new_mps
 		
@@ -240,7 +411,13 @@ class mps:
 	def reverse(self):
 		
 		new_mps = mps(self.N)
-
+		
+		new_mps.nr_mantissa = self.nr_mantissa
+		new_mps.nr_exp = self.nr_exp
+		
+		if self.mtype=='PMPS':
+			self.Ps.reverse()
+		
 		for i in range(self.N):
 			A = self.A[self.N-1-i]
 			
@@ -257,28 +434,7 @@ class mps:
 			new_mps.set_site(new_A, i, new_Corder)
 			
 		return new_mps
-	
-	def l2_distance(self, other:"mps") -> float:
-		"""l2_distance(A, B) -> float:
-		Where A is `self` and B is `other`:
-		Compute || <A|A> - <B|B> ||^2_2
-
-		Args:
-			self (MPS)
-			othher (MPS)
-		"""
-		# Compute:
-		conjB = True
-		overlap = mps_inner_product(self, other, conjB)
-		distance2 = 2 - 2*overlap.real
-		# Validate:
-		error_msg = f"L2 Distance should always be a real & positive value. Instead got {distance2}"
-		assert np.imag(distance2)==0, error_msg
-		if distance2<0:  # If it's a negative value.. it better be very close to zero
-			assert abs(distance2)<EPSILON , error_msg
-			return 0.0
-		# return:
-		return distance2
+		
 
 	#--------------------------  set_site   ---------------------------
 	#
@@ -321,10 +477,15 @@ class mps:
 					order_str = '< '
 				elif self.Corder[i]=='R':
 					order_str='> '
-					
-				mpshape = mpshape + ' {}A_{}({} {} {}) '.\
-					format(order_str,i,self.A[i].shape[0],self.A[i].shape[1], \
-					self.A[i].shape[2])
+				
+				DL, d, DR = self.A[i].shape[0], self.A[i].shape[1], \
+					self.A[i].shape[2]
+					 
+				if self.mtype=='PMPS':
+					P = self.Ps[i]
+					mpshape = mpshape + f" {order_str}A_{i}({DL} {d//P}*{P} {DR}) "
+				else:
+					mpshape = mpshape + f" {order_str}A_{i}({DL} {d} {DR}) "
 
 		return mpshape
 
@@ -408,8 +569,14 @@ class mps:
 			D2 = self.A[i].shape[2]
 
 			M = self.A[i].reshape(D1*d, D2)
+				
+			try:
+				U,S,V = svd(M, full_matrices=False)
+			except:
+				M = M + np.random.randn(*M.shape)*norm(M)*1e-12
+				U,S,V = svd(M, full_matrices=False)
 
-			U,S,V = svd(M, full_matrices=False)
+
 
 
 			if eps is not None:
@@ -510,7 +677,11 @@ class mps:
 				# Use SVD for truncation
 				#
 				
-				U,S,V = svd(M, full_matrices=False)
+				try:
+					U,S,V = svd(M, full_matrices=False)
+				except:
+					M = M + np.random.randn(*M.shape)*norm(M)*1e-12
+					U,S,V = svd(M, full_matrices=False)
 				
 				if nr_bulk:
 					nrS = norm(S)
@@ -578,7 +749,7 @@ class mps:
 		#
 		
 		if nr_bulk:
-			self.set_site(self.A[0]*overall_norm, 0)
+			self.set_site(self.A[0]*overall_norm, 0, self.Corder[0])
 			self.update_A0_norm()
 
 		return
@@ -653,10 +824,18 @@ class mps:
 			# first, find the sites [iD0,iD1] where we should truncate the
 			# right-side bond.
 			#
+			# A bond needs truncation if either:
+			# (1) It is larger than maxD
+			# (2) It is larger than DL*d of the left tensor to which it connects
+			# (3) It is larger than DR*d of the right tensor to which it connects
+			#
 			
 			iD0=None
 			for i in range(self.N-1):
-				if self.A[i].shape[2]>maxD:
+				if self.A[i].shape[2]>min(maxD, \
+					self.A[i].shape[0]*self.A[i].shape[1], \
+					self.A[i+1].shape[2]*self.A[i+1].shape[1]):
+						
 					iD0 = i
 					break
 
@@ -667,7 +846,10 @@ class mps:
 				return
 
 			for i in range(self.N-2, -1, -1):
-				if self.A[i].shape[2]>maxD:
+				if self.A[i].shape[2]> min(maxD, \
+					self.A[i].shape[0]*self.A[i].shape[1], \
+					self.A[i+1].shape[2]*self.A[i+1].shape[1]):
+					
 					iD1 = i
 					break
 				
@@ -723,6 +905,53 @@ class mps:
 		
 
 		return
+
+
+	#
+	# ---------------------------- PMPS_to_MPS ----------------------------
+	#
+
+	def PMPS_to_MPS(self):
+
+		if self.mtype != 'PMPS':
+			print("bmpslib.PMPS_to_MPS error: can only be used on PMPS "\
+				f"(and here mtype='{self.mtype}')")
+			exit(1)
+
+		N = self.N
+		
+		mp = mps(N)
+		
+		for i in range(N):
+			#
+			# Seperate the purifing leg from the physical leg in A[i]
+			#
+			sh = self.A[i].shape
+			A =  self.A[i].reshape([sh[0], sh[1]//self.Ps[i], self.Ps[i], sh[2]])
+
+			# Now A has the form [DL, d, P, DR], where P is the purifying leg
+
+			# Contract A[i] with its complex conjugate along the purifying leg
+			B = tensordot(A, conj(A), axes=([2],[2]))
+
+			#
+			# Now B is of the form [DL, d, DR, DL*, d*, DR*].
+			#
+			# Transpose it to [DL,DL*; d,d*; DR,DR*] and fuse the ket-bra
+			# legs to make it a ket-bra MPS
+			#
+
+			B = B.transpose([0,3,1,4,2,5])
+			sh = B.shape
+			B = B.reshape([sh[0]*sh[1], sh[2]*sh[3], sh[4]*sh[5]])
+
+			mp.set_site(B, i)
+
+		mp.nr_mantissa = abs(self.nr_mantissa**2)
+		mp.nr_exp = 2*self.nr_exp
+
+		return mp
+
 
 
 
@@ -1032,12 +1261,7 @@ class mpo:
 
 
 def fexp(f):
-	if f==0:
-		return 0
-	elif np.isinf(f):
-		raise FloatingPointError(f"f={f}")
-	else:
-		return int(floor(log10(abs(f)))) 
+    return int(floor(log10(abs(f)))) if f != 0 else 0
 
 def fman(f):
     return f/10**fexp(f)
@@ -1472,15 +1696,18 @@ def updateCRight(C, A, B, conjB=False):
 #  mps_inner_product - return the inner product <A|B>
 #
 
-def mps_inner_product(A, B, conjB=False):
+def mps_inner_product(A,B,conjB=False):
 
 	leftC = None
 
 	for i in range(A.N):
 
-		leftC = updateCLeft(leftC, A.A[i], B.A[i], conjB)
+		leftC = updateCLeft(leftC,A.A[i],B.A[i], conjB)
 
-	return leftC[0,0]
+	if conjB:
+		return leftC[0,0]*A.overall_factor()*conj(B.overall_factor())
+	else:
+		return leftC[0,0]*A.overall_factor()*B.overall_factor()
 
 # ---------------------------------------------------------
 #  mps_sandwitch - return the expression <A|O|B>
@@ -1498,7 +1725,11 @@ def mps_sandwitch(A,Op,B,conjB=False):
 		else:
 			leftCO = updateCOLeft(leftCO,A.A[i],Op.A[i],B.A[i])
 
-	return leftCO[0,0,0]
+
+	if conjB:
+		return leftCO[0,0,0]*A.overall_factor()*conj(B.overall_factor())
+	else:
+		return leftCO[0,0,0]*A.overall_factor()*B.overall_factor()
 
 
 

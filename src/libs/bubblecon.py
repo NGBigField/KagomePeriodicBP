@@ -53,13 +53,20 @@
 #   6-Feb-2023: Fixed a bug in swallow_T that appeared when swallowing
 #               a tensor T with no out legs
 #
+#   10-Nov-2023: Add the swallow_ket_T function which replaces swallow_T
+#                when T is a ket tensor.
 #
+#   14-Jan-2024: Improved code documentation in various places, as well
+#                as error & info messages. No actual change to the code.
+#
+#   14-Jan-2024: Removed the opt='low' functionality from bubblecon, 
+#                since it was never really used and did not give any 
+#                advantage. Accordingly, removed the tensor_to_MPS_SVD 
+#                function.
 #
 #   ===================================================================
 #
 #
-#
-
 
 import numpy as np
 import scipy as sp
@@ -67,13 +74,14 @@ import scipy as sp
 from scipy.linalg import sqrtm, polar, expm
 
 from numpy.linalg import norm
-from numpy import sqrt, tensordot, array, eye, zeros, ones, pi, conj
+from numpy import sqrt, tensordot, array, eye, zeros, ones, pi, conj, trace
 
 from libs import bmpslib
 
 from utils.prints import ProgressBar
 
 from _error_types import BubbleConError
+
 
 #
 # --------------------------- fuse_tensor  -----------------------------
@@ -159,128 +167,6 @@ def id_tensor(D_left, D_mid, D_right):
 	T = T.reshape([D_left, D_mid, D_right])
 
 	return T
-
-
-
-
-
-#
-# ----------------------- tensor_to_MPS_SVD --------------------------------
-#
-
-	"""
-
-	Takes a general tensor of shape [i_0, i_1, ...., i_{n-1}] and turns
-	it into an MPS with physical legs of dimensions [i_0, i_1, ...., i_{n-1}]
-	that correspond to the original tensor using a series of SVDs.
-
-	The resulting MPS is left canonical, and is also optionally truncated
-	by a maximal bond dimension D_trunc, or a minimal eigenvalue eps.
-
-
-	Parameters:
-	--------------
-
-	T       --- a general tensor of shape [i_0, ..., i_{n-1}]
-
-	D_trunc --- An optional maximal bond-dimension for truncation. If
-	            specified, the SVD decompositions use only the maximal
-	            D_trunc singular values, which results in an MPS with
-	            maximal bond dimension D_trunc
-
-	eps     --- An optional truncation by minimal SVD singular value. If
-	            specified, the SVD decomp' use only singular values > eps.
-
-	Returns:
-	----------
-	An MPS object
-
-	"""
-
-
-def tensor_to_MPS_SVD(T, D_trunc=None, eps=None):
-
-		N = len(T.shape)   # How many legs our MPS will have
-
-		if N==0:
-			#
-			# No legs - so return a trivial MPS with one tensor of the
-			# shape [1,1,1] whose value is 1
-			#
-			mp = bmpslib.mps(1)
-			mp.set_site(ones([1,1,1]), 0)
-			return mp
-
-		#
-		# The shape of the resulting MPS. The two extra [1] [1] legs
-		# are just for having all tensors have 3 legs.
-		#
-		shape = [1]+list(T.shape)+[1]
-
-		if N==1:
-			#
-			# If T has 1 leg, then return an MPS with one leg
-			#
-			mp = bmpslib.mps(1)
-			mp.A[0] = T.reshape(shape)
-			return mp
-
-		#
-		# Create the output MPS
-		#
-		mp = bmpslib.mps(N)
-
-		#
-		# Transform the tensor to a vector-like row, and start "chopping"
-		# the MPS matrices from it, going from left to right.
-		#
-		T = T.reshape(1,-1)
-
-		for i in range(N-1):
-				DL = T.shape[0]
-				T = T.reshape(DL*shape[i+1],-1)
-				[U,s,V] = np.linalg.svd(T,full_matrices=False)
-
-				#
-				# Truncate the smallest singular values below eps
-				#
-				if eps is not None:
-					cutoff = s[0]*eps
-					s_eff = s[s>cutoff]
-				else:
-					s_eff = s
-
-				#
-				# Truncate the remaining singular values after the first
-				# D_trunc largest ones.
-				#
-				if D_trunc is None:
-					DR = len(s_eff)
-				else:
-					DR = min(len(s_eff),D_trunc)
-
-				s_eff=s_eff[:DR]
-				U=U[:,:DR]
-				V=V[:DR,:]
-				s=np.diag(s_eff)
-
-				#
-				# A_i is the truncated unitary U (an isometry). This ensures
-				# that we are left canonical.
-				#
-				mp.set_site(U.reshape(DL,shape[i+1],DR), i)
-
-				#
-				# Absorb the singular values in V and proceed to the next step.
-				#
-				T = s@V
-
-		mp.set_site(T.reshape(DR,shape[N],1), N-1)  #type: ignore
-
-		return mp
-
-
-
 
 
 
@@ -551,6 +437,466 @@ def fuse_MPS_legs(mp, legs_subsets_list, i0):
 
 
 
+
+#
+# ---------------------------- swallow_ket_T ----------------------------
+#
+
+def swallow_ket_T(mp, ket_T, i0, i1, in_legs, out_legs, \
+	D_trunc=None, eps=None):
+
+	"""
+
+	Contracts a ket tensor with an MPS, and turns the resulting TN back into
+	an MPS. This way, the tensor is "swallowed" by the MPS.
+	
+	This function is equivalent to swallow_T only that here T is a ket 
+	tensor instead of a ket-bra tensor. It is useful when T has a large
+	bond dimension D, and so contracting first the ket to the MPS and 
+	only then the bra is much more efficient (memory and complexity) than
+	first contracting the ket-bra and then swallowing the combined tensor.
+
+	The tensor has to be contracted with a *contiguous* segment of
+	physical legs in the MPS
+
+	NOTE: calculation is done directly on the input MPS. So there is no
+	      need for output MPS
+
+	Input parameters:
+	------------------
+
+	mp --- The MPS (given as an MPS object from bmpslib.py).
+
+	       This MPS also holds the resultant merged MPS.
+
+	ket_T --- The ket tensor to be swallowed. We assume that its first
+	          leg is the physical leg
+
+	i0, i1 --- Specify the contiguous segment of physical legs in the MPS
+	           to be contracted with T. This includes all legs
+	           i0,i0+1,..., i1
+
+	in_legs --- the indices of the input legs in T to be contracted with
+	            the MPS. The order here matters, as it has correspond to
+	            the order of the legs in [i0,i1]. The dimension of each
+	            input leg must be equal to the dimension of the
+	            corresponding physical in the MPS. 
+
+	out_legs --- the indices of the output legs in T, ordered in the way
+	             they will appear in the output MPS. (this list can be
+	             empty)
+
+  NOTE: The indices inside in_legs and out_legs are defined as if 
+        we're in the regular swallow_T case, and there is no physical
+        leg. So if in_legs = [0,2,3], this means that we actually
+        refer to legs [1,3,4] in the ket_tensor T.
+
+	OUTPUT:    NONE
+	---------------
+"""
+
+	log = False
+	#
+	# Number of legs in the ket tensor that we swallow. 
+	#
+	# Note, we expect: n_legs = n_in_legs + n_out_legs + 1
+	#
+	
+	n_legs = len(ket_T.shape)   # no. of legs, including the physical leg.
+	n_in_legs = len(in_legs)    # no. of in legs
+	n_out_legs = len(out_legs)  # no. of out legs
+	
+	#
+	# ===================================================================
+	# STEP 1: prepare T for swallowing. 
+	#         (*) Move the phys ket leg to the end of the tensor
+	#         (*) Premute the tensor legs according to in_legs, out_legs
+	#         (*) Fuse all the out legs (including the phys leg, which 
+	#             is the last)
+	# ===================================================================
+	#
+	
+	#
+	# First, move the physical leg to the end of the tensor and add it 
+	# to the out legs list
+	#
+	
+	T = ket_T.transpose(list(range(1,n_legs)) + [0])
+	
+	out_legs = out_legs + [n_legs-1] # the physical leg is now the last leg
+	
+
+	#
+	# Permute T indices so that their order matches in_legs, out_legs
+	#
+
+	if log:
+		print("\n\n")
+		print("Entring swallow_ket_T with D_trunc={}".format(D_trunc))
+		print("=======================================\n\n")
+
+		print(f"T has {len(T.shape)} legs: 1 physical + {len(in_legs)} "\
+			f"input + {len(out_legs)} output. MPS swallowing range: "\
+			f" i0={i0}  i1={i1}")
+		inl = [T.shape[i] for i in in_legs]
+		outl = [T.shape[i] for i in out_legs]
+		print("Dims in-ket-legs: ", inl, "   Dims of out-ket-legs: ", outl )
+		
+		print("in ket legs: ", in_legs)
+		print("out ket legs: ", out_legs)
+		
+		print(f"Permuting to: {in_legs + out_legs} (last is the phys leg)")
+
+	T0 = T.transpose(in_legs+out_legs)
+
+	#
+	# Save a copy of the current bra tensor, which will be used later.
+	#
+	
+	bra_T0 = conj(T0) 
+
+	#
+	# The dims of the out legs of T0 (including the last one, which is the
+	# physical leg)
+	#
+
+	out_legs_shape = list(T0.shape[len(in_legs):])
+	 
+	#
+	# Fuse all ket out-legs together 
+	#
+
+	D_out = np.prod(out_legs_shape)
+	T0 = T0.reshape(list(T0.shape[:len(in_legs)])+[D_out])
+	
+	#
+	# T0 is now of the following form:
+	# 0, 1, 2, n_in_legs-1 --- the in-ket legs
+	# n_in_legs            --- the fused out legs (including the phys leg)
+	#
+	
+	
+	
+	#
+	# 1. Start with the left-most tensor in the MPS segment. Seperate its
+	#    mid leg to a ket and a bra.
+	#
+
+	sh = mp.A[i0].shape
+	mpsT = mp.A[i0].reshape([sh[0], T0.shape[0], T0.shape[0], sh[2]])
+		
+
+	#
+	# ===================================================================
+	# STEP 2: Contract T0 with the first MPS tensor along its ket leg
+	# ===================================================================
+	#
+	
+	A = tensordot(mpsT, T0, axes=([1], [0]))
+	
+	#
+	# Transpose the legs of A to this order:
+	#
+	# 1. MPS left-leg
+	# 2. MPS right-leg
+	# 3. Remaining legs of T
+	# 4. Out-leg 
+	# 5. bra MPS leg
+	#
+	
+	A = A.transpose([0,2] + list(range(3, 3+n_in_legs)) + [1])
+	
+	#
+	# ===================================================================
+	# STEP 3: Loop over the rest of the MPS tensors and contract their
+	#         ket part to the ket part of T0 (which is now part of A)
+	#      
+	# ===================================================================
+	#
+		
+	k = len(A.shape)
+	
+	for i in range(i0+1, i1+1):
+		
+		#
+		# separate the to ket-bra the mid leg of the MPS. The dim of each
+		# ket/bra should be the dim of the corresponding leg in A --- leg
+		# no. 2
+		#
+		sh = mp.A[i].shape
+		
+		mpsT = mp.A[i].reshape([sh[0], A.shape[2], A.shape[2], sh[2]])
+		
+		#
+		# contract it to A along the left leg and the ket leg 
+		#
+		A = tensordot(mpsT, A, axes=([0,1], [1,2]))
+		
+		#
+		# Transpose A to the following order:
+		# 1. MPS left-leg
+		# 2. MPS right-leg
+		# 3. Remaining legs of T
+		# 4. Fused-out-legs
+		# 5. Previous bra legs
+		# 6. This MPS bra leg
+				
+		A = A.transpose([2,1] + list(range(3, k)) + [0])
+		
+
+	#
+	# ===================================================================
+	# STEP 4: To the resulting contraction of the MPS and the ket-T
+	#         contract now the bra-T. After that unfuse the ket-out
+	#         legs and refuse them with their corresponding bra legs
+	# ===================================================================
+	#
+	
+	#
+	# At this point all the MPS tensors were contracted to T and formed
+	# one huge tensor of the following structure:
+	# 0.   MPS left-leg
+	# 1.   MPS right-leg
+	# 2.   Fused out-legs of T (including phy leg)
+	# 3... bra legs of the MPS (according to their original order)
+	#
+	# We now need to contract the bra legs with the bra tensor conj(T0)
+	#
+	
+	A = tensordot(A, bra_T0, \
+		axes=(list(range(3, 3+n_in_legs)), list(range(n_in_legs))))
+	
+	#
+	# Shape of resultant A:
+	# 0. MPS left-leg
+	# 1. MPS right-leg
+	# 2. Fused ket out legs of T (including ket phy leg)
+	# 3. Unfused bra out legs of T (including bra phy leg)
+	#
+	
+	#
+	# Unfuse the out legs (both ket and bra)
+	#
+	
+	sh = A.shape
+	A = A.reshape([sh[0], sh[1]] + out_legs_shape + out_legs_shape)
+	
+	
+	#
+	# Shape of A:
+	# ============
+	#
+	# 0                             --- MPS left-leg
+	# 1                             --- MPS right-leg
+	# 2 -> 1+n_out_legs             --- ket out legs
+	# 2+n_out_legs                  --- ket phys leg 
+	# 3+n_out_legs-> 2+2*n_out_legs --- bra out legs
+	# 3+2*n_out_legs                --- bra phys leg
+	#
+	
+	#
+	# Contract the phys ket leg to the phys bra leg
+	#
+	
+	A = trace(A, axis1=2+n_out_legs, axis2=3+2*n_out_legs)
+
+	#
+	# Shape of A:
+	# ============
+	#
+	# 0                             --- MPS left-leg
+	# 1                             --- MPS right-leg
+	# 2 -> 1+n_out_legs             --- ket out legs
+	# 2+n_out_legs-> 1+2*n_out_legs --- bra out legs
+	#
+		
+	#
+	# Now move each out bra leg next to its out ket leg, and fust them
+	# together
+	#
+	
+	perm = [0,1]
+	
+	sh = A.shape
+	new_sh = [sh[0], sh[1]]
+	
+	for i in range(n_out_legs):
+		perm = perm + [2+i, 2+n_out_legs+i]
+		new_sh.append(out_legs_shape[i]**2)
+		
+	
+	A = A.transpose(perm)
+	A = A.reshape(new_sh)
+
+	#
+	# Shape of A:
+	# ============
+	#
+	# 0                             --- MPS left-leg
+	# 1                             --- MPS right-leg
+	# 2 -> 1+n_out_legs             --- ket-bra out legs
+	#
+	
+	#
+	# Move the MPS right-leg to the end of the tensor
+	#
+	
+	perm = [0] + list(range(2, 2+n_out_legs)) + [1]
+	
+	A = A.transpose(perm)
+
+
+	#
+	# ================================================================
+	#  STEP 5:  Reshape the resulting tensor into an MPS using the
+	#           tensor_to_mps function
+	# ================================================================
+	#
+
+
+	if n_out_legs==0:
+		#
+		# If there are no out-legs then A has just two legs --- one to
+		# the left and one to the right. We can therefore absorb it
+		# in either the MPS tensor to its left or the MPS tensor to its
+		# right. Its better to absorb it into the MPS tensor with the
+		# highest D so that the new MPS tensor will have a smaller D.
+		#
+
+		if log:
+			print("T has no out-legs so A has only two leg! shape: ", A.shape)
+
+		if i0==0 and i1==mp.N-1:
+
+			# In such case A is just a scalar shaped as a tensor[1,1]
+		  # In this case, we create an MPS with a single trivial tensor
+		  # of the shape [1,1,1]
+
+		  mp.A = [A.reshape([1,1,1])]
+		  mp.Corder=[None]
+		  mp.N = 1
+		  return
+
+		#
+		# Explicitly handle the two edge cases when i0=0 or i1=N-1
+		#
+		if i0==0:
+			mp.A = mp.A[i1+1:]
+			mp.Corder=mp.Corder[i1+1:]
+			mp.N = len(mp.A)
+			mp.set_site(tensordot(A, mp.A[0], axes=([1],[0])), 0)
+			return
+
+		if i1==mp.N-1:
+			mp.A = mp.A[:i0]
+			mp.Corder = mp.Corder[:i0]
+			mp.N = len(mp.A)
+			mp.set_site(tensordot(mp.A[-1], A, axes=([2],[0])), -1)
+			return
+
+		#
+		# So its a regular case in the bulk. Then absorb A along the leg
+		# with the largest bond dimension.
+		#
+
+		mp.A = mp.A[:i0] + mp.A[i1+1:]
+		mp.Corder = mp.Corder[:i0] + mp.Corder[i1+1:]
+		
+		mp.N = len(mp.A)
+		
+		if A.shape[0]<A.shape[1]:
+			#
+			# Absorb to the right
+			#
+			mp.set_site(tensordot(A, mp.A[i0], axes=([1],[0])), i0)
+		else:
+			#
+			# Absorb to the left
+			#
+			mp.set_site(tensordot(mp.A[i0-1], A, axes=([2],[0])), i0-1)
+
+		return
+
+	#
+	# If there are out_legs, then we can turn A into a small MPS and
+	# then combine it with the main MPS.
+	#
+
+	if D_trunc is None:
+		A_mp = tensor_to_MPS_ID(A)
+	else:
+		A_mp = tensor_to_MPS_SVD(A, D_trunc, eps)
+
+	#
+	# The left-most and right-most legs of A_mp are of 
+	# dimension 1, and the left most and right most physical legs are 
+	# of the dimension of the left/right indices of A (which is the 
+	# contraction of T and the MPS segment). So we need to 'chop off'
+	# the left-most and right-most matrices in the sub-MPS, by absorbing
+	# them into the MPS matrices next to them. This way, the resultant 
+	# MPS will have two OPEN legs to the left/right with the right 
+	# dimensionality.
+	
+	if log:
+		print("Orig A_mp shape: ", A_mp.mps_shape())
+
+	#
+	# Absorb the left-most matrix A_0. Recal that it is of the form
+	# [1,D_L, D]. So turn it into a matrix [D_L, D] and abosorb it
+	# into A_1, so that A_1 will be of the form [D_L, XXX, XXX]
+	#
+	AL = A_mp.A[0]
+	AL = AL.reshape(AL.shape[1], AL.shape[2])  
+	A_mp.set_site(tensordot(AL, A_mp.A[1], axes=([1],[0])), 1)
+
+	#
+	# Absorb the right-most matrix A_{N-1}. Recal that it is of the form
+	# [D, D_R, 1]. So turn it into a matrix [D,D_R] and abosorb it
+	# into A_{N-2}, so that A_{N-2} will be of the form [XXX,XXX,D_R]
+	#
+	AR = A_mp.A[A_mp.N-1]
+	AR = AR.reshape(AR.shape[0], AR.shape[1])
+	A_mp.set_site(tensordot(A_mp.A[A_mp.N-2], AR, axes=([2],[0])), A_mp.N-2)
+
+
+	A_mp.A = A_mp.A[1:(A_mp.N-1)]
+	A_mp.Corder = A_mp.Corder[1:(A_mp.N-1)]
+	A_mp.N -= 2
+
+	if log:
+		print("New A_mp shape: ", A_mp.mps_shape())
+
+
+
+	#
+	# ================================================================
+	#  STEP 3:  Merge the two MPSs into one
+	# ================================================================
+	#
+
+
+	#
+	# Merge mp_A into mp
+	#
+
+	if log:
+		print("\n\n")
+		print("Merging:")
+		print("Original mp shape: ", mp.mps_shape())
+
+	mp.A = mp.A[0:i0]+A_mp.A + mp.A[i1+1:]
+	mp.Corder = mp.Corder[0:i0]+A_mp.Corder + mp.Corder[i1+1:]
+
+	mp.N = mp.N - n_in_legs + n_out_legs
+
+	if log:
+		print("New mp shape: ", mp.mps_shape())
+
+
+
+
+
+
 #
 # ---------------------------- swallow_T ----------------------------
 #
@@ -605,7 +951,9 @@ def swallow_T(mp, T, i0, i1, in_legs, out_legs, D_trunc=None, eps=None):
 	#  STEP 1:  Turn the MPS segment that participates in the 
 	#           contraction into a matrix. Do the same for the tensor we
 	#           swallow. Then contract them using the regular matrix
-	#           multiplication of numpy.
+	#           multiplication of numpy (when the dimension over which
+	#           we contract is not too large. Otherwise, we contract
+	#           a group of legs by a group of legs).
 	# ================================================================
 	#
 
@@ -838,12 +1186,13 @@ def swallow_T(mp, T, i0, i1, in_legs, out_legs, D_trunc=None, eps=None):
 		if i0==0 and i1==mp.N-1:
 
 			# In such case A is just a scalar shaped as a tensor[1,1]
-			# In this case, we create an MPS with a single trivial tensor
-			# of the shape [1,1,1]
-			mp.A = [A.reshape([1,1,1])]
-			mp.Corder=[None]
-			mp.N = 1
-			return
+		  # In this case, we create an MPS with a single trivial tensor
+		  # of the shape [1,1,1]
+
+		  mp.A = [A.reshape([1,1,1])]
+		  mp.Corder=[None]
+		  mp.N = 1
+		  return
 
 		#
 		# Explicitly handle the two edge cases when i0=0 or i1=N-1
@@ -1043,16 +1392,7 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 	        greater than or equal to eps. If omitted, all singular values
 	        are taken.
 	        
-	opt	---	Optimization level. There are currently two levels, 'high' 
-					(default) and 'low'. In the 'high' level, a tensor is swallowed
-					*exactly* to the boundary-MPS using the ID-tensor mechanism
-					(function tensor_to_MPS_ID --- see arXiv:2101.04125). After 
-					that, the new boundary MPS is truncated optimally.
-					
-					In the 'low' optimization, the new tensor is swallowed using
-					the SVD method, which truncates it locally. The resultant new
-					boundary MPS is not optimized. This way the optimization is 
-					more local, and possibly faster (but clearly less optimal).
+	opt	---	Optimization level. Disabled. Only accepts opt='high'
 					
 					
 	break_points --- An optional list of steps *after* which a copy of the
@@ -1105,9 +1445,8 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 
 	log=False  # Whether or not to print debuging messages
 	
-	if opt not in ['high', 'low']:
-		print("mps_swallower error: opt parameter should be set to either"\
-		" 'low' or 'high'")
+	if opt != 'high':
+		print("bubblecon error: opt parameter can only be set to 'high'")
 		exit(1)
 
 	n=len(T_list)  # How many vertices are in the TN
@@ -1120,10 +1459,10 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 		ket_tensors = [False]*n
 	
 	#
-	# First, create a dictonary that tells the vertices of each edge
-	# For positive (internal) edge, the value of the dictonary is (i,j), 
-	# where i,j are the vertices connected by it. For negative edges
-	# its (i,i).
+	# First, create a dictonary in which the edges are the keys and their
+	# pair of veritces is the value. For internal edges, the value of the 
+	# dictonary is (i,j), where i,j are the vertices connected by it. 
+	# For negative edges it is (i,i).
 	#
 	
 	vertices = {}
@@ -1140,19 +1479,19 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 				
 				
 	if log:
-		print("vertices of edges:")
+		print("\n\n\n\nvertices of dictionary:")
 		print(vertices)
 
-		
 	root_id = swallow_order[0]
 
 	if log:
+		print("\n")
 		print("root_id is ", root_id)
+		print("\n")
 
 	#
-	# Transpose the indices of T[root_id] so that -1 is the first index
-	# (the most left) and all other vertices are arranged according to
-	# their angles with respect to it in a clockwise fashion.
+	# Transpose the indices of T[root_id] according to their relative
+	# angle with the bubble swallowing angle in a clockwise fashion.
 	#
 
 	root_angles = array(angles_list[root_id])
@@ -1188,7 +1527,7 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 	sorted_angles, permutation, sorted_edges = zip(*L)
 
 	if log:
-		print("permutation: ", permutation)
+		print("root tensor permutation: ", permutation)
 		print("sorted angles: ", sorted_angles)
 		print("sorted edges: ", sorted_edges)
 
@@ -1205,24 +1544,18 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 			print("root tensor is ket. Turning it into ket-bra")
 			
 		T_root = fuse_tensor(T_list[root_id])
-		
-		if log:
-			print("=> done.")
-		
+				
 	T_root = T_root.transpose(permutation)
 
 	#
 	# Turn the root tensor it into an MPS
 	#
 
-	if opt=='high':
-		mp = tensor_to_MPS_ID(T_root)
-		
-		if D_trunc2 is None and D_trunc is not None:
-			mp.reduceD(D_trunc, eps, nr_bulk=True)
+	mp = tensor_to_MPS_ID(T_root)
+	
+	if D_trunc2 is None and D_trunc is not None:
+		mp.reduceD(D_trunc, eps, nr_bulk=True)
 			
-	else:
-		mp = tensor_to_MPS_SVD(T_root, D_trunc, eps)
 		
 	#
 	# Define the swallowed_veritces set 
@@ -1230,9 +1563,8 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 
 	swallowed_vertices = {root_id}
 
-
 	#
-	# Define the mp_edges_list which bookeep the edge of every leg 
+	# Define the mp_edges_list which bookkeeps the edge of every leg 
 	# in the MPS. It is used to know which legs of the MPS should be 
 	# contracted with the swallen tensor
 	#
@@ -1253,13 +1585,14 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 	more_tensors_to_swallow = True
 
 	#
-	# l is an index pointing to the vertex we want to swallow on the
-	# swallow_order list (when it is given)
+	# l is a running index on the swallow_order list, which points to the
+	# vertex we just swallowed.
 	#
 	
 	l=0
 	
 	mp_list = []
+
 
 	if progress_bar:
 		prog_bar = ProgressBar(len(swallow_order)-mp.N, "buublecon contracting: " )
@@ -1284,6 +1617,10 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 		
 		
 
+		# 
+		# Now go to swallow the next vertex
+		#
+		
 		l += 1
 		v = swallow_order[l]
 
@@ -1321,20 +1658,25 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 		k = len(v_edges)
 
 		if log:
-			print("The edges of {} are: {}".format(v, v_edges))
+			print(f"The edges  of {v} are: {v_edges}")
+			print(f"The angles of {v} are: {v_angles}")
 
 		#
-		# First, find (i0,i1). We do that by creating the v_mps_legs, which
-		# is a list of all the locations of the legs in the MPS that point
-		# to v
+		# First, find (i0,i1). We do that by creating the v_mps_legs list.
+		# It is made of taples of the form (i,e), where:
+		#
+		# (*) i = the index of an MPS leg that points to v
+		# (*) e = the edge in v along which it is connected.
+		#
+		# By construction, the list is sortted by the index i.
 		#
 		
 		v_mps_legs = [(i,e) for (i,e) in enumerate(mp_edges_list) \
 			if v in vertices[e]]
 			
 		if not v_mps_legs:
-			print("Error: could not swallow vertex {} because there are no "\
-				"MPS legs that are connected to it.".format(v))
+			print(f"bubblecon error: could not swallow vertex {v} because "\
+				"there are no MPS legs that are connected to it.")
 			print("Current mps legs are: ", mp_edges_list)
 			exit(1)
 			
@@ -1342,7 +1684,7 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 		i1 = v_mps_legs[-1][0]
 		
 		if log:
-			print("Found i0={}  i1={}".format(i0,i1))
+			print(f"Swallowing tensor {v} into MPS legs range {i0} ==> {i1}")
 
 		#
 		# Use v_mps_legs to find in_legs --- the locations of the legs in
@@ -1356,23 +1698,21 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 			print("in-legs: ", in_legs)
 			
 		if len(in_legs) != i1-i0+1:
-			raise BubbleConError("Error while trying to swallow vertex {}: the [i0,i1] range in the MPS (i0={}, i1={}), does" \
-			" not match the number in-legs={}. Perhaps it is not contiguous".format(\
-			v,i0,i1,len(in_legs)))
-			
-			
+			print(f"bubblecon error: while trying to swallow vertex {v}: " \
+				f"the [i0={i0},i1={i1}] range in the MPS does" \
+			" not match the number in-legs={len(in_legs)}. Perhaps it is "\
+			"not contiguous")
+			exit(1)
 		
 		#
-		# Define out_legs as the complement of in_legs and then sort these
-		# legs according to their angle (if there are any).
-		# The angle is calculated with respect to the first leg in in_legs
+		# Define out_legs as the complement set of in_legs, and then sort 
+		# these legs (if there are any) according to their angle. The 
+		# angle is calculated with respect to the first leg in in_legs
 		# (any other in leg there would also be fine)
 		#
 
 		out_legs1 = list( set(range(k)) - set(in_legs) )
-		#
-		#
-
+		
 		if len(out_legs1)>1:
 			rotated_v_angles = (v_angles[in_legs[0]]*ones(k) - v_angles + 2*pi) % (2*pi)
 
@@ -1396,70 +1736,54 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 		
 		tensor_to_swallow = T_list[v]
 		
-		if ket_tensors[v]:
-			
-			if log:
-				print(f"Tensor {v} is ket. Turning it into ket-bra")
-
-			tensor_to_swallow = fuse_tensor(T_list[v])
-			
-			if log:
-				print("=> done.")
-			
 		
-		
-		if opt=='high':
-			#
-			# Here we pass D_trunc=None and eps=None to the swallow_T routine
-			# (simply by omitting them) so that the swallowing is exact. 
-			# Truncation is done later on the *entire* boundary-MPS
-			#
+		#
+		# Here we pass D_trunc=None and eps=None to the swallow_T routine
+		# (simply by omitting them) so that the swallowing is exact. 
+		# Truncation is done later on the *entire* boundary-MPS
+		#
 
-			if D_trunc2 is not None:
+		if log:
+			print("")
+			print("Swallowing the tensor into the MPS\n ")
+
+
+		if D_trunc2 is not None:
+
+			
+			max_D = max_bond(mp, tensor_to_swallow, i0, i1, out_legs)
+			if max_D>D_trunc2 and D_trunc is not None:
 				
-				max_D = max_bond(mp, tensor_to_swallow, i0, i1, out_legs)
-				if max_D>D_trunc2 and D_trunc is not None:
-					
-					if log:
-						print("\n")
-						print(" ====> Truncating bond dimension to {}  <====\n\n".format(D_trunc))
-						
-					mp.reduceD(D_trunc, eps, nr_bulk=True)
-					
-			if log:
-				print("")
-				print("Swallowing the tensor into the MPS ")
-				
-			swallow_T(mp, tensor_to_swallow, i0, i1, in_legs, out_legs)
-			
-			if log:
-				print("=> done.")
-				print("")
-			
-			
-			
-			if D_trunc2 is None and D_trunc is not None:
 				if log:
-					print("Performing reduceD")
+					print("\n")
+					print(f" ====> max_bond > D_trunc2={D_trunc2}. Truncating "
+						"it to D_trunc={D_trunc}  <====\n\n")
 					
 				mp.reduceD(D_trunc, eps, nr_bulk=True)
 				
-				if log:
-					print("=> done.")
-					print("")
-				
-				
+			
+			
+		if ket_tensors[v]:
+			swallow_ket_T(mp, tensor_to_swallow, i0, i1, in_legs, out_legs)
 		else:
-			
+			swallow_T(mp, tensor_to_swallow, i0, i1, in_legs, out_legs)
+		
+		if log:
+			print("=> done.")
+			print("")
+		
+		
+		
+		if D_trunc2 is None and D_trunc is not None:
 			if log:
-				print("")
-				print("Swallowing the tensor into the MPS ")
-			
-			swallow_T(mp, tensor_to_swallow, i0, i1, in_legs, out_legs, D_trunc, eps)
+				print("Performing reduceD")
+				
+			mp.reduceD(D_trunc, eps, nr_bulk=True)
 			
 			if log:
 				print("=> done.")
 				print("")
+				
 
 		if log:
 			print("new MPS shape: ", mp.mps_shape())
@@ -1479,7 +1803,7 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 		mp_edges_list = mp_edges_list[:i0] + v_out_edges_list \
 			+ mp_edges_list[(i1+1):]
 			
-	
+			
 	prog_bar.clear()
 
 
@@ -1521,6 +1845,7 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 		
 
 	return mp
+
 
 
 

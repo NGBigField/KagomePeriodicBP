@@ -18,7 +18,7 @@ from containers import Config
 
 # Import other needed types:
 from enums import UpdateMode, NodeFunctionality
-from containers import MessageDictType, UpdateEdge
+from containers import Message, MessageDictType, UpdateEdge
 from tensor_networks import KagomeTN, CoreTN, ModeTN, EdgeTN, TensorNode, UnitCell
 from tensor_networks.construction import kagome_tn_from_unit_cell
 from _error_types import BPNotConvergedError, ITEError
@@ -74,7 +74,7 @@ def _initial_full_ite_inputs(config:Config, unit_cell:UnitCell, logger:logs.Logg
     
 
 
-def _fix_config_if_bp_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger):
+def _harden_bp_config_if_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger) -> Config:
     if bp_stats.attempts>1: 
         config.bp.max_swallowing_dim = bp_stats.final_config.max_swallowing_dim
         logger.debug(f"        config.bp.max_swallowing_dim updated to {config.bp.max_swallowing_dim}")
@@ -89,7 +89,8 @@ def _calculate_crnt_observables(
 )->tuple[
     dict[tuple[str, str], float],
     dict[str, dict[str, float]],
-    float
+    float,
+    MessageDictType
 ]:
     ## Unpack inputs:
     if segment_stats is None:
@@ -101,10 +102,12 @@ def _calculate_crnt_observables(
 
     ## Get a new fresh tn:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
-    messages, _ = belief_propagation(full_tn, messages, bp_config, live_plots, allow_prog_bar)
+    messages, _ = robust_belief_propagation(full_tn, messages, bp_config, live_plots, allow_prog_bar)
 
     ## Calculate observables:
-    return measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
+    energies, expectations, mean_energy = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
+
+    return energies, expectations, mean_energy, messages
 
 
 def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:logs.Logger, ite_tracker:ITEProgressTracker, plots:ITEPlots)->None:
@@ -117,7 +120,7 @@ def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:
     logger.info("Calculating measurements of initial core...")
 
     ## Calculate observables:
-    energies, expectations, mean_energy = _calculate_crnt_observables(unit_cell, config, messages, None)
+    energies, expectations, mean_energy, messages = _calculate_crnt_observables(unit_cell, config, messages, None)
 
     ## Save data, print performance and plot graphs:
     ite_tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
@@ -205,7 +208,7 @@ def _from_unit_cell_to_stable_mode(
     print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
 
     # If block-bp struggled and increased the virtual dimension, the following iterations must also use a higher dimension:
-    config = _fix_config_if_bp_struggled(config, bp_stats, logger)
+    config = _harden_bp_config_if_struggled(config, bp_stats, logger)
 
     ## Contract to mode:
     mode_tn = reduce_tn(full_tn, ModeTN, trunc_dim=config.trunc_dim, mode=mode)
@@ -216,7 +219,6 @@ def get_imaginary_time_evolution_operator(h:np.ndarray, delta_t:float)->tuple[np
     # h = ite_config.interaction_hamiltonian
     g = ite.g_from_exp_h(h, delta_t)
     return h, g
-
 
 
 ## ==== Main ITE Functions ==== ##
@@ -236,11 +238,12 @@ def ite_per_mode(
     ITEPerModeStats         # Stats
 ]:
 
-    mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
-
     ## for each edge in the mode, update the tensors
     edge_tuples = list(UpdateEdge.all_in_random_order())
     edge_energies = []
+
+    ## prepare statistics and health for debugging:
+    stats = ITEPerModeStats()
 
     prog_bar = get_progress_bar(config, len(edge_tuples), "Executing ITE per-mode:")
     for is_first, is_last, edge_tuple in lists.iterate_with_edge_indicators(edge_tuples):
@@ -249,30 +252,35 @@ def ite_per_mode(
         if config.visuals.live_plots:
             visuals.refresh()
 
-        if config.ite.bp_every_edge and not is_last and not is_first:
+        if config.ite.bp_every_edge or is_first:
+            # Perform BlockBP again, to get converged messages.
             mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
+        else:
+            # Just update the tensors 
+            mode_tn.update_unit_cell_tensors(unit_cell)
 
         edge_tn = reduce_tn(mode_tn, EdgeTN, trunc_dim=config.trunc_dim, edge_tuple=edge_tuple)
 
         # Perform ITE update:
         unit_cell, energy, env_metrics = update_unit_cell(edge_tn, unit_cell, config.ite, delta_t, logger)
-        edge_energies.append(energy)
 
-        # Update mode_tn:
-        mode_tn.update_unit_cell_tensors(unit_cell)
+        # keep stats:
+        edge_energies.append(energy)
+        stats.env_metrics.append(env_metrics)
+
+        ## inputs for next iteration:
+        config.bp = bp_stats.final_config
+
     prog_bar.clear()
 
-    ## Return results and statistics:
-    stats = ITEPerModeStats()
     stats.bp_stats = bp_stats
-    stats.env_metrics = env_metrics
 
     return unit_cell, messages, edge_energies, stats
 
 
 @decorators.add_stats()
-@decorators.multiple_tries(3)
-def ite_segment(
+# @decorators.multiple_tries(3)
+def ite_per_segment(
     unit_cell:UnitCell,
     messages:MessageDictType|None,
     delta_t:float,
@@ -324,12 +332,14 @@ def ite_segment(
             )
         except BPNotConvergedError as e:
             prog_bar.clear()
-            logger.warn(errors.get_traceback(e))
+            # logger.warn(errors.get_traceback(e))
             raise ITEError(*e.args)
+        
         ## Track results:
         stats.ite_per_mode_stats.append(ite_per_mode_stats)
-        logger.debug(f"        Hermicity of environment={ite_per_mode_stats.env_metrics.hermicity!r}")
-        logger.debug(f"        Edge-Energies={edge_energies!r}")
+        logger.debug(f"        Hermicity of environment={[metric.hermicity for metric in ite_per_mode_stats.env_metrics]!r}")
+        logger.debug(f"        Edge-Energies={np.real(edge_energies).tolist()!r}")
+
         ## inputs for next iteration:
         config.bp = ite_per_mode_stats.bp_stats.final_config
 
@@ -353,39 +363,48 @@ def ite_per_delta_t(
     config = config_in.copy()
     # Progress bar:
     prog_bar = get_progress_bar(config, num_repeats, f"Per delta-t...         ")
+    # track sucess:
+    at_least_one_successful_run : bool = False
+    num_errors : int = 0
 
     ## Perform ITE for all repetitions of this delta_t: 
-    at_least_one_successful_run : bool = False
     for i in range(num_repeats):
         prog_bar.next(extra_str=f"mean-energy={segment_stats.mean_energy}")
         logger_method = print_or_log_ite_segment_progress(config, tracker, logger, delta_t, i, num_repeats, segment_stats)
 
         ## Preform ITE segment:
         try:
-            unit_cell, messages, segment_stats = ite_segment(
+            unit_cell, messages, segment_stats = ite_per_segment(
                 unit_cell, messages, delta_t, logger=logger, config_in=config, prev_stats=segment_stats
             )
         except ITEError as e:
-            logger.warn(str(e))
-            # if DEBUG_MODE:
-            #     raise e
-            num_errors = tracker.log_error(e)
-            if num_errors>config.ite.num_errors_threshold:
-                raise ITEError(f"ITE Algo experienced {num_errors} errors.")
+            logger.warn(str(e)+"\n"*3)
+            total_num_errors = tracker.log_error(e)
+            num_errors += 1
+            if total_num_errors >= config.ite.num_total_errors_threshold:
+                raise ITEError(f"ITE Algo experienced {total_num_errors}, and will terminate therefor.")
+            elif num_errors >= config_in.ite.num_errors_per_delta_t_threshold:
+                logger.warn(f"ITE Algo experienced {num_errors} errors for delta_t={delta_t}, and will continue with the next delta_t.")
+                break 
             elif config.ite.segment_error_cause_state_revert:
                 try:
-                    _, energy, segment_stats, _, unit_cell, messages = tracker.revert_back(1)
-                except ITEError:
+                    _, mean_energy, segment_stats, _, unit_cell, messages = tracker.revert_back(1)
+                except ITEError as tracker_error:
+                    logger.error(tracker_error)
                     raise e
             continue
 
         at_least_one_successful_run = True
 
-        ## If bp struggled, we will use the harder config for next times:
-        config.bp = segment_stats.ite_per_mode_stats[-1].bp_stats.final_config
-        
+        config_with_harder_bp = config.copy()
+        config_with_harder_bp.bp = segment_stats.ite_per_mode_stats[-1].bp_stats.final_config
+
         ## Calculate observables:
-        energies, expectations, mean_energy = _calculate_crnt_observables(unit_cell, config, messages, segment_stats)
+        energies, expectations, mean_energy, messages = _calculate_crnt_observables(unit_cell, config_with_harder_bp, messages, segment_stats)
+
+        ## If bp struggled, we will use the harder config for next times:
+        if config.ite.keep_harder_bp_config_between_segments:
+            config = config_with_harder_bp
 
         ## Save data, print performance and plot graphs:
         segment_stats.mean_energy = mean_energy
@@ -421,7 +440,7 @@ def full_ite(
     messages = None
 
     ## Prepare tracking lists and plots:
-    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config)
+    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config, mem_length=config.ite.num_total_errors_threshold)
     _log_and_print_starting_message(logger, config, ite_tracker)  # Print and log valuable information: 
     plots = ITEPlots(active=config.visuals.live_plots, config=config)
 
@@ -436,7 +455,11 @@ def full_ite(
     # Main loop:
     for delta_t, num_repeats in delta_t_list_with_repetitions:
         prog_bar.next(extra_str=f"delta-t={delta_t}")
-        mean_energy, unit_cell, messages, success, step_stats = ite_per_delta_t(unit_cell, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)
+        try:
+            mean_energy, unit_cell, messages, success, step_stats = ite_per_delta_t(unit_cell, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)  
+        except Exception as e:
+            _log_and_print_finish_message(logger, config, ite_tracker, plots)  # Print and log valuable information: 
+            raise e
     
     ## Log finish:
     prog_bar.clear()

@@ -4,7 +4,7 @@ from numpy import ndarray as np_ndarray
 from enums import UnitCellFlavor
 import numpy as np
 
-from utils import saveload, strings
+from utils import saveload, strings, iterations
 
 UNIT_CELL_SUBFOLDER = "unit_cells"
 
@@ -63,6 +63,26 @@ class UnitCell:
              B = _random_tensor(d, D),
              C = _random_tensor(d, D)
         )
+    
+    @staticmethod
+    def random_product_state(d:int, D:int)->"UnitCell":
+        tensor = _random_tensor(d, D)
+        return UnitCell(
+             A = tensor.copy(),
+             B = tensor.copy(),
+             C = tensor.copy()
+        )
+    
+    @staticmethod
+    def zero_product_state(d:int, D:int)->"UnitCell":
+        assert d==2, "Zero state makes canonical sense when d==2"
+        tensor = _zero_state_tensor(D)
+        return UnitCell(
+             A = tensor.copy(),
+             B = tensor.copy(),
+             C = tensor.copy()
+        )
+    
 
     def save(self, file_name:str|None=None)->None:
         file_name = self._derive_file_name(file_name)
@@ -72,6 +92,9 @@ class UnitCell:
     def load(file_name:str, if_exist:bool=True)->"UnitCell":
         return saveload.load(file_name, sub_folder=UNIT_CELL_SUBFOLDER, if_exist=if_exist)
     
+    def set_filename(self, filename:str)->None:
+        self._file_name = filename
+
     def _derive_file_name(self, given_name:str|None)->str:
         if given_name is not None:
             assert isinstance(given_name, str)
@@ -85,8 +108,11 @@ class UnitCell:
         
 
 
-
-
+def _zero_state_tensor(D:int)->np.ndarray:
+    shape = [2]+[D]*4
+    t = np.zeros(shape)
+    t[0, 0, 0, 0, 0] = 1
+    return t
 
 def _random_tensor(d:int, D:int)->np.ndarray:
     rs = np.random.RandomState()
