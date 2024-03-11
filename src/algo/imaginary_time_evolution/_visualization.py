@@ -228,6 +228,7 @@ class ITEPlots():
             fig_main.subplot_mosaic([
                 ['B', 'B'],
                 ['A', 'A'],
+                ['T', 'T'],
                 ['E', 'E'],
                 ['E', 'E']
             ])            
@@ -269,10 +270,14 @@ class ITEPlots():
             p_energies = visuals.AppendablePlot(axis=axes_main["E"])
             p_energies.axis.set_title("energy")
             #
+            p_exec_t = visuals.AppendablePlot(axis=axes_main["T"])
+            p_exec_t.axis.set_title("exec time")
+            #
             self.plots.main = dict(
                 energies=p_energies, 
                 expectations=p_expectations, 
-                delta_t=p_delta_t
+                delta_t=p_delta_t,
+                exec_t=p_exec_t
             )
 
         ## Env plots:        
@@ -357,7 +362,7 @@ class ITEPlots():
 
     def update(self, 
         energies:list[complex], 
-        step_stats:ITESegmentStats, 
+        segment_stats:ITESegmentStats, 
         delta_t:float, 
         expectations:UnitCellExpectationValuesDict, 
         unit_cell:UnitCell, 
@@ -374,13 +379,14 @@ class ITEPlots():
         def _small_scatter(plot:visuals.AppendablePlot, x:float, y:float, c="blue", alpha=1.0)->None:
             plot.axis.scatter(x=x, y=y, c=c, s=4, alpha=alpha)
 
-            
+        had_to_revert = segment_stats.had_to_revert
 
         ## Main:
         if self.show.main:
             if not _initial:
                 self.plots.main["delta_t"].append(delta_t=delta_t, draw_now_=False)
             self.plots.main["expectations"].append(**mean_expec_vals, draw_now_=False)
+            self.plots.main["exec_t"].append(exec_t=segment_stats.execution_time, draw_now_=False)
 
             # Energies per edge:
             i = self._iteration
@@ -397,14 +403,15 @@ class ITEPlots():
             # Ground-truth
             if self.config.ite.reference_ground_energy is not None:
                 plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
-            
+
+
         ## Env Health:
         if self.show.health:
-            num_fractions = len(step_stats.ite_per_mode_stats)
+            num_fractions = len(segment_stats.ite_per_mode_stats)
             if num_fractions>0:
                 frac = 1/num_fractions
                 i = self._iteration-1
-                for mode_stat in step_stats.ite_per_mode_stats:
+                for mode_stat in segment_stats.ite_per_mode_stats:
                     i += frac
 
                     for metric in mode_stat.env_metrics:

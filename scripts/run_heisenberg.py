@@ -20,7 +20,7 @@ d = 2
 def main(
     D = 2,
     N = 2,
-    live_plots:bool|Iterable[bool] = 0, # [1,1,1],
+    live_plots:bool|Iterable[bool] = [1,1,1],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     chi_factor : int = 1,
@@ -28,7 +28,7 @@ def main(
     damping:float|None = 0.3
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.03.11_13.36.17_VITH")
+    unit_cell = UnitCell.load("2024.03.11_14.02.42_CCEJ")
     # unit_cell = UnitCell.random(d=d, D=D)
     # unit_cell = UnitCell.zero_product_state(d=d, D=D)
     unit_cell.set_filename(results_filename) 

@@ -219,6 +219,7 @@ class ITESegmentStats(Stats):
     modes_order : list[UpdateMode] = None  # type: ignore
     delta_t : float = None  # type: ignore
     mean_energy : float = None
+    had_to_revert : bool = False
 
     def __post_init__(self):
         self.ite_per_mode_stats = list()  # Avoid python's infamous immutable lists problem
@@ -316,6 +317,7 @@ class ITEProgressTracker():
         self.last_messages = messages  #type: ignore
         self.last_iter -= num_iter
         # Return:
+        step_stats.had_to_revert = True
         return delta_t, energy, step_stats, expectation_values, core, messages  #type: ignore
 
 
