@@ -22,7 +22,7 @@ from _error_types import ITEError
 import itertools
 
 
-DEFAULT_ITE_TRACKER_MEMORY_LENGTH : int = 5
+DEFAULT_ITE_TRACKER_MEMORY_LENGTH : int = 10
 
 
 _NEXT_IN_ABC_ORDER = {
@@ -34,10 +34,10 @@ _NEXT_IN_ABC_ORDER = {
 
 
 class _LimitedLengthList(Generic[_T]):
-    __slots__ = ("length", "_list")
+    __slots__ = ("length_limit", "_list")
 
     def __init__(self, length:int) -> None:
-        self.length : int = length
+        self.length_limit : int = length
         self._list : list[_T] = []
 
     def pop_oldest(self)->_T:
@@ -51,7 +51,7 @@ class _LimitedLengthList(Generic[_T]):
 
     def append(self, item:_T)->None:
         self._list.append(item)
-        if len(self._list)>self.length:
+        if len(self._list)>self.length_limit:
             self.pop_oldest()
 
     def __setitem__(self, key, value)->None:
@@ -162,13 +162,14 @@ class ITEConfig():
     interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
     # ITE time steps:
     time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
-    num_mode_repetitions_per_segment : int = 1        
+    num_mode_repetitions_per_segment : int = 2
     # File:
     backup_file_name : str = "ite_backup"+strings.time_stamp()+" "+strings.random(6)
     # Control flags:
     random_mode_order : bool = True
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
     segment_error_cause_state_revert : bool = True    
+    keep_harder_bp_config_between_segments : bool = False
     # Control numbers:
     num_total_errors_threshold : int = 20    
     num_errors_per_delta_t_threshold : int = 5    
@@ -298,6 +299,8 @@ class ITEProgressTracker():
         # Check
         num_iter = assertions.integer(num_iter)
         assert num_iter >= 1
+        if self.last_iter <= 0:
+            raise ITEError("ITE Tracker is empty.")
         if self.last_iter < num_iter:
             num_iter = self.last_iter  # There are no more saved results to revert to 
         # lists:

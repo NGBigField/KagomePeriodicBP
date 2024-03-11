@@ -248,6 +248,7 @@ def belief_propagation(
     ## Check failure:         
     if not success:
         messages = min_messages     
+        error = min_error
         tn.connect_messages(messages)
 
     stats = BPStats(iterations=i+1, final_error=error, final_config=config, success=success)  
@@ -280,18 +281,21 @@ def robust_belief_propagation(
     ## For each attempt, run and check success:    
     for attempt_ind in range(config.allowed_retries):
         # Run:
-        messages_out, stats = belief_propagation(tn, messages_in, config, update_plots_between_steps, allow_prog_bar)
+        messages, stats = belief_propagation(tn, messages_in, config, update_plots_between_steps, allow_prog_bar)
 
         # Check success:
         success = stats.final_error < target_error
+        error = stats.final_error
+
         if success:
+            messages_out = messages
+            error_out = error
             break
 
         # Track best results:
-        error = stats.final_error
         if error < min_error:
             min_error = error
-            min_messages = deepcopy(messages_out)
+            min_messages = deepcopy(messages)
 
         # Try again with better config:
         config.max_swallowing_dim *= 2
@@ -301,13 +305,14 @@ def robust_belief_propagation(
         
     else:  # if never had success
         messages_out = min_messages
+        error_out = min_error
         tn.connect_messages(min_messages)
 
     ## Return stats
     overall_stats = BPStats(
         attempts=attempt_ind+1, 
         iterations=stats.iterations, 
-        final_error=stats.final_error, 
+        final_error=error_out, 
         final_config=stats.final_config,
         success=success
     )  

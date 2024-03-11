@@ -20,29 +20,29 @@ d = 2
 def main(
     D = 2,
     N = 2,
-    live_plots:bool|Iterable[bool] =  0, #[1,1,0],
+    live_plots:bool|Iterable[bool] = 0, # [1,1,1],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     chi_factor : int = 1,
-    hamiltonian:str = "Field",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0.3
+    hamiltonian:str = "FM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.03.07_19.57.17- keep")
+    unit_cell = UnitCell.load("2024.03.10_22.52.31_CKNZ")
     # unit_cell = UnitCell.random(d=d, D=D)
     # unit_cell = UnitCell.zero_product_state(d=d, D=D)
-    # unit_cell.set_filename(results_filename) 
+    unit_cell.set_filename(results_filename) 
 
     ## Config:
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
     config.bp.damping = damping
-    config.bp.max_swallowing_dim = 2*D**2
+    config.bp.max_swallowing_dim = 4*D**2
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [0.01]*50 + [0.001]*50 + [1e-4]*50 + [1e-5]*50
+    config.ite.time_steps = [0.001]*50 + [1e-4]*50 + [1e-5]*50
 
     # Interaction:
     match hamiltonian: 

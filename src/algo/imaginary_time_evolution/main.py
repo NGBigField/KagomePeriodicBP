@@ -378,28 +378,33 @@ def ite_per_delta_t(
                 unit_cell, messages, delta_t, logger=logger, config_in=config, prev_stats=segment_stats
             )
         except ITEError as e:
-            logger.warn(str(e))
+            logger.warn(str(e)+"\n"*3)
             total_num_errors = tracker.log_error(e)
+            num_errors += 1
             if total_num_errors >= config.ite.num_total_errors_threshold:
                 raise ITEError(f"ITE Algo experienced {total_num_errors}, and will terminate therefor.")
-            num_errors += 1
-            if num_errors >= config_in.ite.num_errors_per_delta_t_threshold:
+            elif num_errors >= config_in.ite.num_errors_per_delta_t_threshold:
                 logger.warn(f"ITE Algo experienced {num_errors} errors for delta_t={delta_t}, and will continue with the next delta_t.")
                 break 
             elif config.ite.segment_error_cause_state_revert:
                 try:
-                    _, energy, segment_stats, _, unit_cell, messages = tracker.revert_back(2)
-                except ITEError:
+                    _, mean_energy, segment_stats, _, unit_cell, messages = tracker.revert_back(1)
+                except ITEError as tracker_error:
+                    logger.error(tracker_error)
                     raise e
             continue
 
         at_least_one_successful_run = True
 
-        ## If bp struggled, we will use the harder config for next times:
-        config.bp = segment_stats.ite_per_mode_stats[-1].bp_stats.final_config
-        
+        config_with_harder_bp = config.copy()
+        config_with_harder_bp.bp = segment_stats.ite_per_mode_stats[-1].bp_stats.final_config
+
         ## Calculate observables:
-        energies, expectations, mean_energy, messages = _calculate_crnt_observables(unit_cell, config, messages, segment_stats)
+        energies, expectations, mean_energy, messages = _calculate_crnt_observables(unit_cell, config_with_harder_bp, messages, segment_stats)
+
+        ## If bp struggled, we will use the harder config for next times:
+        if config.ite.keep_harder_bp_config_between_segments:
+            config = config_with_harder_bp
 
         ## Save data, print performance and plot graphs:
         segment_stats.mean_energy = mean_energy
@@ -435,7 +440,7 @@ def full_ite(
     messages = None
 
     ## Prepare tracking lists and plots:
-    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config)
+    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config, mem_length=config.ite.num_total_errors_threshold)
     _log_and_print_starting_message(logger, config, ite_tracker)  # Print and log valuable information: 
     plots = ITEPlots(active=config.visuals.live_plots, config=config)
 
