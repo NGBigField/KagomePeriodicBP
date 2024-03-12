@@ -272,6 +272,7 @@ class ITEPlots():
             #
             p_exec_t = visuals.AppendablePlot(axis=axes_main["T"])
             p_exec_t.axis.set_title("exec time")
+            p_exec_t.axis.set_ylabel("t [sec]")
             #
             self.plots.main = dict(
                 energies=p_energies, 
