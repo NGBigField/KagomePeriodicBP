@@ -1,3 +1,14 @@
+if __name__ == "__main__":
+	import pathlib, sys
+	sys.path.append(
+		pathlib.Path(__file__).parent.parent.__str__()
+	)
+	sys.path.append(
+		pathlib.Path(__file__).parent.parent.parent.__str__()
+	)
+
+
+
 # ============================================================================ #
 #|                                  Imports                                   |#
 # ============================================================================ #
@@ -9,7 +20,9 @@ from logging import Logger
 from typing import Any, Final, Mapping
 from utils import strings, saveload, prints
 from enum import Enum, auto
-import types
+import types, project_paths
+
+from typing import Iterable
 
 
 # ============================================================================ #
@@ -155,3 +168,75 @@ def get_logger(
     return logger
 
 
+def _look_for_matching_sentence(
+    parts:list[str], get_values_of:Iterable[str]
+)->tuple[int, list[str]]:
+    for search_index, search_sentence in enumerate(get_values_of):
+        for part_index, part in enumerate(parts):
+            search_words = search_sentence.split(" ")
+            first_search_word = search_words[0]
+
+            ## If we found match at first word:
+            if part==first_search_word:
+                for i in range(part_index+1, len(parts)):
+                    found_sentence = " ".join(parts[part_index:i])
+                    if search_sentence == found_sentence:
+                        values = " ".join(parts[i:])
+                        return search_index, values
+    return -1, None
+
+
+
+def search_words_in_log(
+    filename:str,
+    get_values_of:Iterable[str]
+)->tuple[list[str], ...]:
+    ## Read file:
+    folder = project_paths.logs
+    name_with_extension = saveload._common_name(filename, typ='log')
+    full_path = str(folder)+PATH_SEP+name_with_extension
+
+    ## Init outputs:
+    res = [list() for value in get_values_of]
+
+    ## Iterate:
+    with open(full_path, "r") as file:
+        for line in file:
+
+            parts = line.split(" ")
+            search_index, values = _look_for_matching_sentence(parts, get_values_of)
+            if values is not None:
+                res[search_index].append(values)
+
+
+    return res
+
+    
+
+
+
+def test():
+
+    from matplotlib import pyplot as plt
+
+    log_name = "AFM-stable-log"
+    found_results = search_words_in_log(log_name, ("Edge-Energies", "Mean energy after sequence") )
+    energies = []
+
+    for word in found_results[1]:
+        assert isinstance(word, str)
+        word = word.removeprefix("= ")
+        word = word.removesuffix("\n")
+        energies.append(float(word))
+    
+    plt.plot(energies)
+    plt.show()
+    plt.grid()
+    plt.title("Mean Energy")
+    plt.xlabel("Iteration")
+
+    print("Done.")
+
+if __name__ == "__main__":
+    test()
+    print("Done")
