@@ -399,8 +399,8 @@ class ITEPlots():
             self.plots.main["expectations"].append(**mean_expec_vals, draw_now_=False)
 
             # Time and space complexity
-            self.plots.main["exec_t"].append(time=segment_stats.execution_time, draw_now_=False)
-            self.plots.main["memory_use"].append(space=segment_stats.memory_usage, draw_now_=False)
+            self.plots.main["exec_t"].append(time=segment_stats.execution_time, plt_kwargs={'c':COLORS.time_complexity}, draw_now_=False)
+            self.plots.main["memory_use"].append(space=segment_stats.memory_usage, plt_kwargs={'c':COLORS.space_complexity}, draw_now_=False)
 
             # Energies per edge:
             i = self._iteration
