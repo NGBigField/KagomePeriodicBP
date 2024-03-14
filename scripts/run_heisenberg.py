@@ -44,6 +44,16 @@ def main(
     config.bp.max_swallowing_dim *= chi_factor
     config.ite.time_steps = [1e-3]*200 + [1e-4]*200 + [1e-5]*200 + [1e-6]*200
 
+    ##TODO: Debug
+    # Get size of object, test
+    import sys
+    size1 = sys.getsizeof(config)
+    print(size1)
+    size2 = config.memory_usage
+    print(size2)
+
+
+
     # Interaction:
     match hamiltonian: 
         case "AFM":   config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None)

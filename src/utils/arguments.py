@@ -1,7 +1,7 @@
 from typing import Any, Optional, TypeVar, Union, Callable
 from dataclasses import dataclass
 from collections.abc import Mapping, Container
-from utils import saveload, strings
+from utils import saveload, strings, size
 from sys import getsizeof
 from os.path import getsize
 _T = TypeVar('_T')
@@ -12,6 +12,9 @@ class Stats():
 
     def __post_init__(self):
         pass
+
+    def get_object_size(self) -> int:
+        return size.get_object_size(self)
 
 
 def default_value(
@@ -26,17 +29,4 @@ def default_value(
     if default_factory is not None:
         return default_factory()
     raise ValueError(f"Must provide either `default` value or function `default_factory` that generates a value")
-    
-
-def objsize(obj)->int:
-    """true size of object if it saved into memory using pickle
-
-    Returns:
-        int: size in bytes
-    """
-    temp_file_name = "_temp_size_check_file_"+strings.random(3)
-    fullpath = saveload.save(obj, name=temp_file_name)
-    size = getsize(fullpath)
-    saveload.delete(name=temp_file_name)
-    return size
     

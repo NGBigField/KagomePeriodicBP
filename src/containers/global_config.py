@@ -3,7 +3,7 @@ from containers.belief_propagation import BPConfig
 from containers.sizes_and_dimensions import TNDimensions
 from containers.imaginary_time_evolution import ITEConfig, IterativeProcessConfig
 from containers.visuals import VisualsConfig
-from utils import strings
+from utils import strings, size
 from copy import deepcopy
 
 # Control flags:
@@ -75,6 +75,10 @@ class Config(_ConfigClassWithSubClasses):
 
     def copy(self)->"Config":
         return deepcopy(self)
+    
+    @property
+    def memory_usage(self):
+        return size.get_object_size(self)
     
 
 
