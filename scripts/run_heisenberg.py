@@ -20,12 +20,12 @@ d = 2
 def main(
     D = 2,
     N = 2,
-    live_plots:bool|Iterable[bool] = 0, #[1,1,0],
+    live_plots:bool|Iterable[bool] = [1,0,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
-    parallel:bool = 1,
+    parallel:bool = 0,
     chi_factor : int = 1,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0.5
+    damping:float|None = 0.1
 )->tuple[float, str]:
     
     unit_cell = UnitCell.load("AFM-stable-unit_cell")
@@ -38,20 +38,11 @@ def main(
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
     config.bp.damping = damping
-    config.bp.max_swallowing_dim = 4*D**2
+    config.bp.max_swallowing_dim = 4 # 4*D**2
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
     config.ite.time_steps = [1e-3]*200 + [1e-4]*200 + [1e-5]*200 + [1e-6]*200
-
-    ##TODO: Debug
-    # Get size of object, test
-    import sys
-    size1 = sys.getsizeof(config)
-    print(size1)
-    size2 = config.memory_usage
-    print(size2)
-
 
 
     # Interaction:

@@ -278,8 +278,7 @@ def ite_per_mode(
     return unit_cell, messages, edge_energies, stats
 
 
-@decorators.add_stats()
-# @decorators.multiple_tries(3)
+@decorators.add_stats(memory_usage=True)
 def ite_per_segment(
     unit_cell:UnitCell,
     messages:MessageDictType|None,

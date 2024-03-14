@@ -23,7 +23,12 @@ XYZ_ARROW_LEN = 1.25
 XYZ_ARROW_KWARGS = dict(capstyle='round', color='black', arrow_length_ratio=0.15)
 
 NEW_TRACK_POINT_THRESHOLD = 0.02
-TRACK_COLOR = 'tomato'
+
+@dataclass
+class COLORS:
+    track = 'tomato'
+    time_complexity = "tab:blue"
+    space_complexity = "tab:red"
 
 
 def _set_window_title(window, title:str)->None:
@@ -133,7 +138,7 @@ class BlockSpherePlot():
         ## Plot and save:
         for (xyz1, xyz2, _), alpha in zip(points, alphas, strict=True):
             x, y, z = zip(xyz1, xyz2)
-            _res = self.axis.plot(x, y, z, color=TRACK_COLOR, alpha=alpha)
+            _res = self.axis.plot(x, y, z, color=COLORS.track, alpha=alpha)
             assert isinstance((plot := _res[0]), Line3D)
             self._last_track_plots.append(plot)
 
@@ -224,7 +229,7 @@ class ITEPlots():
 
 
         if self.show.main:
-            fig_main = plt.figure(figsize=(4, 6))
+            fig_main = plt.figure(figsize=(4.5, 6))
             fig_main.subplot_mosaic([
                 ['B', 'B'],
                 ['A', 'A'],
@@ -271,14 +276,19 @@ class ITEPlots():
             p_energies.axis.set_title("energy")
             #
             p_exec_t = visuals.AppendablePlot(axis=axes_main["T"])
-            p_exec_t.axis.set_title("exec time")
-            p_exec_t.axis.set_ylabel("t [sec]")
+            p_exec_t.axis.set_title("time and space complexity")
+            p_memory_use = visuals.AppendablePlot(axis=axes_main["T"].twinx())
+            p_exec_t.axis.set_ylabel("time [sec]", color=COLORS.time_complexity)
+            p_exec_t.axis.tick_params(axis='y', labelcolor=COLORS.time_complexity)
+            p_memory_use.axis.set_ylabel("space [bytes]", color=COLORS.space_complexity)
+            p_memory_use.axis.tick_params(axis='y', labelcolor=COLORS.space_complexity)
             #
             self.plots.main = dict(
                 energies=p_energies, 
                 expectations=p_expectations, 
                 delta_t=p_delta_t,
-                exec_t=p_exec_t
+                exec_t=p_exec_t,
+                memory_use=p_memory_use
             )
 
         ## Env plots:        
@@ -387,7 +397,10 @@ class ITEPlots():
             if not _initial:
                 self.plots.main["delta_t"].append(delta_t=delta_t, draw_now_=False)
             self.plots.main["expectations"].append(**mean_expec_vals, draw_now_=False)
-            self.plots.main["exec_t"].append(exec_t=segment_stats.execution_time, draw_now_=False)
+
+            # Time and space complexity
+            self.plots.main["exec_t"].append(time=segment_stats.execution_time, draw_now_=False)
+            self.plots.main["memory_use"].append(space=segment_stats.memory_usage, draw_now_=False)
 
             # Energies per edge:
             i = self._iteration

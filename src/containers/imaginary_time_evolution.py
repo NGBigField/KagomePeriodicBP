@@ -176,7 +176,7 @@ class ITEConfig():
     interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
     # ITE time steps:
     time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
-    num_mode_repetitions_per_segment : int = 2  # number of modes between each measurement of energy
+    num_mode_repetitions_per_segment : int = 1  # number of modes between each measurement of energy
     # Control flags:
     random_mode_order : bool = True
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t

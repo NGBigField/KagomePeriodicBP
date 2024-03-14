@@ -76,9 +76,6 @@ class Config(_ConfigClassWithSubClasses):
     def copy(self)->"Config":
         return deepcopy(self)
     
-    @property
-    def memory_usage(self):
-        return size.get_object_size(self)
     
 
 

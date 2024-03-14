@@ -1,11 +1,11 @@
 from dataclasses import dataclass, is_dataclass
 from utils import iterations
 import sys
-from collections.abc import Iterable
+import numpy as np
 
 
 def _is_simple_native_python_type(obj)->bool:
-    return isinstance(obj, (str, int, float, bool, complex))
+    return isinstance(obj, (str, int, float, bool, complex, np.ndarray))
 
 
 def get_object_size(obj, visited_objects:set|None=None)->int:
@@ -22,6 +22,7 @@ def get_object_size(obj, visited_objects:set|None=None)->int:
         visited_objects = set()
     elif id(obj) in visited_objects:
         return 0
+    visited_objects.add(id(obj))
 
     ## Get the native size of the object:
     size = sys.getsizeof(obj)  # get object's size without its attributes
@@ -29,14 +30,12 @@ def get_object_size(obj, visited_objects:set|None=None)->int:
         return size
     
     ## Prepare for iteration over inner attributes:
-    # Set against infinite recursions:
-    visited_objects.add(id(obj))
     # Choose simpler iteration methods if exist in native structures:
     if isinstance(obj, dict):
         iterator = obj.values()
     elif is_dataclass(obj):
         iterator = iterations.iterate_dataclass_attributes(obj)
-    elif isinstance(obj, Iterable):
+    elif isinstance(obj, (list, tuple, set)):
         iterator = obj
     else:
         iterator = iterations.iterate_objects_attributes(obj)

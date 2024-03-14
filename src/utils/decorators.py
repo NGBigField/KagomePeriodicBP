@@ -1,5 +1,5 @@
-from typing import Callable, Any, ParamSpec, TypeVar, List, Tuple, Generic
-from utils import tuples, strings, errors, prints
+from typing import Callable, Any, ParamSpec, TypeVar, List, Tuple
+from utils import tuples, errors, prints, size
 from utils.arguments import Stats
 import time
 from numpy import ndarray as np_ndarray
@@ -32,13 +32,40 @@ def when_fails_do(func_secondary:Callable[_In, _Out])->Callable[[Callable[_In, _
     return decorator
 
 
+
+
+
 def add_stats(
-    execution_time:bool=True
+    memory_usage:bool=False
 ) -> Callable[[Callable[_In, _Out]], Callable[_In, _Out]]:  # A function that return a decorator which depends on inputs
 
-    def _add_stats_to_object(stats:Stats, t1:float, t2:float)->None:        
-        if execution_time and stats.execution_time is None:
-            stats.execution_time = t2-t1
+    def _add_stats_to_object(stats:Stats, t1:float, t2:float, size_of_inputs:int, size_of_outputs:int)->None:        
+        stats.execution_time = t2-t1
+        stats.size_of_inputs = size_of_inputs
+        stats.size_of_outputs = size_of_outputs
+
+    def _update_stats_object_in_outputs(inputs:tuple[list, dict], outputs:_Out, t1:float, t2:float)->_Out:
+        if memory_usage:
+            size_of_inputs  = size.get_object_size(inputs)
+            size_of_outputs = size.get_object_size(outputs)
+        else:
+            size_of_inputs, size_of_outputs = None, None
+
+        data = (t1, t2, size_of_inputs, size_of_outputs)
+        if isinstance(outputs, Stats):
+            _add_stats_to_object(outputs, *data)
+        elif isinstance(outputs, tuple):
+            for i, element in enumerate(outputs):
+                if isinstance(element, Stats):
+                    _add_stats_to_object(element, *data)
+                    outputs = tuples.copy_with_replaced_val_at_index(outputs, i, element)
+                    break
+            else:
+                # No available `Stats` object in results:
+                raise TypeError(f"Couldn't find an output of type 'Stats'.")
+            
+        return outputs
+            
 
     def decorator(func:Callable[_In, _Out]) -> Callable[_In, _Out]:  # decorator that return a wrapper to `func`
         def wrapper(*args:_In.args, **kwargs:_In.kwargs) -> _Out:  # wrapper that calls `func`
@@ -49,18 +76,8 @@ def add_stats(
             t2 = time.perf_counter()
 
             ## Add stats:
-            data = (t1, t2)
-            if isinstance(results, Stats):
-                _add_stats_to_object(results, *data)
-            elif isinstance(results, tuple):
-                for i, element in enumerate(results):
-                    if isinstance(element, Stats):
-                        _add_stats_to_object(element, *data)
-                        results = tuples.copy_with_replaced_val_at_index(results, i, element)
-                        break
-                else:
-                    # No available `Stats` object in results:
-                    raise TypeError(f"Couldn't find an output of type 'Stats'.")
+            inputs = (args, kwargs)
+            results = _update_stats_object_in_outputs(inputs, results, t1, t2)
 
             ## Return
             return results
