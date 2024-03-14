@@ -155,6 +155,20 @@ DEFAULT_TIME_STEPS = lambda: [0.02]*5 + [0.01]*5 + [0.001]*100 + [1e-4]*100 + [1
 #     return dts
 
 
+@dataclass
+class IterativeProcessConfig():
+    # File:
+    backup_file_name : str = "ite_backup"+strings.time_stamp()+" "+strings.random(6)
+    # Belief-Propagation flags:
+    start_segment_with_new_bp_message : bool = True
+    bp_not_converged_raises_error : bool = False
+    bp_every_edge : bool = True
+    # Control numbers:
+    num_total_errors_threshold : int = 20    
+    num_errors_per_delta_t_threshold : int = 5    
+    segment_error_cause_state_revert : bool = True    
+    keep_harder_bp_config_between_segments : bool = False
+
 
 @dataclass
 class ITEConfig():
@@ -162,21 +176,10 @@ class ITEConfig():
     interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
     # ITE time steps:
     time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
-    num_mode_repetitions_per_segment : int = 2
-    # File:
-    backup_file_name : str = "ite_backup"+strings.time_stamp()+" "+strings.random(6)
+    num_mode_repetitions_per_segment : int = 2  # number of modes between each measurement of energy
     # Control flags:
     random_mode_order : bool = True
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
-    segment_error_cause_state_revert : bool = True    
-    keep_harder_bp_config_between_segments : bool = False
-    # Control numbers:
-    num_total_errors_threshold : int = 20    
-    num_errors_per_delta_t_threshold : int = 5    
-    # Belief-Propagation flags:
-    start_segment_with_new_bp_message : bool = True
-    bp_not_converged_raises_error : bool = False
-    bp_every_edge : bool = True
 
 
     @property

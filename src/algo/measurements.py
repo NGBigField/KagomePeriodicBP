@@ -220,7 +220,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
     tn_open = repeat_core(core, repeats)
     # Beliefe Propagation:
     tn_stable, _, bp_stats = belief_propagation(tn_open, messages=None, bp_config=config.bp)
-    if bp_stats.final_error>config.bp.target_msg_diff:
+    if bp_stats.final_error>config.bp.msg_diff_terminate:
         raise BPNotConvergedError("")
     tn_stable_around_core = reduce_full_kagome_to_core(tn_stable, chi, method=config.reduce2core_method)
 

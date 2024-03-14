@@ -183,7 +183,7 @@ def belief_propagation(
 
     ## Unpack Configuration:
     max_iterations = config.max_iterations
-    target_error = config.target_msg_diff
+    terminating_error = config.msg_diff_terminate
     n_failure_check_len = config.times_to_deem_failure_when_diff_increases
 
     ## Connect or randomize messages:
@@ -224,7 +224,7 @@ def belief_propagation(
             visuals.refresh()
 
         # Check success conditions:
-        if error<target_error:
+        if error<terminating_error:
             success = True
             break
 
@@ -271,7 +271,8 @@ def robust_belief_propagation(
 ]:
     ## Unpack Configuration:
     config = config.copy()  # Don't affect the sender's copy of config
-    target_error = config.target_msg_diff
+    good_enough_error = config.msg_diff_good_enough
+    terminating_error = config.msg_diff_terminate
 
     ## First attempt inputs:
     messages_in = deepcopy(messages)
@@ -284,10 +285,10 @@ def robust_belief_propagation(
         messages, stats = belief_propagation(tn, messages_in, config, update_plots_between_steps, allow_prog_bar)
 
         # Check success:
-        success = stats.final_error < target_error
+        terminating_condition = stats.final_error < terminating_error
         error = stats.final_error
 
-        if success:
+        if terminating_condition:
             messages_out = messages
             error_out = error
             break
@@ -307,6 +308,9 @@ def robust_belief_propagation(
         messages_out = min_messages
         error_out = min_error
         tn.connect_messages(min_messages)
+
+    ## Did we succeed?
+    success = error_out < good_enough_error
 
     ## Return stats
     overall_stats = BPStats(

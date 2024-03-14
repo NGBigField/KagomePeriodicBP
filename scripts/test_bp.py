@@ -67,7 +67,7 @@ def bp_single_call(
     bp_config = BPConfig(
         max_swallowing_dim=D**2,
         max_iterations=50,
-        target_msg_diff=1e-5
+        msg_diff_terminate=1e-5
     )
 
     ## Tensor-Network
@@ -96,7 +96,7 @@ def growing_tn_bp_test2(
     bp_config = BPConfig(
         max_swallowing_dim=D**2,
         max_iterations=50,
-        target_msg_diff=1e-5
+        msg_diff_terminate=1e-5
     )
     
     ## Load or randomize unit_cell
@@ -152,7 +152,7 @@ def growing_tn_bp_test(
     ## Config:
     bp_config = BPConfig(
         max_swallowing_dim=8,
-        target_msg_diff=1e-7
+        msg_diff_terminate=1e-7
     )
     unit_cell = UnitCell.random(d=d, D=D)
 
@@ -233,7 +233,7 @@ def test_single_bp_vs_growing_TN(
         bp_config = BPConfig(
             max_iterations=60,
             max_swallowing_dim=bp_chi,
-            target_msg_diff=1e-7
+            msg_diff_terminate=1e-7
         )
 
         tn = create_kagome_tn(d, D, bp_N, unit_cell)
@@ -308,7 +308,7 @@ def test_bp_convergence_steps(
         ## Config:
         bp_config = BPConfig(
             max_swallowing_dim=chi,
-            target_msg_diff=1e-5
+            msg_diff_terminate=1e-5
         )
 
 
@@ -376,7 +376,7 @@ def test_bp_convergence_steps_single_run(
 
     if N>4:
         t1 = perf_counter()
-        bp_config = BPConfig(max_iterations=50, max_swallowing_dim=bp_chi, target_msg_diff=1e-7, parallel_msgs=parallel_bp)
+        bp_config = BPConfig(max_iterations=50, max_swallowing_dim=bp_chi, msg_diff_terminate=1e-7, parallel_msgs=parallel_bp)
         _, stats = belief_propagation(tn, None, config=bp_config)
         t2 = perf_counter()
         time_bp = t2-t1

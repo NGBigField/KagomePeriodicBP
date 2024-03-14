@@ -205,7 +205,7 @@ def _from_unit_cell_to_stable_mode(
         update_plots_between_steps=config.visuals.live_plots, 
         allow_prog_bar=config.visuals.progress_bars
     )
-    print_or_log_bp_message(config.bp, config.ite.bp_not_converged_raises_error, bp_stats, logger)
+    print_or_log_bp_message(config.bp, config.iterative_process.bp_not_converged_raises_error, bp_stats, logger)
 
     # If block-bp struggled and increased the virtual dimension, the following iterations must also use a higher dimension:
     config = _harden_bp_config_if_struggled(config, bp_stats, logger)
@@ -252,7 +252,7 @@ def ite_per_mode(
         if config.visuals.live_plots:
             visuals.refresh()
 
-        if config.ite.bp_every_edge or is_first:
+        if config.iterative_process.bp_every_edge or is_first:
             # Perform BlockBP again, to get converged messages.
             mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
         else:
@@ -298,7 +298,7 @@ def ite_per_segment(
     num_modes = config.ite.num_mode_repetitions_per_segment
 
     ## Init messages or use old ones
-    if config.ite.start_segment_with_new_bp_message:
+    if config.iterative_process.start_segment_with_new_bp_message:
         messages = None  # force bp to start with fresh-new messages
 
     ## Generate a random mode order without repeating the same mode previous twice in a row
@@ -363,7 +363,7 @@ def ite_per_delta_t(
     config = config_in.copy()
     # Progress bar:
     prog_bar = get_progress_bar(config, num_repeats, f"Per delta-t...         ")
-    # track sucess:
+    # track success:
     at_least_one_successful_run : bool = False
     num_errors : int = 0
 
@@ -404,7 +404,7 @@ def ite_per_delta_t(
         energies, expectations, mean_energy, messages = _calculate_crnt_observables(unit_cell, config_with_harder_bp, messages, segment_stats)
 
         ## If bp struggled, we will use the harder config for next times:
-        if config.ite.keep_harder_bp_config_between_segments:
+        if config.iterative_process.keep_harder_bp_config_between_segments:
             config = config_with_harder_bp
 
         ## Save data, print performance and plot graphs:
@@ -441,7 +441,7 @@ def full_ite(
     messages = None
 
     ## Prepare tracking lists and plots:
-    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config, mem_length=config.ite.num_total_errors_threshold)
+    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config, mem_length=config.iterative_process.num_total_errors_threshold)
     _log_and_print_starting_message(logger, config, ite_tracker)  # Print and log valuable information: 
     plots = ITEPlots(active=config.visuals.live_plots, config=config)
 

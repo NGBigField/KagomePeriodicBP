@@ -1,7 +1,7 @@
 from dataclasses import dataclass, fields
 from containers.belief_propagation import BPConfig
 from containers.sizes_and_dimensions import TNDimensions
-from containers.imaginary_time_evolution import ITEConfig
+from containers.imaginary_time_evolution import ITEConfig, IterativeProcessConfig
 from containers.visuals import VisualsConfig
 from utils import strings
 from copy import deepcopy
@@ -15,6 +15,7 @@ class _ConfigClassWithSubClasses:
     BPConfig      = BPConfig
     TNDimensions  = TNDimensions
     ITEConfig     = ITEConfig
+    IterativeProcessConfig = IterativeProcessConfig
     VisualsConfig = VisualsConfig
 
 
@@ -23,6 +24,7 @@ class Config(_ConfigClassWithSubClasses):
     # The actual stored data:
     bp : BPConfig 
     ite : ITEConfig 
+    iterative_process : IterativeProcessConfig
     dims : TNDimensions
     visuals : VisualsConfig
     trunc_dim : int
@@ -32,6 +34,7 @@ class Config(_ConfigClassWithSubClasses):
         return Config(
             bp=BPConfig(max_swallowing_dim=D**2),
             ite=ITEConfig(),
+            iterative_process=IterativeProcessConfig(),
             dims=TNDimensions(virtual_dim=D),
             visuals=VisualsConfig(),
             trunc_dim=2*D**2+10
@@ -60,7 +63,7 @@ class Config(_ConfigClassWithSubClasses):
         # self.bp.allowed_retries += 1
         self.trunc_dim *= 4
         if _harder_target:
-            self.bp.target_msg_diff /= 10
+            self.bp.msg_diff_terminate /= 10
 
     def __repr__(self) -> str:        
         s = f"{self.__class__.__name__}:"
