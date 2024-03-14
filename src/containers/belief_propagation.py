@@ -15,7 +15,7 @@ class BPConfig:
     init_msg: MessageModel = MessageModel.RANDOM_QUANTUM
     max_iterations : int|None = 30   # None is used for unlimited number of iterations
     max_swallowing_dim : int = 9
-    msg_diff_terminate : float = 1e-7
+    msg_diff_terminate : float = 1e-6
     msg_diff_good_enough : float = 1e-4
     msg_diff_squared : bool = True  # True is easier to get to 
     allowed_retries : int = 3

@@ -19,13 +19,13 @@ d = 2
 
 def main(
     D = 2,
-    N = 3,
-    live_plots:bool|Iterable[bool] = [1,1,0],
+    N = 2,
+    live_plots:bool|Iterable[bool] = 0, #[1,1,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
-    parallel:bool = 0,
+    parallel:bool = 1,
     chi_factor : int = 1,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0.3
+    damping:float|None = 0.5
 )->tuple[float, str]:
     
     unit_cell = UnitCell.load("AFM-stable-unit_cell")
@@ -42,7 +42,7 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [1e-2]*200 + [1e-3]*200 + [1e-4]*200 + [1e-5]*200 + [1e-6]*200
+    config.ite.time_steps = [1e-3]*200 + [1e-4]*200 + [1e-5]*200 + [1e-6]*200
 
     # Interaction:
     match hamiltonian: 
