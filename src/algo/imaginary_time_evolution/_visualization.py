@@ -377,7 +377,8 @@ class ITEPlots():
         delta_t:float, 
         expectations:UnitCellExpectationValuesDict, 
         unit_cell:UnitCell, 
-        _initial:bool=False
+        _initial:bool=False,
+        _draw_now:bool=True
     ):
         if not self.active:
             return
@@ -405,13 +406,18 @@ class ITEPlots():
             # Energies per edge:
             i = self._iteration
             plot = self.plots.main["energies"]
-            energies4mean = []
-            for edge_tuple, energy in energies.items():
-                energies4mean.append(energy)
-                _small_scatter(plot, i, energy, c="black", alpha=0.6)
-                
+
+            if isinstance(energies, list):
+                energies4mean = []
+                for edge_tuple, energy in energies.items():
+                    energies4mean.append(energy)
+                    _small_scatter(plot, i, energy, c="black", alpha=0.6)
+                energy = sum(energies4mean)/len(energies4mean)
+            elif isinstance(energies, (complex, float, int)):
+                energy = energies
+            else:
+                raise TypeError(f"Not an expected type {type(energies)}")
             # Mean:
-            energy = sum(energies4mean)/len(energies4mean)
             plot.append(mean=(i, energy), draw_now_=False)
 
             # Ground-truth
@@ -461,7 +467,9 @@ class ITEPlots():
                 norm = np.linalg.norm(tensor)
                 # plot.under_text(f"Norm={norm}")
         
-        visuals.draw_now()
+        if _draw_now:
+            visuals.draw_now()
+            
 
     def save(self, logger:logs.Logger|None=None):
         if not self.active:

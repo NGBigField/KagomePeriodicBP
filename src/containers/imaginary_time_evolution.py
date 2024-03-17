@@ -176,7 +176,7 @@ class ITEConfig():
     interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
     # ITE time steps:
     time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
-    num_mode_repetitions_per_segment : int = 1  # number of modes between each measurement of energy
+    num_mode_repetitions_per_segment : int = 3  # number of modes between each measurement of energy
     # Control flags:
     random_mode_order : bool = True
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
@@ -258,7 +258,15 @@ class ITEProgressTracker():
         self.unit_cells         : _LimitedLengthList[UnitCell]          = _LimitedLengthList[UnitCell](mem_length) 
         self.messages           : _LimitedLengthList[dict]              = _LimitedLengthList[dict](mem_length) 
         self.stats              : _LimitedLengthList[ITESegmentStats]   = _LimitedLengthList[ITESegmentStats](mem_length)            
+
+    @property
+    def memory_usage(self)->int:
+        return saveload.get_size(self.file_name, sub_folder=SUB_FOLDER)        
     
+    @property
+    def full_path(self) -> str:
+        return saveload._fullpath(name=self.file_name, sub_folder=SUB_FOLDER)
+
     def log_segment(self, delta_t:float, unit_cell:UnitCell, messages:dict, expectation_values:dict, energy:complex, stats:ITESegmentStats )->None:
         # Get a solid copy
         _unit_cell = unit_cell.copy()
@@ -332,9 +340,25 @@ class ITEProgressTracker():
     def save(self)->None:
         return saveload.save(self, self.file_name, sub_folder=SUB_FOLDER)        
 
-    @property
-    def full_path(self) -> str:
-        return saveload._fullpath(name=self.file_name, sub_folder=SUB_FOLDER)
+    def plot(self, live_plot:bool=False)->None:
+        # Specific plotting imports:
+        from algo.imaginary_time_evolution._visualization import ITEPlots
+        from utils import visuals
+        from containers import Config
+
+        config : Config = deepcopy(self.config)
+        config.visuals.live_plots = [1, 1, 1]
+
+        plots = ITEPlots(active=True, config=config)
+        for delta_t, energy, unit_cell, msg, expectations, stats \
+            in zip(self.delta_ts, self.energies, self.unit_cells, self.messages, self.expectation_values, self.stats ):
+
+            plots.update(energies=energy, segment_stats=stats, delta_t=delta_t, expectations=expectations, unit_cell=unit_cell, _draw_now=live_plot)            
+        
+        visuals.draw_now()
+        print("Done plotting ITE.")
+
+            
         
     def __len__(self)->int:
         assert len(self.delta_ts) == len(self.energies) == len(self.expectation_values) ==  len(self.unit_cells) == len(self.messages) == len(self.stats)             

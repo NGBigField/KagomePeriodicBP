@@ -19,8 +19,8 @@ d = 2
 
 def main(
     D = 2,
-    N = 2,
-    live_plots:bool|Iterable[bool] = [1,0,0],
+    N = 6,
+    live_plots:bool|Iterable[bool] = [0,0,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     chi_factor : int = 1,
@@ -38,11 +38,11 @@ def main(
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
     config.bp.damping = damping
-    config.bp.max_swallowing_dim = 4 # 4*D**2
+    config.bp.max_swallowing_dim = 4*D**2
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [1e-3]*200 + [1e-4]*200 + [1e-5]*200 + [1e-6]*200
+    config.ite.time_steps = [1e-2]*100 + [1e-3]*200 + [1e-4]*200 + [1e-5]*200 + [1e-6]*200
 
 
     # Interaction:
