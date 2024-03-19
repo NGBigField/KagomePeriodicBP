@@ -25,9 +25,9 @@
                 "1",  //seed
                 "0",  //method
                 "2",  //D
-                "3",  //N
-                "8",  //chi
-                "bp_convergence",  //job_type
+                "2",  //N
+                "1",  //chi
+                "ite_afm",  //job_type
                 "[seed,D,N,chi,iterations,num_tensors,energy,exec_time]",  //result_keys
             ]
         }
