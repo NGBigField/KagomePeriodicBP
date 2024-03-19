@@ -18,7 +18,7 @@ import sys, os
 import logging
 from logging import Logger
 from typing import Any, Final, Mapping
-from utils import strings, saveload, prints
+from utils import strings, saveload, prints, tuples, lists
 from enum import Enum, auto
 import types, project_paths
 
@@ -168,28 +168,10 @@ def get_logger(
     return logger
 
 
-def _look_for_matching_sentence(
-    parts:list[str], get_values_of:Iterable[str]
-)->tuple[int, list[str]]:
-    for search_index, search_sentence in enumerate(get_values_of):
-        for part_index, part in enumerate(parts):
-            search_words = search_sentence.split(" ")
-            first_search_word = search_words[0]
-
-            ## If we found match at first word:
-            if part==first_search_word:
-                for i in range(part_index+1, len(parts)):
-                    found_sentence = " ".join(parts[part_index:i])
-                    if search_sentence == found_sentence:
-                        values = " ".join(parts[i:])
-                        return search_index, values
-    return -1, None
-
-
 
 def search_words_in_log(
     filename:str,
-    get_values_of:Iterable[str]
+    words:Iterable[str]
 )->tuple[list[str], ...]:
     ## Read file:
     folder = project_paths.logs
@@ -197,39 +179,40 @@ def search_words_in_log(
     full_path = str(folder)+PATH_SEP+name_with_extension
 
     ## Init outputs:
-    res = [list() for value in get_values_of]
+    res = [list() for _ in words]
 
     ## Iterate:
     with open(full_path, "r") as file:
-        for line in file:
+        for line in file:    
+            for word_index, word in enumerate(words):
 
-            parts = line.split(" ")
-            search_index, values = _look_for_matching_sentence(parts, get_values_of)
-            if values is not None:
-                res[search_index].append(values)
+                location_in_line = strings.search_pattern_in_text(word, line)
+                if location_in_line != -1:  # if found
+                    index_after_word = location_in_line + len(word)
+                    proceeding_str = line[index_after_word:]
+                    res[word_index].append(proceeding_str)
 
-
-    return res
+    return tuple(res)
 
     
 
 
 
-def test():
-
+def plot_log(
+    log_name:str = "2024.03.14_17.14.10 EMBKDJ"
+):
     from matplotlib import pyplot as plt
 
-    log_name = "AFM-stable-log"
-    found_results = search_words_in_log(log_name, ("Edge-Energies", "Mean energy after sequence") )
-    energies = []
+    # Get matching words:
+    edge_energies_str, mean_energies_str = search_words_in_log(log_name, ("Edge-Energies", "Mean energy after sequence") )
+    mean_energies = []
 
-    for word in found_results[1]:
-        assert isinstance(word, str)
-        word = word.removeprefix("= ")
+    ## Plot mean energy
+    for word in mean_energies_str:
+        word = word.removeprefix(" = ")
         word = word.removesuffix("\n")
-        energies.append(float(word))
-    
-    plt.plot(energies)
+        mean_energies.append(float(word))
+    plt.plot(mean_energies)
     plt.show()
     plt.grid()
     plt.title("Mean Energy")
@@ -238,5 +221,5 @@ def test():
     print("Done.")
 
 if __name__ == "__main__":
-    test()
+    plot_log()
     print("Done")

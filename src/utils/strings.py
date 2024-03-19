@@ -118,10 +118,12 @@ def formatted(
         
     return f"{val:{format}}"  
 
+
 def num_out_of_num(num1, num2):
     width = len(str(num2))
     format = lambda num: formatted(num, fill=' ', alignment='>', width=width )
     return format(num1)+"/"+format(num2)
+
 
 def time_stamp():
     t = time.localtime()
@@ -132,6 +134,7 @@ def insert_spaces_in_newlines(s:str, num_spaces:int) -> str:
     spaces = ' '*num_spaces
     s2 = s.replace('\n','\n'+spaces)
     return s2
+
 
 def str_width(s:str, last_line_only:bool=False) -> int:
     lines = s.split('\n')
@@ -151,3 +154,67 @@ def alphabet(upper_case:bool=False)->Generator[str, None, None]:
         l = list( string.ascii_lowercase )
     for s in l:
         yield s
+
+
+def search_pattern_in_text(pattern:str, text:str)->int:
+    return _kmp_search(text, pattern)
+
+
+def _compute_lps_array_for_kmp(pattern):
+	"""
+	This function computes the Longest Proper Prefix which is also a Suffix (LPS) array for a given pattern.
+
+	Args:
+		pattern: The pattern string to compute LPS for.
+
+	Returns:
+		A list representing the LPS array for the given pattern.
+	"""
+	n = len(pattern)
+	lps = [0] * n
+
+	i = 1
+	j = 0
+	while i < n:
+		if pattern[i] == pattern[j]:
+			lps[i] = j + 1
+			i += 1
+			j += 1
+		else:
+			if j != 0:
+				j = lps[j - 1]
+			else:
+				lps[i] = 0
+				i += 1
+	return lps
+
+def _kmp_search(text, pattern):
+	"""
+	This function searches for the pattern in the text using the KMP algorithm.
+
+	Args:
+		text: The text string to search in.
+		pattern: The pattern string to search for.
+
+	Returns:
+		The starting index of the first occurrence of the pattern in the text, 
+		or -1 if the pattern is not found.
+	"""
+	n = len(text)
+	m = len(pattern)
+	lps = _compute_lps_array_for_kmp(pattern)
+
+	i = 0
+	j = 0
+	while i < n:
+		if text[i] == pattern[j]:
+			i += 1
+			j += 1
+		if j == m:
+			return i - j  # pattern found at index i - j
+		elif i < n and text[i] != pattern[j]:
+			if j != 0:
+				j = lps[j - 1]
+			else:
+				i += 1
+	return -1  # pattern not found
