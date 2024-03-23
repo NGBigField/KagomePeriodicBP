@@ -19,17 +19,17 @@ d = 2
 
 def main(
     D = 2,
-    N = 2,
+    N = 10,
     live_plots:bool|Iterable[bool] = [0,0,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
-    parallel:bool = 0,
-    chi_factor : int = 1,
+    parallel:bool = 1,
+    chi_factor : int = 2,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("AFM-stable-unit_cell")
-    # unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.load("AFM-stable-unit_cell")
+    unit_cell = UnitCell.random(d=d, D=D)
     # unit_cell = UnitCell.zero_product_state(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
@@ -38,11 +38,11 @@ def main(
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
     config.bp.damping = damping
-    config.bp.max_swallowing_dim = 2*D**2
+    config.bp.max_swallowing_dim = 4*D**2
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [1e-1]*20 + [1e-2]*200 + [1e-3]*200 + [1e-4]*200 + [1e-5]*200 + [1e-6]*200
+    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(1,12)]
 
 
     # Interaction:

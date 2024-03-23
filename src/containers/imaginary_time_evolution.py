@@ -207,6 +207,7 @@ class ITEConfig():
     
     def __post_init__(self)->None:
         self.interaction_hamiltonian = HamiltonianFuncAndInputs.standard(self.interaction_hamiltonian)
+        self.time_steps = _fix_and_rearrange_time_steps(self.time_steps)
     
 
 class ITEPerModeStats(Stats):
@@ -378,3 +379,13 @@ def _time_steps_str(time_steps:list[float])->str:
             counter = 1    
     s += "["+f"{last}"+"]*"+f"{counter}"
     return s
+
+
+
+def _fix_and_rearrange_time_steps(times:list[float]|list[list[float]])->list[float]:
+    if isinstance(times, list) and isinstance(times[0], list):
+        return lists.join_sub_lists(times)
+    elif isinstance(times, list) and isinstance(times[0], (float, int)):
+        return times
+    else:
+        raise TypeError(f"Not an expected type of argument `times`. It has type {type(times)}")
