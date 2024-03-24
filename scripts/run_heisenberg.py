@@ -28,7 +28,7 @@ def main(
     damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.03.23_22.43.49_LCIU - continue here")
+    unit_cell = UnitCell.load("2024.03.24_17.20.47_TLJT")
     # unit_cell = UnitCell.random(d=d, D=D)
     # unit_cell = UnitCell.zero_product_state(d=d, D=D) 
     unit_cell.set_filename(results_filename) 
@@ -42,7 +42,7 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(2,12)]
+    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(7,12)]
 
 
     # Interaction:
