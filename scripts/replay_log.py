@@ -9,7 +9,7 @@ def main(
     filename:str = "2024.03.23_22.43.49 KNTCBS"
 ):
     ## Parse inputs:
-    if argv[1] is not None:
+    if len(argv)>=2 and argv[1] is not None:
         filename = argv[1]
 
 

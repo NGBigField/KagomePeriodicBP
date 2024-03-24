@@ -199,25 +199,58 @@ def search_words_in_log(
 
 
 def plot_log(
-    log_name:str = "2024.03.14_17.14.10 EMBKDJ"
+    log_name:str = "2024.03.23_22.43.49 KNTCBS"
 ):
     from matplotlib import pyplot as plt
+    from matplotlib.pyplot import Axes
 
-    # Get matching words:
-    edge_energies_str, mean_energies_str = search_words_in_log(log_name, ("Edge-Energies", "Mean energy after sequence") )
+    ## Get matching words:
+    edge_energies_strs, mean_energies_strs, num_mode_repetitions_per_segment_str = search_words_in_log(log_name, 
+        ("Edge-Energies", "Mean energy after sequence", "num_mode_repetitions_per_segment") 
+    )
+
+    n = len(mean_energies_strs)
+    
+    ## Parse num modes per segment:
+    num_mode_repetitions_per_segment = num_mode_repetitions_per_segment_str[0].removeprefix(": ")
+    num_mode_repetitions_per_segment = num_mode_repetitions_per_segment.removesuffix("\n")
+    num_mode_repetitions_per_segment = int(num_mode_repetitions_per_segment)
+
+    ## Gather mean energy
     mean_energies = []
-
-    ## Plot mean energy
-    for word in mean_energies_str:
+    for word in mean_energies_strs:
+        # Parse mean energy
         word = word.removeprefix(" = ")
         word = word.removesuffix("\n")
         mean_energies.append(float(word))
+        
+    ## Plot mean energies:    
+    plt.figure()
     plt.plot(mean_energies)
-    plt.show()
     plt.grid()
     plt.title("Mean Energy")
     plt.xlabel("Iteration")
-
+    
+    ## Plot energy per edge:
+    for i in range(n):
+        for j in range(num_mode_repetitions_per_segment):
+            # Plot only last edge:
+            if j<num_mode_repetitions_per_segment-1:
+                continue
+            # parse:
+            word = edge_energies_strs.pop(0)
+            word = word.removesuffix("]\n")
+            word = word.removeprefix("=[")
+            vals = word.split(", ")
+            assert len(vals)==6
+            energies = [float(val) for val in vals]
+            
+            # Plot:
+            for energy in energies:
+                energy /= 2  # Get equiv energy per site
+                plt.scatter(i, energy, s=4, c="black", alpha=0.5)
+                
+    plt.show()
     print("Done.")
 
 if __name__ == "__main__":
