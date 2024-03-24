@@ -23,14 +23,14 @@ def main(
     live_plots:bool|Iterable[bool] = [0,0,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 1,
-    chi_factor : int = 2,
+    chi_factor : int = 1,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1
 )->tuple[float, str]:
     
-    # unit_cell = UnitCell.load("AFM-stable-unit_cell")
-    unit_cell = UnitCell.random(d=d, D=D)
-    # unit_cell = UnitCell.zero_product_state(d=d, D=D)
+    unit_cell = UnitCell.load("2024.03.23_22.43.49_LCIU - continue here")
+    # unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.zero_product_state(d=d, D=D) 
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -42,7 +42,7 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(1,12)]
+    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(2,12)]
 
 
     # Interaction:

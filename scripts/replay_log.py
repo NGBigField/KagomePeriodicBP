@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 
 
 def main(
-    filename:str = "2024.03.19_12.00.45 FVFAAP"
+    filename:str = "2024.03.23_22.43.49 KNTCBS"
 ):
     logs.plot_log(filename)
     visuals.save_figure(file_name=filename)
