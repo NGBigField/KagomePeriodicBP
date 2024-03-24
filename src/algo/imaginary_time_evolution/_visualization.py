@@ -407,7 +407,7 @@ class ITEPlots():
             i = self._iteration
             plot = self.plots.main["energies"]
 
-            if isinstance(energies, list):
+            if isinstance(energies, dict):
                 energies4mean = []
                 for edge_tuple, energy in energies.items():
                     energies4mean.append(energy)
