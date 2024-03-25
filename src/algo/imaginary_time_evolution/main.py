@@ -383,7 +383,7 @@ def ite_per_delta_t(
             num_errors += 1
             if total_num_errors >= config.iterative_process.num_total_errors_threshold:
                 raise ITEError(f"ITE Algo experienced {total_num_errors}, and will terminate therefor.")
-            elif num_errors >= config_in.ite.num_errors_per_delta_t_threshold:
+            elif num_errors >= config.iterative_process.num_errors_per_delta_t_threshold:
                 logger.warn(f"ITE Algo experienced {num_errors} errors for delta_t={delta_t}, and will continue with the next delta_t.")
                 break 
             elif config.ite.segment_error_cause_state_revert:

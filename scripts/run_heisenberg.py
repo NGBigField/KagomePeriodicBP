@@ -18,7 +18,7 @@ d = 2
 
 
 def decreasing_global_field_func(delta_t:float|None)->float:
-    return delta_t*1e4
+    return delta_t*1e3
 
 def main(
     D = 2,
@@ -27,12 +27,12 @@ def main(
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     chi_factor : int = 1,
-    hamiltonian:str = "FM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1
 )->tuple[float, str]:
     
-    # unit_cell = UnitCell.load("2024.03.25_15.23.13_GYIT")
-    unit_cell = UnitCell.random(d=d, D=D)
+    unit_cell = UnitCell.load("2024.03.25_16.44.05_HIGW")
+    # unit_cell = UnitCell.random(d=d, D=D)
     # unit_cell = UnitCell.zero_product_state(d=d, D=D) 
     unit_cell.set_filename(results_filename) 
 
@@ -45,7 +45,7 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [[10**(-1)]*50] + [[10**(-exp)]*100 for exp in range(2,17)]
+    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(4,17)]
 
 
     # Interaction:
