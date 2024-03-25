@@ -372,6 +372,7 @@ class ITEProgressTracker():
         return ite_tracker
 
     def save(self)->None:
+        # avoid saving local variable:
         return saveload.save(self, self.file_name, sub_folder=SUB_FOLDER)        
 
     def plot(self, live_plot:bool=False)->None:

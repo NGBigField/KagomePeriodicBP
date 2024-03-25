@@ -160,6 +160,22 @@ def search_pattern_in_text(pattern:str, text:str)->int:
     return _kmp_search(text, pattern)
 
 
+def float_list_to_str(l:list[float], num_decimals:int|None=None)->str:
+    s = "["
+    for first, last, item in lists.iterate_with_edge_indicators(l):
+        if num_decimals is None:
+            s += f"{item}"
+        else:
+            s += f"{item:.{num_decimals}f}"
+             
+        
+        if not last:
+            s += ", "
+    s += "]"
+    return s
+
+
+
 def _compute_lps_array_for_kmp(pattern):
 	"""
 	This function computes the Longest Proper Prefix which is also a Suffix (LPS) array for a given pattern.
@@ -218,3 +234,5 @@ def _kmp_search(text, pattern):
 			else:
 				i += 1
 	return -1  # pattern not found
+
+

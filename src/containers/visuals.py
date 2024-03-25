@@ -13,6 +13,7 @@ class VisualsConfig():
 
     progress_bars : bool = True  # Show progress bars to get a feel for expected execution time
     verbose : bool = False  # Print any tiny detail through the code execution 
+    energies_print_decimal_point_length : int = 8
     
     _plots_to_show : tuple[bool] = _DEFAULT_PLOTS_TO_SHOW
 

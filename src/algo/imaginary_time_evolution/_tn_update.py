@@ -23,13 +23,14 @@ import functools
 import numpy as np
 
 
-@functools.cache
+# @functools.cache
 def get_imaginary_time_evolution_operator(hamiltonian_func:HamiltonianFuncAndInputs, delta_t:float) -> tuple[np.ndarray, np.ndarray]: 
     hamiltonian_func = HamiltonianFuncAndInputs.standard(hamiltonian_func)
-    h = hamiltonian_func.call(delta_t=delta_t)
     if delta_t is None:
+        h = hamiltonian_func.call(delta_t=0.0)
         g = None
     else:
+        h = hamiltonian_func.call(delta_t=delta_t)
         g = g_from_exp_h(h, delta_t)
     return h, g
 

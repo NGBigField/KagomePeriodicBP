@@ -29,7 +29,7 @@ import numpy as np
 from numpy.linalg import norm
 
 # Import our shared utilities
-from utils import tuples, lists, assertions, saveload, logs, decorators, errors, prints, visuals
+from utils import tuples, lists, assertions, saveload, logs, decorators, errors, prints, visuals, strings
 
 # For copying config:
 from copy import deepcopy
@@ -336,8 +336,9 @@ def ite_per_segment(
         
         ## Track results:
         stats.ite_per_mode_stats.append(ite_per_mode_stats)
-        logger.debug(f"        Hermicity of environment={[metric.hermicity for metric in ite_per_mode_stats.env_metrics]!r}")
-        logger.debug(f"        Edge-Energies={np.real(edge_energies).tolist()!r}")
+        energies_str = strings.float_list_to_str(np.real(edge_energies).tolist(), config.visuals.energies_print_decimal_point_length)
+        logger.debug(f"        Hermicity of environment={[metric.hermicity for metric in ite_per_mode_stats.env_metrics]!r}")        
+        logger.debug(f"        Edge-Energies after each update="+energies_str)
 
         ## inputs for next iteration:
         config.bp = ite_per_mode_stats.bp_stats.final_config
@@ -380,7 +381,7 @@ def ite_per_delta_t(
             logger.warn(str(e)+"\n"*3)
             total_num_errors = tracker.log_error(e)
             num_errors += 1
-            if total_num_errors >= config.ite.num_total_errors_threshold:
+            if total_num_errors >= config.iterative_process.num_total_errors_threshold:
                 raise ITEError(f"ITE Algo experienced {total_num_errors}, and will terminate therefor.")
             elif num_errors >= config_in.ite.num_errors_per_delta_t_threshold:
                 logger.warn(f"ITE Algo experienced {num_errors} errors for delta_t={delta_t}, and will continue with the next delta_t.")
@@ -410,7 +411,8 @@ def ite_per_delta_t(
         segment_stats.mean_energy = mean_energy
         tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
         plots.update(energies, segment_stats, delta_t, expectations, unit_cell)
-        logger_method(f"Mean energy after sequence = {mean_energy}")
+        logger_method(f"        Edge-Energies after segment =   "+strings.float_list_to_str(list(energies.values()), config.visuals.energies_print_decimal_point_length))
+        logger_method(f"Mean energy after segment = {mean_energy}")
 
         ## Check stopping criteria:
         if config.ite.check_converges and _check_converged(tracker.energies, tracker.delta_ts, delta_t):
