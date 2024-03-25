@@ -37,8 +37,11 @@ def index_by_approx_value(l:list, value:_Numeric, allowed_error:float=1e-6)->int
 
 def join_sub_lists(_lists:list[list[_T]])->list[_T]:
     res = []
-    for _list in _lists:
-        res.extend(_list)
+    for item in _lists:
+        if isinstance(item, list):
+            res.extend(item)
+        else:
+            res.append(item)
     return res
 
 

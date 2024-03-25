@@ -19,17 +19,17 @@ d = 2
 
 def main(
     D = 2,
-    N = 10,
+    N = 2,
     live_plots:bool|Iterable[bool] = [0,0,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    chi_factor : int = 2,
-    hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    chi_factor : int = 1,
+    hamiltonian:str = "FM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.03.24_22.37.58_VWPD")
-    # unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.load("2024.03.24_22.37.58_VWPD - stable start")
+    unit_cell = UnitCell.random(d=d, D=D)
     # unit_cell = UnitCell.zero_product_state(d=d, D=D) 
     unit_cell.set_filename(results_filename) 
 
@@ -42,14 +42,15 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(12,17)]
+    config.ite.time_steps = [1]*10 + [10**(-1)]*200 + [10**(-2)]*100 + [[10**(-exp)]*50 for exp in range(3,17)]
 
 
     # Interaction:
     match hamiltonian: 
         case "AFM":   config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None)
+        case "AFM-T": config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm_with_field, "delta_t")
         case "FM":    config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm, None)
-        case "FM-T":  config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm_with_field, None)
+        case "FM-T":  config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm_with_field, "delta_t")
         case "Field": config.ite.interaction_hamiltonian = (hamiltonians.field, None)
         case _:
             raise ValueError("Not matching any option.")

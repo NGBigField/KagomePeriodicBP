@@ -89,7 +89,7 @@ class UnitCell:
         return saveload.save(self, name=file_name, sub_folder=UNIT_CELL_SUBFOLDER)
 
     @staticmethod
-    def load(file_name:str, if_exist:bool=True)->"UnitCell":
+    def load(file_name:str, if_exist:bool=False)->"UnitCell":
         return saveload.load(file_name, sub_folder=UNIT_CELL_SUBFOLDER, if_exist=if_exist)
     
     def set_filename(self, filename:str)->None:

@@ -7,7 +7,7 @@ from utils.arguments import Stats
 from copy import deepcopy
 
 # For type hinting:
-from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Iterable, Any
+from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Iterable, Any, TypeAlias
 _T = TypeVar("_T")
 
 # Other containers and enums:
@@ -23,6 +23,7 @@ import itertools
 
 
 DEFAULT_ITE_TRACKER_MEMORY_LENGTH : int = 10
+_OptionalHamiltonianArgumentTypes : TypeAlias = _T|tuple[_T]|None|str
 
 
 _NEXT_IN_ABC_ORDER = {
@@ -67,9 +68,15 @@ class _LimitedLengthList(Generic[_T]):
         return len(self._list)
 
 
+def _optional_arguments_for_hamiltonian_function(args:_OptionalHamiltonianArgumentTypes, **kwargs)->_OptionalHamiltonianArgumentTypes:
+    if isinstance(args, str) and args=="delta_t" and "delta_t" in kwargs:
+        return kwargs["delta_t"]
+    return args
+
+
 class HamiltonianFuncAndInputs(NamedTuple):
     func: Callable[[_T], np.ndarray] 
-    args: _T|tuple[_T]|None
+    args: _OptionalHamiltonianArgumentTypes
 
     def __repr__(self) -> str:
         return f"Hamiltonian function {self.func.__name__!r} with arguments: {self.args}"
@@ -91,10 +98,13 @@ class HamiltonianFuncAndInputs(NamedTuple):
 
         raise ValueError(f"Not a valid input for class {HamiltonianFuncAndInputs.__name__!r}") 
 
-    def call(self)->np.ndarray:
+    def call(self, **kwargs)->np.ndarray:
         assert len(self)==2
         func   = self.func
         args   = self.args
+
+        # choose input for hamiltonian function
+        args = _optional_arguments_for_hamiltonian_function(args, **kwargs) 
 
         # call:
         if args is None:
@@ -173,9 +183,9 @@ class IterativeProcessConfig():
 @dataclass
 class ITEConfig():
     # hamiltonian:
-    interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
+    _interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
     # ITE time steps:
-    time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
+    _time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
     num_mode_repetitions_per_segment : int = 1  # number of modes between each measurement of energy
     # Control flags:
     random_mode_order : bool = True
@@ -186,7 +196,7 @@ class ITEConfig():
     def reference_ground_energy(self)->float|None:  
         """Ground truth energy, if known
         """
-        func = self.interaction_hamiltonian.func
+        func = self._interaction_hamiltonian.func
         if hasattr(func, "reference"):
             return func.reference
 
@@ -198,7 +208,7 @@ class ITEConfig():
             value = getattr(obj, field.name)
             if isinstance(value, np.ndarray):
                 value_str = f"ndarray of shape {value.shape}"
-            elif isinstance(value, list) and field.name == "time_steps":
+            elif isinstance(value, list) and field.name == "_time_steps":
                 value_str = _time_steps_str(value)
             else:
                 value_str = str(value)
@@ -206,8 +216,26 @@ class ITEConfig():
         return s
     
     def __post_init__(self)->None:
-        self.interaction_hamiltonian = HamiltonianFuncAndInputs.standard(self.interaction_hamiltonian)
-        self.time_steps = _fix_and_rearrange_time_steps(self.time_steps)
+        self._interaction_hamiltonian = HamiltonianFuncAndInputs.standard(self._interaction_hamiltonian)
+        self._time_steps = _fix_and_rearrange_time_steps(self._time_steps)
+
+    ## ================== Getters and Setters: ================== ##        
+    @property
+    def interaction_hamiltonian(self)->HamiltonianFuncAndInputs:
+        return self._interaction_hamiltonian
+    @interaction_hamiltonian.setter
+    def interaction_hamiltonian(self, value:HamiltonianFuncAndInputs)->None:
+        self._interaction_hamiltonian = value
+        self.__post_init__()
+
+    @property
+    def time_steps(self)->list[float]:
+        return self._time_steps
+    @time_steps.setter
+    def time_steps(self, value:list[float]|list[list[float]])->None:
+        self._time_steps = value
+        self.__post_init__()
+    
     
 
 class ITEPerModeStats(Stats):
@@ -383,9 +411,7 @@ def _time_steps_str(time_steps:list[float])->str:
 
 
 def _fix_and_rearrange_time_steps(times:list[float]|list[list[float]])->list[float]:
-    if isinstance(times, list) and isinstance(times[0], list):
+    if isinstance(times, list):
         return lists.join_sub_lists(times)
-    elif isinstance(times, list) and isinstance(times[0], (float, int)):
-        return times
     else:
         raise TypeError(f"Not an expected type of argument `times`. It has type {type(times)}")

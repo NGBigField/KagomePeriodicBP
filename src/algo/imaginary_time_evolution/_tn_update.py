@@ -26,7 +26,7 @@ import numpy as np
 @functools.cache
 def get_imaginary_time_evolution_operator(hamiltonian_func:HamiltonianFuncAndInputs, delta_t:float) -> tuple[np.ndarray, np.ndarray]: 
     hamiltonian_func = HamiltonianFuncAndInputs.standard(hamiltonian_func)
-    h = hamiltonian_func.call()
+    h = hamiltonian_func.call(delta_t=delta_t)
     if delta_t is None:
         g = None
     else:
@@ -100,7 +100,7 @@ def _calc_environment_equivalent_matrix(environment_tensors:list[np.ndarray]) ->
     return m
 
 
-def update_unit_cell(
+def ite_update_unit_cell(
     edge_tn:EdgeTN,
     unit_cell:UnitCell,
     ite_config:ITEConfig,

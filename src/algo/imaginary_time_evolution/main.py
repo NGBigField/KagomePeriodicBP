@@ -39,7 +39,7 @@ from algo.imaginary_time_evolution._logs_and_prints import print_or_log_bp_messa
                                                             print_or_log_ite_segment_progress, get_progress_bar
 from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
 from algo.imaginary_time_evolution._visualization import ITEPlots
-from algo.imaginary_time_evolution._tn_update import update_unit_cell
+from algo.imaginary_time_evolution._tn_update import ite_update_unit_cell
 
 # Import belief propagation code:
 from algo.belief_propagation import robust_belief_propagation, belief_propagation, BPStats
@@ -262,7 +262,7 @@ def ite_per_mode(
         edge_tn = reduce_tn(mode_tn, EdgeTN, trunc_dim=config.trunc_dim, edge_tuple=edge_tuple)
 
         # Perform ITE update:
-        unit_cell, energy, env_metrics = update_unit_cell(edge_tn, unit_cell, config.ite, delta_t, logger)
+        unit_cell, energy, env_metrics = ite_update_unit_cell(edge_tn, unit_cell, config.ite, delta_t, logger)
 
         # keep stats:
         edge_energies.append(energy)
