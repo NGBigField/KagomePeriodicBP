@@ -23,7 +23,8 @@ import itertools
 
 
 DEFAULT_ITE_TRACKER_MEMORY_LENGTH : int = 10
-_OptionalHamiltonianArgumentTypes : TypeAlias = _T|tuple[_T]|None|str
+_HamilInputType : TypeAlias = _T|tuple[_T]|None|str
+_HamilInputRuleType : TypeAlias = Callable[[Any], _HamilInputType]|None
 
 
 _NEXT_IN_ABC_ORDER = {
@@ -68,43 +69,47 @@ class _LimitedLengthList(Generic[_T]):
         return len(self._list)
 
 
-def _optional_arguments_for_hamiltonian_function(args:_OptionalHamiltonianArgumentTypes, **kwargs)->_OptionalHamiltonianArgumentTypes:
+def _optional_arguments_for_hamiltonian_function(args:_HamilInputType, rule:_HamilInputRuleType, **kwargs)->_HamilInputType:
     if isinstance(args, str) and args=="delta_t" and "delta_t" in kwargs:
-        return kwargs["delta_t"]
+        args = kwargs["delta_t"]
+    if rule is not None:
+        args = rule(args)
     return args
 
 
 class HamiltonianFuncAndInputs(NamedTuple):
-    func: Callable[[_T], np.ndarray] 
-    args: _OptionalHamiltonianArgumentTypes
+    func: Callable[[_HamilInputType], np.ndarray] 
+    args: _HamilInputType
+    args_rule: _HamilInputRuleType
 
     def __repr__(self) -> str:
         return f"Hamiltonian function {self.func.__name__!r} with arguments: {self.args}"
 
     @staticmethod
     def default()->"HamiltonianFuncAndInputs":
-        return HamiltonianFuncAndInputs(func=zero, args=None)
+        return HamiltonianFuncAndInputs(func=zero, args=None, args_rule=None)
 
     @staticmethod
     def standard(self_or_tuple)->"HamiltonianFuncAndInputs":
-        assert len(self_or_tuple)==2
+        assert len(self_or_tuple)==3
         assert callable(self_or_tuple[0])
         if isinstance(self_or_tuple, HamiltonianFuncAndInputs):
             assert callable(self_or_tuple.func)
             return self_or_tuple
         
         if isinstance(self_or_tuple, tuple):
-            return HamiltonianFuncAndInputs(func=self_or_tuple[0], args=self_or_tuple[1])
+            return HamiltonianFuncAndInputs(func=self_or_tuple[0], args=self_or_tuple[1], args_rule=self_or_tuple[2])
 
         raise ValueError(f"Not a valid input for class {HamiltonianFuncAndInputs.__name__!r}") 
 
     def call(self, **kwargs)->np.ndarray:
-        assert len(self)==2
-        func   = self.func
-        args   = self.args
+        assert len(self)==3
+        func = self.func
+        args = self.args
+        rule = self.args_rule
 
         # choose input for hamiltonian function
-        args = _optional_arguments_for_hamiltonian_function(args, **kwargs) 
+        args = _optional_arguments_for_hamiltonian_function(args, rule, **kwargs) 
 
         # call:
         if args is None:

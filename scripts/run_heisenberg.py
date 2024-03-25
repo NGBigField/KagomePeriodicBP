@@ -17,6 +17,9 @@ import numpy as np
 d = 2
 
 
+def decreasing_global_field_func(delta_t:float)->float:
+    return delta_t*1e3
+
 def main(
     D = 2,
     N = 2,
@@ -42,16 +45,16 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [1]*10 + [10**(-1)]*200 + [10**(-2)]*100 + [[10**(-exp)]*50 for exp in range(3,17)]
+    config.ite.time_steps = [10**(-2)]*100 + [[10**(-exp)]*50 for exp in range(3,17)]
 
 
     # Interaction:
     match hamiltonian: 
-        case "AFM":   config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None)
-        case "AFM-T": config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm_with_field, "delta_t")
-        case "FM":    config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm, None)
-        case "FM-T":  config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm_with_field, "delta_t")
-        case "Field": config.ite.interaction_hamiltonian = (hamiltonians.field, None)
+        case "AFM":   config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None, None)
+        case "AFM-T": config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm_with_field, "delta_t", lambda delta_t: decreasing_global_field_func(delta_t))
+        case "FM":    config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm, None, None)
+        case "FM-T":  config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm_with_field, "delta_t", lambda delta_t: decreasing_global_field_func(delta_t))
+        case "Field": config.ite.interaction_hamiltonian = (hamiltonians.field, None, None)
         case _:
             raise ValueError("Not matching any option.")
     
