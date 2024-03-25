@@ -22,13 +22,13 @@ def main(
     N = 10,
     live_plots:bool|Iterable[bool] = [0,0,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
-    parallel:bool = 1,
-    chi_factor : int = 1,
+    parallel:bool = 0,
+    chi_factor : int = 2,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.03.24_17.20.47_TLJT")
+    unit_cell = UnitCell.load("2024.03.24_22.37.58_VWPD")
     # unit_cell = UnitCell.random(d=d, D=D)
     # unit_cell = UnitCell.zero_product_state(d=d, D=D) 
     unit_cell.set_filename(results_filename) 
@@ -42,7 +42,7 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(7,12)]
+    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(12,17)]
 
 
     # Interaction:
