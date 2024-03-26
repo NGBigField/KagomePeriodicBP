@@ -199,14 +199,14 @@ def search_words_in_log(
 
 
 def plot_log(
-    log_name:str = "2024.03.23_22.43.49 KNTCBS"
+    log_name:str = "2024.03.25_18.23.58 NAAWTV"
 ):
     from matplotlib import pyplot as plt
     from matplotlib.pyplot import Axes
 
     ## Get matching words:
     edge_energies_strs, mean_energies_strs, num_mode_repetitions_per_segment_str = search_words_in_log(log_name, 
-        ("Edge-Energies", "Mean energy after sequence", "num_mode_repetitions_per_segment") 
+        ("Edge-Energies after each update", " Mean energy after segment", "num_mode_repetitions_per_segment") 
     )
 
     n = len(mean_energies_strs)
