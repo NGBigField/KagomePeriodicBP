@@ -17,8 +17,18 @@ import numpy as np
 d = 2
 
 
+force_values = np.linspace(1e-3, 0, 800*6)
+iter_force_value = iter(force_values)
+enter_counter = 0
 def decreasing_global_field_func(delta_t:float|None)->float:
-    return delta_t*1e-6
+    global enter_counter 
+    enter_counter += 1
+    try:
+        next_force_value = next(iter_force_value)
+    except StopIteration:
+        next_force_value = 0
+    return next_force_value
+
 
 def main(
     D = 2,
@@ -31,7 +41,7 @@ def main(
     damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.03.25_22.15.12_QHBX_final")
+    unit_cell = UnitCell.load("2024.03.27_08.57.11_TNIZ")
     # unit_cell = UnitCell.random(d=d, D=D)
     # unit_cell = UnitCell.zero_product_state(d=d, D=D) 
     unit_cell.set_filename(results_filename) 
@@ -45,7 +55,7 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [[10**(-exp)]*100 for exp in range(10,24)]
+    config.ite.time_steps = [[10**(-exp)]*100 for exp in range(2,24)]
 
 
     # Interaction:
