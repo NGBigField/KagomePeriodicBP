@@ -17,7 +17,7 @@ import numpy as np
 d = 2
 
 
-force_values = np.logspace(-12, -18, 800*6)
+force_values = np.logspace(-14, -18, 800*6)
 iter_force_value = iter(force_values)
 enter_counter = 0
 def decreasing_global_field_func(delta_t:float|None)->float:
@@ -33,16 +33,16 @@ def decreasing_global_field_func(delta_t:float|None)->float:
 def main(
     D = 2,
     N = 2,
-    live_plots:bool|Iterable[bool] = [0,0,0],
+    live_plots:bool|Iterable[bool] = [1,0,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     chi_factor : int = 1,
-    hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.03.28_11.14.02_UAXU")
-    # unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.load("2024.03.28_17.53.11_RHPI")
+    unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -54,7 +54,7 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(5,16)]
+    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(2,16)]
 
 
     # Interaction:

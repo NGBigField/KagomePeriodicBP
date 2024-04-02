@@ -52,7 +52,7 @@ field.reference = - GLOBAL_FIELD_STRENGTH
 def heisenberg_afm()->np.ndarray:
 	"""Heisenberg Anti-FerroMagnetic model
 	"""
-	return _tensor_product(x,x) + _tensor_product(y,y) + _tensor_product(z,z) 
+	return 1.001*_tensor_product(x,x) + 0.997*_tensor_product(y,y) + 0.99941*_tensor_product(z,z) 
 # heisenberg_afm.reference = -0.438703897456
 heisenberg_afm.reference = -0.38620
 
