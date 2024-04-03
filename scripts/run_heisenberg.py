@@ -33,16 +33,16 @@ def decreasing_global_field_func(delta_t:float|None)->float:
 def main(
     D = 2,
     N = 3,
-    live_plots:bool|Iterable[bool] = [1,0,0],
+    live_plots:bool|Iterable[bool] = [0,0,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     chi_factor : int = 2,
-    hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.04.03_16.01.50_UINH")
-    # unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.load("2024.04.03_16.01.50_UINH")
+    unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -56,7 +56,7 @@ def main(
     config.bp.max_swallowing_dim *= chi_factor
     config.bp.msg_diff_terminate = 1e-16
     config.bp.max_iterations = 80
-    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(5,10)]
+    config.ite.time_steps = [[10**(-exp)]*100 for exp in range(2,12)]
 
 
     # Interaction:
