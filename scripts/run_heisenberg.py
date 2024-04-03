@@ -36,7 +36,7 @@ def main(
     live_plots:bool|Iterable[bool] = [1,0,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    chi_factor : int = 1,
+    chi_factor : int = 2,
     hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1
 )->tuple[float, str]:
@@ -54,7 +54,7 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim *= chi_factor
-    config.bp.msg_diff_terminate = 1e-15
+    config.bp.msg_diff_terminate = 1e-16
     config.bp.max_iterations = 80
     config.ite.time_steps = [[10**(-exp)]*50 for exp in range(5,10)]
 
