@@ -102,7 +102,10 @@ def _calculate_crnt_observables(
 
     # TODO: Delete
     config = config.copy()
+    D = config.dims.virtual_dim
     config.dims.big_lattice_size = 6
+    config.trunc_dim = 2*D**2 + 10
+    config.bp.max_swallowing_dim = 4*D**2
     messages = None
 
     ## Get a new fresh tn:
