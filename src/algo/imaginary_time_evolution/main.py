@@ -100,6 +100,11 @@ def _calculate_crnt_observables(
     live_plots = config.visuals.live_plots
     allow_prog_bar = config.visuals.progress_bars
 
+    # TODO: Delete
+    config = config.copy()
+    config.dims.big_lattice_size = 6
+    messages = None
+
     ## Get a new fresh tn:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
     messages, _ = robust_belief_propagation(full_tn, messages, bp_config, live_plots, allow_prog_bar)
@@ -387,8 +392,13 @@ def ite_per_delta_t(
                 logger.warn(f"ITE Algo experienced {num_errors} errors for delta_t={delta_t}, and will continue with the next delta_t.")
                 break 
             elif config.iterative_process.segment_error_cause_state_revert:
+                
+                revert_length = 1
+                if len(tracker) < revert_length:
+                    continue
+                
                 try:
-                    _, mean_energy, segment_stats, _, unit_cell, messages = tracker.revert_back(1)
+                    _, mean_energy, segment_stats, _, unit_cell, messages = tracker.revert_back(revert_length)
                 except ITEError as tracker_error:
                     logger.error(tracker_error)
                     raise e
