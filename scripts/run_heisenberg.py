@@ -33,16 +33,16 @@ def decreasing_global_field_func(delta_t:float|None)->float:
 def main(
     D = 2,
     N = 2,
-    chi_factor : int = 1,
+    chi_factor : int = 2,
     live_plots:bool|Iterable[bool] = [0,0,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0
+    damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.04.03_21.23.49_YTCE")
-    # unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.load("2024.04.03_21.23.49_YTCE")
+    unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -51,10 +51,11 @@ def main(
     config.visuals.live_plots = live_plots
     config.bp.damping = damping
     config.bp.parallel_msgs = parallel
+    config.trunc_dim = 8*D**2
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim = 4*D**2
     config.bp.max_swallowing_dim *= chi_factor
-    config.bp.msg_diff_terminate = 1e-16
+    config.bp.msg_diff_terminate = 1e-15
     config.bp.msg_diff_good_enough = 1e-5
     config.bp.max_iterations = 90
     config.bp.times_to_deem_failure_when_diff_increases = 4
