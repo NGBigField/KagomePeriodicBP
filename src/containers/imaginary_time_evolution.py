@@ -244,10 +244,11 @@ class ITEConfig():
     
 
 class ITEPerModeStats(Stats):
-    bp_stats : BPStats = None 
+    bp_stats : list[BPStats] = None 
     env_metrics : list[MatrixMetrics]
 
     def __post_init__(self):
+        self.bp_stats = list()
         self.env_metrics = list()  # Avoid python's infamous immutable lists problem
 
         

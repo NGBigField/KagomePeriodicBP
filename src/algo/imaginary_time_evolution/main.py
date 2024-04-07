@@ -75,7 +75,7 @@ def _initial_full_ite_inputs(config:Config, unit_cell:UnitCell, logger:logs.Logg
 
 
 def _harden_bp_config_if_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger) -> Config:
-    if bp_stats.attempts>1: 
+    if not bp_stats.success: 
         config.bp.max_swallowing_dim = bp_stats.final_config.max_swallowing_dim
         logger.debug(f"        config.bp.max_swallowing_dim updated to {config.bp.max_swallowing_dim}")
         if bp_stats.final_config.max_swallowing_dim>=config.trunc_dim:
@@ -85,7 +85,7 @@ def _harden_bp_config_if_struggled(config:Config, bp_stats:BPStats, logger:logs.
 
 
 def _calculate_crnt_observables(
-    unit_cell:UnitCell, config:Config, messages:MessageDictType, segment_stats:ITESegmentStats|None
+    unit_cell:UnitCell, config:Config, messages:MessageDictType
 )->tuple[
     dict[tuple[str, str], float],
     dict[str, dict[str, float]],
@@ -93,24 +93,18 @@ def _calculate_crnt_observables(
     MessageDictType
 ]:
     ## Unpack inputs:
-    if segment_stats is None:
-        bp_config = config.bp
-    else:
-        bp_config = segment_stats.ite_per_mode_stats[-1].bp_stats.final_config
     live_plots = config.visuals.live_plots
     allow_prog_bar = config.visuals.progress_bars
 
     # TODO: Delete
     config = config.copy()
-    D = config.dims.virtual_dim
-    config.dims.big_lattice_size = 6
-    config.trunc_dim = 2*D**2 + 10
-    config.bp.max_swallowing_dim = 4*D**2
+    config.dims.big_lattice_size += 2 
+    config.bp.allowed_retries = 1 
     messages = None
 
     ## Get a new fresh tn:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
-    messages, _ = robust_belief_propagation(full_tn, messages, bp_config, live_plots, allow_prog_bar)
+    messages, _ = robust_belief_propagation(full_tn, messages, config.bp    , live_plots, allow_prog_bar)
 
     ## Calculate observables:
     energies, expectations, mean_energy = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
@@ -128,7 +122,7 @@ def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:
     logger.info("Calculating measurements of initial core...")
 
     ## Calculate observables:
-    energies, expectations, mean_energy, messages = _calculate_crnt_observables(unit_cell, config, messages, None)
+    energies, expectations, mean_energy, messages = _calculate_crnt_observables(unit_cell, config, messages)
 
     ## Save data, print performance and plot graphs:
     ite_tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
@@ -202,7 +196,7 @@ def _mode_order_without_repetitions(prev_order:list[UpdateMode], ite_config:ITEC
 def _from_unit_cell_to_stable_mode(
     unit_cell:UnitCell, messages:MessageDictType, config:Config, logger:logs.Logger, mode:UpdateMode
 )->tuple[
-    ModeTN, MessageDictType, BPStats
+    ModeTN, MessageDictType, BPStats, Config
 ]:
     ## Duplicate core into a big tensor-network:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
@@ -220,7 +214,7 @@ def _from_unit_cell_to_stable_mode(
 
     ## Contract to mode:
     mode_tn = reduce_tn(full_tn, ModeTN, trunc_dim=config.trunc_dim, mode=mode)
-    return mode_tn, messages, bp_stats
+    return mode_tn, messages, bp_stats, config
 
 
 def get_imaginary_time_evolution_operator(h:np.ndarray, delta_t:float)->tuple[np.ndarray, np.ndarray]:
@@ -262,7 +256,7 @@ def ite_per_mode(
 
         if config.iterative_process.bp_every_edge or is_first:
             # Perform BlockBP again, to get converged messages.
-            mode_tn, messages, bp_stats = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
+            mode_tn, messages, bp_stats, config = _from_unit_cell_to_stable_mode(unit_cell, messages, config, logger, mode)
         else:
             # Just update the tensors 
             mode_tn.update_unit_cell_tensors(unit_cell)
@@ -275,13 +269,10 @@ def ite_per_mode(
         # keep stats:
         edge_energies.append(energy)
         stats.env_metrics.append(env_metrics)
-
-        ## inputs for next iteration:
-        config.bp = bp_stats.final_config
+        stats.bp_stats.append(bp_stats)
 
     prog_bar.clear()
 
-    stats.bp_stats = bp_stats
 
     return unit_cell, messages, edge_energies, stats
 
@@ -349,7 +340,7 @@ def ite_per_segment(
         logger.debug(f"        Edge-Energies after each update="+energies_str)
 
         ## inputs for next iteration:
-        config.bp = ite_per_mode_stats.bp_stats.final_config
+        # config.bp = ite_per_mode_stats.bp_stats.final_config
 
     prog_bar.clear()
 
@@ -411,10 +402,10 @@ def ite_per_delta_t(
         at_least_one_successful_run = True
 
         config_with_harder_bp = config.copy()
-        config_with_harder_bp.bp = segment_stats.ite_per_mode_stats[-1].bp_stats.final_config
+        config_with_harder_bp.bp = segment_stats.ite_per_mode_stats[-1].bp_stats[-1].final_config
 
         ## Calculate observables:
-        energies, expectations, mean_energy, messages = _calculate_crnt_observables(unit_cell, config_with_harder_bp, messages, segment_stats)
+        energies, expectations, mean_energy, messages = _calculate_crnt_observables(unit_cell, config_with_harder_bp, messages)
 
         ## If bp struggled, we will use the harder config for next times:
         if config.iterative_process.keep_harder_bp_config_between_segments:

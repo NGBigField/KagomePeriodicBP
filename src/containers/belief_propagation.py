@@ -18,7 +18,7 @@ class BPConfig:
     msg_diff_terminate : float = 1e-6
     msg_diff_good_enough : float = 1e-4
     msg_diff_squared : bool = True  # True is easier to get to 
-    allowed_retries : int = 3
+    allowed_retries : int = 2
     times_to_deem_failure_when_diff_increases  : int = 3
     parallel_msgs : bool = False
     damping : float|None = None  # The `learning-step` of the messages. 
