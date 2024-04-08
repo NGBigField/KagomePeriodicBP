@@ -18,6 +18,7 @@ from containers.density_matrices import MatrixMetrics
 from tensor_networks import UnitCell
 from _error_types import ITEError
 
+
 # For smart iterations:
 import itertools
 
@@ -25,6 +26,10 @@ import itertools
 DEFAULT_ITE_TRACKER_MEMORY_LENGTH : int = 10
 _HamilInputType : TypeAlias = _T|tuple[_T]|None|str
 _HamilInputRuleType : TypeAlias = Callable[[Any], _HamilInputType]|None
+
+
+def _Identity_function(x):
+    return x
 
 
 _NEXT_IN_ABC_ORDER = {
@@ -183,6 +188,9 @@ class IterativeProcessConfig():
     num_errors_per_delta_t_threshold : int = 5    
     segment_error_cause_state_revert : bool = True    
     keep_harder_bp_config_between_segments : bool = False
+    # Measure expectation and energies:
+    num_mode_repetitions_per_segment : int = 1  # number of modes between each measurement of energy
+    change_config_for_measurements_func : Callable[[_T], _T] = _Identity_function
 
 
 @dataclass
@@ -191,7 +199,6 @@ class ITEConfig():
     _interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
     # ITE time steps:
     _time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
-    num_mode_repetitions_per_segment : int = 1  # number of modes between each measurement of energy
     # Control flags:
     random_mode_order : bool = True
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t

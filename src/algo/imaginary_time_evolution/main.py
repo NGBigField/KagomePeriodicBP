@@ -50,6 +50,16 @@ from algo.tn_reduction import reduce_tn
 from libs import ITE as ite
 
 
+
+def _change_config_for_measurements_if_applicable(config:Config)->Config:
+    if config.iterative_process.change_config_for_measurements_func is None:
+        return config
+    
+    func = config.iterative_process.change_config_for_measurements_func
+    assert callable(func)
+    return func(config.copy())
+
+
 def _initial_full_ite_inputs(config:Config, unit_cell:UnitCell, logger:logs.Logger):
     # Config:
     if config is None:
@@ -79,7 +89,7 @@ def _harden_bp_config_if_struggled(config:Config, bp_stats:BPStats, logger:logs.
         config.bp.max_swallowing_dim = bp_stats.final_config.max_swallowing_dim
         logger.debug(f"        config.bp.max_swallowing_dim updated to {config.bp.max_swallowing_dim}")
         if bp_stats.final_config.max_swallowing_dim>=config.trunc_dim:
-            config.trunc_dim = int(bp_stats.final_config.max_swallowing_dim*1.5)
+            config.trunc_dim = int(bp_stats.final_config.max_swallowing_dim*1.33)
             logger.debug(f"        config.bubblecon_trunc_dim updated to {config.trunc_dim}")
     return config
 
@@ -96,15 +106,15 @@ def _calculate_crnt_observables(
     live_plots = config.visuals.live_plots
     allow_prog_bar = config.visuals.progress_bars
 
-    # TODO: Delete
-    config = config.copy()
-    config.dims.big_lattice_size += 2 
-    config.bp.allowed_retries = 1 
-    messages = None
+    config_in = config
+    messages_in = None
+
+    ## Sometimes we would like to change the configurations for measurements:
+    config = _change_config_for_measurements_if_applicable(config)
 
     ## Get a new fresh tn:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
-    messages, _ = robust_belief_propagation(full_tn, messages, config.bp    , live_plots, allow_prog_bar)
+    messages, _ = robust_belief_propagation(full_tn, messages_in, config.bp    , live_plots, allow_prog_bar)
 
     ## Calculate observables:
     energies, expectations, mean_energy = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
@@ -293,7 +303,7 @@ def ite_per_segment(
     ## Copy and parse config:
     config = config_in.copy()
     use_prog_bar = config.visuals.progress_bars
-    num_modes = config.ite.num_mode_repetitions_per_segment
+    num_modes = config.iterative_process.num_mode_repetitions_per_segment
 
     ## Init messages or use old ones
     if config.iterative_process.start_segment_with_new_bp_message:
@@ -401,15 +411,12 @@ def ite_per_delta_t(
 
         at_least_one_successful_run = True
 
-        config_with_harder_bp = config.copy()
-        config_with_harder_bp.bp = segment_stats.ite_per_mode_stats[-1].bp_stats[-1].final_config
-
         ## Calculate observables:
-        energies, expectations, mean_energy, messages = _calculate_crnt_observables(unit_cell, config_with_harder_bp, messages)
+        energies, expectations, mean_energy, messages = _calculate_crnt_observables(unit_cell, config, messages)
 
         ## If bp struggled, we will use the harder config for next times:
         if config.iterative_process.keep_harder_bp_config_between_segments:
-            config = config_with_harder_bp
+            raise NotImplementedError()
 
         ## Save data, print performance and plot graphs:
         segment_stats.mean_energy = mean_energy
