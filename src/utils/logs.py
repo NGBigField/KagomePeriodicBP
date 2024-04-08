@@ -199,13 +199,13 @@ def search_words_in_log(
 
 
 def plot_log(
-    log_name:str = "2024.04.07_19.47.05 QNDVBI"
+    log_name:str = "2024.04.07_20.51.11 OOXMGR"
 ):
     from matplotlib import pyplot as plt
     from matplotlib.pyplot import Axes
 
     ## Get matching words:
-    edge_energies_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, reference_energy = search_words_in_log(log_name, 
+    edge_energies_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, reference_energy_str = search_words_in_log(log_name, 
         ("Edge-Energies after each update", " Mean energy after segment", "num_mode_repetitions_per_segment", "Hamiltonian's reference energy") 
     )
 
@@ -251,11 +251,14 @@ def plot_log(
                 plt.scatter(i, energy, s=4, c="black", alpha=0.5)
                 
     ## Plot reference energy:
-    if len(reference_energy)==0:
+    if len(reference_energy_str)==0:
         pass
-    elif len(reference_energy)==1:
-        reference_energy = reference_energy[0]
-        plt.axhline(reference_energy)
+    elif len(reference_energy_str)==1:
+        reference_energy = reference_energy_str[0]
+        reference_energy = reference_energy.removeprefix(" is ")
+        reference_energy = reference_energy.removesuffix("\n")
+        reference_energy = float(reference_energy)
+        plt.axhline(reference_energy, linestyle="--", color="g")
     else:
         raise NotImplementedError("Not a known case")
 

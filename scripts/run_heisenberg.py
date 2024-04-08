@@ -17,7 +17,7 @@ import numpy as np
 d = 2
 
 
-force_values = np.logspace(-12, -20, 500*6)
+force_values = np.logspace(-14, -20, 500*6)
 iter_force_value = iter(force_values)
 enter_counter = 0
 def decreasing_global_field_func(delta_t:float|None)->float:
@@ -36,18 +36,18 @@ def _config_at_test_function(config:Config)->Config:
 
 
 def main(
-    D = 2,
+    D = 1,
     N = 2,
     chi_factor : int = 1,
-    live_plots:bool|Iterable[bool] = [0,0,0],
+    live_plots:bool|Iterable[bool] = [1,0,0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0.2
+    hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    damping:float|None = 0
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.04.07_16.29.49_JHAD")
-    # unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.load("2024.04.07_16.29.49_JHAD")
+    unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -60,14 +60,14 @@ def main(
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim = 4*D**2
     config.bp.max_swallowing_dim *= chi_factor
-    config.bp.msg_diff_terminate = 1e-6
+    config.bp.msg_diff_terminate = 1e-10
     config.bp.msg_diff_good_enough = 1e-5
     config.bp.max_iterations = 61
     config.bp.times_to_deem_failure_when_diff_increases = 3
     config.bp.allowed_retries = 2
-    config.iterative_process.num_mode_repetitions_per_segment = 2
+    config.iterative_process.num_mode_repetitions_per_segment = 1
     config.iterative_process.change_config_for_measurements_func = _config_at_test_function
-    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(2,12)]
+    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(2, 12)]
 
     # Interaction:
     match hamiltonian: 
