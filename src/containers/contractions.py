@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from containers._meta import container_repr
 from lattices.directions import BlockSide, LatticeDirection
 
 @dataclass

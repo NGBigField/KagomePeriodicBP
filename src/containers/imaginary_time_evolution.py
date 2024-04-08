@@ -11,6 +11,7 @@ from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Iterable, 
 _T = TypeVar("_T")
 
 # Other containers and enums:
+from containers._meta import _ConfigClass
 from enums.imaginary_time_evolution import UpdateMode
 from enums.tensor_networks import UnitCellFlavor
 from containers.belief_propagation import BPStats
@@ -176,7 +177,7 @@ DEFAULT_TIME_STEPS = lambda: [0.02]*5 + [0.01]*5 + [0.001]*100 + [1e-4]*100 + [1
 
 
 @dataclass
-class IterativeProcessConfig():
+class IterativeProcessConfig(_ConfigClass):
     # File:
     backup_file_name : str = "ite_backup"+strings.time_stamp()+" "+strings.random(6)
     # Belief-Propagation flags:
@@ -192,9 +193,12 @@ class IterativeProcessConfig():
     num_mode_repetitions_per_segment : int = 1  # number of modes between each measurement of energy
     change_config_for_measurements_func : Callable[[_T], _T] = _Identity_function
 
+    def __repr__(self) -> str:
+        return super().__repr__()
+
 
 @dataclass
-class ITEConfig():
+class ITEConfig(_ConfigClass):
     # hamiltonian:
     _interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
     # ITE time steps:
@@ -202,7 +206,6 @@ class ITEConfig():
     # Control flags:
     random_mode_order : bool = True
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
-
 
     @property
     def reference_ground_energy(self)->float|None:  

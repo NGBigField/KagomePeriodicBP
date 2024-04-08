@@ -199,7 +199,7 @@ def search_words_in_log(
 
 
 def plot_log(
-    log_name:str = "2024.04.07_16.29.49 RZPIDA"
+    log_name:str = "2024.04.07_19.47.05 QNDVBI"
 ):
     from matplotlib import pyplot as plt
     from matplotlib.pyplot import Axes

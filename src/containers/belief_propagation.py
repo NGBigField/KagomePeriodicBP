@@ -1,17 +1,16 @@
 from dataclasses import dataclass, field
 from enums import MessageModel
 from utils.arguments import Stats
-from containers._meta import container_repr
+from containers._meta import _ConfigClass
 from containers.contractions import MPSOrientation
 from typing import NamedTuple, TypeAlias
 from lattices.directions import LatticeDirection
 from libs.bmpslib import mps as MPS
 from lattices.directions import BlockSide
-from copy import deepcopy
 
 
 @dataclass
-class BPConfig: 
+class BPConfig(_ConfigClass): 
     init_msg: MessageModel = MessageModel.RANDOM_QUANTUM
     max_iterations : int|None = 30   # None is used for unlimited number of iterations
     max_swallowing_dim : int = 9
@@ -24,12 +23,9 @@ class BPConfig:
     damping : float|None = None  # The `learning-step` of the messages. 
     # damping=0 will take 100% the new message while damping=1 will keep the old message.
     hermitize_msgs : bool = True
-
-    def __repr__(self) -> str:
-        return container_repr(self)
     
-    def copy(self)->"BPConfig":
-        return deepcopy(self)
+    def __repr__(self) -> str:
+        return super().__repr__()
 
 
 @dataclass

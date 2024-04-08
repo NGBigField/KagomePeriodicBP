@@ -3,6 +3,7 @@ from containers.belief_propagation import BPConfig
 from containers.sizes_and_dimensions import TNDimensions
 from containers.imaginary_time_evolution import ITEConfig, IterativeProcessConfig
 from containers.visuals import VisualsConfig
+from containers._meta import _ConfigClass
 from utils import size, prints
 from copy import deepcopy
 
@@ -10,7 +11,7 @@ from copy import deepcopy
 from _config_reader import DEBUG_MODE, ALLOW_VISUALS
 
 
-class _ConfigClassWithSubClasses:
+class _StoreConfigClasses:
     # For easier reach of these needed config data classes:
     BPConfig      = BPConfig
     TNDimensions  = TNDimensions
@@ -20,7 +21,7 @@ class _ConfigClassWithSubClasses:
 
 
 @dataclass
-class Config(_ConfigClassWithSubClasses): 
+class Config(_StoreConfigClasses, _ConfigClass): 
     # The actual stored data:
     bp : BPConfig 
     ite : ITEConfig 
