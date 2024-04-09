@@ -196,6 +196,12 @@ def search_words_in_log(
 
     
 
+def _energies_from_energies_str_line(line:str)->list[float]:
+    line = line.removesuffix("]\n")
+    line = line.removeprefix("=[")
+    vals = line.split(", ")
+    assert len(vals)==6
+    return [float(val) for val in vals]
 
 
 def plot_log(
@@ -205,9 +211,10 @@ def plot_log(
     from matplotlib.pyplot import Axes
 
     ## Get matching words:
-    edge_energies_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, reference_energy_str = search_words_in_log(log_name, 
-        ("Edge-Energies after each update", " Mean energy after segment", "num_mode_repetitions_per_segment", "Hamiltonian's reference energy") 
+    edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, reference_energy_str = search_words_in_log(log_name, 
+        ("Edge-Energies after each update", "Edge-Energies after segment", " Mean energy after segment", "num_mode_repetitions_per_segment", "Hamiltonian's reference energy") 
     )
+
 
     n = len(mean_energies_strs)
     
@@ -234,21 +241,19 @@ def plot_log(
     ## Plot energy per edge:
     for i in range(n):
         for j in range(num_mode_repetitions_per_segment):
+
+            energies_during = _energies_from_energies_str_line(edge_energies_during_strs.pop(0))
             # Plot only last edge:
             if j<num_mode_repetitions_per_segment-1:
                 continue
             # parse:
-            word = edge_energies_strs.pop(0)
-            word = word.removesuffix("]\n")
-            word = word.removeprefix("=[")
-            vals = word.split(", ")
-            assert len(vals)==6
-            energies = [float(val) for val in vals]
+            energies_4mean  = _energies_from_energies_str_line(edge_energies_for_mean_strs.pop(0))
             
             # Plot:
-            for energy in energies:
-                energy /= 2  # Get equiv energy per site
-                plt.scatter(i, energy, s=4, c="black", alpha=0.5)
+            for color, energies in [("black", energies_during), ("green", energies_4mean)]:
+                for energy in energies:
+                    energy /= 2  # Get equiv energy per site
+                    plt.scatter(i, energy, s=4, c=color, alpha=0.5)
                 
     ## Plot reference energy:
     if len(reference_energy_str)==0:

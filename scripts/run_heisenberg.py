@@ -32,22 +32,23 @@ def decreasing_global_field_func(delta_t:float|None)->float:
 
 def _config_at_test_function(config:Config)->Config:
     config.dims.big_lattice_size += 1
+    config.bp.msg_diff_terminate = 1e-14
     return config
 
 
 def main(
-    D = 1,
-    N = 2,
+    D = 2,
+    N = 5,
     chi_factor : int = 1,
-    live_plots:bool|Iterable[bool] = [1,0,0],
+    live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0
 )->tuple[float, str]:
     
-    # unit_cell = UnitCell.load("2024.04.07_16.29.49_JHAD")
-    unit_cell = UnitCell.random(d=d, D=D)
+    unit_cell = UnitCell.load("2024.04.09_10.17.57_MCGA")
+    # unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -60,21 +61,21 @@ def main(
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim = 4*D**2
     config.bp.max_swallowing_dim *= chi_factor
-    config.bp.msg_diff_terminate = 1e-10
-    config.bp.msg_diff_good_enough = 1e-5
+    config.bp.msg_diff_terminate = 1e-16
+    config.bp.msg_diff_good_enough = 1e-7
     config.bp.max_iterations = 61
     config.bp.times_to_deem_failure_when_diff_increases = 3
-    config.bp.allowed_retries = 2
+    config.bp.allowed_retries = 3
     config.iterative_process.num_mode_repetitions_per_segment = 1
     config.iterative_process.change_config_for_measurements_func = _config_at_test_function
-    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(2, 12)]
+    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(8, 14)]
 
     # Interaction:
     match hamiltonian: 
-        case "AFM":   config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None, None)
-        case "AFM-T": config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm_with_field, "delta_t", decreasing_global_field_func)
         case "FM":    config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm, None, None)
         case "FM-T":  config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm_with_field, "delta_t", decreasing_global_field_func)
+        case "AFM":   config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None, None)
+        case "AFM-T": config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm_with_field, "delta_t", decreasing_global_field_func)
         case "Field": config.ite.interaction_hamiltonian = (hamiltonians.field, None, None)
         case _:
             raise ValueError("Not matching any option.")
