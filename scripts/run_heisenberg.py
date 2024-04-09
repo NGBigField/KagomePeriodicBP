@@ -32,7 +32,7 @@ def decreasing_global_field_func(delta_t:float|None)->float:
 
 def _config_at_test_function(config:Config)->Config:
     config.dims.big_lattice_size += 1
-    config.bp.msg_diff_terminate = 1e-14
+    config.bp.msg_diff_terminate = 1e-15
     return config
 
 
@@ -62,10 +62,10 @@ def main(
     config.bp.max_swallowing_dim = 4*D**2
     config.bp.max_swallowing_dim *= chi_factor
     config.bp.msg_diff_terminate = 1e-16
-    config.bp.msg_diff_good_enough = 1e-7
+    config.bp.msg_diff_good_enough = 1e-10
     config.bp.max_iterations = 61
     config.bp.times_to_deem_failure_when_diff_increases = 3
-    config.bp.allowed_retries = 3
+    config.bp.allowed_retries = 2
     config.iterative_process.num_mode_repetitions_per_segment = 1
     config.iterative_process.change_config_for_measurements_func = _config_at_test_function
     config.ite.time_steps = [[10**(-exp)]*20 for exp in range(8, 14)]
