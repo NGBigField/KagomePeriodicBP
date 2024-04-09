@@ -198,7 +198,7 @@ def search_words_in_log(
 
 def _energies_from_energies_str_line(line:str)->list[float]:
     line = line.removesuffix("]\n")
-    line = line.removeprefix("=[")
+    line = line.removeprefix("[")
     vals = line.split(", ")
     assert len(vals)==6
     return [float(val) for val in vals]
@@ -209,10 +209,11 @@ def plot_log(
 ):
     from matplotlib import pyplot as plt
     from matplotlib.pyplot import Axes
+    from matplotlib.lines import Line2D
 
     ## Get matching words:
     edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, reference_energy_str = search_words_in_log(log_name, 
-        ("Edge-Energies after each update", "Edge-Energies after segment", " Mean energy after segment", "num_mode_repetitions_per_segment", "Hamiltonian's reference energy") 
+        ("Edge-Energies after each update=", "Edge-Energies after segment =   ", " Mean energy after segment", "num_mode_repetitions_per_segment", "Hamiltonian's reference energy") 
     )
 
 
@@ -233,11 +234,11 @@ def plot_log(
         
     ## Plot mean energies:    
     plt.figure()
-    plt.plot(mean_energies)
+    mean_energy_plot = plt.plot(mean_energies, color="tab:blue", label="mean energy")
     plt.grid()
     plt.title("Mean Energy")
     plt.xlabel("Iteration")
-    
+
     ## Plot energy per edge:
     for i in range(n):
         for j in range(num_mode_repetitions_per_segment):
@@ -250,10 +251,14 @@ def plot_log(
             energies_4mean  = _energies_from_energies_str_line(edge_energies_for_mean_strs.pop(0))
             
             # Plot:
-            for color, energies in [("black", energies_during), ("green", energies_4mean)]:
-                for energy in energies:
+            for color, energies, name in [
+                ("black", energies_during, "energies at update"), 
+                ("blue", energies_4mean , "energies per edge")
+            ]:
+                for is_first, _, energy in lists.iterate_with_edge_indicators(energies):
                     energy /= 2  # Get equiv energy per site
-                    plt.scatter(i, energy, s=4, c=color, alpha=0.5)
+                    label = name if is_first else None
+                    plot_item = plt.scatter(i, energy, s=4, c=color, alpha=0.5, label=label)
                 
     ## Plot reference energy:
     if len(reference_energy_str)==0:
@@ -263,10 +268,12 @@ def plot_log(
         reference_energy = reference_energy.removeprefix(" is ")
         reference_energy = reference_energy.removesuffix("\n")
         reference_energy = float(reference_energy)
-        plt.axhline(reference_energy, linestyle="--", color="g")
+        reference_plot = plt.axhline(reference_energy, linestyle="--", color="g", label="reference")
     else:
         raise NotImplementedError("Not a known case")
+    
 
+    plt.legend()
     plt.show()
     print("Done.")
 

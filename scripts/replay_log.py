@@ -24,9 +24,11 @@ def main(
     if filename is None:
         filename = _get_last_log_file()
 
+    ## Main call:
     logs.plot_log(filename)
+
+    # Done:
     visuals.save_figure(file_name=filename)
-    
     print("Done.")
 
 
