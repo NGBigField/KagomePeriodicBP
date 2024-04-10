@@ -47,6 +47,7 @@ class Config(_StoreConfigClasses, _ConfigClass):
     def __post_init__(self)->None:
         # other post inits:
         self.ite.__post_init__()
+        self.bp.__post_init__()
         # specials:
         trunc_d_bp = self.bp.max_swallowing_dim
         trunc_d_all_other = self.trunc_dim

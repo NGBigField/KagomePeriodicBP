@@ -26,6 +26,13 @@ class BPConfig(_ConfigClass):
     
     def __repr__(self) -> str:
         return super().__repr__()
+    
+    def __post_init__(self) -> None:
+        if self.msg_diff_terminate > self.msg_diff_good_enough:
+            raise ValueError(f"In bp config, msg_diff_terminate={self.msg_diff_terminate}"+
+                             f"< msg_diff_good_enough={self.msg_diff_good_enough}"+
+                             f"  This will cause bp to fail at every step."
+                            )
 
 
 @dataclass

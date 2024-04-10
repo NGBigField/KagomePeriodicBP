@@ -7,7 +7,7 @@ from algo.belief_propagation import BPConfig, BPStats
 # Import containers of ite:
 from containers.imaginary_time_evolution import ITEProgressTracker, ITESegmentStats
 from containers import Config
-from algo.imaginary_time_evolution._visualization import ITEPlots
+from algo.imaginary_time_evolution import _visualization 
 
 # Common errors:
 from _error_types import BPNotConvergedError
@@ -45,7 +45,7 @@ def _log_and_print_starting_message(logger:logs.Logger, config:Config, ite_track
     logger.info(" ")
 
 
-def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker, plots:ITEPlots)->None: #TODO ITEPlots
+def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker, plots:_visualization.ITEPlots)->None: #TODO ITEPlots
 
     logger.info("\n")
     _common_logger_prints(logger, config, ite_tracker)

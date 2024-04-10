@@ -305,7 +305,7 @@ def robust_belief_propagation(
             min_messages = deepcopy(messages)
 
         # Try again with better config:
-        config.max_swallowing_dim *= 2
+        config.max_swallowing_dim = int(1.5*config.max_swallowing_dim)
         if isinstance(config.max_iterations, int):
             config.max_iterations += 11
         messages_in = None

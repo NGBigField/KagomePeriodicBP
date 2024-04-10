@@ -31,24 +31,25 @@ def decreasing_global_field_func(delta_t:float|None)->float:
 
 
 def _config_at_test_function(config:Config)->Config:
-    config.dims.big_lattice_size += 1
-    config.bp.msg_diff_terminate = 1e-15
+    config.dims.big_lattice_size += 0
+    config.bp.msg_diff_terminate /= 2
+    config.bp.allowed_retries    += 1
     return config
 
 
 def main(
-    D = 2,
-    N = 5,
+    D = 1,
+    N = 2,
     chi_factor : int = 1,
-    live_plots:bool|Iterable[bool] = [0, 0, 0],
+    live_plots:bool|Iterable[bool] = [1, 1, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0
+    hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    damping:float|None = 0.0
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.04.09_10.17.57_MCGA")
-    # unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.load("2024.04.10_10.24.40_OJSK")
+    unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -61,14 +62,15 @@ def main(
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim = 4*D**2
     config.bp.max_swallowing_dim *= chi_factor
-    config.bp.msg_diff_terminate = 1e-16
-    config.bp.msg_diff_good_enough = 1e-10
-    config.bp.max_iterations = 61
-    config.bp.times_to_deem_failure_when_diff_increases = 3
+    config.bp.msg_diff_terminate = 1e-3
+    config.bp.msg_diff_good_enough = 1e-2
+    config.bp.max_iterations = 81
+    config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.allowed_retries = 2
-    config.iterative_process.num_mode_repetitions_per_segment = 1
+    config.iterative_process.num_mode_repetitions_per_segment = 2
+    config.iterative_process.start_segment_with_new_bp_message = False
     config.iterative_process.change_config_for_measurements_func = _config_at_test_function
-    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(8, 14)]
+    config.ite.time_steps = [[10**(-exp)]*10 for exp in range(2, 16)]
 
     # Interaction:
     match hamiltonian: 

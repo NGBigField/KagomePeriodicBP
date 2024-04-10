@@ -7,7 +7,7 @@ from utils.arguments import Stats
 from copy import deepcopy
 
 # For type hinting:
-from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Iterable, Any, TypeAlias
+from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Iterable, Any, TypeAlias, Union
 _T = TypeVar("_T")
 
 # Other containers and enums:
@@ -126,7 +126,6 @@ class HamiltonianFuncAndInputs(NamedTuple):
             return func(args)
             
 
-
 class UpdateEdge(NamedTuple): 
     first : UnitCellFlavor
     second : UnitCellFlavor
@@ -139,7 +138,7 @@ class UpdateEdge(NamedTuple):
         return self.second is _NEXT_IN_ABC_ORDER[self.first]
     
     def __str__(self) -> str:
-        return f"({self.first}, {self.second})"
+        return UpdateEdge.to_str(self)
     
     @property
     def as_strings(self)->tuple[str, str]:
@@ -155,7 +154,15 @@ class UpdateEdge(NamedTuple):
     def all_in_random_order()->Generator["UpdateEdge", None, None]:
         random_order = lists.shuffle(list(UpdateEdge.all_options()))
         return (mode for mode in random_order)
-
+    
+    @staticmethod
+    def to_str(edge_tuple: Union["UpdateEdge",tuple])->str:
+        if isinstance(edge_tuple, UpdateEdge):
+            return f"({edge_tuple.first}, {edge_tuple.second})"
+        elif isinstance(edge_tuple, tuple):
+            return f"({edge_tuple[0]}, {edge_tuple[1]})"
+        else:
+            raise TypeError("Not an expected type")
 
 
 SUB_FOLDER = "ite_trackers"

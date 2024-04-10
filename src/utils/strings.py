@@ -164,10 +164,9 @@ def float_list_to_str(l:list[float], num_decimals:int|None=None)->str:
     s = "["
     for first, last, item in lists.iterate_with_edge_indicators(l):
         if num_decimals is None:
-            s += f"{item}"
+            s += f"{item:+}"
         else:
-            s += f"{item:.{num_decimals}f}"
-             
+            s += f"{item:+.{num_decimals}f}"         
         
         if not last:
             s += ", "

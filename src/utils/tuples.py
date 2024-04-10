@@ -8,7 +8,7 @@ from typing import (
 )
 
 import operator
-from typing import overload
+from typing import NamedTuple
 from copy import deepcopy
 
 _T1 = TypeVar("_T1")
@@ -58,6 +58,19 @@ def copy_with_replaced_val_at_index(t:tuple, i:int, val:Any) -> tuple:
     temp[i] = val
     return tuple(temp)
 
+
+def copy_with_replaced_val_at_key(t:NamedTuple, key:str, val:Any) -> NamedTuple:
+    i = get_index_of_named_tuple_key(t=t, key=key)
+    # create native tuple:
+    t2 = copy_with_replaced_val_at_index(t, i, val)    
+    # use constructor to create instance of the same NamedTuple as t:
+    return t.__class__(*t2)  
+
+def get_index_of_named_tuple_key(t:NamedTuple, key:str)->int:
+    for i, field in enumerate(t._fields):
+        if field == key:
+            return i
+    raise ValueError(f"Key {key!r} not found in tuple {t}")
 
 def equal(t1:Tuple[_T1,...], t2:Tuple[_T1,...], allow_permutation:bool=False)->bool:
     if len(t1)!=len(t2):

@@ -49,7 +49,7 @@ def field(direction='x')->np.ndarray:
 field.reference = - GLOBAL_FIELD_STRENGTH
 
 
-FULLY_SYMMETRIC : bool = True
+FULLY_SYMMETRIC : bool = False
 
 def heisenberg_afm()->np.ndarray:
 	"""Heisenberg Anti-FerroMagnetic model
@@ -57,7 +57,7 @@ def heisenberg_afm()->np.ndarray:
 	if FULLY_SYMMETRIC:
 		return 1.0*_tensor_product(x,x) + 1.0*_tensor_product(y,y) + 1.0*_tensor_product(z,z) 
 	else:
-		return 1.01*_tensor_product(x,x) + 0.98*_tensor_product(y,y) + 0.99*_tensor_product(z,z) 
+		return 1.0001*_tensor_product(x,x) + 0.9998*_tensor_product(y,y) + 0.9999*_tensor_product(z,z) 
 # heisenberg_afm.reference = -0.438703897456
 heisenberg_afm.reference = -0.38620
 

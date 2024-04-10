@@ -24,7 +24,7 @@ import numpy as np
 
 
 # @functools.cache
-def get_imaginary_time_evolution_operator(hamiltonian_func:HamiltonianFuncAndInputs, delta_t:float) -> tuple[np.ndarray, np.ndarray]: 
+def get_imaginary_time_evolution_operator(hamiltonian_func:HamiltonianFuncAndInputs, delta_t:float|None) -> tuple[np.ndarray, np.ndarray]: 
     hamiltonian_func = HamiltonianFuncAndInputs.standard(hamiltonian_func)
     if delta_t is None:
         h = hamiltonian_func.call(delta_t=0.0)
