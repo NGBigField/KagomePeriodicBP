@@ -850,7 +850,7 @@ def fuse_tensor(T):
 # ---------------------- reduced_env  ----------------------------
 #
 
-def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
+def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None, verbose:bool=False):
 
 	"""
 	
@@ -1178,7 +1178,7 @@ def reduced_env(Ti, Tj, env_i=None, env_j=None, mps_env=None):
 
 	Hermicity = norm(Nred-conj(Nred.T))/norm(Nred)
 	
-	if Hermicity > HERMICITY_ERR:
+	if Hermicity > HERMICITY_ERR and verbose:
 		print("\n")
 		print("* * * ITE Warning: * * *")
 		print("ITE.reduced_env: The reduced env tensor Nred is not hermitian")

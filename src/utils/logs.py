@@ -7,9 +7,11 @@ import sys, os
 import logging
 from logging import Logger
 from typing import Any, Final, Mapping
-from utils import strings, saveload, prints
+from utils import strings, saveload, prints, tuples, lists
 from enum import Enum, auto
-import types
+import types, project_paths
+
+from typing import Iterable
 
 
 # ============================================================================ #
@@ -155,3 +157,30 @@ def get_logger(
     return logger
 
 
+
+def search_words_in_log(
+    filename:str,
+    words:Iterable[str]
+)->tuple[list[str], ...]:
+    ## Read file:
+    folder = project_paths.logs
+    name_with_extension = saveload._common_name(filename, typ='log')
+    full_path = str(folder)+PATH_SEP+name_with_extension
+
+    ## Init outputs:
+    res = [list() for _ in words]
+
+    ## Iterate:
+    with open(full_path, "r") as file:
+        for line in file:    
+            for word_index, word in enumerate(words):
+
+                location_in_line = strings.search_pattern_in_text(word, line)
+                if location_in_line != -1:  # if found
+                    index_after_word = location_in_line + len(word)
+                    proceeding_str = line[index_after_word:]
+                    res[word_index].append(proceeding_str)
+
+    return tuple(res)
+
+    

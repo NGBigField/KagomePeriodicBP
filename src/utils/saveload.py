@@ -142,6 +142,13 @@ def load(name:str, sub_folder:Optional[str]=None, if_exist:bool=False) -> Any:
     # Load:
     return pickle.load(file)
 
+def get_size(name:str, sub_folder:Optional[str]=None, if_exist:bool=False) -> int:
+    if if_exist and not exist(name=name, sub_folder=sub_folder):
+        return None
+    # fullpath:
+    fullpath = _fullpath(name, sub_folder)
+    # get size
+    return os.path.getsize(fullpath)
 
 def delete(name:str, sub_folder:Optional[str]=None, if_exist:bool=False)->None:
     if if_exist and not exist(name=name, sub_folder=sub_folder):

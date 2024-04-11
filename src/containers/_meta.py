@@ -1,5 +1,7 @@
 from numpy import ndarray as np_ndarray
 from dataclasses import fields
+from copy import deepcopy
+
 
 def container_repr(obj)->str:
     s = f"{obj.__class__.__name__}:"
@@ -12,3 +14,18 @@ def container_repr(obj)->str:
             value_str = str(value)
         s += f"    {field.name}: {value_str}"
     return s
+
+
+class _ConfigClass():
+    def __setattr__(self, k, v): 
+        is_annotation = k in self.__annotations__
+        is_existing_attr = hasattr(self, k)
+        if not (is_annotation or is_existing_attr): 
+            raise AttributeError(f'{self.__class__.__name__} dataclass has no field {k}')
+        super().__setattr__(k, v)
+
+    def __repr__(self) -> str:
+        return container_repr(self)
+    
+    def copy(self)->"_ConfigClass":
+        return deepcopy(self)

@@ -28,7 +28,6 @@ def field_in_direction(direction:Literal['x', 'y', 'z'], strength:float=0.0)->np
 
 
 
-
 def heisenberg_fm()->np.ndarray:
 	"""Heisenberg FerroMagnetic model
 	"""
@@ -36,11 +35,11 @@ def heisenberg_fm()->np.ndarray:
 heisenberg_fm.reference = -0.5
 
 
-def heisenberg_fm_with_field()->np.ndarray:
+def heisenberg_fm_with_field(f:float=0.0)->np.ndarray:
 	"""Heisenberg FerroMagnetic model with Global field in the x direction
 	"""
-	return heisenberg_fm() + field_in_direction(direction="x", strength=GLOBAL_FIELD_STRENGTH)
-heisenberg_fm_with_field.reference = heisenberg_fm.reference - GLOBAL_FIELD_STRENGTH
+	return heisenberg_fm() + field_in_direction(direction="x", strength=f)
+heisenberg_fm_with_field.reference = heisenberg_fm.reference 
 
 
 def field(direction='x')->np.ndarray:
@@ -50,12 +49,24 @@ def field(direction='x')->np.ndarray:
 field.reference = - GLOBAL_FIELD_STRENGTH
 
 
+FULLY_SYMMETRIC : bool = False
+
 def heisenberg_afm()->np.ndarray:
 	"""Heisenberg Anti-FerroMagnetic model
 	"""
-	return _tensor_product(x,x) + _tensor_product(y,y) + _tensor_product(z,z) 
+	if FULLY_SYMMETRIC:
+		return 1.0*_tensor_product(x,x) + 1.0*_tensor_product(y,y) + 1.0*_tensor_product(z,z) 
+	else:
+		return 1.0001*_tensor_product(x,x) + 0.9998*_tensor_product(y,y) + 0.9999*_tensor_product(z,z) 
 # heisenberg_afm.reference = -0.438703897456
 heisenberg_afm.reference = -0.38620
+
+
+def heisenberg_afm_with_field(f:float=0.0)->np.ndarray:
+	"""Heisenberg Anti-FerroMagnetic model with adjustable strength of global field
+	"""
+	return heisenberg_afm() + field_in_direction(direction="x", strength=f)
+heisenberg_afm_with_field.reference = heisenberg_afm.reference
 
 
 def ising_with_transverse_field(B:float)->np.ndarray:

@@ -7,7 +7,7 @@ from algo.belief_propagation import BPConfig, BPStats
 # Import containers of ite:
 from containers.imaginary_time_evolution import ITEProgressTracker, ITESegmentStats
 from containers import Config
-from algo.imaginary_time_evolution._visualization import ITEPlots
+from algo.imaginary_time_evolution import _visualization 
 
 # Common errors:
 from _error_types import BPNotConvergedError
@@ -38,10 +38,14 @@ def _common_logger_prints(logger:logs.Logger, config:Config, ite_tracker:ITEProg
 
 def _log_and_print_starting_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker)->None:
     _common_logger_prints(logger, config, ite_tracker)
+    hamiltonian_func = config.ite.interaction_hamiltonian.func
+    if hasattr(hamiltonian_func, "reference"):
+        refernce = getattr(hamiltonian_func, "reference")
+        logger.info(f"Hamiltonian's reference energy is {refernce!r}")
     logger.info(" ")
 
 
-def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker, plots:ITEPlots)->None: #TODO ITEPlots
+def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker, plots:_visualization.ITEPlots)->None: #TODO ITEPlots
 
     logger.info("\n")
     _common_logger_prints(logger, config, ite_tracker)
@@ -91,9 +95,13 @@ def print_or_log_ite_segment_progress(
 
 
 def print_or_log_bp_message(config:BPConfig, not_converged_causes_error:bool, stats:BPStats, logger:logs.Logger):
+    # Define:
+    threshold_error = config.msg_diff_good_enough
     space = "        "
     _blue_text = lambda s: prints.add_color(s, prints.PrintColors.BLUE)
-    if stats.final_error<config.target_msg_diff:
+
+    # decision tree:
+    if stats.final_error<threshold_error:
         if stats.attempts==1:
             _attempt_msg = f"Block-BP Converged at "\
                 +_blue_text("first attempt")\
@@ -105,9 +113,9 @@ def print_or_log_bp_message(config:BPConfig, not_converged_causes_error:bool, st
         _iter_msg = f", Iteration "+ _blue_text(f"{stats.iterations+1} out of {stats.final_config.max_iterations}")
         logger.debug(space+_attempt_msg+_iter_msg)
     else:
-        _msg = f"BlockBP didn't converge to error {config.target_msg_diff}. error is now {stats.final_error}"
+        _msg = f"BlockBP didn't converge to error {threshold_error} after {stats.attempts} attempts. Error is now {stats.final_error}"
         if not_converged_causes_error:
             raise BPNotConvergedError(_msg)
         else:
-            logger.warn(space+_msg)
+            logger.warn(space+_msg+"\n"*4)
 

@@ -47,7 +47,7 @@ def test_full_ite(
     config.ite.time_steps =  [1e-7]*200
     config.ite.bp_every_edge = False
     # BP:
-    config.bp.target_msg_diff = 1e-7
+    config.bp.msg_diff_terminate = 1e-7
 
 
     ## Run:

@@ -37,8 +37,11 @@ def index_by_approx_value(l:list, value:_Numeric, allowed_error:float=1e-6)->int
 
 def join_sub_lists(_lists:list[list[_T]])->list[_T]:
     res = []
-    for _list in _lists:
-        res.extend(_list)
+    for item in _lists:
+        if isinstance(item, list):
+            res.extend(item)
+        else:
+            res.append(item)
     return res
 
 
@@ -88,8 +91,10 @@ def sum(list_:List[_Numeric], / , lambda_:Callable[[_Numeric], _Numeric]=_identi
         res += lambda_(item)
     return res  
 
+
 def real(list_:List[_Numeric],/) -> List[int|float]:
     return [ np.real(v) for v in list_ ]  
+
 
 def product(_list:List[_Numeric]) -> _Numeric:
     prod = 1
@@ -97,11 +102,13 @@ def product(_list:List[_Numeric]) -> _Numeric:
         prod *= item
     return prod
 
+
 def all_isinstance( l:list[_T], cls: Type[_T]  ) -> TypeGuard[list[_T]]:
     for item in l:
         if not isinstance(item, cls):
             return False
     return True
+
 
 def equal(l1:_Iterable, l2:_Iterable) -> bool:
 
@@ -133,6 +140,7 @@ def equal(l1:_Iterable, l2:_Iterable) -> bool:
     else:
         return l1==l2
     
+
 def share_item(l1:_Iterable, l2:_Iterable) -> bool:
     for v1 in l1:
         for v2 in l2:
@@ -155,6 +163,7 @@ def common_super_class(lis:List[Any]) -> type:
         if all(x in mro for mro in classes):
             return x
 
+
 def iterate_with_periodic_prev_next_items(l:List[_T], skip_first:bool=False) -> Generator[Tuple[_T, _T, _T], None, None]:
     for i, (is_first, is_last, crnt) in enumerate(iterate_with_edge_indicators(l)):
         prev, next = None, None
@@ -165,7 +174,6 @@ def iterate_with_periodic_prev_next_items(l:List[_T], skip_first:bool=False) -> 
         if next is None:    next = l[i+1]
         yield prev, crnt, next
         
-
 
 def iterate_with_edge_indicators(l:List[_T]|np.ndarray) -> Generator[Tuple[bool, bool, _T], None, None]:
     is_first : bool = True
@@ -202,6 +210,7 @@ def swap_items(lis:List[_T], i1:int, i2:int, copy:bool=True) -> List[_T]:
     lis[i2] = item1
     return lis
 
+
 def random_item(lis:list[_T])->_T:
     n = len(lis)
     index = np.random.choice(n)
@@ -223,6 +232,7 @@ def convert_whole_numbers_to_int(lis:List[float|int])->List[float|int]:
             lis_copy[i] = int(x)
     return lis_copy
 
+
 def rearrange(l:List[_T], order:List[int]) -> List[_T]:
     # all indices are different and number of indices is correct:
     assert len(set(order))==len(order)==len(l)
@@ -230,8 +240,10 @@ def rearrange(l:List[_T], order:List[int]) -> List[_T]:
     ## rearrange:
     return [ l[i] for i in order ]
 
+
 def is_sorted(l:list[int]|list[float])->bool:
     return all(a <= b for a, b in zip(l, l[1:]))
+
 
 def repeated_items(l:list[_T]) -> Generator[tuple[_T, int], None, None]:
     """ repeated_items(l:list[_T]) -> Generator[tuple[_T, int], None, None]

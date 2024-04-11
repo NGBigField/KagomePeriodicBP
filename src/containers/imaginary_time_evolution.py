@@ -7,10 +7,11 @@ from utils.arguments import Stats
 from copy import deepcopy
 
 # For type hinting:
-from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Iterable, Any
+from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Iterable, Any, TypeAlias, Union
 _T = TypeVar("_T")
 
 # Other containers and enums:
+from containers._meta import _ConfigClass
 from enums.imaginary_time_evolution import UpdateMode
 from enums.tensor_networks import UnitCellFlavor
 from containers.belief_propagation import BPStats
@@ -18,11 +19,18 @@ from containers.density_matrices import MatrixMetrics
 from tensor_networks import UnitCell
 from _error_types import ITEError
 
+
 # For smart iterations:
 import itertools
 
 
 DEFAULT_ITE_TRACKER_MEMORY_LENGTH : int = 10
+_HamilInputType : TypeAlias = _T|tuple[_T]|None|str
+_HamilInputRuleType : TypeAlias = Callable[[Any], _HamilInputType]|None
+
+
+def _Identity_function(x):
+    return x
 
 
 _NEXT_IN_ABC_ORDER = {
@@ -67,34 +75,47 @@ class _LimitedLengthList(Generic[_T]):
         return len(self._list)
 
 
+def _optional_arguments_for_hamiltonian_function(args:_HamilInputType, rule:_HamilInputRuleType, **kwargs)->_HamilInputType:
+    if isinstance(args, str) and args=="delta_t" and "delta_t" in kwargs:
+        args = kwargs["delta_t"]
+    if rule is not None:
+        args = rule(args)
+    return args
+
+
 class HamiltonianFuncAndInputs(NamedTuple):
-    func: Callable[[_T], np.ndarray] 
-    args: _T|tuple[_T]|None
+    func: Callable[[_HamilInputType], np.ndarray] 
+    args: _HamilInputType
+    args_rule: _HamilInputRuleType
 
     def __repr__(self) -> str:
         return f"Hamiltonian function {self.func.__name__!r} with arguments: {self.args}"
 
     @staticmethod
     def default()->"HamiltonianFuncAndInputs":
-        return HamiltonianFuncAndInputs(func=zero, args=None)
+        return HamiltonianFuncAndInputs(func=zero, args=None, args_rule=None)
 
     @staticmethod
     def standard(self_or_tuple)->"HamiltonianFuncAndInputs":
-        assert len(self_or_tuple)==2
+        assert len(self_or_tuple)==3
         assert callable(self_or_tuple[0])
         if isinstance(self_or_tuple, HamiltonianFuncAndInputs):
             assert callable(self_or_tuple.func)
             return self_or_tuple
         
         if isinstance(self_or_tuple, tuple):
-            return HamiltonianFuncAndInputs(func=self_or_tuple[0], args=self_or_tuple[1])
+            return HamiltonianFuncAndInputs(func=self_or_tuple[0], args=self_or_tuple[1], args_rule=self_or_tuple[2])
 
         raise ValueError(f"Not a valid input for class {HamiltonianFuncAndInputs.__name__!r}") 
 
-    def call(self)->np.ndarray:
-        assert len(self)==2
-        func   = self.func
-        args   = self.args
+    def call(self, **kwargs)->np.ndarray:
+        assert len(self)==3
+        func = self.func
+        args = self.args
+        rule = self.args_rule
+
+        # choose input for hamiltonian function
+        args = _optional_arguments_for_hamiltonian_function(args, rule, **kwargs) 
 
         # call:
         if args is None:
@@ -104,7 +125,6 @@ class HamiltonianFuncAndInputs(NamedTuple):
         else:
             return func(args)
             
-
 
 class UpdateEdge(NamedTuple): 
     first : UnitCellFlavor
@@ -118,7 +138,7 @@ class UpdateEdge(NamedTuple):
         return self.second is _NEXT_IN_ABC_ORDER[self.first]
     
     def __str__(self) -> str:
-        return f"({self.first}, {self.second})"
+        return UpdateEdge.to_str(self)
     
     @property
     def as_strings(self)->tuple[str, str]:
@@ -134,7 +154,15 @@ class UpdateEdge(NamedTuple):
     def all_in_random_order()->Generator["UpdateEdge", None, None]:
         random_order = lists.shuffle(list(UpdateEdge.all_options()))
         return (mode for mode in random_order)
-
+    
+    @staticmethod
+    def to_str(edge_tuple: Union["UpdateEdge",tuple])->str:
+        if isinstance(edge_tuple, UpdateEdge):
+            return f"({edge_tuple.first}, {edge_tuple.second})"
+        elif isinstance(edge_tuple, tuple):
+            return f"({edge_tuple[0]}, {edge_tuple[1]})"
+        else:
+            raise TypeError("Not an expected type")
 
 
 SUB_FOLDER = "ite_trackers"
@@ -155,35 +183,43 @@ DEFAULT_TIME_STEPS = lambda: [0.02]*5 + [0.01]*5 + [0.001]*100 + [1e-4]*100 + [1
 #     return dts
 
 
-
 @dataclass
-class ITEConfig():
-    # hamiltonian:
-    interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
-    # ITE time steps:
-    time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
-    num_mode_repetitions_per_segment : int = 2
+class IterativeProcessConfig(_ConfigClass):
     # File:
     backup_file_name : str = "ite_backup"+strings.time_stamp()+" "+strings.random(6)
-    # Control flags:
-    random_mode_order : bool = True
-    check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
-    segment_error_cause_state_revert : bool = True    
-    keep_harder_bp_config_between_segments : bool = False
+    # Belief-Propagation flags:
+    start_segment_with_new_bp_message : bool = True
+    bp_not_converged_raises_error : bool = False
+    bp_every_edge : bool = True
     # Control numbers:
     num_total_errors_threshold : int = 20    
     num_errors_per_delta_t_threshold : int = 5    
-    # Belief-Propagation flags:
-    start_segment_with_new_bp_message : bool = True
-    bp_not_converged_raises_error : bool = True
-    bp_every_edge : bool = True
+    segment_error_cause_state_revert : bool = True    
+    keep_harder_bp_config_between_segments : bool = False
+    # Measure expectation and energies:
+    num_mode_repetitions_per_segment : int = 1  # number of modes between each measurement of energy
+    change_config_for_measurements_func : Callable[[_T], _T] = _Identity_function
 
+    def __repr__(self) -> str:
+        return super().__repr__()
+
+
+@dataclass
+class ITEConfig(_ConfigClass):
+    # hamiltonian:
+    _interaction_hamiltonian : HamiltonianFuncAndInputs = field(default_factory=HamiltonianFuncAndInputs.default)
+    # ITE time steps:
+    _time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
+    # Control flags:
+    random_mode_order : bool = True
+    check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
+    normalize_tensors_after_update : bool = True
 
     @property
     def reference_ground_energy(self)->float|None:  
         """Ground truth energy, if known
         """
-        func = self.interaction_hamiltonian.func
+        func = self._interaction_hamiltonian.func
         if hasattr(func, "reference"):
             return func.reference
 
@@ -195,7 +231,7 @@ class ITEConfig():
             value = getattr(obj, field.name)
             if isinstance(value, np.ndarray):
                 value_str = f"ndarray of shape {value.shape}"
-            elif isinstance(value, list) and field.name == "time_steps":
+            elif isinstance(value, list) and field.name == "_time_steps":
                 value_str = _time_steps_str(value)
             else:
                 value_str = str(value)
@@ -203,14 +239,34 @@ class ITEConfig():
         return s
     
     def __post_init__(self)->None:
-        self.interaction_hamiltonian = HamiltonianFuncAndInputs.standard(self.interaction_hamiltonian)
+        self._interaction_hamiltonian = HamiltonianFuncAndInputs.standard(self._interaction_hamiltonian)
+        self._time_steps = _fix_and_rearrange_time_steps(self._time_steps)
+
+    ## ================== Getters and Setters: ================== ##        
+    @property
+    def interaction_hamiltonian(self)->HamiltonianFuncAndInputs:
+        return self._interaction_hamiltonian
+    @interaction_hamiltonian.setter
+    def interaction_hamiltonian(self, value:HamiltonianFuncAndInputs)->None:
+        self._interaction_hamiltonian = value
+        self.__post_init__()
+
+    @property
+    def time_steps(self)->list[float]:
+        return self._time_steps
+    @time_steps.setter
+    def time_steps(self, value:list[float]|list[list[float]])->None:
+        self._time_steps = value
+        self.__post_init__()
+    
     
 
 class ITEPerModeStats(Stats):
-    bp_stats : BPStats = None 
+    bp_stats : list[BPStats] = None 
     env_metrics : list[MatrixMetrics]
 
     def __post_init__(self):
+        self.bp_stats = list()
         self.env_metrics = list()  # Avoid python's infamous immutable lists problem
 
         
@@ -219,6 +275,7 @@ class ITESegmentStats(Stats):
     modes_order : list[UpdateMode] = None  # type: ignore
     delta_t : float = None  # type: ignore
     mean_energy : float = None
+    had_to_revert : bool = False
 
     def __post_init__(self):
         self.ite_per_mode_stats = list()  # Avoid python's infamous immutable lists problem
@@ -254,7 +311,15 @@ class ITEProgressTracker():
         self.unit_cells         : _LimitedLengthList[UnitCell]          = _LimitedLengthList[UnitCell](mem_length) 
         self.messages           : _LimitedLengthList[dict]              = _LimitedLengthList[dict](mem_length) 
         self.stats              : _LimitedLengthList[ITESegmentStats]   = _LimitedLengthList[ITESegmentStats](mem_length)            
+
+    @property
+    def memory_usage(self)->int:
+        return saveload.get_size(self.file_name, sub_folder=SUB_FOLDER)        
     
+    @property
+    def full_path(self) -> str:
+        return saveload._fullpath(name=self.file_name, sub_folder=SUB_FOLDER)
+
     def log_segment(self, delta_t:float, unit_cell:UnitCell, messages:dict, expectation_values:dict, energy:complex, stats:ITESegmentStats )->None:
         # Get a solid copy
         _unit_cell = unit_cell.copy()
@@ -316,6 +381,7 @@ class ITEProgressTracker():
         self.last_messages = messages  #type: ignore
         self.last_iter -= num_iter
         # Return:
+        step_stats.had_to_revert = True
         return delta_t, energy, step_stats, expectation_values, core, messages  #type: ignore
 
 
@@ -325,11 +391,28 @@ class ITEProgressTracker():
         return ite_tracker
 
     def save(self)->None:
+        # avoid saving local variable:
         return saveload.save(self, self.file_name, sub_folder=SUB_FOLDER)        
 
-    @property
-    def full_path(self) -> str:
-        return saveload._fullpath(name=self.file_name, sub_folder=SUB_FOLDER)
+    def plot(self, live_plot:bool=False)->None:
+        # Specific plotting imports:
+        from algo.imaginary_time_evolution._visualization import ITEPlots
+        from utils import visuals
+        from containers import Config
+
+        config : Config = deepcopy(self.config)
+        config.visuals.live_plots = [1, 1, 1]
+
+        plots = ITEPlots(active=True, config=config)
+        for delta_t, energy, unit_cell, msg, expectations, stats \
+            in zip(self.delta_ts, self.energies, self.unit_cells, self.messages, self.expectation_values, self.stats ):
+
+            plots.update(energies=energy, segment_stats=stats, delta_t=delta_t, expectations=expectations, unit_cell=unit_cell, _draw_now=live_plot)            
+        
+        visuals.draw_now()
+        print("Done plotting ITE.")
+
+            
         
     def __len__(self)->int:
         assert len(self.delta_ts) == len(self.energies) == len(self.expectation_values) ==  len(self.unit_cells) == len(self.messages) == len(self.stats)             
@@ -349,3 +432,11 @@ def _time_steps_str(time_steps:list[float])->str:
             counter = 1    
     s += "["+f"{last}"+"]*"+f"{counter}"
     return s
+
+
+
+def _fix_and_rearrange_time_steps(times:list[float]|list[list[float]])->list[float]:
+    if isinstance(times, list):
+        return lists.join_sub_lists(times)
+    else:
+        raise TypeError(f"Not an expected type of argument `times`. It has type {type(times)}")

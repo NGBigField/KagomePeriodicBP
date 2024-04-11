@@ -183,7 +183,7 @@ def belief_propagation(
 
     ## Unpack Configuration:
     max_iterations = config.max_iterations
-    target_error = config.target_msg_diff
+    terminating_error = config.msg_diff_terminate
     n_failure_check_len = config.times_to_deem_failure_when_diff_increases
 
     ## Connect or randomize messages:
@@ -224,7 +224,7 @@ def belief_propagation(
             visuals.refresh()
 
         # Check success conditions:
-        if error<target_error:
+        if error<terminating_error:
             success = True
             break
 
@@ -240,16 +240,16 @@ def belief_propagation(
     
     steps_iterator.clear()
     assert isinstance(error, float)
-
-    ## Hermitize messages:
-    if config.hermitize_msgs:
-        messages = _hermitize_messages(messages)
         
     ## Check failure:         
     if not success:
         messages = min_messages     
         error = min_error
         tn.connect_messages(messages)
+
+    ## Hermitize messages:
+    if config.hermitize_msgs:
+        messages = _hermitize_messages(messages)
 
     stats = BPStats(iterations=i+1, final_error=error, final_config=config, success=success)  
   
@@ -271,23 +271,30 @@ def robust_belief_propagation(
 ]:
     ## Unpack Configuration:
     config = config.copy()  # Don't affect the sender's copy of config
-    target_error = config.target_msg_diff
+    good_enough_error = config.msg_diff_good_enough
+    terminating_error = config.msg_diff_terminate
 
     ## First attempt inputs:
     messages_in = deepcopy(messages)
+
+    ## Track best and total outputs of individual belief_propagation rungs:
     min_messages = messages_in
     min_error = np.inf
+    total_iterations = 0
+
 
     ## For each attempt, run and check success:    
     for attempt_ind in range(config.allowed_retries):
         # Run:
         messages, stats = belief_propagation(tn, messages_in, config, update_plots_between_steps, allow_prog_bar)
 
-        # Check success:
-        success = stats.final_error < target_error
+        # unpack:
         error = stats.final_error
+        total_iterations += stats.iterations
 
-        if success:
+        # Check success:
+        terminating_condition = stats.final_error < terminating_error
+        if terminating_condition:
             messages_out = messages
             error_out = error
             break
@@ -298,9 +305,9 @@ def robust_belief_propagation(
             min_messages = deepcopy(messages)
 
         # Try again with better config:
-        config.max_swallowing_dim *= 2
+        config.max_swallowing_dim = int(1.5*config.max_swallowing_dim)
         if isinstance(config.max_iterations, int):
-            config.max_iterations += 10
+            config.max_iterations += 11
         messages_in = None
         
     else:  # if never had success
@@ -308,10 +315,13 @@ def robust_belief_propagation(
         error_out = min_error
         tn.connect_messages(min_messages)
 
+    ## Did we succeed?
+    success = error_out < good_enough_error
+
     ## Return stats
     overall_stats = BPStats(
         attempts=attempt_ind+1, 
-        iterations=stats.iterations, 
+        iterations=total_iterations, 
         final_error=error_out, 
         final_config=stats.final_config,
         success=success

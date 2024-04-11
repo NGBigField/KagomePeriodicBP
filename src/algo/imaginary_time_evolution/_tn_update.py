@@ -23,13 +23,14 @@ import functools
 import numpy as np
 
 
-@functools.cache
-def get_imaginary_time_evolution_operator(hamiltonian_func:HamiltonianFuncAndInputs, delta_t:float) -> tuple[np.ndarray, np.ndarray]: 
+# @functools.cache
+def get_imaginary_time_evolution_operator(hamiltonian_func:HamiltonianFuncAndInputs, delta_t:float|None) -> tuple[np.ndarray, np.ndarray]: 
     hamiltonian_func = HamiltonianFuncAndInputs.standard(hamiltonian_func)
-    h = hamiltonian_func.call()
     if delta_t is None:
+        h = hamiltonian_func.call(delta_t=0.0)
         g = None
     else:
+        h = hamiltonian_func.call(delta_t=delta_t)
         g = g_from_exp_h(h, delta_t)
     return h, g
 
@@ -100,7 +101,7 @@ def _calc_environment_equivalent_matrix(environment_tensors:list[np.ndarray]) ->
     return m
 
 
-def update_unit_cell(
+def ite_update_unit_cell(
     edge_tn:EdgeTN,
     unit_cell:UnitCell,
     ite_config:ITEConfig,
@@ -129,12 +130,14 @@ def update_unit_cell(
     ## Calc energy and updated env metrics:
     rdm_after = rho_ij(t1_new, t2_new, mps_env=mps_env)
     energy_after = np.dot(rdm_after.flatten(),  h.flatten())
+    energy_after /= 2  # Divide by 2 to get effective energy per site
     metrics = _check_rdms_metrics(rdm_after)
     metrics.other["original_negativity_ratio"] = _calc_original_negativity_ratio(origin_eigen_vals)
 
     ## normalize
-    t1_new = t1_new / np.linalg.norm(t1_new)
-    t2_new = t2_new / np.linalg.norm(t2_new)
+    if ite_config.normalize_tensors_after_update:
+        t1_new = t1_new / np.linalg.norm(t1_new)
+        t2_new = t2_new / np.linalg.norm(t2_new)
 
     ## Update tensors:
     f1, f2 = edge_tn.unit_cell_flavors

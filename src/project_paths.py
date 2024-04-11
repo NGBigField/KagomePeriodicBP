@@ -5,6 +5,7 @@ from pathlib import Path
 src : Path = Path(__file__).parent
 base : Path = src.parent
 scripts : Path = base/"scripts"
+logs : Path = base/"logs"
 data : Path = base/"data"
 
 

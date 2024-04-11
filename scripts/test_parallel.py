@@ -41,7 +41,7 @@ def test_parallel_execution_time(
 
     ## Prepare config:
     config = BPConfig(
-        max_iterations=10, max_swallowing_dim=D**2, target_msg_diff=1e-10, parallel_msgs=parallel
+        max_iterations=10, max_swallowing_dim=D**2, msg_diff_terminate=1e-10, parallel_msgs=parallel
     )
 
     ## Test BlockBP Performance:

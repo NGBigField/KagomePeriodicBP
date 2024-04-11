@@ -46,6 +46,7 @@ from utils import assertions, logs, errors, lists, parallel_exec, prints, string
 # A bit of OOP:
 from copy import deepcopy
 from typing import TypeVar, TypeAlias
+from dataclasses import dataclass
 
 _T = TypeVar('_T')
 
@@ -67,6 +68,11 @@ MULTIPROCESSING = False
 TensorNetworkType = TypeVar("TensorNetworkType", bound=TensorNetwork)
 
 
+
+@dataclass
+class _ValueAndCount():
+    value : float = 0.0
+    count : int   = 0
 
 
 
@@ -110,10 +116,32 @@ def print_results_table(results:dict[str, dict[str, float]])->None:
         print(row_str)
 
 
+def _get_edge_rdm_and_energy(edge_tn:EdgeTN, h:np.ndarray, force_real:bool)->float:
 
-def _mean(list_:list[_T])->_T:
-    return sum(list_)/len(list_)  #type: ignore
-        
+    # Compute Reduce-Density-Matrix (RDM)
+    rdm = edge_tn.rdm
+
+    # Calc energy:
+    energy  = np.dot(rdm.flatten(),  h.flatten()) 
+    energy  /= 2  # Divide by 2 to get energy per site instead of per edge
+    if DEBUG_MODE and force_real:
+        energy = assertions.real(energy)
+    elif force_real:
+        energy = float(np.real(energy))
+
+    return rdm, energy
+
+def _get_hamiltonian_tensor(hamiltonian)->np.ndarray:
+    if isinstance(hamiltonian, np.ndarray):
+        h = hamiltonian
+    elif callable(hamiltonian):
+        h = hamiltonian()
+    elif isinstance(hamiltonian, tuple|HamiltonianFuncAndInputs):
+        h, _ = get_imaginary_time_evolution_operator(hamiltonian, None)
+    else:
+        raise TypeError(f"Not a valid type for input 'hamiltonian' of type {hamiltonian!r}")    
+    return h
+
 def mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[str, float]:
     mean_per_direction : dict[str, float] = dict(x=0, y=0, z=0)
     # Add
@@ -132,8 +160,7 @@ def measure_energies_and_observables_together(
     force_real:bool=True
 )->tuple[
     dict[tuple[str, str], float],
-    UnitCellExpectationValuesDict,
-    float
+    UnitCellExpectationValuesDict
 ]:
     ## Prepare outputs and check inputs:
     # inputs:
@@ -142,44 +169,26 @@ def measure_energies_and_observables_together(
     if mode is None:
         mode = UpdateMode.random()
 
-    if isinstance(hamiltonian, np.ndarray):
-        h = hamiltonian
-    elif callable(hamiltonian):
-        h = hamiltonian()
-    elif isinstance(hamiltonian, tuple|HamiltonianFuncAndInputs):
-        h, _ = get_imaginary_time_evolution_operator(hamiltonian, None)
-    else:
-        raise TypeError(f"Not a valid type for input 'hamiltonian' of type {hamiltonian!r}")
+    h = _get_hamiltonian_tensor(hamiltonian)
 
     # outputs:
     energies = dict()
     expectations = {
-        abc : { xyz : [0.0, 0] for xyz in ['x', 'y', 'z'] } 
+        abc : { xyz : _ValueAndCount() for xyz in ['x', 'y', 'z'] } 
         for abc in ['A', 'B', 'C']
     }
-    energies4mean = []
     
     ## Contract to mode:
     mode_tn = reduce_tn(tn, ModeTN, trunc_dim, copy=True, mode=mode)
 
     ## For each edge, reduce a bit more and calc energy:
     for edge_tuple in UpdateEdge.all_options():
+    
         # do the final needed contraction for this specific edge:
         edge_tn = reduce_tn(mode_tn, target_type=EdgeTN, trunc_dim=trunc_dim, copy=True, edge_tuple=edge_tuple)
-
-        # Compute Reduce-Density-Matrix (RDM)
-        rdm = edge_tn.rdm
-
-        # Calc energy:
-        edge_energy  = np.dot(rdm.flatten(),  h.flatten()) 
-        edge_energy  /= 2  # Divide by 2 to get energy per site instead of per edge
-        if DEBUG_MODE and force_real:
-            edge_energy = assertions.real(edge_energy)
-        elif force_real:
-            edge_energy = float(np.real(edge_energy))
+        rdm, edge_energy = _get_edge_rdm_and_energy(edge_tn, h, force_real)
 
         # keep energies:
-        energies4mean.append(edge_energy)
         energies[edge_tuple.as_strings] = edge_energy
 
         # Calc expectations:
@@ -190,19 +199,18 @@ def measure_energies_and_observables_together(
         for xyz, tuple_ in per_edge_results.items():
             for value, abc_flavor in zip(tuple_, [f1, f2]):
                 abc = abc_flavor.name
-                expectations[abc][xyz][0] += value # accumulate values
-                expectations[abc][xyz][1] += 1     # count appearances
+                expectations[abc][xyz].value += value # accumulate values
+                expectations[abc][xyz].count += 1     # count appearances
 
     # mean expectation values from all appearances :
     for abc in ['A', 'B', 'C']:
         for xyz in ['x', 'y', 'z']:
-            sum_, count_ = expectations[abc][xyz]
-            expectations[abc][xyz] = sum_/count_
+            sum_   = expectations[abc][xyz].value
+            count_ = expectations[abc][xyz].count
+            # override value, count tuple with mean:
+            expectations[abc][xyz] = sum_/count_  
     
-    # mean energy from all energies prt site:
-    mean_energy = sum(energies4mean)/len(energies4mean)
-
-    return energies, expectations, mean_energy
+    return energies, expectations
 
 
 def _measurements_everything_on_duplicated_core_specific_size(
@@ -220,7 +228,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
     tn_open = repeat_core(core, repeats)
     # Beliefe Propagation:
     tn_stable, _, bp_stats = belief_propagation(tn_open, messages=None, bp_config=config.bp)
-    if bp_stats.final_error>config.bp.target_msg_diff:
+    if bp_stats.final_error>config.bp.msg_diff_terminate:
         raise BPNotConvergedError("")
     tn_stable_around_core = reduce_full_kagome_to_core(tn_stable, chi, method=config.reduce2core_method)
 

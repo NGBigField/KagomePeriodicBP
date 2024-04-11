@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from containers._meta import container_repr
+from containers._meta import _ConfigClass
 from typing import Iterable
 from utils import assertions
 
@@ -9,10 +9,11 @@ _DEFAULT_PLOTS_TO_SHOW = (True, True, False)
 
 
 @dataclass
-class VisualsConfig(): 
+class VisualsConfig(_ConfigClass): 
 
     progress_bars : bool = True  # Show progress bars to get a feel for expected execution time
     verbose : bool = False  # Print any tiny detail through the code execution 
+    energies_print_decimal_point_length : int = 8
     
     _plots_to_show : tuple[bool] = _DEFAULT_PLOTS_TO_SHOW
 
@@ -42,6 +43,3 @@ class VisualsConfig():
 
         else:
             raise ValueError(_assert_msg)
-
-    def __repr__(self) -> str:
-        return container_repr(self)

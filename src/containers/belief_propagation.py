@@ -1,34 +1,38 @@
 from dataclasses import dataclass, field
 from enums import MessageModel
 from utils.arguments import Stats
-from containers._meta import container_repr
+from containers._meta import _ConfigClass
 from containers.contractions import MPSOrientation
 from typing import NamedTuple, TypeAlias
 from lattices.directions import LatticeDirection
 from libs.bmpslib import mps as MPS
 from lattices.directions import BlockSide
-from copy import deepcopy
 
 
 @dataclass
-class BPConfig: 
+class BPConfig(_ConfigClass): 
+    init_msg: MessageModel = MessageModel.RANDOM_QUANTUM
     max_iterations : int|None = 30   # None is used for unlimited number of iterations
     max_swallowing_dim : int = 9
-    target_msg_diff : float = 1e-5
+    msg_diff_terminate : float = 1e-6
+    msg_diff_good_enough : float = 1e-4
     msg_diff_squared : bool = True  # True is easier to get to 
-    init_msg: MessageModel = MessageModel.RANDOM_QUANTUM
-    allowed_retries : int = 3
-    times_to_deem_failure_when_diff_increases  : int = 4
+    allowed_retries : int = 2
+    times_to_deem_failure_when_diff_increases  : int = 3
     parallel_msgs : bool = False
     damping : float|None = None  # The `learning-step` of the messages. 
-    hermitize_msgs : bool = True
     # damping=0 will take 100% the new message while damping=1 will keep the old message.
-
-    def __repr__(self) -> str:
-        return container_repr(self)
+    hermitize_msgs : bool = True
     
-    def copy(self)->"BPConfig":
-        return deepcopy(self)
+    def __repr__(self) -> str:
+        return super().__repr__()
+    
+    def __post_init__(self) -> None:
+        if self.msg_diff_terminate > self.msg_diff_good_enough:
+            raise ValueError(f"In bp config, msg_diff_terminate={self.msg_diff_terminate}"+
+                             f"< msg_diff_good_enough={self.msg_diff_good_enough}"+
+                             f"  This will cause bp to fail at every step."
+                            )
 
 
 @dataclass
