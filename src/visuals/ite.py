@@ -551,7 +551,6 @@ def plot_from_log(
         ("Edge-Energies after each update=", "Edge-Energies after segment =   ", " Mean energy after segment", "num_mode_repetitions_per_segment", "Hamiltonian's reference energy", "segment:") 
     )
 
-
     num_segments = len(mean_energies_strs)
     
     ## Parse num modes per segment:

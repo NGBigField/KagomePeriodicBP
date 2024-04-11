@@ -26,15 +26,15 @@ SCATTER_STYLE_FOR_ITE = ScatterStyleFoeITE(
     energies_at_update = ScatterStyle(
         color="black",
         marker="d",
-        size=20,
-        alpha=0.6
+        size=12,
+        alpha=0.5
     )
     ,
     energies_after_segment = ScatterStyle(
         color="blue",
         marker="o",
-        size=20,
-        alpha=0.6
+        size=12,
+        alpha=0.5
     )
 )
 

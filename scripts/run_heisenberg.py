@@ -39,16 +39,16 @@ def _config_at_measurement(config:Config)->Config:
 
 def main(
     D = 2,
-    N = 2,
+    N = 3,
     chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    hamiltonian:str = "FM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.0
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.04.10_19.36.36_OIYD - stable")
+    unit_cell = UnitCell.load("2024.04.11_09.43.42_CGOP - stable -0.25")
     # unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
@@ -62,16 +62,17 @@ def main(
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim = 4*D**2
     config.bp.max_swallowing_dim *= chi_factor
-    config.bp.msg_diff_terminate = 1e-5 #1e-14
-    config.bp.msg_diff_good_enough =1e-4 # 1e-7
+    config.bp.msg_diff_terminate = 1e-15
+    config.bp.msg_diff_good_enough = 1e-7
     config.bp.max_iterations = 81
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.allowed_retries = 2
     config.ite.normalize_tensors_after_update = True
+    config.iterative_process.bp_every_edge = False
     config.iterative_process.num_mode_repetitions_per_segment = 2
     config.iterative_process.start_segment_with_new_bp_message = False
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
-    config.ite.time_steps = [[10**(-exp)]*10 for exp in range(2, 20)]
+    config.ite.time_steps = [[10**(-exp)]*10 for exp in range(6, 20, 2)]
 
     # Interaction:
     match hamiltonian: 
