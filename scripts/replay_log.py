@@ -2,7 +2,7 @@ import _import_src  ## Needed to import src folders when scripts are called from
 
 # Types in the code:
 from utils import logs, visuals
-from visuals import ite_progress
+from visuals.ite import plot_from_log
 from sys import argv
 import os
 
@@ -24,7 +24,7 @@ def main(
         filename = _get_last_log_file()
 
     ## Main call:
-    ite_progress.plot_from_log(filename)
+    plot_from_log(filename)
 
     # Done:
     visuals.save_figure(file_name=filename)

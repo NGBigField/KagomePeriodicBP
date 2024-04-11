@@ -23,7 +23,8 @@ from algo.measurements import mean_expectation_values, UnitCellExpectationValues
 from _config_reader import ALLOW_VISUALS
 
 if ALLOW_VISUALS:
-    from utils.visuals import Axes3D, Quiver, Line3D, Text, plt, DEFAULT_PYPLOT_FIGSIZE, _XYZ
+    from utils.visuals import Axes3D, Quiver, Line3D, Text, DEFAULT_PYPLOT_FIGSIZE, _XYZ
+    from matplotlib import pyplot as plt
 else:
     Axes3D, Quiver, Line3D, Text = None, None, None, None
 
@@ -528,6 +529,17 @@ def _energies_from_energies_str_line(line:str)->list[float]:
     return [float(val) for val in vals]
 
 
+def _scatter_energies(
+    energies_word:str, i:int, style:visual_constants.ScatterStyle, label:str,  is_first:bool
+)->None:
+    
+    energies = _energies_from_energies_str_line(energies_word)
+    for energy in energies:
+        label = label if is_first else None
+        # energy /= 2  # Get equiv energy per site
+        plt.scatter(i, energy, s=style.size, c=style.color, alpha=style.alpha, marker=style.marker, label=label)
+        is_first = False
+
 
 
 def plot_from_log(
@@ -535,12 +547,12 @@ def plot_from_log(
 ):
 
     ## Get matching words:
-    edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, reference_energy_str = logs.search_words_in_log(log_name, 
-        ("Edge-Energies after each update=", "Edge-Energies after segment =   ", " Mean energy after segment", "num_mode_repetitions_per_segment", "Hamiltonian's reference energy") 
+    edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, reference_energy_str, segment_data_str = logs.search_words_in_log(log_name, 
+        ("Edge-Energies after each update=", "Edge-Energies after segment =   ", " Mean energy after segment", "num_mode_repetitions_per_segment", "Hamiltonian's reference energy", "segment:") 
     )
 
 
-    n = len(mean_energies_strs)
+    num_segments = len(mean_energies_strs)
     
     ## Parse num modes per segment:
     num_mode_repetitions_per_segment = num_mode_repetitions_per_segment_str[0].removeprefix(": ")
@@ -557,37 +569,23 @@ def plot_from_log(
         
     ## Plot mean energies:    
     plt.figure()
-    mean_energy_plot = plt.plot(mean_energies, color="tab:blue", label="mean energy")
+    plt.plot(mean_energies, color="tab:blue", label="mean energy")
     plt.grid()
     plt.title("Mean Energy")
     plt.xlabel("Iteration")
 
     ## Plot energy per edge:
-    is_first = {
-        "energies at update" : True,
-        "energies per edge"  : True,
-    }
+    is_first = True
     
-    for i in range(n):
-        for j in range(num_mode_repetitions_per_segment):
+    for i in range(num_segments):
+        _scatter_energies(energies_word=edge_energies_for_mean_strs.pop(0), i=i, style=energies_after_segment_style, label="energies per edge", is_first=is_first)
 
-            energies_during = _energies_from_energies_str_line(edge_energies_during_strs.pop(0))
-            # Plot only last edge:
-            if j<num_mode_repetitions_per_segment-1:
-                continue
-            # parse:
-            energies_4mean  = _energies_from_energies_str_line(edge_energies_for_mean_strs.pop(0))
-            
-            # Plot:
-            for style, energies, name in [
-                (energies_at_update_style    , energies_during, "energies at update"), 
-                (energies_after_segment_style, energies_4mean , "energies per edge" )
-            ]:
-                for energy in energies:
-                    energy /= 2  # Get equiv energy per site
-                    label = name if is_first[name] else None
-                    plt.scatter(i, energy, s=style.size, c=style.color, alpha=0.5, marker=style.marker, label=label)
-                    is_first[name] = False
+
+        for j in range(num_mode_repetitions_per_segment):
+            index = i + j/num_mode_repetitions_per_segment
+            _scatter_energies(energies_word=edge_energies_during_strs.pop(0), i=index, style=energies_at_update_style, label="energies at update", is_first=is_first)
+            is_first = False
+
                 
     ## Plot reference energy:
     if len(reference_energy_str)==0:
