@@ -571,8 +571,9 @@ def plot_from_log(
     plt.figure()
     plt.plot(mean_energies, color="tab:blue", label="mean energy")
     plt.grid()
-    plt.title("Mean Energy")
+    plt.title("ITE Energies")
     plt.xlabel("Iteration")
+    plt.ylabel("Energy")
 
     ## Plot energy per edge:
     is_first = True

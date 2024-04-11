@@ -187,6 +187,17 @@ def _check_converged(energies_in:list[complex|None], delta_ts:list[float], crnt_
     return True
 
 
+def _log_plot_and_print_segment_results(
+    plots:ITEPlots, tracker:ITEProgressTracker, delta_t, unit_cell, messages, expectations, logger_method, segment_stats, mean_energy, config,
+    energies_at_end, energies_at_updates
+)->None:
+    tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
+    plots.update(energies_at_end, energies_at_updates, segment_stats, delta_t, expectations, unit_cell)
+    energies_str = strings.float_list_to_str(list(energies_at_end.values()), config.visuals.energies_print_decimal_point_length)
+    logger_method(f"        Edge-Energies after segment =   "+energies_str)
+    logger_method(f"Mean energy after segment = {mean_energy}")
+
+
 def _mode_order_without_repetitions(prev_order:list[UpdateMode], ite_config:ITEConfig, num_modes:int)->list[UpdateMode]:
     # Get random variation:
     if ite_config.random_mode_order:
@@ -329,7 +340,7 @@ def ite_per_segment(
     stats = ITESegmentStats()
     stats.modes_order = modes_order
     stats.delta_t = delta_t
-    edge_energies_at_updates : list[dict[str, float]] = []
+    energies_at_updates : list[dict[str, float]] = []
 
     if use_prog_bar:  
         log_method = logger.debug
@@ -349,7 +360,7 @@ def ite_per_segment(
 
         ## Run:
         try:
-            unit_cell, messages, edge_energies, ite_per_mode_stats = ite_per_mode(
+            unit_cell, messages, energies_at_update_per_mode, ite_per_mode_stats = ite_per_mode(
                 unit_cell, messages, delta_t, logger, config, update_mode
             )
         except BPNotConvergedError as e:
@@ -359,8 +370,8 @@ def ite_per_segment(
         
         ## Track results:
         stats.ite_per_mode_stats.append(ite_per_mode_stats)
-        edge_energies_at_updates.append(edge_energies)
-        energies_str = strings.float_list_to_str([np.real(energy) for energy in edge_energies.values()], config.visuals.energies_print_decimal_point_length)
+        energies_at_updates.append(energies_at_update_per_mode)
+        energies_str = strings.float_list_to_str([np.real(energy) for energy in energies_at_update_per_mode.values()], config.visuals.energies_print_decimal_point_length)
         logger.debug(f"        Hermicity of environment={[metric.hermicity for metric in ite_per_mode_stats.env_metrics]!r}")        
         logger.debug(f"        Edge-Energies after each update="+energies_str)
 
@@ -369,7 +380,7 @@ def ite_per_segment(
 
     prog_bar.clear()
 
-    return unit_cell, messages, edge_energies_at_updates, stats
+    return unit_cell, messages, energies_at_updates, stats
 
 
 # @decorators.multiple_tries(3)
@@ -427,8 +438,8 @@ def ite_per_delta_t(
         at_least_one_successful_run = True
 
         ## Calculate observables:
-        energies_at_end, expectations, messages = _calculate_crnt_observables(unit_cell, config, messages)
-        mean_energy = _mean_energy_from_energies_dict(energies_at_end)
+        energies_after_segment, expectations, messages = _calculate_crnt_observables(unit_cell, config, messages)
+        mean_energy = _mean_energy_from_energies_dict(energies_after_segment)
 
         ## If bp struggled, we will use the harder config for next times:
         if config.iterative_process.keep_harder_bp_config_between_segments:
@@ -436,10 +447,10 @@ def ite_per_delta_t(
 
         ## Save data, print performance and plot graphs:
         segment_stats.mean_energy = mean_energy
-        tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
-        plots.update(energies_at_end, energies_at_updates, segment_stats, delta_t, expectations, unit_cell)
-        logger_method(f"        Edge-Energies after segment =   "+strings.float_list_to_str(list(energies_at_end.values()), config.visuals.energies_print_decimal_point_length))
-        logger_method(f"Mean energy after segment = {mean_energy}")
+        _log_plot_and_print_segment_results(
+            plots, tracker, delta_t, unit_cell, messages, expectations, logger_method, segment_stats, mean_energy, config,
+            energies_after_segment, energies_at_updates
+        )
 
         ## Check stopping criteria:
         if config.ite.check_converges and _check_converged(tracker.energies, tracker.delta_ts, delta_t):

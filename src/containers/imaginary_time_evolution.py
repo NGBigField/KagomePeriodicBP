@@ -213,6 +213,7 @@ class ITEConfig(_ConfigClass):
     # Control flags:
     random_mode_order : bool = True
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
+    normalize_tensors_after_update : bool = True
 
     @property
     def reference_ground_energy(self)->float|None:  

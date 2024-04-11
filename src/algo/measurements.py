@@ -116,7 +116,7 @@ def print_results_table(results:dict[str, dict[str, float]])->None:
         print(row_str)
 
 
-def _get_edge_rdm_and_energy(edge_tn:EdgeTN, mode_tn:ModeTN, h:np.ndarray, trunc_dim:int, force_real:bool)->float:
+def _get_edge_rdm_and_energy(edge_tn:EdgeTN, h:np.ndarray, force_real:bool)->float:
 
     # Compute Reduce-Density-Matrix (RDM)
     rdm = edge_tn.rdm
@@ -131,6 +131,16 @@ def _get_edge_rdm_and_energy(edge_tn:EdgeTN, mode_tn:ModeTN, h:np.ndarray, trunc
 
     return rdm, energy
 
+def _get_hamiltonian_tensor(hamiltonian)->np.ndarray:
+    if isinstance(hamiltonian, np.ndarray):
+        h = hamiltonian
+    elif callable(hamiltonian):
+        h = hamiltonian()
+    elif isinstance(hamiltonian, tuple|HamiltonianFuncAndInputs):
+        h, _ = get_imaginary_time_evolution_operator(hamiltonian, None)
+    else:
+        raise TypeError(f"Not a valid type for input 'hamiltonian' of type {hamiltonian!r}")    
+    return h
 
 def mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[str, float]:
     mean_per_direction : dict[str, float] = dict(x=0, y=0, z=0)
@@ -159,14 +169,7 @@ def measure_energies_and_observables_together(
     if mode is None:
         mode = UpdateMode.random()
 
-    if isinstance(hamiltonian, np.ndarray):
-        h = hamiltonian
-    elif callable(hamiltonian):
-        h = hamiltonian()
-    elif isinstance(hamiltonian, tuple|HamiltonianFuncAndInputs):
-        h, _ = get_imaginary_time_evolution_operator(hamiltonian, None)
-    else:
-        raise TypeError(f"Not a valid type for input 'hamiltonian' of type {hamiltonian!r}")
+    h = _get_hamiltonian_tensor(hamiltonian)
 
     # outputs:
     energies = dict()
@@ -183,8 +186,7 @@ def measure_energies_and_observables_together(
     
         # do the final needed contraction for this specific edge:
         edge_tn = reduce_tn(mode_tn, target_type=EdgeTN, trunc_dim=trunc_dim, copy=True, edge_tuple=edge_tuple)
-
-        rdm, edge_energy = _get_edge_rdm_and_energy(edge_tn, mode_tn, h, trunc_dim, force_real)
+        rdm, edge_energy = _get_edge_rdm_and_energy(edge_tn, h, force_real)
 
         # keep energies:
         energies[edge_tuple.as_strings] = edge_energy

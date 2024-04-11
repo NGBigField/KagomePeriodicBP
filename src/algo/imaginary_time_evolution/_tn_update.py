@@ -130,12 +130,14 @@ def ite_update_unit_cell(
     ## Calc energy and updated env metrics:
     rdm_after = rho_ij(t1_new, t2_new, mps_env=mps_env)
     energy_after = np.dot(rdm_after.flatten(),  h.flatten())
+    energy_after /= 2  # Divide by 2 to get effective energy per site
     metrics = _check_rdms_metrics(rdm_after)
     metrics.other["original_negativity_ratio"] = _calc_original_negativity_ratio(origin_eigen_vals)
 
     ## normalize
-    t1_new = t1_new / np.linalg.norm(t1_new)
-    t2_new = t2_new / np.linalg.norm(t2_new)
+    if ite_config.normalize_tensors_after_update:
+        t1_new = t1_new / np.linalg.norm(t1_new)
+        t2_new = t2_new / np.linalg.norm(t2_new)
 
     ## Update tensors:
     f1, f2 = edge_tn.unit_cell_flavors
