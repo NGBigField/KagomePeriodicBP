@@ -32,7 +32,7 @@ def decreasing_global_field_func(delta_t:float|None)->float:
 
 def _config_at_measurement(config:Config)->Config:
     config.dims.big_lattice_size += 0
-    config.bp.msg_diff_terminate /= 2
+    config.bp.msg_diff_terminate /= 1
     config.bp.allowed_retries    += 1
     return config
 
