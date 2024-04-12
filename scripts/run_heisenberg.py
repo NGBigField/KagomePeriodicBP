@@ -39,16 +39,16 @@ def _config_at_measurement(config:Config)->Config:
 
 def main(
     D = 2,
-    N = 3,
+    N = 5,
     chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.0
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.04.11_09.43.42_CGOP - stable -0.25")
+    unit_cell = UnitCell.load("2024.04.11_18.04.20_ZTXN")
     # unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
@@ -68,11 +68,11 @@ def main(
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.allowed_retries = 2
     config.ite.normalize_tensors_after_update = True
-    config.iterative_process.bp_every_edge = False
+    config.iterative_process.bp_every_edge = True
     config.iterative_process.num_mode_repetitions_per_segment = 2
     config.iterative_process.start_segment_with_new_bp_message = False
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
-    config.ite.time_steps = [[10**(-exp)]*10 for exp in range(6, 20, 2)]
+    config.ite.time_steps = [[10**(-exp)]*25 for exp in range(2, 14, 1)]
 
     # Interaction:
     match hamiltonian: 
