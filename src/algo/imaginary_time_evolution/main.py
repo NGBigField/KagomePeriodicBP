@@ -123,7 +123,12 @@ def _calculate_crnt_observables(
 
     ## Get a new fresh tn:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
-    messages, _ = robust_belief_propagation(full_tn, messages, config.bp    , live_plots, allow_prog_bar)
+    
+    ## BP:
+    if config.iterative_process.use_bp:
+        messages, _ = robust_belief_propagation(full_tn, messages, config.bp    , live_plots, allow_prog_bar)
+    else:
+        full_tn.connect_uniform_messages()
 
     ## Calculate observables:
     energies, expectations = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
