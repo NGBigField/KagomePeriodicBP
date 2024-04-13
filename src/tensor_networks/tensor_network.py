@@ -26,7 +26,7 @@ import lattices.triangle as triangle_lattice
 # Common types:
 from _types import EdgeIndicatorType, PosScalarType, EdgesDictType
 from _error_types import TensorNetworkError, LatticeError, DirectionError, NetworkConnectionError
-from enums import NodeFunctionality, UpdateMode, UnitCellFlavor
+from enums import NodeFunctionality, UpdateMode, UnitCellFlavor, MessageModel
 from containers.belief_propagation import MessageDictType, Message, MPSOrientation
 from containers.sizes_and_dimensions import TNDimensions
 
@@ -306,13 +306,18 @@ class KagomeTN(TensorNetwork):
         # Clear cache so that nodes are derived again
         self.clear_cache()
 
-    # add sub method:
     def connect_random_messages(self) -> None:
+        return self._connect_messages_of_specific_initial_model(msg_model=MessageModel.RANDOM_QUANTUM)
+
+    def connect_uniform_messages(self) -> None:
+        return self._connect_messages_of_specific_initial_model(msg_model=MessageModel.UNIFORM_QUANTUM)
+
+    def _connect_messages_of_specific_initial_model(self, msg_model:MessageModel) -> None:
         D = self.dimensions.virtual_dim
         message_length = self.num_message_connections
         messages = { 
             edge_side : Message(
-                mps=initial_message(D=D, N=message_length), 
+                mps=initial_message(D=D, N=message_length, message_model=msg_model), 
                 orientation=MPSOrientation.standard(edge_side.opposite())
             ) 
             for edge_side in BlockSide.all_in_counter_clockwise_order()  \

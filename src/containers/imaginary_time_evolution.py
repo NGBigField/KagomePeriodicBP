@@ -192,6 +192,7 @@ class IterativeProcessConfig(_ConfigClass):
     bp_not_converged_raises_error : bool = False
     bp_every_edge : bool = True
     # Control numbers:
+    use_bp : bool = True  # Controls if we use block-belief-propagation or not
     num_total_errors_threshold : int = 20    
     num_errors_per_delta_t_threshold : int = 5    
     segment_error_cause_state_revert : bool = True    

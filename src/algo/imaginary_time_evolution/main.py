@@ -235,15 +235,20 @@ def _from_unit_cell_to_stable_mode(
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
 
     ## Perform BlockBP:
-    messages, bp_stats = robust_belief_propagation(
-        full_tn, messages, config.bp, 
-        update_plots_between_steps=config.visuals.live_plots, 
-        allow_prog_bar=config.visuals.progress_bars
-    )
-    print_or_log_bp_message(config.bp, config.iterative_process.bp_not_converged_raises_error, bp_stats, logger)
+    if config.iterative_process.use_bp:
+        messages, bp_stats = robust_belief_propagation(
+            full_tn, messages, config.bp, 
+            update_plots_between_steps=config.visuals.live_plots, 
+            allow_prog_bar=config.visuals.progress_bars
+        )
 
-    # If block-bp struggled and increased the virtual dimension, the following iterations must also use a higher dimension:
-    config = _harden_bp_config_if_struggled(config, bp_stats, logger)
+        print_or_log_bp_message(config.bp, config.iterative_process.bp_not_converged_raises_error, bp_stats, logger)
+
+        # If block-bp struggled and increased the virtual dimension, the following iterations must also use a higher dimension:
+        config = _harden_bp_config_if_struggled(config, bp_stats, logger)
+    else:
+        bp_stats = None
+        full_tn.connect_uniform_messages()
 
     ## Contract to mode:
     mode_tn = reduce_tn(full_tn, ModeTN, trunc_dim=config.trunc_dim, mode=mode)

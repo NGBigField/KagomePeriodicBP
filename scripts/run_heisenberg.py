@@ -39,13 +39,14 @@ def _config_at_measurement(config:Config)->Config:
 
 def main(
     D = 2,
-    N = 5,
+    N = 15,
     chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0.0
+    active_bp:bool = False,
+    damping:float|None = 0.0,
 )->tuple[float, str]:
     
     unit_cell = UnitCell.load("2024.04.11_18.04.20_ZTXN")
@@ -62,17 +63,18 @@ def main(
     config.trunc_dim *= chi_factor
     config.bp.max_swallowing_dim = 4*D**2
     config.bp.max_swallowing_dim *= chi_factor
-    config.bp.msg_diff_terminate = 1e-15
-    config.bp.msg_diff_good_enough = 1e-7
-    config.bp.max_iterations = 81
+    config.bp.msg_diff_terminate = 2 #1e-15
+    config.bp.msg_diff_good_enough = 3 #1e-57
+    config.bp.max_iterations = 1
     config.bp.times_to_deem_failure_when_diff_increases = 4
-    config.bp.allowed_retries = 2
+    config.bp.allowed_retries = 1
     config.ite.normalize_tensors_after_update = True
-    config.iterative_process.bp_every_edge = True
+    config.iterative_process.bp_every_edge = False
     config.iterative_process.num_mode_repetitions_per_segment = 2
     config.iterative_process.start_segment_with_new_bp_message = False
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
-    config.ite.time_steps = [[10**(-exp)]*25 for exp in range(2, 14, 1)]
+    config.iterative_process.use_bp = active_bp
+    config.ite.time_steps = [[10**(-exp)]*25 for exp in range(1, 14, 1)]
 
     # Interaction:
     match hamiltonian: 

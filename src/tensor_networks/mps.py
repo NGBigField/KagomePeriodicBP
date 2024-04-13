@@ -130,7 +130,8 @@ def init_mps_quantum(D_list, random=False) -> MPS:
 				assert abs(_s-1)<1e-5, f"Must be a physical state"
       
 		else:
-			ketbra = np.eye(D2)
+			ketbra = np.eye(D3)
+			ketbra /= norm(ketbra)
 
 		ketbra = ketbra.reshape([D,D,D,D,D,D])
 		ketbra = ketbra.transpose([0,3, 1,4, 2,5])
