@@ -4,10 +4,10 @@ from numpy import ndarray as np_ndarray
 from enums import UnitCellFlavor
 import numpy as np
 
-from utils import saveload, strings, iterations
+from utils import saveload, strings, iterations, files
 
 UNIT_CELL_SUBFOLDER = "unit_cells"
-
+UNIT_CELL_FOLDER_FULLPATH = saveload.DATA_FOLDER + saveload.PATH_SEP + UNIT_CELL_SUBFOLDER
 
 @dataclass
 class UnitCell: 
@@ -90,6 +90,8 @@ class UnitCell:
 
     @staticmethod
     def load(file_name:str, if_exist:bool=False)->"UnitCell":
+        if file_name=="last":
+            file_name = files.get_last_file_in_folder(UNIT_CELL_FOLDER_FULLPATH)
         return saveload.load(file_name, sub_folder=UNIT_CELL_SUBFOLDER, if_exist=if_exist)
     
     def set_filename(self, filename:str)->None:

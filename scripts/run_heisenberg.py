@@ -49,7 +49,8 @@ def main(
     damping:float|None = 0.0,
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("2024.04.11_18.04.20_ZTXN")
+    unit_cell = UnitCell.load("last")
+    # unit_cell = UnitCell.load("2024.04.11_18.04.20_ZTXN")
     # unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
@@ -73,7 +74,7 @@ def main(
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.use_bp = active_bp
     config.ite.normalize_tensors_after_update = False
-    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(1, 18, 1)]
+    config.ite.time_steps = [[10**(-exp)]*25 for exp in range(0, 18, 1)]
 
     # Interaction:
     match hamiltonian: 
