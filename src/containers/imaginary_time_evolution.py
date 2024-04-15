@@ -27,7 +27,7 @@ import itertools
 DEFAULT_ITE_TRACKER_MEMORY_LENGTH : int = 10
 _HamilInputType : TypeAlias = _T|tuple[_T]|None|str
 _HamilInputRuleType : TypeAlias = Callable[[Any], _HamilInputType]|None
-
+NUM_EDGES_PER_MODE : int = 6
 
 def _Identity_function(x):
     return x
@@ -151,8 +151,10 @@ class UpdateEdge(NamedTuple):
             yield UpdateEdge(a, b)
 
     @staticmethod
-    def all_in_random_order()->Generator["UpdateEdge", None, None]:
+    def all_in_random_order(num_edges:int=NUM_EDGES_PER_MODE)->Generator["UpdateEdge", None, None]:
         random_order = lists.shuffle(list(UpdateEdge.all_options()))
+        if num_edges != NUM_EDGES_PER_MODE:
+            random_order = lists.repeat_list(random_order, num_items=num_edges)
         return (mode for mode in random_order)
     
     @staticmethod
@@ -199,6 +201,7 @@ class IterativeProcessConfig(_ConfigClass):
     keep_harder_bp_config_between_segments : bool = False
     # Measure expectation and energies:
     num_mode_repetitions_per_segment : int = 1  # number of modes between each measurement of energy
+    num_edge_repetitions_per_mode : int = 6  # number of edges before new segment
     change_config_for_measurements_func : Callable[[_T], _T] = _Identity_function
 
     def __repr__(self) -> str:

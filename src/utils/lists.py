@@ -12,6 +12,7 @@ from typing import (
 from copy import deepcopy
 import numpy as np
 
+from utils import arguments
 
 _T = TypeVar("_T")
 _Iterable = list|np.ndarray|dict
@@ -22,6 +23,12 @@ _FloatOrComplex = TypeVar("_FloatOrComplex", float, complex)
 def _identity(x:_Numeric)->_Numeric:
     return x
 
+def _minimum_required_copies(crnt_len:int, trgt_len:int)->int:
+    div, mod = divmod(trgt_len, crnt_len)
+    if mod==0:
+       return div
+    else: 
+        return div+1 
 
 def index_by_approx_value(l:list, value:_Numeric, allowed_error:float=1e-6)->int:
     distances = [abs(v-value) if isinstance(v,float|int|complex) else np.inf for v in l]
@@ -224,6 +231,17 @@ def shuffle(lis:list[_T])->list[_T]:
     res = rearrange(lis, order=new_order)
     return res
 
+def repeat_list(lis:list[_T], /, num_times:int|None=None, num_items:int|None=None)->list[_T]:
+    # Check inputs:
+    name, _ = arguments.only_single_input_allowed(function_name="repeat_list", num_times=num_times, num_items=num_items)
+    # choose based on inputs:
+    match name:
+        case "num_times":
+            return lis*num_times
+        case "num_items":
+            d = _minimum_required_copies(len(lis), num_items)
+            larger_list = repeat_list(lis, num_times=d)
+            return larger_list[:num_items]
 
 def convert_whole_numbers_to_int(lis:List[float|int])->List[float|int]:
     lis_copy : list[int|float] = lis.copy()

@@ -284,14 +284,15 @@ def ite_per_mode(
 ]:
 
     ## for each edge in the mode, update the tensors
-    edge_tuples = list(UpdateEdge.all_in_random_order())
+    num_edges = config.iterative_process.num_edge_repetitions_per_mode
+    edge_tuples = UpdateEdge.all_in_random_order(num_edges=num_edges)
     edge_energies = dict()
 
     ## prepare statistics and health for debugging:
     stats = ITEPerModeStats()
 
-    prog_bar = get_progress_bar(config, len(edge_tuples), "Executing ITE per-mode:")
-    for is_first, is_last, edge_tuple in lists.iterate_with_edge_indicators(edge_tuples):
+    prog_bar = get_progress_bar(config, num_edges, "Executing ITE per-mode:")
+    for is_first, is_last, edge_tuple in lists.iterate_with_edge_indicators(list(edge_tuples)):
         prog_bar.next(extra_str=f"{edge_tuple}")
 
         if config.visuals.live_plots:

@@ -57,9 +57,7 @@ class Config(_StoreConfigClasses, _ConfigClass):
             self.trunc_dim = self.bp.max_swallowing_dim*2
         if not ALLOW_VISUALS:
             self.visuals.live_plots = False
-        # inactive bp:
-        if not self.iterative_process.use_bp:
-            self.iterative_process.bp_every_edge = False 
+
 
     def strengthen(self, _harder_target:bool=True):
         if isinstance(self.bp.max_iterations, int):

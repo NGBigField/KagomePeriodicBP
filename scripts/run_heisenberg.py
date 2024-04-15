@@ -39,13 +39,13 @@ def _config_at_measurement(config:Config)->Config:
 
 def main(
     D = 2,
-    N = 12,
-    chi_factor : int = 1,
+    N = 2,
+    chi_factor : int = 1.0,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    active_bp:bool = False,
+    active_bp:bool = True,
     damping:float|None = 0.0,
 )->tuple[float, str]:
     
@@ -59,22 +59,21 @@ def main(
     config.visuals.live_plots = live_plots
     config.bp.damping = damping
     config.bp.parallel_msgs = parallel
-    config.trunc_dim = 4*D**2+20
-    config.trunc_dim *= chi_factor
-    config.bp.max_swallowing_dim = 4*D**2
-    config.bp.max_swallowing_dim *= chi_factor
-    config.bp.msg_diff_terminate = 2 #1e-15
-    config.bp.msg_diff_good_enough = 3 #1e-57
-    config.bp.max_iterations = 1
+    config.trunc_dim = int(4*D**2+20 * chi_factor)
+    config.bp.max_swallowing_dim = int(4*D**2 * chi_factor)
+    config.bp.msg_diff_terminate = 1e-14
+    config.bp.msg_diff_good_enough = 1e-5
     config.bp.times_to_deem_failure_when_diff_increases = 4
-    config.bp.allowed_retries = 1
-    config.ite.normalize_tensors_after_update = True
-    config.iterative_process.bp_every_edge = False
-    config.iterative_process.num_mode_repetitions_per_segment = 2
-    config.iterative_process.start_segment_with_new_bp_message = False
+    config.bp.max_iterations = 80
+    config.bp.allowed_retries = 2
+    config.iterative_process.bp_every_edge = True
+    config.iterative_process.num_mode_repetitions_per_segment = 1
+    config.iterative_process.num_edge_repetitions_per_mode = 3
+    config.iterative_process.start_segment_with_new_bp_message = True
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.use_bp = active_bp
-    config.ite.time_steps = [[10**(-exp)]*25 for exp in range(1, 14, 1)]
+    config.ite.normalize_tensors_after_update = False
+    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(1, 18, 1)]
 
     # Interaction:
     match hamiltonian: 

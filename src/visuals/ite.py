@@ -525,7 +525,7 @@ def _energies_from_energies_str_line(line:str)->list[float]:
     line = line.removesuffix("]\n")
     line = line.removeprefix("[")
     vals = line.split(", ")
-    assert len(vals)==6
+    # assert len(vals)==6
     return [float(val) for val in vals]
 
 
