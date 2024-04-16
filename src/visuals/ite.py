@@ -487,6 +487,7 @@ class ITEPlots():
 
             ## Entanglement
             _scatter_plot_at_main_per_edge(results_dict=entangelment, iteration=i, base_style=energies_after_segment_style, axis_name="entanglement")
+            self.plots.main["entanglement"].axis.set_ylim(bottom=0)
 
 
         ## Env Health:

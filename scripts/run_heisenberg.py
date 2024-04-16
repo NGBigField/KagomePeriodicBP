@@ -46,12 +46,12 @@ def main(
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     active_bp:bool = True,
-    damping:float|None = 0.0,
+    damping:float|None = None
 )->tuple[float, str]:
     
     # unit_cell = UnitCell.load("last")
-    unit_cell = UnitCell.load("2024.04.11_09.43.42_CGOP - stable -0.25")
-    # unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.load("2024.04.11_09.43.42_CGOP - stable -0.25")
+    unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
