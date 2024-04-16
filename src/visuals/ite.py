@@ -43,6 +43,9 @@ XYZ_ARROW_KWARGS = dict(capstyle='round', color='black', arrow_length_ratio=0.15
 
 NEW_TRACK_POINT_THRESHOLD = 0.02
 
+PLOT_ENTANGLEMENT = True
+PLOT_COMPLEXITY = False
+
 @dataclass
 class COLORS:
     track = 'tomato'
@@ -249,13 +252,21 @@ class ITEPlots():
 
         if self.show.main:
             fig_main = plt.figure(figsize=(4.5, 6))
-            fig_main.subplot_mosaic([
+            mosaic = [
                 ['B', 'B'],
-                ['A', 'A'],
-                ['T', 'T'],
-                ['E', 'E'],
-                ['E', 'E']
-            ])            
+                ['A', 'A']
+            ]
+
+            if PLOT_COMPLEXITY:
+                mosaic.append(['T', 'T'])
+            mosaic.append(['E', 'E'])
+            mosaic.append(['E', 'E'])
+                
+            if PLOT_ENTANGLEMENT:
+                mosaic.append(['N', 'N'])
+
+            fig_main.subplot_mosaic(mosaic)            
+       
             self.figs.main = fig_main
         
         if self.show.health:
@@ -294,20 +305,32 @@ class ITEPlots():
             p_energies = visuals.AppendablePlot(axis=axes_main["E"])
             p_energies.axis.set_title("energy")
             #
-            p_exec_t = visuals.AppendablePlot(axis=axes_main["T"])
-            p_exec_t.axis.set_title("time and space complexity")
-            p_memory_use = visuals.AppendablePlot(axis=axes_main["T"].twinx())
-            p_exec_t.axis.set_ylabel("time [sec]", color=COLORS.time_complexity)
-            p_exec_t.axis.tick_params(axis='y', labelcolor=COLORS.time_complexity)
-            p_memory_use.axis.set_ylabel("space [bytes]", color=COLORS.space_complexity)
-            p_memory_use.axis.tick_params(axis='y', labelcolor=COLORS.space_complexity)
+            if PLOT_COMPLEXITY:
+                p_exec_t = visuals.AppendablePlot(axis=axes_main["T"])
+                p_exec_t.axis.set_title("time and space complexity")
+                p_memory_use = visuals.AppendablePlot(axis=axes_main["T"].twinx())
+                p_exec_t.axis.set_ylabel("time [sec]", color=COLORS.time_complexity)
+                p_exec_t.axis.tick_params(axis='y', labelcolor=COLORS.time_complexity)
+                p_memory_use.axis.set_ylabel("space [bytes]", color=COLORS.space_complexity)
+                p_memory_use.axis.tick_params(axis='y', labelcolor=COLORS.space_complexity)
+            else:
+                p_exec_t, p_memory_use = visuals.AppendablePlot.inacive(), visuals.AppendablePlot.inacive()
+            #
+            if PLOT_ENTANGLEMENT:
+                p_entanglement = visuals.AppendablePlot(axis=axes_main["N"])
+                p_entanglement.axis.set_title("entanglement")
+                p_entanglement.axis.set_ylabel("Negativity")
+                p_entanglement.axis.set_xlabel("iteration")
+            else:
+                p_entanglement = visuals.AppendablePlot.inacive()
             #
             self.plots.main = dict(
                 energies=p_energies, 
                 expectations=p_expectations, 
                 delta_t=p_delta_t,
                 exec_t=p_exec_t,
-                memory_use=p_memory_use
+                memory_use=p_memory_use,
+                entanglement=p_entanglement
             )
 
         ## Env plots:        
@@ -392,11 +415,12 @@ class ITEPlots():
 
     def update(self, 
         energies_at_end : dict[str, float], 
-        energies_at_updates :list[dict[str, float]] ,
-        segment_stats:ITESegmentStats, 
-        delta_t:float, 
-        expectations:UnitCellExpectationValuesDict, 
-        unit_cell:UnitCell, 
+        energies_at_updates : list[dict[str, float]] ,
+        segment_stats : ITESegmentStats, 
+        delta_t : float, 
+        expectations : UnitCellExpectationValuesDict, 
+        unit_cell : UnitCell, 
+        entangelment : list[dict[str, float]],
         _initial:bool=False,
         _draw_now:bool=True
     ):
@@ -412,12 +436,14 @@ class ITEPlots():
             plot.axis.scatter(x=x, y=y, c=style.color, s=style.size, alpha=style.alpha, marker=style.marker)
 
 
-        def _scatter_plot_of_energies_per_edge(energies_dict:dict[str, float], iteration:int, base_style:visual_constants.ScatterStyle)->None:
-            plot = self.plots.main["energies"]
-            for edge_tuple, energy in energies_dict.items():
+        def _scatter_plot_at_main_per_edge(results_dict:dict[str, float], iteration:int, base_style:visual_constants.ScatterStyle, axis_name:str)->None:
+            plot = self.plots.main[axis_name]
+
+            for edge_tuple, value in results_dict.items():
                 marker = visual_constants.EDGE_TUPLE_TO_MARKER[UpdateEdge.to_str(edge_tuple)]
                 style = tuples.copy_with_replaced_val_at_key(base_style, "marker", marker)
-                _small_scatter(plot, iteration, energy, style=style)
+                style = tuples.copy_with_replaced_val_at_key(style, "alpha", 1.0)
+                _small_scatter(plot, iteration, value, style=style)
 
 
         had_to_revert = segment_stats.had_to_revert
@@ -437,7 +463,7 @@ class ITEPlots():
             plot = self.plots.main["energies"]
 
             if isinstance(energies_at_end, dict):
-                _scatter_plot_of_energies_per_edge(energies_dict=energies_at_end, iteration=i, base_style=energies_after_segment_style)
+                _scatter_plot_at_main_per_edge(results_dict=energies_at_end, iteration=i, base_style=energies_after_segment_style, axis_name="energies")
                 mean_energy = lists.average(list(energies_at_end.values()))
             elif isinstance(energies_at_end, (complex, float, int)):
                 mean_energy = energies_at_end
@@ -450,7 +476,7 @@ class ITEPlots():
             j = self._iteration-1
             for energies in energies_at_updates:
                 j += frac
-                _scatter_plot_of_energies_per_edge(energies_dict=energies, iteration=j, base_style=energies_at_update_style)
+                _scatter_plot_at_main_per_edge(results_dict=energies, iteration=j, base_style=energies_at_update_style, axis_name="energies")
                 
             # Mean:
             plot.append(mean=(i, mean_energy), draw_now_=False)
@@ -458,6 +484,9 @@ class ITEPlots():
             # Ground-truth
             if self.config.ite.reference_ground_energy is not None:
                 plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
+
+            ## Entanglement
+            _scatter_plot_at_main_per_edge(results_dict=entangelment, iteration=i, base_style=energies_after_segment_style, axis_name="entanglement")
 
 
         ## Env Health:

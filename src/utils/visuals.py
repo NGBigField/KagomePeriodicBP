@@ -10,6 +10,7 @@ if __name__ == "__main__":
 
 
 # Everyone needs numpy:
+from matplotlib.pyplot import Axes
 import numpy as np
 
 # for type hints:
@@ -40,12 +41,13 @@ else:
 
 # For OOP:
 from enum import Enum
+from functools import wraps
 
 # for copy:
 from copy import deepcopy
 
 # Use our other utils 
-from utils import strings, assertions, arguments, saveload
+from utils import strings, assertions, arguments, saveload, types
 
 # For saving plots:
 from pathlib import Path
@@ -59,6 +61,8 @@ import colorsys
 
 # For sleeping:
 import time
+
+
 
 
 # ============================================================================ #
@@ -267,6 +271,11 @@ class AppendablePlot():
         self.legend_on : bool = legend_on
         self._update()        
 
+
+    @classmethod
+    def inacive(cls)->"InactiveAppendablePlot":
+        return InactiveAppendablePlot()
+
     def _next_x(self, name:str) -> float|int:
         x_vals = self.values[name][0]
         if len(x_vals)==0:
@@ -357,6 +366,59 @@ class AppendablePlot():
         self._update(draw_now_=draw_now_)
 
 
+
+
+class InactiveObject(): 
+    def __call__(self, *args: Any, **kwds: Any) -> Any:
+        return InactiveObject()
+
+class InactiveDescriptor():
+    def __init__(self) -> None: ...
+    def __get__(self, instance, owner):
+        return self
+    def __set__(self, instance, value): ...
+    def __delete__(self, instance) : ...    
+    def __getattribute__(self, name: str) -> Any: 
+        return InactiveObject()
+    def __setattr__(self, name: str, value: Any) -> None: ...
+
+
+def InactiveMethoedWrapper(func):
+    def wrapper(*args, **kwargs):
+        return None
+    return wrapper
+
+
+class InactiveAppendablePlot(AppendablePlot):
+    fig = InactiveDescriptor()
+    axis = InactiveDescriptor()
+    values = InactiveDescriptor()
+    legend_on = InactiveDescriptor()
+
+    @classmethod
+    def all_method(self)->set[str]:
+        for attr_name in dir(self):
+            if attr_name[:2] == "__":
+                continue
+ 
+            attr = getattr(self, attr_name)
+
+            if callable(attr):
+                yield attr
+
+        
+    def __init__(self) -> None:
+
+        for method in self.all_method():
+            name = method.__name__
+            method = InactiveMethoedWrapper(method)
+            try:
+                assert isinstance(name, str)
+            except Exception as e:
+                print(name)
+                print(method)
+                print(e)
+            setattr(self, name, method)
 
 
 class matplotlib_colors(Enum):
@@ -507,9 +569,8 @@ class matplotlib_colors(Enum):
 
 
 if __name__ == "__main__":
-    ap = AppendablePlot()
-    for y in range(10):
-        z = y + np.random.randint(-2, 2)
-        ap.append(y=y, z=z)
-        time.sleep(0.5)
+    ap = InactiveAppendablePlot()
+    a = ap.axis
+    g = a.grid()
 
+    print("Done.")  

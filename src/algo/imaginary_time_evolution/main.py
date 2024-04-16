@@ -109,9 +109,10 @@ def _harden_bp_config_if_struggled(config:Config, bp_stats:BPStats, logger:logs.
 def _calculate_crnt_observables(
     unit_cell:UnitCell, config:Config, messages:MessageDictType
 )->tuple[
-    dict[tuple[str, str], float],
-    dict[str, dict[str, float]],
-    MessageDictType
+    dict[tuple[str, str], float],  # energies
+    dict[str, dict[str, float]],  # expectations
+    dict[tuple[str, str], float],  # entangelment
+    MessageDictType  # messages
 ]:
     ## Unpack inputs:
     live_plots = config.visuals.live_plots
@@ -131,9 +132,9 @@ def _calculate_crnt_observables(
         full_tn.connect_uniform_messages()
 
     ## Calculate observables:
-    energies, expectations = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
+    energies, expectations, entangelment = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
 
-    return energies, expectations, messages
+    return energies, expectations, entangelment, messages
 
 def _mean_energy_from_energies_dict(energies:dict[str, float])->float:
     return lists.average(list(energies.values()))
@@ -148,12 +149,12 @@ def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:
     logger.info("Calculating measurements of initial core...")
 
     ## Calculate observables:
-    energies, expectations, messages = _calculate_crnt_observables(unit_cell, config, messages)
+    energies, expectations, entangelment, messages = _calculate_crnt_observables(unit_cell, config, messages)
     mean_energy = _mean_energy_from_energies_dict(energies)
 
     ## Save data, print performance and plot graphs:
     ite_tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
-    plots.update(energies, [], segment_stats, delta_t, expectations, unit_cell, _initial=True)
+    plots.update(energies, [], segment_stats, delta_t, expectations, unit_cell, entangelment, _initial=True)
     logger.info(f"Mean energy at iteration 0: {mean_energy}")
 
 
@@ -194,12 +195,14 @@ def _check_converged(energies_in:list[complex|None], delta_ts:list[float], crnt_
 
 def _log_plot_and_print_segment_results(
     plots:ITEPlots, tracker:ITEProgressTracker, delta_t, unit_cell, messages, expectations, logger_method, segment_stats, mean_energy, config,
-    energies_at_end, energies_at_updates
+    energies_at_end, energies_at_updates, entangelment
 )->None:
     tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
-    plots.update(energies_at_end, energies_at_updates, segment_stats, delta_t, expectations, unit_cell)
-    energies_str = strings.float_list_to_str(list(energies_at_end.values()), config.visuals.energies_print_decimal_point_length)
+    plots.update(energies_at_end, energies_at_updates, segment_stats, delta_t, expectations, unit_cell, entangelment)
+    energies_str     = strings.float_list_to_str(list(energies_at_end.values()), config.visuals.energies_print_decimal_point_length)
+    entanglement_str = strings.float_list_to_str(list(entangelment.values())   , config.visuals.energies_print_decimal_point_length)
     logger_method(f"        Edge-Energies after segment =   "+energies_str)
+    logger_method(f"        Edge-Negativities           =   "+entanglement_str)
     logger_method(f"Mean energy after segment = {mean_energy}")
 
 
@@ -449,7 +452,7 @@ def ite_per_delta_t(
         at_least_one_successful_run = True
 
         ## Calculate observables:
-        energies_after_segment, expectations, messages = _calculate_crnt_observables(unit_cell, config, messages)
+        energies_after_segment, expectations, entangelment, messages = _calculate_crnt_observables(unit_cell, config, messages)
         mean_energy = _mean_energy_from_energies_dict(energies_after_segment)
 
         ## If bp struggled, we will use the harder config for next times:
@@ -460,7 +463,7 @@ def ite_per_delta_t(
         segment_stats.mean_energy = mean_energy
         _log_plot_and_print_segment_results(
             plots, tracker, delta_t, unit_cell, messages, expectations, logger_method, segment_stats, mean_energy, config,
-            energies_after_segment, energies_at_updates
+            energies_after_segment, energies_at_updates, entangelment
         )
 
         ## Check stopping criteria:
