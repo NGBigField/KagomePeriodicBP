@@ -44,7 +44,7 @@ def main(
     live_plots:bool|Iterable[bool] = [1, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "FM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     active_bp:bool = True,
     damping:float|None = None
 )->tuple[float, str]:
@@ -62,8 +62,8 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim = int(4*D**2+20 * chi_factor)
     config.bp.max_swallowing_dim = int(4*D**2 * chi_factor)
-    config.bp.msg_diff_terminate = 1e-14
-    config.bp.msg_diff_good_enough = 1e-7
+    config.bp.msg_diff_terminate = 1e-6
+    config.bp.msg_diff_good_enough = 1e-5
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 80
     config.bp.allowed_retries = 2
@@ -74,7 +74,7 @@ def main(
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.use_bp = active_bp
     config.ite.normalize_tensors_after_update = True
-    config.ite.time_steps = [[10**(-exp)]*100 for exp in range(1, 18, 1)]
+    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(1, 18, 1)]
 
     # Interaction:
     match hamiltonian: 

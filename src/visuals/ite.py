@@ -436,13 +436,14 @@ class ITEPlots():
             plot.axis.scatter(x=x, y=y, c=style.color, s=style.size, alpha=style.alpha, marker=style.marker)
 
 
-        def _scatter_plot_at_main_per_edge(results_dict:dict[str, float], iteration:int, base_style:visual_constants.ScatterStyle, axis_name:str)->None:
+        def _scatter_plot_at_main_per_edge(results_dict:dict[str, float], iteration:int, base_style:visual_constants.ScatterStyle, axis_name:str, alpha:float|None=None)->None:
             plot = self.plots.main[axis_name]
 
             for edge_tuple, value in results_dict.items():
                 marker = visual_constants.EDGE_TUPLE_TO_MARKER[UpdateEdge.to_str(edge_tuple)]
                 style = tuples.copy_with_replaced_val_at_key(base_style, "marker", marker)
-                style = tuples.copy_with_replaced_val_at_key(style, "alpha", 1.0)
+                if alpha is not None:
+                    style = tuples.copy_with_replaced_val_at_key(style, "alpha", alpha)
                 _small_scatter(plot, iteration, value, style=style)
 
 
@@ -486,7 +487,7 @@ class ITEPlots():
                 plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
 
             ## Entanglement
-            _scatter_plot_at_main_per_edge(results_dict=entangelment, iteration=i, base_style=energies_after_segment_style, axis_name="entanglement")
+            _scatter_plot_at_main_per_edge(results_dict=entangelment, iteration=i, base_style=energies_after_segment_style, axis_name="entanglement", alpha=1.0)
             self.plots.main["entanglement"].axis.set_ylim(bottom=0)
 
 
