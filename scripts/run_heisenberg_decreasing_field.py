@@ -4,7 +4,7 @@ import _import_src  ## Needed to import src folders when scripts are called from
 from containers import Config
 from tensor_networks import UnitCell
 
-from utils import strings
+from utils import strings, prints
 from typing import Iterable
 
 
@@ -17,29 +17,32 @@ import numpy as np
 d = 2
 
 
-force_values = np.logspace(-14, -20, 500*6)
-iter_force_value = iter(force_values)
-enter_counter = 0
-def decreasing_global_field_func(delta_t:float|None)->float:
-    global enter_counter 
-    enter_counter += 1
-    try:
-        next_force_value = next(iter_force_value)
-    except StopIteration:
-        next_force_value = 0
-    return next_force_value
-
-
-GLOBAL_FIELD = 1.5
-def constant_global_field(delta_t:float|None)->float:
-    return GLOBAL_FIELD
-
-
 def _config_at_measurement(config:Config)->Config:
     config.dims.big_lattice_size += 0
     config.bp.msg_diff_terminate /= 1
     config.bp.allowed_retries    += 1
     return config
+
+
+
+def run_single_ite(
+    unit_cell:UnitCell,
+    field_strength:float,
+    config:Config,
+    results_filename:str
+):
+    ## Set:
+    config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm_with_field, field_strength, None)
+    unit_cell.set_filename(results_filename+f"_{field_strength}") 
+
+    ## Run:
+    energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)
+
+    ## Save
+    fullpath = unit_cell_out.save(results_filename+f"_{field_strength}+_final")
+    print("Done")
+
+    return unit_cell
 
 
 def main(
@@ -49,15 +52,14 @@ def main(
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     active_bp:bool = True,
-    damping:float|None = None
+    damping:float|None = None,
+    field_strength_values = np.arange(1.5, 0, -0.1)
 )->tuple[float, str]:
     
     # unit_cell = UnitCell.load("last")
     # unit_cell = UnitCell.load("2024.04.11_09.43.42_CGOP - stable -0.25")
     unit_cell = UnitCell.random(d=d, D=D)
-    unit_cell.set_filename(results_filename) 
 
     ## Config:
     config = Config.derive_from_physical_dim(D)
@@ -67,38 +69,35 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim = int(4*D**2+20 * chi_factor)
     config.bp.max_swallowing_dim = int(4*D**2 * chi_factor)
-    config.bp.msg_diff_terminate = 1e-5
-    config.bp.msg_diff_good_enough = 1e-4
+    config.bp.msg_diff_terminate = 1e-6
+    config.bp.msg_diff_good_enough = 1e-5
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 80
     config.bp.allowed_retries = 2
     config.iterative_process.bp_every_edge = True
-    config.iterative_process.num_mode_repetitions_per_segment = 1
+    config.iterative_process.num_mode_repetitions_per_segment = 3
     config.iterative_process.num_edge_repetitions_per_mode = 6
     config.iterative_process.start_segment_with_new_bp_message = True
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.use_bp = active_bp
     config.ite.normalize_tensors_after_update = True
-    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(1, 18, 1)]
+    config.ite.time_steps = [[10**(-exp)]*15 for exp in range(1, 8, 1)]
 
-    # Interaction:
-    match hamiltonian: 
-        case "FM":    config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm, None, None)
-        case "FM-T":  config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm_with_field, "delta_t", constant_global_field)
-        case "AFM":   config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None, None)
-        case "AFM-T": config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm_with_field, "delta_t", constant_global_field)
-        case "Field": config.ite.interaction_hamiltonian = (hamiltonians.field, None, None)
-        case _:
-            raise ValueError("Not matching any option.")
-    
 
-    ## Run:
-    energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)
-    fullpath = unit_cell_out.save(results_filename+"_final")
-    print("Done")
+    prog_bar = prints.ProgressBar(len(field_strength_values), print_prefix="Decreasing field test: ")
+    for field_strength in field_strength_values: 
+        prog_bar.append_extra_str(f" field={field_strength}")
+        prog_bar.next()
 
-    return energy, fullpath
+        unit_cell = run_single_ite(
+            unit_cell=unit_cell,
+            field_strength=field_strength, 
+            config=config,
+            results_filename=results_filename 
+        )
+        config.ite.time_steps = [[10**(-exp)]*15 for exp in range(3, 8, 1)]
 
+    prog_bar.clear()
 
 
 if __name__ == "__main__":
