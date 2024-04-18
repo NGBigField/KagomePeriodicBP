@@ -72,7 +72,9 @@ def _change_config_for_measurements_if_applicable(
     return new_config, new_message
 
 
-def _initial_full_ite_inputs(config:Config, unit_cell:UnitCell, logger:logs.Logger):
+def _initial_inputs(
+    config:Config, unit_cell:UnitCell, logger:logs.Logger, common_results_name:str
+)->tuple[Config, UnitCell, logs.Logger, None, ITESegmentStats, ITEProgressTracker, ITEPlots]:
     # Config:
     if config is None:
         config = Config.derive_from_physical_dim(DEFAULT_PHYSICAL_DIM)
@@ -85,15 +87,44 @@ def _initial_full_ite_inputs(config:Config, unit_cell:UnitCell, logger:logs.Logg
         unit_cell = unit_cell.copy()
     else:
         raise TypeError(f"Not an expected type for input 'initial_core' of type {type(unit_cell)!r}")
-    
+    # filename:
+    if unit_cell._file_name is None:
+        unit_cell._file_name = common_results_name
+
     # Logger:
     if logger is None:
-        logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=KEEP_LOGS)
+        logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=KEEP_LOGS, filename=common_results_name)
     elif not isinstance(logger, logs.Logger):
         raise TypeError(f"Not an expected type for input 'logger' of type {type(logger)!r}")
     
-    return config, unit_cell, logger
-    
+    # Initial inputs for first iterations:
+    messages = None
+    step_stats = ITESegmentStats()  # initial step stats for the first iteration. used for randomized mode order
+
+    # Prepare tracking lists and plots:
+    ite_tracker, plots = _initialize_visuals_and_trackers(config, unit_cell, logger, messages, common_results_name)
+
+    return config, unit_cell, logger, messages, step_stats, ite_tracker, plots
+
+
+## Prepare tracking lists and plots:
+def _initialize_visuals_and_trackers(
+    config:Config, 
+    unit_cell:UnitCell, 
+    logger:logs.Logger, 
+    messages:MessageDictType,
+    common_results_name:str
+)->tuple[
+    ITEProgressTracker, # ite_tracker, 
+    ITEPlots # plots
+]:
+    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, 
+                                     config=config, mem_length=config.iterative_process.num_total_errors_threshold,
+                                     filename=common_results_name)
+    _log_and_print_starting_message(logger, config, ite_tracker)  # Print and log valuable information: 
+    plots = ITEPlots(active=config.visuals.live_plots, config=config)
+
+    return ite_tracker, plots
 
 
 def _harden_bp_config_if_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger) -> Config:
@@ -478,7 +509,8 @@ def ite_per_delta_t(
 def full_ite(
     unit_cell:UnitCell|None=None,
     config:Config|None=None,
-    logger:logs.Logger|None=None
+    logger:logs.Logger|None=None,
+    common_results_name:str=None
 )->tuple[
     float,                  # energy
     UnitCell,               # core
@@ -486,17 +518,8 @@ def full_ite(
     logs.Logger             # Logger
 ]:
 
-    ## Initial Settings:
-    config, unit_cell, logger = _initial_full_ite_inputs(config, unit_cell, logger)
-    
-    ## Initial inputs for first iterations:
-    step_stats = ITESegmentStats()  # initial step stats for the first iteration. used for randomized mode order
-    messages = None
-
-    ## Prepare tracking lists and plots:
-    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config, mem_length=config.iterative_process.num_total_errors_threshold)
-    _log_and_print_starting_message(logger, config, ite_tracker)  # Print and log valuable information: 
-    plots = ITEPlots(active=config.visuals.live_plots, config=config)
+    ## Initial Settings inputs and visuals:
+    config, unit_cell, logger, messages, step_stats, ite_tracker, plots = _initial_inputs(config, unit_cell, logger, common_results_name)
 
     ## Calculate observables of starting core:
     if config.visuals.live_plots: 

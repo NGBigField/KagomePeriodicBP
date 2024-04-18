@@ -4,7 +4,7 @@ import _import_src  ## Needed to import src folders when scripts are called from
 from containers import Config
 from tensor_networks import UnitCell
 
-from utils import strings, prints
+from utils import strings, prints, logs
 from typing import Iterable
 
 
@@ -29,17 +29,19 @@ def run_single_ite(
     unit_cell:UnitCell,
     field_strength:float,
     config:Config,
-    results_filename:str
+    crnt_results_name:str,
+    logger:logs.Logger
 ):
+    
     ## Set:
     config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm_with_field, field_strength, None)
-    unit_cell.set_filename(results_filename+f"_{field_strength}") 
 
     ## Run:
-    energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)
+    energy, unit_cell_out, ite_tracker, logger = full_ite(
+        unit_cell, config=config, common_results_name=crnt_results_name, logger=logger
+    )
 
-    ## Save
-    fullpath = unit_cell_out.save(results_filename+f"_{field_strength}+_final")
+    ## End:
     print("Done")
 
     return unit_cell
@@ -50,7 +52,7 @@ def main(
     N = 2,
     chi_factor : int = 1.0,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
-    results_filename:str = strings.time_stamp()+"_"+strings.random(4),
+    results_filename:str = strings.time_stamp(),
     parallel:bool = 0,
     active_bp:bool = True,
     damping:float|None = None,
@@ -72,7 +74,7 @@ def main(
     config.bp.msg_diff_terminate = 1e-6
     config.bp.msg_diff_good_enough = 1e-5
     config.bp.times_to_deem_failure_when_diff_increases = 4
-    config.bp.max_iterations = 80
+    config.bp.max_iterations = 30
     config.bp.allowed_retries = 2
     config.iterative_process.bp_every_edge = True
     config.iterative_process.num_mode_repetitions_per_segment = 3
@@ -84,18 +86,22 @@ def main(
     config.ite.time_steps = [[10**(-exp)]*15 for exp in range(1, 8, 1)]
 
 
+    logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=True, filename=results_filename)
+
     prog_bar = prints.ProgressBar(len(field_strength_values), print_prefix="Decreasing field test: ")
-    for field_strength in field_strength_values: 
-        prog_bar.append_extra_str(f" field={field_strength}")
-        prog_bar.next()
+    for i, field_strength in enumerate(field_strength_values):
+
+        prog_bar.next(extra_str=f" field={field_strength}")
+        crnt_results_name = results_filename+"_"+strings.formatted(i, fill="0", width=3)+f"_f={field_strength}"
 
         unit_cell = run_single_ite(
             unit_cell=unit_cell,
             field_strength=field_strength, 
             config=config,
-            results_filename=results_filename 
+            crnt_results_name=crnt_results_name,
+            logger=logger
         )
-        config.ite.time_steps = [[10**(-exp)]*15 for exp in range(3, 8, 1)]
+        config.ite.time_steps = [[10**(-exp)]*15 for exp in range(4, 8, 1)]
 
     prog_bar.clear()
 

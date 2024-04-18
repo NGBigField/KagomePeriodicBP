@@ -299,7 +299,7 @@ _TrackerStepOutputs = tuple[
 
 class ITEProgressTracker():
 
-    def __init__(self, unit_cell:UnitCell, messages:dict|None, config:Any, mem_length:int=DEFAULT_ITE_TRACKER_MEMORY_LENGTH):
+    def __init__(self, unit_cell:UnitCell, messages:dict|None, config:Any, mem_length:int=DEFAULT_ITE_TRACKER_MEMORY_LENGTH, filename:str=None):
         # From input:
         self.last_unit_cell : UnitCell = unit_cell.copy()
         self.last_messages : dict = deepcopy(messages)  #type: ignore
@@ -307,7 +307,7 @@ class ITEProgressTracker():
         # Fresh variables:
         self.last_iter : int = 0
         self.error_counters : dict[type, int] = {}
-        self.file_name : str = "ite-tracker_"+strings.time_stamp()+" "+strings.random(5)
+        self.file_name : str = filename if filename is not None else "ite-tracker_"+strings.time_stamp()+" "+strings.random(5)
         # Lists memory:
         self.delta_ts           : _LimitedLengthList[float]             = _LimitedLengthList[float](mem_length) 
         self.energies           : _LimitedLengthList[complex|None]      = _LimitedLengthList[complex|None](mem_length)     
