@@ -2,6 +2,10 @@
 #|                                    Imports                                         |#
 # ==================================================================================== #
 
+# configuratoin:
+from _config_reader import SAVE_FILES_WITH
+
+
 # Typing hints:
 from typing import (
     Tuple,
@@ -23,8 +27,16 @@ from pathlib import Path
 import os
 
 # For saving stuff:
-import pickle
-import csv
+match SAVE_FILES_WITH:
+    case "pickle":
+        import pickle
+    case "dill":
+        import dill as pickle   # A common alias to simplify things
+    case None:
+        pass
+        
+
+
 
 # ==================================================================================== #
 #|                                  Constants                                         |#
