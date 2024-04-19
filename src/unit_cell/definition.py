@@ -97,6 +97,16 @@ class UnitCell:
     def set_filename(self, filename:str)->None:
         self._file_name = filename
 
+    def add_noise(self, noise_precentage:float)->None:
+        def _add_noise(t:np.ndarray)->np.ndarray:
+            norm = np.linalg.norm(t)
+            scale = norm*noise_precentage/100
+            noise = np.random.normal(scale=scale, size=t.shape)
+            return t + noise
+        self.A = _add_noise(self.A)
+        self.B = _add_noise(self.B)
+        self.C = _add_noise(self.C)
+
     def _derive_file_name(self, given_name:str|None)->str:
         if given_name is not None:
             assert isinstance(given_name, str)
@@ -107,6 +117,7 @@ class UnitCell:
             return self._file_name
 
         return strings.time_stamp()
+
         
 
 

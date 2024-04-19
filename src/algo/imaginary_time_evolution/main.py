@@ -398,6 +398,11 @@ def ite_per_segment(
         prog_bar = prints.ProgressBar.inactive()
 
 
+    ## Add gaussian noise?
+    if (noise_precentage := config.ite.add_gaussian_noise_precentage) is not None:
+        unit_cell.add_noise(noise_precentage)
+
+
     for update_mode in modes_order:
         _mode_str = f"update_mode={update_mode.name}"
         prog_bar.next(extra_str=_mode_str)

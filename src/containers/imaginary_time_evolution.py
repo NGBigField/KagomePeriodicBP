@@ -218,6 +218,8 @@ class ITEConfig(_ConfigClass):
     random_mode_order : bool = True
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
     normalize_tensors_after_update : bool = True
+    # Optimizaion params:
+    add_gaussian_noise_precentage : float|None = 1.0 
 
     @property
     def reference_ground_energy(self)->float|None:  

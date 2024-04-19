@@ -64,7 +64,7 @@ def main(
     parallel:bool = 0,
     active_bp:bool = True,
     damping:float|None = 0.1,
-    field_strength_values = [round(x, 2) for x in  np.arange(0.9, 0, -0.1)]
+    field_strength_values = [round(x, 2) for x in  np.arange(1.0, 0, -0.1)]
 )->tuple[float, str]:
     
     unit_cell = UnitCell.load("last")
@@ -91,7 +91,8 @@ def main(
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.use_bp = active_bp
     config.ite.normalize_tensors_after_update = True
-    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(3, 8, 1)]
+    config.ite.add_gaussian_noise_precentage = 0.01
+    config.ite.time_steps = [10**(-1)]*10+[[10**(-exp)]*20 for exp in range(2, 8, 1)]
 
 
     logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=True, filename=results_filename)
@@ -113,7 +114,7 @@ def main(
         except Exception as e:
             continue
 
-        config.ite.time_steps = [[10**(-exp)]*15 for exp in range(4, 8, 1)]
+        config.ite.time_steps = [[10**(-exp)]*10 for exp in range(3, 8, 1)]
 
     prog_bar.clear()
 
