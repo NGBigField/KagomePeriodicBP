@@ -116,9 +116,10 @@ def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None ) -> Non
     folder = get_saved_figures_folder()
     # Full path:
     fullpath = folder.joinpath(file_name)
-    fullpath_str = str(fullpath.resolve())+".png"
-    # Save:
-    fig.savefig(fullpath_str)
+    for ext in ["png", "svg"]:
+        fullpath_str = str(fullpath.resolve())+"."+ext
+        # Save:
+        fig.savefig(fullpath_str)
     return 
 
 

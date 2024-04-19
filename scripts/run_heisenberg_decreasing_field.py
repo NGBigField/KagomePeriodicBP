@@ -36,6 +36,9 @@ def run_single_ite(
     ## Set:
     config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm_with_field, field_strength, None)
 
+    ## print\log:
+    logger.debug(f"field_strength={field_strength}")
+
     ## Run:
     energy, unit_cell, ite_tracker, logger = full_ite(
         unit_cell, config=config, common_results_name=crnt_results_name, logger=logger
@@ -55,7 +58,7 @@ def main(
     results_filename:str = strings.time_stamp(),
     parallel:bool = 0,
     active_bp:bool = True,
-    damping:float|None = None,
+    damping:float|None = 0.1,
     field_strength_values = np.arange(1.5, 0, -0.1).tolist()
 )->tuple[float, str]:
     
@@ -71,19 +74,19 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim = int(4*D**2+20 * chi_factor)
     config.bp.max_swallowing_dim = int(4*D**2 * chi_factor)
-    config.bp.msg_diff_terminate = 1e-5
-    config.bp.msg_diff_good_enough = 1e-4
+    config.bp.msg_diff_terminate = 1e-9
+    config.bp.msg_diff_good_enough = 1e-5
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 30
     config.bp.allowed_retries = 2
     config.iterative_process.bp_every_edge = True
-    config.iterative_process.num_mode_repetitions_per_segment = 3
+    config.iterative_process.num_mode_repetitions_per_segment = 2
     config.iterative_process.num_edge_repetitions_per_mode = 6
     config.iterative_process.start_segment_with_new_bp_message = True
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.use_bp = active_bp
     config.ite.normalize_tensors_after_update = True
-    config.ite.time_steps = [[10**(-exp)]*15 for exp in range(2, 6, 1)]
+    config.ite.time_steps = [[10**(-exp)]*15 for exp in range(2, 8, 1)]
 
 
     logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=True, filename=results_filename)

@@ -25,6 +25,7 @@ from _config_reader import ALLOW_VISUALS
 if ALLOW_VISUALS:
     from utils.visuals import Axes3D, Quiver, Line3D, Text, DEFAULT_PYPLOT_FIGSIZE, _XYZ
     from matplotlib import pyplot as plt
+    from matplotlib.axes import Axes
 else:
     Axes3D, Quiver, Line3D, Text = None, None, None, None
 
@@ -574,12 +575,13 @@ def _scatter_energies(
 
 
 def plot_from_log(
-    log_name:str = "2024.04.10_10.24.40 VJDEMA - long"
+    log_name:str = "2024.04.10_10.24.40 VJDEMA - long",
+    save:bool = True
 ):
 
     ## Get matching words:
-    edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, reference_energy_str, segment_data_str = logs.search_words_in_log(log_name, 
-        ("Edge-Energies after each update=", "Edge-Energies after segment =   ", " Mean energy after segment", "num_mode_repetitions_per_segment", "Hamiltonian's reference energy", "segment:") 
+    edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, reference_energy_str, segment_data_str, delta_t_strs = logs.search_words_in_log(log_name, 
+        ("Edge-Energies after each update=", "Edge-Energies after segment =   ", " Mean energy after segment", "num_mode_repetitions_per_segment", "Hamiltonian's reference energy", "segment:", "delta_t") 
     )
 
     num_segments = len(mean_energies_strs)
@@ -596,14 +598,26 @@ def plot_from_log(
         word = word.removeprefix(" = ")
         word = word.removesuffix("\n")
         mean_energies.append(float(word))
-        
+
+    ## Prepare plots        
+    fig = plt.figure()
+    fig.suptitle("ITE")
+    fig.subplot_mosaic(
+        [
+            ['delta_t',   'delta_t'],
+            ['Energies', 'Energies'],
+            ['Energies', 'Energies'],
+        ]
+    )
+
+    axes : dict[str, Axes] = {axis._label : axis for axis in fig.get_axes()}
+
     ## Plot mean energies:    
-    plt.figure()
-    plt.plot(mean_energies, color="tab:blue", label="mean energy", linewidth=3)
-    plt.grid()
-    plt.title("ITE Energies")
-    plt.xlabel("Iteration")
-    plt.ylabel("Energy")
+    ax = axes['Energies']
+    ax.plot(mean_energies, color="tab:blue", label="mean energy", linewidth=3)
+    ax.grid()
+    ax.set_ylabel("Energy")
+    ax.set_xlabel("Iteration")
 
     ## Plot energy per edge:
     is_first = True
@@ -621,7 +635,7 @@ def plot_from_log(
     ## Plot reference energy:
     if len(reference_energy_str)==0:
         pass
-    elif len(reference_energy_str)==1:
+    elif len(reference_energy_str)>0:
         reference_energy = reference_energy_str[0]
         reference_energy = reference_energy.removeprefix(" is ")
         reference_energy = reference_energy.removesuffix("\n")
@@ -630,11 +644,41 @@ def plot_from_log(
     else:
         raise NotImplementedError("Not a known case")
     
-
     plt.legend()
+
+
+    ## Delta_t plot:
+    ax = axes["delta_t"]
+    ax.set_ylabel("delta_T")
+    ax.set_yscale("log")
+
+    delta_t_vec = []
+    for line in delta_t_strs:
+        if line[0] == "_":
+            continue
+        assert line[0] == "="
+        words = line.split(" ")
+        word = words[0] 
+        word = word.removeprefix("=")
+        word = word.removesuffix(":")
+        delta_t = float(word)
+        delta_t_vec.append(delta_t)
+
+    ax.plot(delta_t_vec)
+
+
+    if save:
+        visuals.save_figure(fig=fig)
+
+
     plt.show()
     print("Done.")
 
+
 if __name__ == "__main__":
-    plot_from_log()
-    print("Done")
+    from project_paths import add_src, add_base, add_scripts
+    add_src()
+    add_base()
+    add_scripts()
+    from scripts import replay_log
+    replay_log.main()
