@@ -644,7 +644,7 @@ def plot_from_log(
     else:
         raise NotImplementedError("Not a known case")
     
-    plt.legend()
+    plt.legend(loc="best")
 
 
     ## Delta_t plot:

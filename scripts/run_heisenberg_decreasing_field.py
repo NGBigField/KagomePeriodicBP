@@ -46,7 +46,7 @@ def run_single_ite(
 
     ## Save:
     unit_cell_final = unit_cell.copy()
-    unit_cell_final._file_name = unit_cell._file_name + f"_f={field_strength}" 
+    unit_cell_final._file_name = crnt_results_name 
     unit_cell_final.save()
 
     ## End:
@@ -63,13 +63,14 @@ def main(
     results_filename:str = strings.time_stamp(),
     parallel:bool = 0,
     active_bp:bool = True,
-    damping:float|None = 0.1,
-    field_strength_values = [round(x, 2) for x in  np.arange(1.0, 0, -0.1)]
+    damping:float|None = 0.1
 )->tuple[float, str]:
     
     unit_cell = UnitCell.load("last")
     # unit_cell = UnitCell.load("2024.04.11_09.43.42_CGOP - stable -0.25")
     # unit_cell = UnitCell.random(d=d, D=D)
+
+    unit_cell._file_name = strings.time_stamp()
 
     ## Config:
     config = Config.derive_from_physical_dim(D)
@@ -91,8 +92,10 @@ def main(
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.use_bp = active_bp
     config.ite.normalize_tensors_after_update = True
-    config.ite.add_gaussian_noise_precentage = 0.01
-    config.ite.time_steps = [10**(-1)]*10+[[10**(-exp)]*20 for exp in range(2, 8, 1)]
+    config.ite.add_gaussian_noise_precentage = 1e-6
+    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(3, 6, 1)]
+
+    field_strength_values = [round(x, 3) for x in  np.arange(0.6, 0, -0.05)]
 
 
     logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=True, filename=results_filename)
@@ -114,7 +117,7 @@ def main(
         except Exception as e:
             continue
 
-        config.ite.time_steps = [[10**(-exp)]*10 for exp in range(3, 8, 1)]
+        config.ite.time_steps = [[10**(-exp)]*20 for exp in range(4, 10, 1)]
 
     prog_bar.clear()
 

@@ -399,7 +399,9 @@ def ite_per_segment(
 
 
     ## Add gaussian noise?
-    if (noise_precentage := config.ite.add_gaussian_noise_precentage) is not None:
+    if config.ite.add_gaussian_noise_precentage is not None:
+        # the smallest delta_t, the smallest the noise:
+        noise_precentage = config.ite.add_gaussian_noise_precentage * delta_t  
         unit_cell.add_noise(noise_precentage)
 
 
