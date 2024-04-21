@@ -80,7 +80,7 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim = int(4*D**2+20 * chi_factor)
     config.bp.max_swallowing_dim = int(4*D**2 * chi_factor)
-    config.bp.msg_diff_terminate = 1e-9
+    config.bp.msg_diff_terminate = 1e-12
     config.bp.msg_diff_good_enough = 1e-5
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 30
@@ -93,9 +93,9 @@ def main(
     config.iterative_process.use_bp = active_bp
     config.ite.normalize_tensors_after_update = True
     config.ite.add_gaussian_noise_precentage = 1e-6
-    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(3, 6, 1)]
+    config.ite.time_steps = [[10**(-exp)]*35 for exp in range(2, 4, 1)]
 
-    field_strength_values = [round(x, 3) for x in  np.arange(0.6, 0, -0.05)]
+    field_strength_values = [round(x, 3) for x in  np.arange(0.3, 0, -0.05)]
 
 
     logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=True, filename=results_filename)
@@ -117,7 +117,7 @@ def main(
         except Exception as e:
             continue
 
-        config.ite.time_steps = [[10**(-exp)]*20 for exp in range(4, 10, 1)]
+        config.ite.time_steps = [[10**(-exp)]*25 for exp in range(3, 5, 1)]
 
     prog_bar.clear()
 
