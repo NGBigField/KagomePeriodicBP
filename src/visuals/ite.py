@@ -576,7 +576,8 @@ def _scatter_energies(
 
 def plot_from_log(
     log_name:str = "2024.04.10_10.24.40 VJDEMA - long",
-    save:bool = True
+    save:bool = True,
+    legend:bool = False
 ):
 
     ## Get matching words:
@@ -644,7 +645,9 @@ def plot_from_log(
     else:
         raise NotImplementedError("Not a known case")
     
-    plt.legend(loc="best")
+
+    if legend:
+        plt.legend(loc="best")
 
 
     ## Delta_t plot:

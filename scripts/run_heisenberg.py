@@ -44,19 +44,19 @@ def _config_at_measurement(config:Config)->Config:
 
 def main(
     D = 2,
-    N = 2,
-    chi_factor : int = 1.0,
+    N = 3,
+    chi_factor : int = 2,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     active_bp:bool = True,
     damping:float|None = None
 )->tuple[float, str]:
     
-    # unit_cell = UnitCell.load("last")
+    unit_cell = UnitCell.load("last")
     # unit_cell = UnitCell.load("2024.04.11_09.43.42_CGOP - stable -0.25")
-    unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -67,19 +67,20 @@ def main(
     config.bp.parallel_msgs = parallel
     config.trunc_dim = int(4*D**2+20 * chi_factor)
     config.bp.max_swallowing_dim = int(4*D**2 * chi_factor)
-    config.bp.msg_diff_terminate = 1e-5
-    config.bp.msg_diff_good_enough = 1e-4
+    config.bp.msg_diff_terminate = 1e-12
+    config.bp.msg_diff_good_enough = 1e-5
     config.bp.times_to_deem_failure_when_diff_increases = 4
-    config.bp.max_iterations = 80
+    config.bp.max_iterations = 50
     config.bp.allowed_retries = 2
     config.iterative_process.bp_every_edge = True
-    config.iterative_process.num_mode_repetitions_per_segment = 1
+    config.iterative_process.num_mode_repetitions_per_segment = 4
     config.iterative_process.num_edge_repetitions_per_mode = 6
     config.iterative_process.start_segment_with_new_bp_message = True
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.use_bp = active_bp
     config.ite.normalize_tensors_after_update = True
-    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(1, 18, 1)]
+    config.ite.add_gaussian_noise_precentage = 0.05
+    config.ite.time_steps = [[10**(-exp)]*10 for exp in range(2, 15, 1)]
 
     # Interaction:
     match hamiltonian: 
