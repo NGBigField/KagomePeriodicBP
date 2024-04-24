@@ -83,7 +83,6 @@ class UnitCell:
              C = tensor.copy()
         )
     
-
     def save(self, file_name:str|None=None)->None:
         file_name = self._derive_file_name(file_name)
         return saveload.save(self, name=file_name, sub_folder=UNIT_CELL_SUBFOLDER)
@@ -97,10 +96,10 @@ class UnitCell:
     def set_filename(self, filename:str)->None:
         self._file_name = filename
 
-    def add_noise(self, noise_precentage:float)->None:
+    def add_noise(self, noise_fraction:float)->None:
         def _add_noise(t:np.ndarray)->np.ndarray:
             norm = np.linalg.norm(t)
-            scale = norm*noise_precentage/100
+            scale = norm*noise_fraction
             noise = np.random.normal(scale=scale, size=t.shape)
             return t + noise
         self.A = _add_noise(self.A)

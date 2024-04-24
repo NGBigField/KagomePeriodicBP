@@ -92,7 +92,7 @@ def main(
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.use_bp = active_bp
     config.ite.normalize_tensors_after_update = True
-    config.ite.add_gaussian_noise_precentage = 10
+    config.ite.add_gaussian_noise_fraction = 10
     config.ite.time_steps = [[10**(-exp)]*25 for exp in range(3, 5, 1)]
 
     field_strength_values = [round(x, 4) for x in  np.linspace(0.20, 0, 5)]*2

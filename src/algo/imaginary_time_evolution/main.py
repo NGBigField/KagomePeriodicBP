@@ -247,10 +247,10 @@ def _pre_segment_init_params(
 
 
     ## Add gaussian noise?
-    if config.ite.add_gaussian_noise_precentage is not None:
+    if config.ite.add_gaussian_noise_fraction is not None:
         # the smallest delta_t, the smallest the noise:  #TODO check if still applicable 
-        noise_precentage = config.ite.add_gaussian_noise_precentage * delta_t  
-        unit_cell.add_noise(noise_precentage)
+        noise_fraction = config.ite.add_gaussian_noise_fraction * delta_t  
+        unit_cell.add_noise(noise_fraction)
 
     return unit_cell, messages, stats, config, energies_at_updates, prog_bar, modes_order, log_method
 

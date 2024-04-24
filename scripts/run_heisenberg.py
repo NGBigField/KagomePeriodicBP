@@ -50,8 +50,7 @@ def main(
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    active_bp:bool = True,
-    damping:float|None = None
+    damping:float|None = 0.1
 )->tuple[float, str]:
     
     unit_cell = UnitCell.load("last")
@@ -63,10 +62,10 @@ def main(
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
-    config.bp.damping = damping
-    config.bp.parallel_msgs = parallel
     config.trunc_dim = int((4*D**2+20) * chi_factor)
     config.bp.max_swallowing_dim = int(4*D**2 * chi_factor)
+    config.bp.damping = damping
+    config.bp.parallel_msgs = parallel
     config.bp.msg_diff_terminate = 1e-14
     config.bp.msg_diff_good_enough = 1e-5
     config.bp.times_to_deem_failure_when_diff_increases = 4
@@ -77,9 +76,10 @@ def main(
     config.iterative_process.num_edge_repetitions_per_mode = 6
     config.iterative_process.start_segment_with_new_bp_message = True
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
-    config.iterative_process.use_bp = active_bp
+    config.iterative_process.use_bp = True
     config.ite.normalize_tensors_after_update = True
-    config.ite.add_gaussian_noise_precentage = 0.001
+    config.ite.always_use_lowest_energy_state = False
+    config.ite.add_gaussian_noise_fraction = None
     config.ite.time_steps = [[10**(-exp)]*15 for exp in range(1, 20, 1)]
 
     # Interaction:
