@@ -312,7 +312,7 @@ def prev_item_cyclic(lis:list[_T], item:_T)->_T:
 
 
 def reversed(lis:list[_T])->_T:
-    """ Like native `reversed()` but returns list instead of an iterator
+    """ Like native `reversed()` but returns list copy instead of an iterator of original list
     """
     res = lis.copy()
     res.reverse()

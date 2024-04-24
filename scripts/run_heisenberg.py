@@ -71,11 +71,11 @@ def main(
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 50
     config.bp.allowed_retries = 2
-    config.iterative_process.bp_every_edge = True
     config.iterative_process.num_mode_repetitions_per_segment = 3
     config.iterative_process.num_edge_repetitions_per_mode = 6
-    config.iterative_process.start_segment_with_new_bp_message = True
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
+    config.iterative_process.start_segment_with_new_bp_message = True
+    config.iterative_process.bp_every_edge = False
     config.iterative_process.use_bp = True
     config.ite.normalize_tensors_after_update = True
     config.ite.always_use_lowest_energy_state = False

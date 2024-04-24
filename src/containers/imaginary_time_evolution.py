@@ -137,7 +137,7 @@ class UpdateEdge(NamedTuple):
         """
         return self.second is _NEXT_IN_ABC_ORDER[self.first]
     
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         return UpdateEdge.to_str(self)
     
     @property
@@ -219,6 +219,8 @@ class ITEConfig(_ConfigClass):
     normalize_tensors_after_update : bool = True
     # Optimizaion params:
     add_gaussian_noise_fraction : float|None = None
+    # Hamiltonian commutation constraints:
+    symmetric_product_formula : bool = True
 
     @property
     def reference_ground_energy(self)->float|None:  

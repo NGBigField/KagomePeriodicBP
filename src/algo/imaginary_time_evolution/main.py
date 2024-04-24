@@ -63,6 +63,19 @@ class SegmentResults(NamedTuple):
     def is_better_than(self, other:"SegmentResults")->bool:
         return self.energy < other.energy 
 
+def _edge_order_per_mode(
+    config:Config,
+    mode:UpdateMode
+)->list[UpdateEdge]:
+    
+    ## for each edge in the mode, once
+    num_edges = config.iterative_process.num_edge_repetitions_per_mode
+    edge_tuples = list(UpdateEdge.all_in_random_order(num_edges=num_edges))
+
+    if config.ite.symmetric_product_formula:
+        edge_tuples += lists.reversed(edge_tuples)
+        
+    return edge_tuples
 
 def _change_config_for_measurements_if_applicable(
     config:Config, messages:MessageDictType
@@ -455,15 +468,14 @@ def ite_per_mode(
     ITEPerModeStats         # Stats
 ]:
 
-    ## for each edge in the mode, update the tensors
-    num_edges = config.iterative_process.num_edge_repetitions_per_mode
-    edge_tuples = UpdateEdge.all_in_random_order(num_edges=num_edges)
+    ## Decide the order of the edges:
+    edge_tuples = _edge_order_per_mode(config, mode)
+
+    ## prepare statistics and results:
+    stats = ITEPerModeStats()
     edge_energies = dict()
 
-    ## prepare statistics and health for debugging:
-    stats = ITEPerModeStats()
-
-    prog_bar = get_progress_bar(config, num_edges, "Executing ITE per-mode:")
+    prog_bar = get_progress_bar(config, len(edge_tuples), "Executing ITE per-mode:")
     for is_first, is_last, edge_tuple in lists.iterate_with_edge_indicators(list(edge_tuples)):
         prog_bar.next(extra_str=f"{edge_tuple}")
 
