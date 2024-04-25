@@ -608,12 +608,8 @@ def ite_per_delta_t(
             if crnt_results.is_better_than(best_results):
                 best_results = crnt_results
 
-
     if use_lowest_energy_results:
-        unit_cell = best_results.unit_cell
-        messages = best_results.messages
-        mean_energy = best_results.energy
-        segment_stats = best_results.stats
+        unit_cell, messages, mean_energy, segment_stats = best_results
         
 
     prog_bar.clear()

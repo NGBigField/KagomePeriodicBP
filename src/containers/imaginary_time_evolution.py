@@ -216,7 +216,9 @@ class ITEConfig(_ConfigClass):
     random_mode_order : bool = True
     always_use_lowest_energy_state : bool = False
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
+    # After update flags:
     normalize_tensors_after_update : bool = True
+    force_hermitian_tensors_after_update : bool = True
     # Optimizaion params:
     add_gaussian_noise_fraction : float|None = None
     # Hamiltonian commutation constraints:

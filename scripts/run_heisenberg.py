@@ -36,7 +36,7 @@ def constant_global_field(delta_t:float|None)->float:
 
 
 def _config_at_measurement(config:Config)->Config:
-    config.dims.big_lattice_size += 1
+    config.dims.big_lattice_size += 0
     config.bp.msg_diff_terminate /= 1
     config.bp.allowed_retries    += 1
     return config
@@ -44,13 +44,13 @@ def _config_at_measurement(config:Config)->Config:
 
 def main(
     D = 2,
-    N = 2,
-    chi_factor : int = 1.0,
+    N = 3,
+    chi_factor : int = 5.0,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0.1
+    damping:float|None = None
 )->tuple[float, str]:
     
     unit_cell = UnitCell.load("last")
@@ -71,16 +71,17 @@ def main(
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 50
     config.bp.allowed_retries = 2
-    config.iterative_process.num_mode_repetitions_per_segment = 3
+    config.iterative_process.num_mode_repetitions_per_segment = 1
     config.iterative_process.num_edge_repetitions_per_mode = 6
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.start_segment_with_new_bp_message = True
-    config.iterative_process.bp_every_edge = False
     config.iterative_process.use_bp = True
+    config.iterative_process.bp_every_edge = False
     config.ite.normalize_tensors_after_update = True
+    config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
     config.ite.add_gaussian_noise_fraction = None
-    config.ite.time_steps = [[10**(-exp)]*15 for exp in range(1, 20, 1)]
+    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(3, 15, 1)]
 
     # Interaction:
     match hamiltonian: 
