@@ -49,7 +49,7 @@ from algo.imaginary_time_evolution._tn_update import ite_update_unit_cell
 from algo.belief_propagation import robust_belief_propagation, belief_propagation, BPStats
 
 # Other algorithms we need:
-from algo.measurements import derive_xyz_expectation_values_with_tn, measure_energies_and_observables_together
+from algo.measurements import measure_energies_and_observables_together, mean_expectation_values
 from algo.tn_reduction import reduce_tn
 from libs import ITE as ite
 
@@ -62,6 +62,7 @@ class SegmentResults(NamedTuple):
 
     def is_better_than(self, other:"SegmentResults")->bool:
         return self.energy < other.energy 
+
 
 def _edge_order_per_mode(
     config:Config,
@@ -76,6 +77,7 @@ def _edge_order_per_mode(
         edge_tuples += lists.reversed(edge_tuples)
         
     return edge_tuples
+
 
 def _change_config_for_measurements_if_applicable(
     config:Config, messages:MessageDictType
@@ -275,22 +277,33 @@ def _log_plot_and_print_segment_results(
     energies_at_updates:EnergiesOfEdgesDuringUpdateType, 
     entangelment
 )->None:
+    ## Tracker and plot objects:
     tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
     plots.update(energies_at_end, energies_at_updates, segment_stats, delta_t, expectations, unit_cell, entangelment)
-    energies_str     = strings.float_list_to_str(list(energies_at_end.values()), config.visuals.energies_print_decimal_point_length)
-    entanglement_str = strings.float_list_to_str(list(entangelment.values())   , config.visuals.energies_print_decimal_point_length)
+
+    ## Print and log:
+    num_decimals = config.visuals.energies_print_decimal_point_length
+    xyz_means = mean_expectation_values(expectations)
+    energies_str     = strings.float_list_to_str(list(energies_at_end.values()), num_decimals=num_decimals)
+    entanglement_str = strings.float_list_to_str(list(entangelment.values())   , num_decimals=num_decimals)
+    xyz_str          = strings.float_dict_to_str(xyz_means                     , num_decimals=num_decimals)
     logger_method(f"        Edge-Energies after segment =   "+energies_str)
     logger_method(f"        Edge-Negativities           =   "+entanglement_str)
+    logger_method(f"        Expectation-Values          =   "+xyz_str)
     logger_method(f"Mean energy after segment = {mean_energy}")
 
 
 def _post_segment_measurements_checks_and_visuals(
-    config:Config, unit_cell:UnitCell, messages:MessageDictType, 
+    config:Config, 
+    unit_cell:UnitCell, 
+    messages:MessageDictType, 
     tracker:ITEProgressTracker,
     plots:ITEPlots, 
     logger_method:Callable[[str], None],
-    segment_stats:ITESegmentStats, energies_at_updates:EnergiesOfEdgesDuringUpdateType,
+    segment_stats:ITESegmentStats, 
+    energies_at_updates:EnergiesOfEdgesDuringUpdateType,
     delta_t:float, 
+    best_results:SegmentResults
 )->tuple[
     bool,  # should break
     EnergyPerEdgeDictType,  # energies_after_segment 
@@ -318,7 +331,13 @@ def _post_segment_measurements_checks_and_visuals(
     if config.ite.check_converges and _check_converged(tracker.energies, tracker.delta_ts, delta_t):
         should_break = True
 
-    return should_break, mean_energy, unit_cell, messages
+    ## Which unit cell has minimal energy:
+    crnt_results = SegmentResults(unit_cell=unit_cell, messages=messages, energy=mean_energy, stats=segment_stats)
+    if crnt_results.is_better_than(best_results):
+        best_results = crnt_results
+
+
+    return should_break, mean_energy, unit_cell, messages, best_results
 
 
 def _deal_with_segment_error(
@@ -586,7 +605,7 @@ def ite_per_delta_t(
             )
         except ITEError as error:
             errors_count += 1
-            should_break = _deal_with_segment_error(error=error, errors_count=errors_count, logger=logger, tracker=tracker, config=Config, delta_t=delta_t)
+            should_break = _deal_with_segment_error(error=error, errors_count=errors_count, logger=logger, tracker=tracker, config=config, delta_t=delta_t)
             if should_break:
                 break
             else:
@@ -595,18 +614,12 @@ def ite_per_delta_t(
             at_least_one_successful_run = True
 
         ## Measurements, checks and visuals:
-        should_break, mean_energy, unit_cell, messages, = _post_segment_measurements_checks_and_visuals(
+        should_break, mean_energy, unit_cell, messages, best_results = _post_segment_measurements_checks_and_visuals(
             config=config, unit_cell=unit_cell, messages=messages, tracker=tracker, plots=plots, logger_method=logger_method, 
-            segment_stats=segment_stats, energies_at_updates=energies_at_updates, delta_t=delta_t
+            segment_stats=segment_stats, energies_at_updates=energies_at_updates, delta_t=delta_t, best_results=best_results
         )
         if should_break:
             break
-
-        ## Which unit cell has minimal energy:
-        if use_lowest_energy_results:
-            crnt_results = SegmentResults(unit_cell=unit_cell, messages=messages, energy=mean_energy, stats=segment_stats)
-            if crnt_results.is_better_than(best_results):
-                best_results = crnt_results
 
     if use_lowest_energy_results:
         unit_cell, messages, mean_energy, segment_stats = best_results
@@ -687,5 +700,5 @@ def robust_full_ite(
 
 
 if __name__ == "__main__":
-    from scripts.run_heisenberg import main
+    from scripts.run_ite import main
     main()

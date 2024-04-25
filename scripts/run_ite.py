@@ -30,7 +30,7 @@ def decreasing_global_field_func(delta_t:float|None)->float:
     return next_force_value
 
 
-GLOBAL_FIELD = 1.5
+GLOBAL_FIELD = 0.0
 def constant_global_field(delta_t:float|None)->float:
     return GLOBAL_FIELD
 
@@ -44,13 +44,13 @@ def _config_at_measurement(config:Config)->Config:
 
 def main(
     D = 2,
-    N = 3,
-    chi_factor : int = 5.0,
+    N = 2,
+    chi_factor : int = 1.0,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = None
+    hamiltonian:str = "Ising-AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    damping:float|None = 0.1
 )->tuple[float, str]:
     
     unit_cell = UnitCell.load("last")
@@ -71,7 +71,7 @@ def main(
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 50
     config.bp.allowed_retries = 2
-    config.iterative_process.num_mode_repetitions_per_segment = 1
+    config.iterative_process.num_mode_repetitions_per_segment = 2
     config.iterative_process.num_edge_repetitions_per_mode = 6
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.start_segment_with_new_bp_message = True
@@ -80,19 +80,22 @@ def main(
     config.ite.normalize_tensors_after_update = True
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
-    config.ite.add_gaussian_noise_fraction = None
-    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(3, 15, 1)]
+    config.ite.add_gaussian_noise_fraction = 1e-9
+    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(3, 12, 1)]
+    # config.ite.time_steps = [[[man*10**(-exp)]*10 for man in [5, 2, 1]] for exp in range(3, 5, 1)]
 
     # Interaction:
     match hamiltonian: 
-        case "FM":    config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm, None, None)
-        case "FM-T":  config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_fm_with_field, "delta_t", constant_global_field)
-        case "AFM":   config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None, None)
-        case "AFM-T": config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm_with_field, "delta_t", constant_global_field)
-        case "Field": config.ite.interaction_hamiltonian = (hamiltonians.field, None, None)
+        case "FM":        h = (hamiltonians.heisenberg_fm, None, None)
+        case "FM-T":      h = (hamiltonians.heisenberg_fm_with_field, "delta_t", constant_global_field)
+        case "AFM":       h = (hamiltonians.heisenberg_afm, None, None)
+        case "AFM-T":     h = (hamiltonians.heisenberg_afm_with_field, "delta_t", constant_global_field)
+        case "Field":     h = (hamiltonians.field, None, None)
+        case "Ising-AFM": h = (hamiltonians.ising_with_transverse_field, "delta_t", constant_global_field)
         case _:
             raise ValueError("Not matching any option.")
-    
+        
+    config.ite.interaction_hamiltonian = h
 
     ## Run:
     energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)

@@ -31,7 +31,7 @@ from containers.belief_propagation import MessageDictType, Message, MPSOrientati
 from containers.sizes_and_dimensions import TNDimensions
 
 # utilities used in our code:
-from utils import assertions, lists, tuples, numerics, indices, strings
+from utils import assertions, lists, tuples, numerics, indices, strings, arguments
 
 import numpy as np
 from typing import NamedTuple, TypeVar
@@ -285,11 +285,10 @@ class KagomeTN(TensorNetwork):
     #|                 Cache Control                   |#
     # ================================================= #
     def clear_cache(self)->None:
-        # nodes
-        try:    
+        # clear nodes
+        if arguments.is_cached_property(self, "nodes"):
             del self.nodes
-        except AttributeError:  
-            pass
+
 
     # ================================================= #
     #|                    messages                     |#

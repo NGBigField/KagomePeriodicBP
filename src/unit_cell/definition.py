@@ -130,7 +130,7 @@ def _random_tensor(d:int, D:int)->np.ndarray:
     rs = np.random.RandomState()
     t = rs.uniform(size=[d]+[D]*4) \
         + 1j*rs.normal(size=[d]+[D]*4)
-    t = t/np.linalg.norm(t)
+    t /= np.linalg.norm(t)  # normalize
     return t
 
 
