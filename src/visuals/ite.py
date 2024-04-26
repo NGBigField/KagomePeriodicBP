@@ -576,10 +576,8 @@ def _scatter_values(
 
 
 def _plot_per_segment_health_common(ax:Axes, strs:list[str], style:visual_constants.ScatterStyle=default_marker_style) -> None:
-    indices = []
-    for i, line in enumerate(strs):
-        indices.append(i)
 
+    for i, line in enumerate(strs):
         _, line = line.split("[")
         line, _ = line.split("]")
         words = line.split(",")
@@ -686,10 +684,6 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
         reference_plot = ax.axhline(reference_energy, linestyle="--", color="g", label="reference")
     else:
         raise NotImplementedError("Not a known case")
-    
-
-    if legend:
-        plt.legend(loc="best")
 
 
     ## Delta_t plot:
