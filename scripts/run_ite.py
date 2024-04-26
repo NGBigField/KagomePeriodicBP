@@ -50,7 +50,7 @@ def main(
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = None
+    damping:float|None = 0.1
 )->tuple[float, str]:
     
     unit_cell = UnitCell.load("last")
@@ -81,7 +81,7 @@ def main(
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
     config.ite.add_gaussian_noise_fraction = 1e-9
-    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(3, 12, 1)]
+    config.ite.time_steps = [[10**(-exp)]*25 for exp in range(3, 12, 1)]
     # config.ite.time_steps = [[[man*10**(-exp)]*10 for man in [5, 2, 1]] for exp in range(3, 5, 1)]
 
     # Interaction:
