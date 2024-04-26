@@ -1,11 +1,13 @@
 ## Get config:
 from _config_reader import DEBUG_MODE
 
-from collections.abc import Iterable
 from containers import TNDimensions, ITEConfig, Config, MatrixMetrics
 from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
 from tensor_networks import TensorNetwork, TensorNode, KagomeTN, EdgeTN, UnitCell, create_kagome_tn
 from utils import lists, logs, assertions, prints
+from enums import UnitCellFlavor
+from _types import PermutationOrdersType
+
 
 # Used types:
 from _error_types import ITEError
@@ -18,8 +20,9 @@ from algo.density_matrices import rho_ij_to_rho, calc_metrics
 from algo.imaginary_time_evolution._constants import ENV_HERMICITY_THRESHOLD
 
 # For quick and smart function caching:
-import functools
+import functools  #TODO  use cache
 
+# For math and tensors:
 import numpy as np
 
 
@@ -100,9 +103,59 @@ def _calc_environment_equivalent_matrix(environment_tensors:list[np.ndarray]) ->
     return m
 
 
+def _measures_on_edge(t1_new, t2_new, mps_env, h:np.ndarray=None, eigen_values=None) -> tuple[complex, MatrixMetrics]:
+    rdm = rho_ij(t1_new, t2_new, mps_env=mps_env)
+
+    if h is None:
+        energy = None
+    else:
+        energy = np.dot(rdm.flatten(),  h.flatten())
+        energy /= 2  # Divide by 2 to get effective energy per site
+
+    metrics = _check_rdms_metrics(rdm)
+    if eigen_values is not None:
+        metrics.other["original_negativity_ratio"] = _calc_original_negativity_ratio(eigen_values)
+
+    return energy, metrics
+
+
+def invert_permutation(permutation:list[int]) -> list[int]:
+	"""
+	Given a permutation in the form of a list of integers, find its
+	inverse permutation. 
+	"""
+	inv = np.zeros_like(np.array(permutation))
+	inv[permutation] = np.arange(len(inv), dtype=inv.dtype)
+
+	return list(inv)
+
+
+def _derive_permutation(flavour:UnitCellFlavor, edge_tn:EdgeTN, permutation_orders:PermutationOrdersType)->list[int]:
+    old_node = edge_tn.get_nodes_by_cell_flavor(flavour)[0]
+    original_permutation_order = permutation_orders[old_node.name]
+    reversed_permutation_order = invert_permutation(original_permutation_order)
+    assert old_node.is_ket
+    full_ket_tensor_permutation = [0]+[i+1 for i in reversed_permutation_order]  # ket tensors have additional physical leg
+    return full_ket_tensor_permutation
+
+
+def _update_unit_cell_tensors_in_canonical_leg_order(
+    unit_cell:UnitCell, edge_tn:EdgeTN, permutation_orders:PermutationOrdersType, t1_new:np.ndarray, t2_new:np.ndarray
+) -> UnitCell:
+
+    f1, f2 = edge_tn.unit_cell_flavors
+    for flavour, tensor in zip([f1, f2], [t1_new, t2_new], strict=True):
+        permutation = _derive_permutation(flavour, edge_tn, permutation_orders)
+        tensor = tensor.transpose(permutation)
+        unit_cell[flavour] = tensor
+    
+    return unit_cell
+
+
 def ite_update_unit_cell(
     edge_tn:EdgeTN,
     unit_cell:UnitCell,
+    permutation_orders:PermutationOrdersType,
     ite_config:ITEConfig,
     delta_t:float,
     logger:logs.Logger
@@ -114,8 +167,7 @@ def ite_update_unit_cell(
 
     ## rdm and metrics before update:
     t1, t2, mps_env = edge_tn.edge_and_environment()
-    rdm_before = rho_ij(t1, t2, mps_env=mps_env)
-    _check_rdms_metrics(rdm_before)
+    _measures_on_edge(t1, t2, mps_env, h=None, eigen_values=None)
 
     ## Prepare inputs for time evolution update:
     # Get Time Evolution Operator
@@ -126,12 +178,8 @@ def ite_update_unit_cell(
     ## Perform ITE step on edge:
     t1_new, t2_new, origin_eigen_vals = apply_2local_gate( g=g, Dmax=d_virtual, Ti=t1, Tj=t2, mps_env=mps_env )    
 
-    ## Calc energy and updated env metrics:
-    rdm_after = rho_ij(t1_new, t2_new, mps_env=mps_env)
-    energy_after = np.dot(rdm_after.flatten(),  h.flatten())
-    energy_after /= 2  # Divide by 2 to get effective energy per site
-    metrics = _check_rdms_metrics(rdm_after)
-    metrics.other["original_negativity_ratio"] = _calc_original_negativity_ratio(origin_eigen_vals)
+    # Calc energy and calc env metrics:
+    energy_after, metrics = _measures_on_edge(t1_new, t2_new, mps_env, h=h, eigen_values=origin_eigen_vals)
 
     ## normalize
     if ite_config.normalize_tensors_after_update:
@@ -139,11 +187,8 @@ def ite_update_unit_cell(
         t2_new = t2_new / np.linalg.norm(t2_new)
 
     ## Update tensors:
-    f1, f2 = edge_tn.unit_cell_flavors
-    unit_cell[f1] = t1_new
-    unit_cell[f2] = t2_new
-
-    ## Keep copy 
+    unit_cell = _update_unit_cell_tensors_in_canonical_leg_order(unit_cell, edge_tn, permutation_orders, t1_new, t2_new) 
+    # Keep copy:
     unit_cell.save()
 
     return unit_cell, energy_after, metrics

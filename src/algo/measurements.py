@@ -199,6 +199,7 @@ def measure_energies_and_observables_together(
     
         # do the final needed contraction for this specific edge:
         edge_tn = reduce_tn(mode_tn, target_type=EdgeTN, trunc_dim=trunc_dim, copy=True, edge_tuple=edge_tuple)
+        edge_tn.rearrange_tensors_and_legs_into_canonical_order()
         rdm, edge_energy = _get_edge_rdm_and_energy(edge_tn, h, force_real)
         edge_negativity = compute_negativity_of_rdm(rdm)
 

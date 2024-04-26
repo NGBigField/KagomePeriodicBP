@@ -26,6 +26,7 @@ if ALLOW_VISUALS:
     from utils.visuals import Axes3D, Quiver, Line3D, Text, DEFAULT_PYPLOT_FIGSIZE, _XYZ
     from matplotlib import pyplot as plt
     from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
 else:
     Axes3D, Quiver, Line3D, Text = None, None, None, None
 
@@ -574,12 +575,50 @@ def _scatter_values(
         is_first = False
 
 
+def _plot_per_segment_health_common(ax:Axes, strs:list[str], style:visual_constants.ScatterStyle=default_marker_style) -> None:
+    indices = []
+    for i, line in enumerate(strs):
+        indices.append(i)
 
-def plot_from_log(
-    log_name:str = "2024.04.10_10.24.40 VJDEMA - long",
-    save:bool = True,
-    legend:bool = False
-):
+        _, line = line.split("[")
+        line, _ = line.split("]")
+        words = line.split(",")
+        for word in words:
+            value = float(word)
+            ax.scatter(i, value, s=style.size, c=style.color, alpha=style.alpha, marker=style.marker)
+
+
+def _plot_health_figure_from_log(log_name:str) -> Figure: 
+    ## Get matching words:
+    hermicity_strs, tensor_distance_strs = logs.search_words_in_log(log_name, 
+        ("Hermicity of environment=", "Tensor update distance") 
+    )
+    ## Prepare plots        
+    fig = plt.figure(figsize=(5, 6))
+    fig.suptitle("ITE")
+    fig.subplot_mosaic(
+        [
+            ['Hermicity' ,  'Hermicity'],
+            ['distance'  , 'distance'  ],
+        ]
+    )
+    axes : dict[str, Axes] = {axis._label : axis for axis in fig.get_axes()}
+
+
+    ## Hermicity:
+    ax = axes["Hermicity"]
+    _plot_per_segment_health_common(ax, hermicity_strs)
+    ax.set_ylabel("Hermicity")
+
+    ## Hermicity:
+    ax = axes["distance"]
+    _plot_per_segment_health_common(ax, tensor_distance_strs)
+    ax.set_ylabel("Update Distance")
+
+    return fig
+
+
+def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
 
     ## Get matching words:
     edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, \
@@ -615,7 +654,6 @@ def plot_from_log(
             ['entangle', 'entangle'],
         ]
     )
-
     axes : dict[str, Axes] = {axis._label : axis for axis in fig.get_axes()}
 
     ## Plot mean energies:    
@@ -717,9 +755,18 @@ def plot_from_log(
             continue
         ax.sharex(first_ax)
 
+
+def plot_from_log(
+    log_name:str = "2024.04.10_10.24.40 VJDEMA - long",
+    save:bool = True
+):
+    main_fig = _plot_main_figure_from_log(log_name)
+    health_fig = _plot_health_figure_from_log(log_name)
+
     # save:
     if save:
-        visuals.save_figure(fig=fig)
+        visuals.save_figure(fig=main_fig)
+        visuals.save_figure(fig=health_fig)
 
     # Show:
     plt.show()

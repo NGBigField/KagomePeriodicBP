@@ -56,7 +56,9 @@ def _reduce_tn_one_step(tn:TensorNetwork, trunc_dim:int, copy:bool, **kwargs_in)
     kwargs_to_use["copy"]=copy
     kwargs_to_use = _remove_unneeded_kwargs(func, kwargs_to_use)
 
-    return func(tn, **kwargs_to_use)
+    res = func(tn, **kwargs_to_use)
+
+    return res
 
 
 def reduce_tn(tn:TensorNetwork, target_type:Type[TensorNetworkOutput], trunc_dim:int, copy:bool=True, **kwargs)->TensorNetworkOutput:

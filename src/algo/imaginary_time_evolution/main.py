@@ -21,19 +21,18 @@ from containers.imaginary_time_evolution import ITEConfig, ITEProgressTracker, I
 from containers import Config
 
 # Import other needed types:
-from enums import UpdateMode, NodeFunctionality
-from containers import Message, MessageDictType, UpdateEdge
-from tensor_networks import KagomeTN, CoreTN, ModeTN, EdgeTN, TensorNode, UnitCell
+from enums import UpdateMode
+from containers import MessageDictType, UpdateEdge
+from tensor_networks import KagomeTN, CoreTN, ModeTN, EdgeTN, UnitCell
 from tensor_networks.construction import kagome_tn_from_unit_cell
 from _error_types import BPNotConvergedError, ITEError
-from lattices.directions import Direction
 
 # For numeric stuff:
 import numpy as np
 from numpy.linalg import norm
 
 # Import our shared utilities
-from utils import tuples, lists, assertions, saveload, logs, decorators, errors, prints, visuals, strings
+from utils import lists, logs, decorators, errors, prints, visuals, strings
 
 # For copying config:
 from copy import deepcopy
@@ -51,7 +50,6 @@ from algo.belief_propagation import robust_belief_propagation, belief_propagatio
 # Other algorithms we need:
 from algo.measurements import measure_energies_and_observables_together, mean_expectation_values
 from algo.tn_reduction import reduce_tn
-from libs import ITE as ite
 
 
 class SegmentResults(NamedTuple):
@@ -216,7 +214,19 @@ def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:
     plots.update(energies, [], segment_stats, delta_t, expectations, unit_cell, entangelment, _initial=True)
     logger.info(f"Mean energy at iteration 0: {mean_energy}")
 
-
+def _log_per_mode_results(
+    logger:logs.Logger, 
+    energies_at_update_per_mode:dict[str, float], 
+    ite_per_mode_stats:ITEPerModeStats, 
+    config:Config
+)->None:
+    num_decimal = config.visuals.energies_print_decimal_point_length
+    hermicity_str = f"{[metric.hermicity for metric in ite_per_mode_stats.env_metrics]!r}"
+    energies_str = strings.float_list_to_str([np.real(energy) for energy in energies_at_update_per_mode.values()], num_decimals=num_decimal)
+    tensor_distance_str = f"{[metric.other['update_distance'] for metric in ite_per_mode_stats.env_metrics]!r}"
+    logger.debug(f"        Hermicity of environment="+hermicity_str)        
+    logger.debug(f"        Edge-Energies after each update="+energies_str)
+    logger.debug(f"        Tensor update distance="+tensor_distance_str)
 
 
 def _pre_segment_init_params(
@@ -505,9 +515,12 @@ def ite_per_mode(
             mode_tn.update_unit_cell_tensors(unit_cell)
 
         edge_tn = reduce_tn(mode_tn, EdgeTN, trunc_dim=config.trunc_dim, edge_tuple=edge_tuple)
+        permutation_orders = edge_tn.rearrange_tensors_and_legs_into_canonical_order()
 
         # Perform ITE update:
-        unit_cell, energy, env_metrics = ite_update_unit_cell(edge_tn, unit_cell, config.ite, delta_t, logger)
+        old_cell = unit_cell.copy()
+        unit_cell, energy, env_metrics = ite_update_unit_cell(edge_tn, unit_cell, permutation_orders, config.ite, delta_t, logger)
+        env_metrics.other["update_distance"] = unit_cell.distance(old_cell)
 
         # keep stats:
         edge_energies[edge_tuple] = energy
@@ -551,15 +564,13 @@ def ite_per_segment(
             )
         except BPNotConvergedError as e:
             prog_bar.clear()
-            # logger.warn(errors.get_traceback(e))
             raise ITEError(*e.args)
         
-        ## Track results:
+        ## Track and log results:
         stats.ite_per_mode_stats.append(ite_per_mode_stats)
         energies_at_updates.append(energies_at_update_per_mode)
-        energies_str = strings.float_list_to_str([np.real(energy) for energy in energies_at_update_per_mode.values()], config.visuals.energies_print_decimal_point_length)
-        logger.debug(f"        Hermicity of environment={[metric.hermicity for metric in ite_per_mode_stats.env_metrics]!r}")        
-        logger.debug(f"        Edge-Energies after each update="+energies_str)
+        _log_per_mode_results(logger, energies_at_update_per_mode, ite_per_mode_stats, config=config)
+
 
     prog_bar.clear()
 

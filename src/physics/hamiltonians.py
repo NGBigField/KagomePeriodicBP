@@ -49,7 +49,7 @@ def field(direction='x')->np.ndarray:
 field.reference = - GLOBAL_FIELD_STRENGTH
 
 
-FULLY_SYMMETRIC : bool = False
+FULLY_SYMMETRIC : bool = True
 
 def heisenberg_afm()->np.ndarray:
 	"""Heisenberg Anti-FerroMagnetic model

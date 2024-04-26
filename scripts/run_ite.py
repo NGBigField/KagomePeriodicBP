@@ -49,13 +49,13 @@ def main(
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "Ising-AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1
 )->tuple[float, str]:
     
     # unit_cell = UnitCell.load("last")
-    unit_cell = UnitCell.load("2024.04.25_20.17.29 ising - stable")
-    # unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.load("2024.04.25_20.17.29 ising --- stable")
+    unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -78,10 +78,10 @@ def main(
     config.iterative_process.use_bp = True
     config.iterative_process.bp_every_edge = True
     config.ite.normalize_tensors_after_update = True
-    config.ite.symmetric_product_formula = True
+    config.ite.symmetric_product_formula = False
     config.ite.always_use_lowest_energy_state = False
-    config.ite.add_gaussian_noise_fraction = 1e-9
-    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(2, 12, 1)]
+    config.ite.add_gaussian_noise_fraction = None
+    config.ite.time_steps = [0.1]*20 + [[10**(-exp)]*50 for exp in range(2, 12, 1)]
     # config.ite.time_steps = [[[man*10**(-exp)]*10 for man in [5, 2, 1]] for exp in range(3, 5, 1)]
 
     # Interaction:

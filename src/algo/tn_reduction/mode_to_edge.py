@@ -13,7 +13,7 @@ if __name__ == "__main__":
 from _config_reader import DEBUG_MODE
 
 # Types we need in our module:
-from lattices.directions import Direction, LatticeDirection, BlockSide, sort
+from lattices.directions import Direction, LatticeDirection, BlockSide
 from tensor_networks import ArbitraryTN, ModeTN, EdgeTN, TensorNode, get_common_edge, get_common_edge_legs
 from tensor_networks import TensorNode
 from tensor_networks.node import TensorNode, two_nodes_ordered_by_relative_direction
@@ -32,69 +32,6 @@ from algo.contract_tensor_network import contract_tensor_network
 # For numerics and tensor stuff:
 import numpy as np
 
-
-def _rearrange_tensors_and_legs_into_canonical_order(tn:ArbitraryTN)->None:
-    ## Basic info:
-    # Get core nodes:
-    cores = tn.nodes[:2]
-    # Find neighbors, not in order
-    neighbors1 = [node for node in tn.all_neighbors(cores[0]) if node is not cores[1]]
-    neighbors2 = [node for node in tn.all_neighbors(cores[1]) if node is not cores[0]]
-    # Check:
-    if DEBUG_MODE:
-        assert len(neighbors1) == len(neighbors2) == 3
-        assert cores[0].functionality in [NodeFunctionality.CenterCore, NodeFunctionality.AroundCore]
-        assert cores[1].functionality in [NodeFunctionality.CenterCore, NodeFunctionality.AroundCore]
-
-
-    # find middle leg between cores:
-    ie1, ie2 = get_common_edge_legs(cores[0], cores[1])
-    ## Rearrange the legs of the core nodes and the order of env_tensors connected to them:
-    env_index = 2
-    for core_node, edge_index in zip([cores[0], cores[1]], [ie1, ie2]):
-        ## Correct order of core_node legs:
-        direction_to_other_core = core_node.directions[edge_index]
-        ordered_directions = sort.arbitrary_directions_by_clock_order(direction_to_other_core, core_node.directions, clockwise=False)
-        permutation_order = [core_node.directions.index(dir) for dir in ordered_directions]
-        core_node.permute(permutation_order)
-
-        ## Correct the indices of the neighbors in the TN ordering of nodes:
-        for is_first, _, direction in lists.iterate_with_edge_indicators(core_node.directions):
-            # First directions should now be the other core:
-            if is_first:
-                if DEBUG_MODE:
-                    assert direction is direction_to_other_core
-                continue
-            
-            # Give node a new index:
-            neighbor = tn.find_neighbor(core_node, direction)
-            crnt_neighbor_index = tn.nodes.index(neighbor)
-            tn.swap_nodes(crnt_neighbor_index, env_index)
-
-            env_index += 1
-
-    ## Rearrange legs of env tensors:
-    env_tensors = tn.nodes[2:]
-    assert len(env_tensors) == 6, "Must have 6 environment tensors"
-    for prev, crnt, next in lists.iterate_with_periodic_prev_next_items(env_tensors):
-        for i, direction in enumerate(crnt.directions):
-            neighbor = tn.find_neighbor(crnt, direction) 
-            if   neighbor is prev:   i0 = i
-            elif neighbor in cores:  i1 = i
-            elif neighbor is next:   i2 = i
-            else:   
-                raise ValueError("Bug. Should have found a correct neighbor")
-        permutation_order = [i0, i1, i2]
-        crnt.permute(permutation_order)
-
-    return tn
-
-
-
-
-""" ================================================================================================================ """
-""" ================================================================================================================ """
-""" ================================================================================================================ """
 
 
 
@@ -341,9 +278,7 @@ def reduce_mode_to_edge(
             node_contract_into = mps_nodes[i_contract_into]
             tn.contract(node_to_contract, node_contract_into)
 
-    ## Rearrange legs in a canonical order used in the input of `ite.rho_ij()`
-    _rearrange_tensors_and_legs_into_canonical_order(tn)
-
+    ## Convert type:
     edge_tn = EdgeTN.from_arbitrary_tn(tn)
     if DEBUG_MODE:
         edge_tn.validate()

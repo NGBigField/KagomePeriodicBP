@@ -3,6 +3,7 @@ from typing import Generator
 from numpy import ndarray as np_ndarray
 from enums import UnitCellFlavor
 import numpy as np
+from metrics.distance import tensor_distance
 
 from utils import saveload, strings, iterations, files
 
@@ -105,6 +106,11 @@ class UnitCell:
         self.A = _add_noise(self.A)
         self.B = _add_noise(self.B)
         self.C = _add_noise(self.C)
+
+    def distance(self, other:"UnitCell") -> float:
+        distances = [tensor_distance(t1, t2) for (_, t1), (_,t2) in zip(self.items(), other.items(), strict=True) ]
+        return sum(distances)
+
 
     def _derive_file_name(self, given_name:str|None)->str:
         if given_name is not None:
