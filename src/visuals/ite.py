@@ -685,7 +685,7 @@ def plot_from_log(
 
     ## Plot Expectations:   
     ax = axes['expect'] 
-    expectation_values_strs
+    ax.grid()
     ax.set_ylabel("Expectations")
     x, y, z = [], [], []
     for ind, line in enumerate(expectation_values_strs):
@@ -706,7 +706,6 @@ def plot_from_log(
     ax.plot(iterations, y, label="y")
     ax.plot(iterations, z, label="z")
     ax.legend(loc="lower left")
-
 
 
     ## Finally:

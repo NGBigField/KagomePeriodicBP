@@ -53,9 +53,9 @@ def main(
     damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("last")
+    # unit_cell = UnitCell.load("last")
     # unit_cell = UnitCell.load("2024.04.11_09.43.42_CGOP - stable -0.25")
-    # unit_cell = UnitCell.random(d=d, D=D)
+    unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -81,7 +81,7 @@ def main(
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
     config.ite.add_gaussian_noise_fraction = 1e-9
-    config.ite.time_steps = [[10**(-exp)]*20 for exp in range(3, 12, 1)]
+    config.ite.time_steps = [[10**(-exp)]*50 for exp in range(2, 12, 1)]
     # config.ite.time_steps = [[[man*10**(-exp)]*10 for man in [5, 2, 1]] for exp in range(3, 5, 1)]
 
     # Interaction:
