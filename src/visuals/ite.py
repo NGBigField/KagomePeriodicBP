@@ -645,7 +645,7 @@ def plot_from_log(
         reference_energy = reference_energy.removeprefix(" is ")
         reference_energy = reference_energy.removesuffix("\n")
         reference_energy = float(reference_energy)
-        reference_plot = plt.axhline(reference_energy, linestyle="--", color="g", label="reference")
+        reference_plot = ax.axhline(reference_energy, linestyle="--", color="g", label="reference")
     else:
         raise NotImplementedError("Not a known case")
     

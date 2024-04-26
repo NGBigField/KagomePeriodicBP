@@ -464,11 +464,6 @@ def _from_unit_cell_to_stable_mode(
     return mode_tn, messages, bp_stats, config
 
 
-def get_imaginary_time_evolution_operator(h:np.ndarray, delta_t:float)->tuple[np.ndarray, np.ndarray]:
-    # h = ite_config.interaction_hamiltonian
-    g = ite.g_from_exp_h(h, delta_t)
-    return h, g
-
 
 ## ==== Main ITE Functions ==== ##
 
@@ -493,6 +488,7 @@ def ite_per_mode(
     ## prepare statistics and results:
     stats = ITEPerModeStats()
     edge_energies = dict()
+    mode_tn : ModeTN
 
     prog_bar = get_progress_bar(config, len(edge_tuples), "Executing ITE per-mode:")
     for is_first, is_last, edge_tuple in lists.iterate_with_edge_indicators(list(edge_tuples)):

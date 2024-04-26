@@ -1,4 +1,4 @@
-from typing import Callable, Any, ParamSpec, TypeVar, List, Tuple
+from typing import Callable, Any, ParamSpec, TypeVar
 from utils import tuples, errors, prints, size
 from utils.arguments import Stats
 import time
@@ -87,7 +87,7 @@ def add_stats(
 
 
 def ignore_first_method_call(func:Callable)->Callable: # decorator that returns a wrapper:
-    objects_that_already_called : List[Tuple[object, Callable]] = []
+    objects_that_already_called : list[tuple[object, Callable]] = []
 
     def wrapper(self, *args, **kwargs)->Any: # wrapeer that cals the function            
         nonlocal objects_that_already_called
@@ -136,3 +136,12 @@ def list_tries(list_:list)->Callable[[Callable], Callable]: # function that retu
     return decorator
 
 
+# def conditional(dec, condition:bool, otherwise=None)->Callable[[Callable[_In, _Out]], Callable[_In, _Out]]:
+#     def decorator(func:Callable[_In, _Out])->Callable[_In, _Out]:
+#         if condition:
+#             return dec(func)
+#         elif otherwise is not None:
+#             return otherwise(func)
+#         else:
+#             return func  # Return the function unchanged, not decorated.
+#     return decorator

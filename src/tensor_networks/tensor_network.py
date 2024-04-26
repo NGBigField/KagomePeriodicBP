@@ -31,7 +31,7 @@ from containers.belief_propagation import MessageDictType, Message, MPSOrientati
 from containers.sizes_and_dimensions import TNDimensions
 
 # utilities used in our code:
-from utils import assertions, lists, tuples, numerics, indices, strings, arguments
+from utils import lists, tuples, numerics, indices, strings, arguments
 
 import numpy as np
 from typing import NamedTuple, TypeVar
@@ -47,7 +47,7 @@ from tensor_networks.mps import initial_message, physical_tensor_with_split_mid_
 from libs.ITE import rho_ij
 
 # For OOP:
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from typing import Any, Final
 
 _T = TypeVar("_T")
@@ -56,7 +56,6 @@ _T = TypeVar("_T")
 class TensorDims(NamedTuple):
     virtual  : int
     physical : int
-
 
 class TensorNetwork(ABC):
     """The base Tensor-Network (TN) class
@@ -286,7 +285,7 @@ class KagomeTN(TensorNetwork):
     # ================================================= #
     def clear_cache(self)->None:
         # clear nodes
-        if arguments.is_cached_property(self, "nodes"):
+        if arguments.property_is_chached(self, "nodes"):
             del self.nodes
 
 
@@ -710,7 +709,7 @@ def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
         functionality = NodeFunctionality.CenterCore if triangle.index == center_triangle_index else NodeFunctionality.Padding
 
         # Add:
-        network_node = TensorNode(
+        tensor_node = TensorNode(
             index=lattice_node.index,
             tensor=tensor,
             is_ket=True,
@@ -722,10 +721,10 @@ def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
             boundaries=lattice_node.boundaries,
             name=f"{cell_flavor}"
         )
-        nodes.append(network_node)
+        nodes.append(tensor_node)
 
         if functionality is NodeFunctionality.CenterCore:
-            center_nodes.append(network_node)
+            center_nodes.append(tensor_node)
 
     # Nearest-neighbors of the center triangles are part of the outer-core:
     for node in center_nodes:

@@ -44,6 +44,7 @@ _PosFuncType = Callable[[int, int], tuple[int, int] ]
 _FULL_CONTRACTION_ORDERS_CACHE_KEY_TYPE : TypeAlias = tuple[int, BlockSide, ContractionDepth]
 
 ## Constants:
+CACHE_CONTRACTION_ORDER : bool = False  #TODO please check if neeeded True
 BREAK_MARKER = -100
 Full = ContractionDepth.Full
 ToCore = ContractionDepth.ToCore
@@ -622,7 +623,8 @@ def get_contraction_order(tn:KagomeTN|CoreTN, direction:BlockSide, depth:Contrac
     assert depth is not ContractionDepth.ToEdge, f"Contraction to edge method does not exist for a full Kagome TN"
     global FULL_CONTRACTION_ORDERS_CACHE
     cache_key = (tn.lattice.N, direction, depth)
-    if cache_key in FULL_CONTRACTION_ORDERS_CACHE:
+
+    if CACHE_CONTRACTION_ORDER and cache_key in FULL_CONTRACTION_ORDERS_CACHE:
         contraction_order = FULL_CONTRACTION_ORDERS_CACHE[cache_key]
     else:
         # Derive:

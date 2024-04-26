@@ -49,13 +49,13 @@ def main(
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
-    hamiltonian:str = "Ising-AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1
 )->tuple[float, str]:
     
     # unit_cell = UnitCell.load("last")
-    # unit_cell = UnitCell.load("2024.04.11_09.43.42_CGOP - stable -0.25")
-    unit_cell = UnitCell.random(d=d, D=D)
+    unit_cell = UnitCell.load("2024.04.25_20.17.29 ising - stable")
+    # unit_cell = UnitCell.random(d=d, D=D)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -66,8 +66,8 @@ def main(
     config.bp.max_swallowing_dim = int(4*D**2 * chi_factor)
     config.bp.damping = damping
     config.bp.parallel_msgs = parallel
-    config.bp.msg_diff_terminate = 1e-14
-    config.bp.msg_diff_good_enough = 1e-5
+    config.bp.msg_diff_terminate = 1e-6
+    config.bp.msg_diff_good_enough = 1e-4
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 50
     config.bp.allowed_retries = 2
@@ -76,7 +76,7 @@ def main(
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.start_segment_with_new_bp_message = True
     config.iterative_process.use_bp = True
-    config.iterative_process.bp_every_edge = False
+    config.iterative_process.bp_every_edge = True
     config.ite.normalize_tensors_after_update = True
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False

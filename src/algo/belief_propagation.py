@@ -96,7 +96,6 @@ def _signle_outgoing_message(
     tn:KagomeTN, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool
 ) -> Message:
     
-
     ## use bubble con to compute outgoing message:
     mps, _, mps_direction = contract_tensor_network(
         tn, 

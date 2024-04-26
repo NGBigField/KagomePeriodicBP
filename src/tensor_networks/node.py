@@ -221,7 +221,7 @@ class TensorNode():
 
     def __repr__(self) -> str:
         positions = lists.convert_whole_numbers_to_int(list(self.pos))
-        return f"Node '{self.name}' at index [{self.index}] on site {tuple(positions)}"
+        return f"Node '{self.name}' at index [{self.index}] on site {tuple(positions)} in address {id(self)}"
 
     
 def validated_int_square_root(a:int)->int:

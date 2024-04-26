@@ -50,5 +50,5 @@ def only_single_input_allowed(function_name:str|None=None, **kwargs:_T)->tuple[s
     return only_key, only_value
 
 
-def is_cached_property(obj, attr_name:str)->bool:
+def property_is_chached(obj, attr_name:str)->bool:
     return attr_name in obj.__dict__
