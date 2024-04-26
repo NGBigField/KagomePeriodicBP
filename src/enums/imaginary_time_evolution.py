@@ -1,10 +1,11 @@
-from enum import Enum, auto
+from enum import Enum, auto, unique
 from enums.tensor_networks import UnitCellFlavor
 from typing import Generator
 from lattices.directions import BlockSide
 from utils import lists
 
 
+@unique
 class UpdateMode(Enum):
     A = auto()
     B = auto()

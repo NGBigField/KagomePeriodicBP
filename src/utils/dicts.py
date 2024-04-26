@@ -1,4 +1,4 @@
-from typing import TypeVar, Any, Callable
+from typing import TypeVar, Any, Callable, Generator
 import numpy as np
 from copy import deepcopy
 
@@ -65,3 +65,16 @@ def statistics_along_key(dictionaries:list[dict[str, Any]], key)->tuple[float, f
     mean = np.mean(values)
 
     return mean, std
+
+
+def iterate_with_edge_indicators(d:dict[_T, _T2]|np.ndarray) -> Generator[tuple[bool, bool, _T, _T2], None, None]:
+    is_first : bool = True
+    is_last  : bool = False
+    n = len(d)
+    for i, (key, item) in enumerate(d.items()):
+        if i+1==n:
+            is_last = True
+        
+        yield is_first, is_last, key, item
+
+        is_first = False

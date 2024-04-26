@@ -3,11 +3,12 @@ from typing import Generator
 from numpy import ndarray as np_ndarray
 from enums import UnitCellFlavor
 import numpy as np
+from metrics.distance import tensor_distance
 
-from utils import saveload, strings, iterations
+from utils import saveload, strings, iterations, files
 
 UNIT_CELL_SUBFOLDER = "unit_cells"
-
+UNIT_CELL_FOLDER_FULLPATH = saveload.DATA_FOLDER + saveload.PATH_SEP + UNIT_CELL_SUBFOLDER
 
 @dataclass
 class UnitCell: 
@@ -83,17 +84,33 @@ class UnitCell:
              C = tensor.copy()
         )
     
-
     def save(self, file_name:str|None=None)->None:
         file_name = self._derive_file_name(file_name)
         return saveload.save(self, name=file_name, sub_folder=UNIT_CELL_SUBFOLDER)
 
     @staticmethod
     def load(file_name:str, if_exist:bool=False)->"UnitCell":
+        if file_name=="last":
+            file_name = files.get_last_file_in_folder(UNIT_CELL_FOLDER_FULLPATH)
         return saveload.load(file_name, sub_folder=UNIT_CELL_SUBFOLDER, if_exist=if_exist)
     
     def set_filename(self, filename:str)->None:
         self._file_name = filename
+
+    def add_noise(self, noise_fraction:float)->None:
+        def _add_noise(t:np.ndarray)->np.ndarray:
+            norm = np.linalg.norm(t)
+            scale = norm*noise_fraction
+            noise = np.random.normal(scale=scale, size=t.shape)
+            return t + noise
+        self.A = _add_noise(self.A)
+        self.B = _add_noise(self.B)
+        self.C = _add_noise(self.C)
+
+    def distance(self, other:"UnitCell") -> float:
+        distances = [tensor_distance(t1, t2) for (_, t1), (_,t2) in zip(self.items(), other.items(), strict=True) ]
+        return sum(distances)
+
 
     def _derive_file_name(self, given_name:str|None)->str:
         if given_name is not None:
@@ -105,6 +122,7 @@ class UnitCell:
             return self._file_name
 
         return strings.time_stamp()
+
         
 
 
@@ -118,7 +136,7 @@ def _random_tensor(d:int, D:int)->np.ndarray:
     rs = np.random.RandomState()
     t = rs.uniform(size=[d]+[D]*4) \
         + 1j*rs.normal(size=[d]+[D]*4)
-    t = t/np.linalg.norm(t)
+    t /= np.linalg.norm(t)  # normalize
     return t
 
 

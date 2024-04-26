@@ -160,16 +160,30 @@ def search_pattern_in_text(pattern:str, text:str)->int:
     return _kmp_search(text, pattern)
 
 
+def _float_to_str_common_append(value:float, num_decimals:int|None, is_last_item:bool)->str:
+    if num_decimals is None:
+        s = f"{value:+}"
+    else:
+        s = f"{value:+.{num_decimals}f}"   
+
+    if not is_last_item:
+        s += ", "
+
+    return s
+
+def float_dict_to_str(d:dict[Any, float], num_decimals:int|None=None)->str:
+    s = "{"
+    for i, (key, value) in enumerate(d.items()):
+        is_last = i==len(d)-1
+        s += f"{key}: "
+        s += _float_to_str_common_append(value, num_decimals, is_last_item=is_last)
+    s += "}"
+    return s
+
 def float_list_to_str(l:list[float], num_decimals:int|None=None)->str:
     s = "["
-    for first, last, item in lists.iterate_with_edge_indicators(l):
-        if num_decimals is None:
-            s += f"{item:+}"
-        else:
-            s += f"{item:+.{num_decimals}f}"         
-        
-        if not last:
-            s += ", "
+    for _, is_last, value in lists.iterate_with_edge_indicators(l):
+        s += _float_to_str_common_append(value, num_decimals, is_last_item=is_last)
     s += "]"
     return s
 

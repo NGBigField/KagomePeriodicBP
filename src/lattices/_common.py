@@ -1,5 +1,5 @@
-from lattices.directions import Direction, BlockSide
 from _types import EdgeIndicatorType, PosScalarType
+from lattices.directions import Direction, BlockSide
 from utils import tuples
 from dataclasses import dataclass, field
 

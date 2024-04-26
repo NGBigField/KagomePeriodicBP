@@ -8,7 +8,7 @@ if __name__ == "__main__":
 	)
 
 
-from utils import visuals, strings, logs, prints, tuples, lists, saveload
+from utils import visuals, strings, logs, prints, tuples, lists, saveload, dicts
 
 from tensor_networks import UnitCell
 from containers import Config, ITESegmentStats, UpdateEdge
@@ -25,6 +25,8 @@ from _config_reader import ALLOW_VISUALS
 if ALLOW_VISUALS:
     from utils.visuals import Axes3D, Quiver, Line3D, Text, DEFAULT_PYPLOT_FIGSIZE, _XYZ
     from matplotlib import pyplot as plt
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
 else:
     Axes3D, Quiver, Line3D, Text = None, None, None, None
 
@@ -42,6 +44,9 @@ XYZ_ARROW_LEN = 1.25
 XYZ_ARROW_KWARGS = dict(capstyle='round', color='black', arrow_length_ratio=0.15)
 
 NEW_TRACK_POINT_THRESHOLD = 0.02
+
+PLOT_ENTANGLEMENT = True
+PLOT_COMPLEXITY = False
 
 @dataclass
 class COLORS:
@@ -249,13 +254,21 @@ class ITEPlots():
 
         if self.show.main:
             fig_main = plt.figure(figsize=(4.5, 6))
-            fig_main.subplot_mosaic([
+            mosaic = [
                 ['B', 'B'],
-                ['A', 'A'],
-                ['T', 'T'],
-                ['E', 'E'],
-                ['E', 'E']
-            ])            
+                ['A', 'A']
+            ]
+
+            if PLOT_COMPLEXITY:
+                mosaic.append(['T', 'T'])
+            mosaic.append(['E', 'E'])
+            mosaic.append(['E', 'E'])
+                
+            if PLOT_ENTANGLEMENT:
+                mosaic.append(['N', 'N'])
+
+            fig_main.subplot_mosaic(mosaic)            
+       
             self.figs.main = fig_main
         
         if self.show.health:
@@ -294,20 +307,32 @@ class ITEPlots():
             p_energies = visuals.AppendablePlot(axis=axes_main["E"])
             p_energies.axis.set_title("energy")
             #
-            p_exec_t = visuals.AppendablePlot(axis=axes_main["T"])
-            p_exec_t.axis.set_title("time and space complexity")
-            p_memory_use = visuals.AppendablePlot(axis=axes_main["T"].twinx())
-            p_exec_t.axis.set_ylabel("time [sec]", color=COLORS.time_complexity)
-            p_exec_t.axis.tick_params(axis='y', labelcolor=COLORS.time_complexity)
-            p_memory_use.axis.set_ylabel("space [bytes]", color=COLORS.space_complexity)
-            p_memory_use.axis.tick_params(axis='y', labelcolor=COLORS.space_complexity)
+            if PLOT_COMPLEXITY:
+                p_exec_t = visuals.AppendablePlot(axis=axes_main["T"])
+                p_exec_t.axis.set_title("time and space complexity")
+                p_memory_use = visuals.AppendablePlot(axis=axes_main["T"].twinx())
+                p_exec_t.axis.set_ylabel("time [sec]", color=COLORS.time_complexity)
+                p_exec_t.axis.tick_params(axis='y', labelcolor=COLORS.time_complexity)
+                p_memory_use.axis.set_ylabel("space [bytes]", color=COLORS.space_complexity)
+                p_memory_use.axis.tick_params(axis='y', labelcolor=COLORS.space_complexity)
+            else:
+                p_exec_t, p_memory_use = visuals.AppendablePlot.inacive(), visuals.AppendablePlot.inacive()
+            #
+            if PLOT_ENTANGLEMENT:
+                p_entanglement = visuals.AppendablePlot(axis=axes_main["N"])
+                p_entanglement.axis.set_title("entanglement")
+                p_entanglement.axis.set_ylabel("Negativity")
+                p_entanglement.axis.set_xlabel("iteration")
+            else:
+                p_entanglement = visuals.AppendablePlot.inacive()
             #
             self.plots.main = dict(
                 energies=p_energies, 
                 expectations=p_expectations, 
                 delta_t=p_delta_t,
                 exec_t=p_exec_t,
-                memory_use=p_memory_use
+                memory_use=p_memory_use,
+                entanglement=p_entanglement
             )
 
         ## Env plots:        
@@ -392,11 +417,12 @@ class ITEPlots():
 
     def update(self, 
         energies_at_end : dict[str, float], 
-        energies_at_updates :list[dict[str, float]] ,
-        segment_stats:ITESegmentStats, 
-        delta_t:float, 
-        expectations:UnitCellExpectationValuesDict, 
-        unit_cell:UnitCell, 
+        energies_at_updates : list[dict[str, float]] ,
+        segment_stats : ITESegmentStats, 
+        delta_t : float, 
+        expectations : UnitCellExpectationValuesDict, 
+        unit_cell : UnitCell, 
+        entangelment : list[dict[str, float]],
         _initial:bool=False,
         _draw_now:bool=True
     ):
@@ -412,12 +438,15 @@ class ITEPlots():
             plot.axis.scatter(x=x, y=y, c=style.color, s=style.size, alpha=style.alpha, marker=style.marker)
 
 
-        def _scatter_plot_of_energies_per_edge(energies_dict:dict[str, float], iteration:int, base_style:visual_constants.ScatterStyle)->None:
-            plot = self.plots.main["energies"]
-            for edge_tuple, energy in energies_dict.items():
+        def _scatter_plot_at_main_per_edge(results_dict:dict[str, float], iteration:int, base_style:visual_constants.ScatterStyle, axis_name:str, alpha:float|None=None)->None:
+            plot = self.plots.main[axis_name]
+
+            for edge_tuple, value in results_dict.items():
                 marker = visual_constants.EDGE_TUPLE_TO_MARKER[UpdateEdge.to_str(edge_tuple)]
                 style = tuples.copy_with_replaced_val_at_key(base_style, "marker", marker)
-                _small_scatter(plot, iteration, energy, style=style)
+                if alpha is not None:
+                    style = tuples.copy_with_replaced_val_at_key(style, "alpha", alpha)
+                _small_scatter(plot, iteration, value, style=style)
 
 
         had_to_revert = segment_stats.had_to_revert
@@ -437,7 +466,7 @@ class ITEPlots():
             plot = self.plots.main["energies"]
 
             if isinstance(energies_at_end, dict):
-                _scatter_plot_of_energies_per_edge(energies_dict=energies_at_end, iteration=i, base_style=energies_after_segment_style)
+                _scatter_plot_at_main_per_edge(results_dict=energies_at_end, iteration=i, base_style=energies_after_segment_style, axis_name="energies")
                 mean_energy = lists.average(list(energies_at_end.values()))
             elif isinstance(energies_at_end, (complex, float, int)):
                 mean_energy = energies_at_end
@@ -450,7 +479,7 @@ class ITEPlots():
             j = self._iteration-1
             for energies in energies_at_updates:
                 j += frac
-                _scatter_plot_of_energies_per_edge(energies_dict=energies, iteration=j, base_style=energies_at_update_style)
+                _scatter_plot_at_main_per_edge(results_dict=energies, iteration=j, base_style=energies_at_update_style, axis_name="energies")
                 
             # Mean:
             plot.append(mean=(i, mean_energy), draw_now_=False)
@@ -458,6 +487,10 @@ class ITEPlots():
             # Ground-truth
             if self.config.ite.reference_ground_energy is not None:
                 plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
+
+            ## Entanglement
+            _scatter_plot_at_main_per_edge(results_dict=entangelment, iteration=i, base_style=energies_after_segment_style, axis_name="entanglement", alpha=1.0)
+            self.plots.main["entanglement"].axis.set_ylim(bottom=0)
 
 
         ## Env Health:
@@ -521,34 +554,75 @@ class ITEPlots():
 
 
 
-def _energies_from_energies_str_line(line:str)->list[float]:
-    line = line.removesuffix("]\n")
-    line = line.removeprefix("[")
+def _values_from_values_str_lne(line:str)->list[float]:
+    _, line = line.split(sep='[')
+    line, _ = line.split(sep=']')
     vals = line.split(", ")
-    assert len(vals)==6
+    # assert len(vals)==6
     return [float(val) for val in vals]
 
 
-def _scatter_energies(
-    energies_word:str, i:int, style:visual_constants.ScatterStyle, label:str,  is_first:bool
+def _scatter_values(
+    ax:Axes,    
+    values_line:str, i:int, style:visual_constants.ScatterStyle=default_marker_style, label:str=None,  is_first:bool=None
 )->None:
     
-    energies = _energies_from_energies_str_line(energies_word)
-    for energy in energies:
-        label = label if is_first else None
-        # energy /= 2  # Get equiv energy per site
-        plt.scatter(i, energy, s=style.size, c=style.color, alpha=style.alpha, marker=style.marker, label=label)
+    values = _values_from_values_str_lne(values_line)
+    for value in values:
+        if is_first is None or not is_first:
+            label = None
+        ax.scatter(i, value, s=style.size, c=style.color, alpha=style.alpha, marker=style.marker, label=label)
         is_first = False
 
 
+def _plot_per_segment_health_common(ax:Axes, strs:list[str], style:visual_constants.ScatterStyle=default_marker_style) -> None:
 
-def plot_from_log(
-    log_name:str = "2024.04.10_10.24.40 VJDEMA - long"
-):
+    for i, line in enumerate(strs):
+        _, line = line.split("[")
+        line, _ = line.split("]")
+        words = line.split(",")
+        for word in words:
+            value = float(word)
+            ax.scatter(i, value, s=style.size, c=style.color, alpha=style.alpha, marker=style.marker)
+
+
+def _plot_health_figure_from_log(log_name:str) -> Figure: 
+    ## Get matching words:
+    hermicity_strs, tensor_distance_strs = logs.search_words_in_log(log_name, 
+        ("Hermicity of environment=", "Tensor update distance") 
+    )
+    ## Prepare plots        
+    fig = plt.figure(figsize=(5, 6))
+    fig.suptitle("ITE")
+    fig.subplot_mosaic(
+        [
+            ['Hermicity' ,  'Hermicity'],
+            ['distance'  , 'distance'  ],
+        ]
+    )
+    axes : dict[str, Axes] = {axis._label : axis for axis in fig.get_axes()}
+
+
+    ## Hermicity:
+    ax = axes["Hermicity"]
+    _plot_per_segment_health_common(ax, hermicity_strs)
+    ax.set_ylabel("Hermicity")
+
+    ## Hermicity:
+    ax = axes["distance"]
+    _plot_per_segment_health_common(ax, tensor_distance_strs)
+    ax.set_ylabel("Update Distance")
+
+    return fig
+
+
+def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
 
     ## Get matching words:
-    edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, reference_energy_str, segment_data_str = logs.search_words_in_log(log_name, 
-        ("Edge-Energies after each update=", "Edge-Energies after segment =   ", " Mean energy after segment", "num_mode_repetitions_per_segment", "Hamiltonian's reference energy", "segment:") 
+    edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, \
+        reference_energy_str, segment_data_str, delta_t_strs, edge_negativities_strs, expectation_values_strs = logs.search_words_in_log(log_name, 
+        ("Edge-Energies after each update=", "Edge-Energies after segment =   ", " Mean energy after segment", "num_mode_repetitions_per_segment",\
+          "Hamiltonian's reference energy", "segment:", "delta_t", "Edge-Negativities", "Expectation-Values") 
     )
 
     num_segments = len(mean_energies_strs)
@@ -565,45 +639,140 @@ def plot_from_log(
         word = word.removeprefix(" = ")
         word = word.removesuffix("\n")
         mean_energies.append(float(word))
-        
+
+    ## Prepare plots        
+    fig = plt.figure(figsize=(5, 6))
+    fig.suptitle("ITE")
+    fig.subplot_mosaic(
+        [
+            ['delta_t' ,  'delta_t'],
+            ['expect'  , 'expect'  ],
+            ['Energies', 'Energies'],
+            ['Energies', 'Energies'],
+            ['entangle', 'entangle'],
+        ]
+    )
+    axes : dict[str, Axes] = {axis._label : axis for axis in fig.get_axes()}
+
     ## Plot mean energies:    
-    plt.figure()
-    plt.plot(mean_energies, color="tab:blue", label="mean energy")
-    plt.grid()
-    plt.title("ITE Energies")
-    plt.xlabel("Iteration")
-    plt.ylabel("Energy")
+    ax = axes['Energies']
+    ax.plot(mean_energies, color="tab:blue", label="mean energy", linewidth=3)
+    ax.grid()
+    ax.set_ylabel("Energy")
 
     ## Plot energy per edge:
     is_first = True
     
     for i in range(num_segments):
-        _scatter_energies(energies_word=edge_energies_for_mean_strs.pop(0), i=i, style=energies_after_segment_style, label="energies per edge", is_first=is_first)
+        _scatter_values(ax, values_line=edge_energies_for_mean_strs.pop(0), i=i, style=energies_after_segment_style, label="energies per edge", is_first=is_first)
 
 
         for j in range(num_mode_repetitions_per_segment):
             index = i + j/num_mode_repetitions_per_segment
-            _scatter_energies(energies_word=edge_energies_during_strs.pop(0), i=index, style=energies_at_update_style, label="energies at update", is_first=is_first)
+            _scatter_values(ax, values_line=edge_energies_during_strs.pop(0), i=index, style=energies_at_update_style, label="energies at update", is_first=is_first)
             is_first = False
 
                 
     ## Plot reference energy:
     if len(reference_energy_str)==0:
         pass
-    elif len(reference_energy_str)==1:
+    elif len(reference_energy_str)>0:
         reference_energy = reference_energy_str[0]
         reference_energy = reference_energy.removeprefix(" is ")
         reference_energy = reference_energy.removesuffix("\n")
         reference_energy = float(reference_energy)
-        reference_plot = plt.axhline(reference_energy, linestyle="--", color="g", label="reference")
+        reference_plot = ax.axhline(reference_energy, linestyle="--", color="g", label="reference")
     else:
         raise NotImplementedError("Not a known case")
-    
 
-    plt.legend()
+
+    ## Delta_t plot:
+    ax = axes["delta_t"]
+    ax.set_ylabel("delta_T")
+    ax.set_yscale("log")
+
+    delta_t_vec = []
+    for line in delta_t_strs:
+        if line[0] in ["_", "\n"]:
+            continue
+        assert line[0] == "="
+        words = line.split(" ")
+        word = words[0] 
+        word = word.removeprefix("=")
+        word = word.removesuffix(":")
+        delta_t = float(word)
+        delta_t_vec.append(delta_t)
+
+    ax.plot(delta_t_vec)
+
+
+    ## Plot Entanglement:    
+    ax = axes['entangle']
+    ax.grid()
+    ax.set_ylabel("Negativity")
+    ax.set_xlabel("Iteration")
+    for i, line in enumerate(edge_negativities_strs):
+        _scatter_values(ax, line, i)
+
+
+    ## Plot Expectations:   
+    ax = axes['expect'] 
+    ax.grid()
+    ax.set_ylabel("Expectations")
+    x, y, z = [], [], []
+    for ind, line in enumerate(expectation_values_strs):
+        _, line = line.split(sep="{")
+        line, _ = line.split(sep="}")
+        words = line.split(sep=",")
+
+        def _get_value(i:int)->float:
+            _, value_str = words[i].split(": ")
+            return float(value_str)
+        
+        x.append(_get_value(0))
+        y.append(_get_value(1))
+        z.append(_get_value(2))
+
+    iterations = [i for i, _ in enumerate(x)]
+    ax.plot(iterations, x, label="x")
+    ax.plot(iterations, y, label="y")
+    ax.plot(iterations, z, label="z")
+    ax.legend(loc="lower left")
+
+
+    ## Finally:
+    # link x axes:
+    first_ax = None
+    for first, _, _, ax in dicts.iterate_with_edge_indicators(axes):
+        if first:
+            first_ax = ax
+            continue
+        ax.sharex(first_ax)
+
+
+def plot_from_log(
+    log_name:str = "2024.04.10_10.24.40 VJDEMA - long",
+    save:bool = True
+):
+    main_fig = _plot_main_figure_from_log(log_name)
+    health_fig = _plot_health_figure_from_log(log_name)
+
+    # save:
+    if save:
+        visuals.save_figure(fig=main_fig)
+        visuals.save_figure(fig=health_fig)
+
+    # Show:
     plt.show()
+
+    # Done:
     print("Done.")
 
+
 if __name__ == "__main__":
-    plot_from_log()
-    print("Done")
+    from project_paths import add_src, add_base, add_scripts
+    add_src()
+    add_base()
+    add_scripts()
+    from scripts import replay_log
+    replay_log.main()

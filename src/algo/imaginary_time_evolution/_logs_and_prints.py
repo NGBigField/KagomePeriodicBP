@@ -28,12 +28,16 @@ def get_progress_bar(config:Config, num_repeats:int, print_prefix:str)->prints.P
 
 
 def _common_logger_prints(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker)->None:
-    logger.info(config)
-    logger.info(f"ITE-Tracker saved at {ite_tracker.full_path!r}")
+    # Choose if debug or info (meaning if to print on screen or only to file):
+    logger_method = logger.debug
+    # Print basic info
+    logger_method(config)
+    logger_method(f"ITE-Tracker saved at {ite_tracker.full_path!r}")
+    # Print where the logger is saved:
     for handler in logger.handlers:
         if isinstance(handler, logs.logging.FileHandler):
             path = handler.baseFilename
-            logger.info(f"Logger saved at      {path!r}")    
+            logger_method(f"Logger saved at      {path!r}")    
 
 
 def _log_and_print_starting_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker)->None:
@@ -41,8 +45,8 @@ def _log_and_print_starting_message(logger:logs.Logger, config:Config, ite_track
     hamiltonian_func = config.ite.interaction_hamiltonian.func
     if hasattr(hamiltonian_func, "reference"):
         refernce = getattr(hamiltonian_func, "reference")
-        logger.info(f"Hamiltonian's reference energy is {refernce!r}")
-    logger.info(" ")
+        logger.debug(f"Hamiltonian's reference energy is {refernce!r}")
+    logger.debug(" ")
 
 
 def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker, plots:_visualization.ITEPlots)->None: #TODO ITEPlots

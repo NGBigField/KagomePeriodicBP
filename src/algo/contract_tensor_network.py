@@ -8,8 +8,10 @@ import numpy as np
 from libs import bmpslib
 
 # Types we need in our module:
-from tensor_networks import KagomeTN, CoreTN, ModeTN, MPS
+from tensor_networks import KagomeTN, CoreTN, ModeTN, MPS, TensorNode
+from tensor_networks.node import NodeFunctionality, UnitCellFlavor
 from lattices.directions import LatticeDirection, BlockSide, check
+from lattices.edges import edges_dict_from_edges_list
 from enums import ContractionDepth
 from _types import EdgeIndicatorType
 from containers import BubbleConConfig, MPSOrientation, MessageDictType
@@ -22,6 +24,71 @@ from algo.contraction_order import get_contraction_order
 
 # Other modules we made and need here   
 from libs.bubblecon import bubblecon
+
+
+def _cell_flavor_from_index(i:int) -> UnitCellFlavor:
+    m = i%3
+    match m:
+        case 0: return UnitCellFlavor.A
+        case 1: return UnitCellFlavor.B
+        case 2: return UnitCellFlavor.C
+        case _:
+            raise ValueError("Not a matched case")
+    
+
+def _plot_tn_with_connected_corner(
+    tensors     : list[np.ndarray],  
+    edges_list  : list[list[str]],      
+    angles_list : list[list[float]],  
+    positions   : list[tuple[float, float]],
+    tn          : KagomeTN 
+)->None:
+
+    from tensor_networks.visualizations import plot_network
+    from lattices.directions import LatticeDirection, Direction
+    from lattices.triangle import total_vertices
+
+    edges_dict = edges_dict_from_edges_list(edges_list)
+    nodes = []
+
+
+    # Decide num_core_nodes:
+    for n in range(2, 20):
+        num_core_nodes = total_vertices(n)*3
+        if num_core_nodes>len(tensors):
+            num_core_nodes = total_vertices(n-1)*3
+            break
+
+            
+
+    for i, (tensor, edges, angles, position) in enumerate(zip(tensors, edges_list, angles_list, positions, strict=True)):
+
+        if i<num_core_nodes:
+            is_ket = True
+            directions = [LatticeDirection.from_angle(a) for a in angles]
+            functionality=NodeFunctionality.Undefined
+            cell_flavor = _cell_flavor_from_index(i)
+        else:
+            is_ket = False
+            directions = [Direction(name="rand", angle=a) for a in angles]
+            functionality=NodeFunctionality.Message
+            cell_flavor = UnitCellFlavor.NoneLattice
+
+        node = TensorNode(
+            index=i,
+            name=f"f{i}",
+            tensor=tensor,
+            is_ket=is_ket,
+            pos=position,
+            edges=edges,
+            directions=directions,
+            functionality=functionality,
+            cell_flavor=cell_flavor
+        )
+
+        nodes.append(node)
+
+    plot_network(nodes, edges_dict)
 
 
 def connect_corner_messages(
@@ -101,10 +168,12 @@ def contract_tensor_network(
     ## Connect first MPS message to a side tensor, to allow efficient contraction:
     if isinstance(tn, KagomeTN):
         tensors, edges_list, angles = connect_corner_messages(tn, direction)
+        # _plot_tn_with_connected_corner(tensors, edges_list, angles, tn.positions, tn)
     elif isinstance(tn, CoreTN|ModeTN):
         tensors, edges_list, angles = tn.tensors, tn.edges_list, tn.angles
     else:
         raise TypeError(f"Not an expected type {type(tn)} of input 'tn'")
+    
 
     ## Call main function:
     mps = bubblecon(

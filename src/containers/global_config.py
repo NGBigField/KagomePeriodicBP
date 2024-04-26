@@ -58,6 +58,7 @@ class Config(_StoreConfigClasses, _ConfigClass):
         if not ALLOW_VISUALS:
             self.visuals.live_plots = False
 
+
     def strengthen(self, _harder_target:bool=True):
         if isinstance(self.bp.max_iterations, int):
             self.bp.max_iterations *= 2

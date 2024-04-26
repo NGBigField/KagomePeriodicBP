@@ -11,7 +11,7 @@ if __name__ == "__main__":
 
 
 from utils import strings
-from scripts.run_heisenberg import main as run_ite
+from scripts.run_ite import main as run_ite
 
 
 def main(

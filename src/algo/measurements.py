@@ -39,6 +39,10 @@ from algo.imaginary_time_evolution._tn_update import get_imaginary_time_evolutio
 
 # For energy estimation:
 from libs.ITE import rho_ij
+from libs.TenQI import op_to_mat
+
+# Quantum Information metrics:
+from metrics import negativity
 
 # Utils:
 from utils import assertions, logs, errors, lists, parallel_exec, prints, strings
@@ -75,7 +79,6 @@ class _ValueAndCount():
     count : int   = 0
 
 
-
 def _find_not_none_item_in_double_dict( d :dict[str, dict[str, _T]], keys1, keys2) -> _T:
     for k1 in keys1:
         for k2 in keys2:
@@ -83,6 +86,14 @@ def _find_not_none_item_in_double_dict( d :dict[str, dict[str, _T]], keys1, keys
             if item is not None:
                 return item
 
+def compute_negativity_of_rdm(rdm:np.ndarray)->float:
+    matrix = op_to_mat(rdm)
+    try:
+        value = negativity(matrix)
+    except Exception as e:
+        value = negativity(matrix)
+        value = None
+    return value
 
 def print_results_table(results:dict[str, dict[str, float]])->None:
     node_keys = ["A", "B", "C"]
@@ -159,8 +170,9 @@ def measure_energies_and_observables_together(
     mode:UpdateMode|None=None,
     force_real:bool=True
 )->tuple[
-    dict[tuple[str, str], float],
-    UnitCellExpectationValuesDict
+    dict[tuple[str, str], float],  # energies
+    UnitCellExpectationValuesDict,  # expectations
+    dict[tuple[str, str], float]  # entangelment
 ]:
     ## Prepare outputs and check inputs:
     # inputs:
@@ -173,6 +185,7 @@ def measure_energies_and_observables_together(
 
     # outputs:
     energies = dict()
+    entangelment = dict()
     expectations = {
         abc : { xyz : _ValueAndCount() for xyz in ['x', 'y', 'z'] } 
         for abc in ['A', 'B', 'C']
@@ -186,10 +199,13 @@ def measure_energies_and_observables_together(
     
         # do the final needed contraction for this specific edge:
         edge_tn = reduce_tn(mode_tn, target_type=EdgeTN, trunc_dim=trunc_dim, copy=True, edge_tuple=edge_tuple)
+        edge_tn.rearrange_tensors_and_legs_into_canonical_order()
         rdm, edge_energy = _get_edge_rdm_and_energy(edge_tn, h, force_real)
+        edge_negativity = compute_negativity_of_rdm(rdm)
 
         # keep energies:
         energies[edge_tuple.as_strings] = edge_energy
+        entangelment[edge_tuple.as_strings] = edge_negativity
 
         # Calc expectations:
         per_edge_results = expectation_values_with_rdm(rdm, force_real=force_real)
@@ -210,7 +226,7 @@ def measure_energies_and_observables_together(
             # override value, count tuple with mean:
             expectations[abc][xyz] = sum_/count_  
     
-    return energies, expectations
+    return energies, expectations, entangelment
 
 
 def _measurements_everything_on_duplicated_core_specific_size(

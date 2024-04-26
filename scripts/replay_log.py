@@ -1,16 +1,15 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 
 # Types in the code:
-from utils import logs, visuals
+from utils import logs, visuals, files
 from visuals.ite import plot_from_log
 from sys import argv
 import os
 
 def _get_last_log_file()->str:
     ## File search:
-    folder_full_path = logs.LOGS_FOLDER
-    file_names = [file for file in os.listdir(folder_full_path)]
-    return file_names[-1]
+    return files.get_last_file_in_folder(logs.LOGS_FOLDER)
+
 
 
 def main(
@@ -24,10 +23,9 @@ def main(
         filename = _get_last_log_file()
 
     ## Main call:
-    plot_from_log(filename)
+    plot_from_log(filename, save=True)
 
     # Done:
-    visuals.save_figure(file_name=filename)
     print("Done.")
 
 
