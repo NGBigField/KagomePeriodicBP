@@ -69,8 +69,15 @@ def _edge_order_per_mode(
     
     ## for each edge in the mode, once
     num_edges = config.iterative_process.num_edge_repetitions_per_mode
-    edge_tuples = list(UpdateEdge.all_in_random_order(num_edges=num_edges))
 
+    ## Randon?
+    if config.ite.random_edge_order:
+        edge_tuples = list(UpdateEdge.all_in_random_order(num_edges=num_edges))
+    else:
+        assert num_edges==6
+        edge_tuples = list(UpdateEdge.all_options())
+
+    ## Symmetric?
     if config.ite.symmetric_product_formula:
         edge_tuples += lists.reversed(edge_tuples)
         

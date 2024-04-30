@@ -67,6 +67,7 @@ H : np.matrix = np.matrix(
 Z : np.matrix = pauli.z
 
 
+DEFAULT_USING_ROTATION_METHOD_FOR_EXPECTATIONS = False
 MULTIPROCESSING = False
 
 TensorNetworkType = TypeVar("TensorNetworkType", bound=TensorNetwork)
@@ -577,7 +578,10 @@ def _rotate_rdm(rho:np.matrix, pauli_name:str)->np.matrix:
             raise ValueError("Not an option")
 
 
-def _calc_rdm_projection_in_axis(rho:np.matrix, pauli_name:str, force_real:bool=False, using_rotation_method:bool=False)->complex|float:
+def _calc_rdm_projection_in_axis(
+    rho:np.matrix, pauli_name:str, force_real:bool=False, 
+    using_rotation_method:bool=DEFAULT_USING_ROTATION_METHOD_FOR_EXPECTATIONS
+)->complex|float:
 
     ## Calculate:
     if using_rotation_method:

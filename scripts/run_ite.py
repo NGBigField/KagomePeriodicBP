@@ -44,7 +44,7 @@ def _config_at_measurement(config:Config)->Config:
 
 def main(
     D = 2,
-    N = 2,
+    N = 3,
     chi_factor : int = 1.0,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
@@ -66,7 +66,7 @@ def main(
     config.bp.max_swallowing_dim = int(4*D**2 * chi_factor)
     config.bp.damping = damping
     config.bp.parallel_msgs = parallel
-    config.bp.msg_diff_terminate = 1e-10
+    config.bp.msg_diff_terminate = 1e-11
     config.bp.msg_diff_good_enough = 1e-4
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 50
@@ -76,12 +76,13 @@ def main(
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.start_segment_with_new_bp_message = True
     config.iterative_process.use_bp = True
-    config.iterative_process.bp_every_edge = False
+    config.iterative_process.bp_every_edge = True
     config.ite.normalize_tensors_after_update = True
+    config.ite.random_edge_order = False
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
-    config.ite.add_gaussian_noise_fraction = 1e-9
-    config.ite.time_steps = [[10**(-exp)]*25 for exp in range(3, 12, 1)]
+    config.ite.add_gaussian_noise_fraction = 1e-8
+    config.ite.time_steps = [[10**(-exp)]*100 for exp in np.linspace(3, 4, 6)]
     # config.ite.time_steps = [[[man*10**(-exp)]*10 for man in [5, 2, 1]] for exp in range(3, 5, 1)]
 
     # Interaction:

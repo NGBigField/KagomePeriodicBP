@@ -59,7 +59,7 @@ def heisenberg_afm()->np.ndarray:
 	else:
 		return 1.0001*_tensor_product(x,x) + 0.9998*_tensor_product(y,y) + 0.9999*_tensor_product(z,z) 
 # heisenberg_afm.reference = -0.438703897456
-heisenberg_afm.reference = -0.38620
+heisenberg_afm.reference = -0.40454  # -0.38620
 
 
 def heisenberg_afm_with_field(f:float=0.0)->np.ndarray:

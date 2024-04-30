@@ -213,6 +213,7 @@ class ITEConfig(_ConfigClass):
     # ITE time steps:
     _time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
     # Control flags:
+    random_edge_order : bool = True
     random_mode_order : bool = True
     always_use_lowest_energy_state : bool = False
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
