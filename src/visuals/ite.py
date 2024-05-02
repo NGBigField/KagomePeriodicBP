@@ -592,7 +592,7 @@ def _plot_health_figure_from_log(log_name:str) -> Figure:
         ("Hermicity of environment=", "Tensor update distance") 
     )
     ## Prepare plots        
-    fig = plt.figure(figsize=(5, 6))
+    fig = plt.figure(figsize=(4, 4))
     fig.suptitle("ITE")
     fig.subplot_mosaic(
         [
@@ -754,8 +754,8 @@ def plot_from_log(
     log_name:str = "2024.04.10_10.24.40 VJDEMA - long",
     save:bool = True
 ):
-    main_fig = _plot_main_figure_from_log(log_name)
     health_fig = _plot_health_figure_from_log(log_name)
+    main_fig = _plot_main_figure_from_log(log_name)
 
     # save:
     if save:
