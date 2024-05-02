@@ -754,16 +754,22 @@ def plot_from_log(
     log_name:str = "2024.04.10_10.24.40 VJDEMA - long",
     save:bool = True
 ):
-    health_fig = _plot_health_figure_from_log(log_name)
-    main_fig = _plot_main_figure_from_log(log_name)
+    
+    for _plot_func, name in [
+        (_plot_main_figure_from_log, "main"),
+        (_plot_health_figure_from_log, "health")
+    ]:
 
-    # save:
-    if save:
-        visuals.save_figure(fig=main_fig)
-        visuals.save_figure(fig=health_fig)
+        # Plot
+        fig = _plot_func(log_name)
+
+        # save:
+        if save:
+            visuals.save_figure(fig=fig  , file_name=log_name+" - "+name) 
 
     # Show:
     plt.show()
+
 
     # Done:
     print("Done.")
