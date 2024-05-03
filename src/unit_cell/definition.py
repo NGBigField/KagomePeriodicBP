@@ -5,7 +5,8 @@ from enums import UnitCellFlavor
 import numpy as np
 from metrics.distance import tensor_distance
 
-from utils import saveload, strings, iterations, files
+from utils import saveload, strings, iterations, files, assertions
+from physics import density_matrices
 
 UNIT_CELL_SUBFOLDER = "unit_cells"
 UNIT_CELL_FOLDER_FULLPATH = saveload.DATA_FOLDER + saveload.PATH_SEP + UNIT_CELL_SUBFOLDER
@@ -98,11 +99,18 @@ class UnitCell:
         self._file_name = filename
 
     def add_noise(self, noise_fraction:float)->None:
+        def _random_tensor_like(t:np.ndarray)->np.ndarray:
+            dims = t.shape
+            m = density_matrices.random_quantum_state_tensor(dims)
+            return m
+
         def _add_noise(t:np.ndarray)->np.ndarray:
             norm = np.linalg.norm(t)
             scale = norm*noise_fraction
-            noise = np.random.normal(scale=scale, size=t.shape)
+            noise = _random_tensor_like(t)
+            noise *= scale
             return t + noise
+        
         self.A = _add_noise(self.A)
         self.B = _add_noise(self.B)
         self.C = _add_noise(self.C)

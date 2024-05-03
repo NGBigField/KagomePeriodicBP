@@ -38,18 +38,13 @@ def constant_global_field(delta_t:float|None)->float:
 def _config_at_measurement(config:Config)->Config:
     config.dims.big_lattice_size += 0
     config.bp.msg_diff_terminate /= 10
-    config.bp.allowed_retries    += 0
-
-    chi_factor = 2
-    D = config.dims.virtual_dim
-    config.trunc_dim = int((2*D**2+10) * chi_factor)
-    config.bp.max_swallowing_dim = int(2*D**2 * chi_factor)
+    config.bp.allowed_retries    += 1
     return config
 
 
 def main(
     D = 2,
-    N = 2,
+    N = 3,
     chi_factor : int = 2.0,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
@@ -76,18 +71,18 @@ def main(
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 50
     config.bp.allowed_retries = 2
-    config.iterative_process.num_mode_repetitions_per_segment = 2
+    config.iterative_process.num_mode_repetitions_per_segment = 5
     config.iterative_process.num_edge_repetitions_per_mode = 6
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.start_segment_with_new_bp_message = True
     config.iterative_process.use_bp = True
-    config.iterative_process.bp_every_edge = False
+    config.iterative_process.bp_every_edge = True
     config.ite.normalize_tensors_after_update = True
-    config.ite.random_edge_order = False
+    config.ite.random_edge_order = True
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
-    config.ite.add_gaussian_noise_fraction = 1e-6
-    config.ite.time_steps = [[10**(-exp)]*200 for exp in range(2, 7, 1)]
+    config.ite.add_gaussian_noise_fraction = None
+    config.ite.time_steps = [[10**(-exp)]*100 for exp in np.arange(2.5, 5, 0.5)]
     # config.ite.time_steps = [[[man*10**(-exp)]*10 for man in [5, 2, 1]] for exp in range(3, 5, 1)]
 
     # Interaction:
