@@ -36,6 +36,7 @@ def main(
     results = dict(
         D=D,
         N=N,
+        chi=chi_factor,
         energy=energy,
         path=unit_cell_file_path
     )

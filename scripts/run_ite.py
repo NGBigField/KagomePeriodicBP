@@ -88,7 +88,7 @@ def main(
     config.ite.always_use_lowest_energy_state = True
     config.ite.add_gaussian_noise_fraction = 1e-6
     config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(3, 6, 1)]
-    # config.ite.time_steps = [[[man*10**(-exp)]*10 for man in [5, 2, 1]] for exp in range(3, 5, 1)]
+    # config.ite.time_steps = [0.001]*3
 
     # Interaction:
     match hamiltonian: 

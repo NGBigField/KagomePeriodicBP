@@ -27,15 +27,15 @@ if not os.path.exists(results_dir):
 RESULT_KEYS_DICT = dict(
     bp = ["with_bp", 'D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'],
     parallel_timings = ["parallel", 'D', 'N', 'seed', 'bp-step', 'reduction'],
-    ite_afm = ["seed","D", "N", "energy", "path"],
+    ite_afm = ["seed","D", "N", "chi", "energy", "path"],
     bp_convergence = ['seed', 'D', 'N', 'chi', 'iterations', 'rdm_diff_bp', 'rdm_diff_random', 'z_bp', 'z_random', 'time_bp', 'time_random']
 )
 
 ## all values:
 DEFAULT_VALS = {}
-DEFAULT_VALS['N'] = [2, 4, 8] 
-DEFAULT_VALS['D'] = [2]
-DEFAULT_VALS['chi'] = [1, 2, 3, 4]
+DEFAULT_VALS['N'] = [2, 3, 4] 
+DEFAULT_VALS['D'] = [2, 3, 4, 5, 6]
+DEFAULT_VALS['chi'] = [1, 2, 3]
 DEFAULT_VALS['method'] = [1]
 DEFAULT_VALS['seed'] = range(1)
 
