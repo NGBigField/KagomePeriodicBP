@@ -22,7 +22,7 @@ from containers import Config
 
 # Import other needed types:
 from enums import UpdateMode
-from containers import MessageDictType, UpdateEdge
+from containers import MessageDictType, UpdateEdge, BestUnitCellData
 from tensor_networks import KagomeTN, CoreTN, ModeTN, EdgeTN, UnitCell
 from tensor_networks.construction import kagome_tn_from_unit_cell
 from _error_types import BPNotConvergedError, ITEError
@@ -348,11 +348,19 @@ def _post_segment_measurements_checks_and_visuals(
     if config.ite.check_converges and _check_converged(tracker.energies, tracker.delta_ts, delta_t):
         should_break = True
 
-    ## Which unit cell has minimal energy:
+    ## Which unit cell has minimal energy in crnt full run:
     crnt_results = SegmentResults(unit_cell=unit_cell, messages=messages, energy=mean_energy, stats=segment_stats)
     if crnt_results.is_better_than(best_results):
         best_results = crnt_results
 
+    ## Which unit cell has minimal energy ever:
+    D = config.dims.virtual_dim
+    best_data = BestUnitCellData.load(D=D)
+    crnt_data = BestUnitCellData(unit_cell=unit_cell, mean_energy=mean_energy, D=D)
+    if best_data is None:  # no best unit_cell is stored
+        crnt_data.save()
+    elif crnt_data.is_better_than(best_data):
+        crnt_data.save()
 
     return should_break, mean_energy, unit_cell, messages, best_results
 
@@ -577,7 +585,6 @@ def ite_per_segment(
         stats.ite_per_mode_stats.append(ite_per_mode_stats)
         energies_at_updates.append(energies_at_update_per_mode)
         _log_per_mode_results(logger, energies_at_update_per_mode, ite_per_mode_stats, config=config)
-
 
     prog_bar.clear()
 

@@ -143,8 +143,8 @@ def save(var:Any, name:Optional[str]=None, sub_folder:Optional[str]=None, if_not
     return fullpath
 
 
-def load(name:str, sub_folder:Optional[str]=None, if_exist:bool=False) -> Any:
-    if if_exist and not exist(name=name, sub_folder=sub_folder):
+def load(name:str, sub_folder:Optional[str]=None, none_if_not_exist:bool=False) -> Any:
+    if none_if_not_exist and not exist(name=name, sub_folder=sub_folder):
         return None
     # fullpath:
     fullpath = _fullpath(name, sub_folder)

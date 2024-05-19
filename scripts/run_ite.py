@@ -53,9 +53,14 @@ def main(
     damping:float|None = 0.1
 )->tuple[float, str]:
     
-    unit_cell = UnitCell.load("last")
+    # unit_cell = UnitCell.load("last")
     # unit_cell = UnitCell.load("2024.04.25_20.17.29 ising --- stable")
     # unit_cell = UnitCell.random(d=d, D=D)
+
+    unit_cell = UnitCell.load_best(D=D)
+    if unit_cell is None:
+        unit_cell = UnitCell.random(d=d, D=D)
+
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -66,11 +71,11 @@ def main(
     config.bp.max_swallowing_dim = int(2*D**2 * chi_factor)
     config.bp.damping = damping
     config.bp.parallel_msgs = parallel
-    config.bp.msg_diff_terminate = 1e-7
+    config.bp.msg_diff_terminate = 1e-12
     config.bp.msg_diff_good_enough = 1e-4
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 50
-    config.bp.allowed_retries = 2
+    config.bp.allowed_retries = 3
     config.iterative_process.num_mode_repetitions_per_segment = 5
     config.iterative_process.num_edge_repetitions_per_mode = 6
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
@@ -80,9 +85,9 @@ def main(
     config.ite.normalize_tensors_after_update = True
     config.ite.random_edge_order = True
     config.ite.symmetric_product_formula = True
-    config.ite.always_use_lowest_energy_state = False
-    config.ite.add_gaussian_noise_fraction = None
-    config.ite.time_steps = [[10**(-exp)]*100 for exp in np.arange(2.5, 5, 0.5)]
+    config.ite.always_use_lowest_energy_state = True
+    config.ite.add_gaussian_noise_fraction = 1e-6
+    config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(3, 6, 1)]
     # config.ite.time_steps = [[[man*10**(-exp)]*10 for man in [5, 2, 1]] for exp in range(3, 5, 1)]
 
     # Interaction:

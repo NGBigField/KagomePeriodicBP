@@ -8,8 +8,9 @@ from metrics.distance import tensor_distance
 from utils import saveload, strings, iterations, files, assertions
 from physics import density_matrices
 
-UNIT_CELL_SUBFOLDER = "unit_cells"
-UNIT_CELL_FOLDER_FULLPATH = saveload.DATA_FOLDER + saveload.PATH_SEP + UNIT_CELL_SUBFOLDER
+UNIT_CELL_SUBFOLDER_NAME = "unit_cells"
+UNIT_CELL_FOLDER_FULLPATH = saveload.DATA_FOLDER + saveload.PATH_SEP + UNIT_CELL_SUBFOLDER_NAME
+BEST_UNIT_CELL_FOLDER_FULLPATH = UNIT_CELL_FOLDER_FULLPATH + saveload.PATH_SEP + "best"
 
 @dataclass
 class UnitCell: 
@@ -87,14 +88,21 @@ class UnitCell:
     
     def save(self, file_name:str|None=None)->None:
         file_name = self._derive_file_name(file_name)
-        return saveload.save(self, name=file_name, sub_folder=UNIT_CELL_SUBFOLDER)
+        return saveload.save(self, name=file_name, sub_folder=UNIT_CELL_SUBFOLDER_NAME)
 
     @staticmethod
     def load(file_name:str, if_exist:bool=False)->"UnitCell":
         if file_name=="last":
             file_name = files.get_last_file_in_folder(UNIT_CELL_FOLDER_FULLPATH)
-        return saveload.load(file_name, sub_folder=UNIT_CELL_SUBFOLDER, if_exist=if_exist)
+        return saveload.load(file_name, sub_folder=UNIT_CELL_SUBFOLDER_NAME, none_if_not_exist=if_exist)
     
+    def load_best(D:int, none_if_not_exist:bool=True) -> "UnitCell":
+        data = BestUnitCellData.load(D=D, none_if_not_exist=none_if_not_exist)
+        if data is None and none_if_not_exist:
+            return None
+        assert data.D == D
+        return data.unit_cell        
+
     def set_filename(self, filename:str)->None:
         self._file_name = filename
 
@@ -148,4 +156,41 @@ def _random_tensor(d:int, D:int)->np.ndarray:
     return t
 
 
+BEST_UNIT_CELL_DATA_FOLDER_NAME = UNIT_CELL_SUBFOLDER_NAME + saveload.PATH_SEP + "best"
 
+@dataclass
+class BestUnitCellData:
+    unit_cell : UnitCell
+    mean_energy : float
+    D : int
+
+    def is_better_than(self, other:"BestUnitCellData") -> bool:
+        return self.mean_energy < other.mean_energy
+    
+    @staticmethod
+    def load(D:int, none_if_not_exist:bool=True) -> "BestUnitCellData":
+        BestUnitCellData.force_folder_exist()
+        file_names = files.get_all_file_names_in_folder(BEST_UNIT_CELL_FOLDER_FULLPATH)
+        for file_name in file_names:
+            dim_str, *_ = file_name.split(" ") 
+            _, dim_str = dim_str.split("=") 
+            if int(dim_str) == D:
+                return saveload.load(file_name, sub_folder=BEST_UNIT_CELL_DATA_FOLDER_NAME)
+        
+        if none_if_not_exist:
+            return None
+        else:
+            raise FileExistsError(f"No saved file for best unit_cell with D={D}")
+        
+    
+    def save(self) -> None:
+        BestUnitCellData.force_folder_exist()
+        file_name = self._canonical_file_name()
+        return saveload.save(self, file_name, sub_folder=BEST_UNIT_CELL_DATA_FOLDER_NAME)
+
+    def _canonical_file_name(self) -> str:
+        return f"D={self.D} energy={self.mean_energy}"
+    
+    @staticmethod
+    def force_folder_exist() -> None:
+        saveload.force_folder_exists(BEST_UNIT_CELL_FOLDER_FULLPATH)
