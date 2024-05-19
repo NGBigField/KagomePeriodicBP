@@ -43,7 +43,7 @@ def _config_at_measurement(config:Config)->Config:
 
 
 def main(
-    D = 3,
+    D = 2,
     N = 2,
     chi_factor : int = 2.0,
     live_plots:bool|Iterable[bool] = [0, 0, 0],

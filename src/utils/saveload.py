@@ -153,14 +153,6 @@ def load(name:str, sub_folder:Optional[str]=None, none_if_not_exist:bool=False) 
     # Load:
     return pickle.load(file)
 
-def get_size(name:str, sub_folder:Optional[str]=None, if_exist:bool=False) -> int:
-    if if_exist and not exist(name=name, sub_folder=sub_folder):
-        return None
-    # fullpath:
-    fullpath = _fullpath(name, sub_folder)
-    # get size
-    return os.path.getsize(fullpath)
-
 def delete(name:str, sub_folder:Optional[str]=None, if_exist:bool=False)->None:
     if if_exist and not exist(name=name, sub_folder=sub_folder):
         return None 
@@ -168,6 +160,13 @@ def delete(name:str, sub_folder:Optional[str]=None, if_exist:bool=False)->None:
     fullpath = _fullpath(name, sub_folder)   
     os.remove(fullpath)
 
+def get_size(name:str, sub_folder:Optional[str]=None, if_exist:bool=False) -> int:
+    if if_exist and not exist(name=name, sub_folder=sub_folder):
+        return None
+    # fullpath:
+    fullpath = _fullpath(name, sub_folder)
+    # get size
+    return os.path.getsize(fullpath)
 
 def force_subfolder_exists(folder_name:str) -> None:
     folderpath = DATA_FOLDER + PATH_SEP + folder_name

@@ -166,30 +166,39 @@ class BestUnitCellData:
 
     def is_better_than(self, other:"BestUnitCellData") -> bool:
         return self.mean_energy < other.mean_energy
-    
+
     @staticmethod
     def load(D:int, none_if_not_exist:bool=True) -> "BestUnitCellData":
         BestUnitCellData.force_folder_exist()
-        file_names = files.get_all_file_names_in_folder(BEST_UNIT_CELL_FOLDER_FULLPATH)
-        for file_name in file_names:
-            dim_str, *_ = file_name.split(" ") 
-            _, dim_str = dim_str.split("=") 
-            if int(dim_str) == D:
-                return saveload.load(file_name, sub_folder=BEST_UNIT_CELL_DATA_FOLDER_NAME)
-        
+        for file_name in BestUnitCellData._all_files_with_D(D=D):
+            return saveload.load(file_name, sub_folder=BEST_UNIT_CELL_DATA_FOLDER_NAME)
         if none_if_not_exist:
             return None
         else:
             raise FileExistsError(f"No saved file for best unit_cell with D={D}")
         
-    
     def save(self) -> None:
         BestUnitCellData.force_folder_exist()
+        BestUnitCellData._remove_all_with_D(D=self.D)
         file_name = self._canonical_file_name()
         return saveload.save(self, file_name, sub_folder=BEST_UNIT_CELL_DATA_FOLDER_NAME)
+    
+    @staticmethod
+    def _all_files_with_D(D:int) -> Generator[str, None, None]:
+        file_names = files.get_all_file_names_in_folder(BEST_UNIT_CELL_FOLDER_FULLPATH)
+        for file_name in file_names:
+            dim_str, *_ = file_name.split(" ") 
+            _, dim_str = dim_str.split("=") 
+            if int(dim_str) == D:
+                yield file_name
 
     def _canonical_file_name(self) -> str:
         return f"D={self.D} energy={self.mean_energy}"
+    
+    @staticmethod
+    def _remove_all_with_D(D:int) -> None:
+        for file_name in BestUnitCellData._all_files_with_D(D=D):
+            saveload.delete(file_name, sub_folder=BEST_UNIT_CELL_DATA_FOLDER_NAME)
     
     @staticmethod
     def force_folder_exist() -> None:
