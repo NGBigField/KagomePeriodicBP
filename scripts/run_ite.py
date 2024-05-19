@@ -43,8 +43,8 @@ def _config_at_measurement(config:Config)->Config:
 
 
 def main(
-    D = 2,
-    N = 3,
+    D = 3,
+    N = 2,
     chi_factor : int = 2.0,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),

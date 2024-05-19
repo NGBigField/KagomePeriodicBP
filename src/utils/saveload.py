@@ -5,7 +5,6 @@
 # configuratoin:
 from _config_reader import SAVE_FILES_WITH
 
-
 # Typing hints:
 from typing import (
     Tuple,

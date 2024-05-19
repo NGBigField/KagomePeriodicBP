@@ -4,8 +4,9 @@ import numpy as np
 def random_quantum_state_tensor(dims:tuple[int,...]) -> np.ndarray:
     rand = lambda: np.random.rand(*dims)
     m = rand() + 1j*rand()
-    m_h = m.transpose()
-    m_h = m_h.conjugate()
+    # m_h = m.transpose()
+    # m_h = m_h.conjugate()
+    m_h = m.conjugate()
     m *= m_h
     m /= m.trace()
     return m
