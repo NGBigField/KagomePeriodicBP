@@ -44,7 +44,7 @@ def _config_at_measurement(config:Config)->Config:
 
 def main(
     D = 2,
-    N = 2,
+    N = 3,
     chi_factor : int = 2.0,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
@@ -86,7 +86,7 @@ def main(
     config.ite.random_edge_order = True
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = True
-    config.ite.add_gaussian_noise_fraction = 1e-6
+    config.ite.add_gaussian_noise_fraction = None
     config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(3, 6, 1)]
     # config.ite.time_steps = [0.001]*3
 

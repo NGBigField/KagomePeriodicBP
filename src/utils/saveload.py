@@ -26,13 +26,10 @@ from pathlib import Path
 import os
 
 # For saving stuff:
-match SAVE_FILES_WITH:
-    case "pickle":
-        import pickle
-    case "dill":
-        import dill as pickle   # A common alias to simplify things
-    case None:
-        pass
+if SAVE_FILES_WITH == "pickle":
+    import pickle
+elif SAVE_FILES_WITH == "dill":
+    import dill as pickle   # A common alias to simplify things
         
 
 
