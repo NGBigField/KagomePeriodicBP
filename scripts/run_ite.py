@@ -52,7 +52,8 @@ def main(
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1
 )->tuple[float, str]:
-    
+
+    ## Choose unit-cell:    
     # unit_cell = UnitCell.load("last")
     # unit_cell = UnitCell.load("2024.04.25_20.17.29 ising --- stable")
     # unit_cell = UnitCell.random(d=d, D=D)
