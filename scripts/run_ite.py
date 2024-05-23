@@ -44,8 +44,8 @@ def _config_at_measurement(config:Config)->Config:
 
 def main(
     D = 2,
-    N = 3,
-    chi_factor : int = 2.0,
+    N = 2,
+    chi_factor : int = 1.0,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
@@ -54,9 +54,9 @@ def main(
 )->tuple[float, str]:
 
     ## Choose unit-cell:    
-    # unit_cell = UnitCell.load("last")
     # unit_cell = UnitCell.load("2024.04.25_20.17.29 ising --- stable")
     # unit_cell = UnitCell.random(d=d, D=D)
+    # unit_cell = UnitCell.load("last")
 
     unit_cell = UnitCell.load_best(D=D)
     if unit_cell is None:
@@ -72,12 +72,12 @@ def main(
     config.bp.max_swallowing_dim = int(2*D**2 * chi_factor)
     config.bp.damping = damping
     config.bp.parallel_msgs = parallel
-    config.bp.msg_diff_terminate = 1e-12
+    config.bp.msg_diff_terminate = 1e-13
     config.bp.msg_diff_good_enough = 1e-4
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 50
     config.bp.allowed_retries = 3
-    config.iterative_process.num_mode_repetitions_per_segment = 5
+    config.iterative_process.num_mode_repetitions_per_segment = 2
     config.iterative_process.num_edge_repetitions_per_mode = 6
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.start_segment_with_new_bp_message = True
@@ -87,8 +87,8 @@ def main(
     config.ite.random_edge_order = True
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = True
-    config.ite.add_gaussian_noise_fraction = None
-    config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(3, 6, 1)]
+    config.ite.add_gaussian_noise_fraction = 1e-6
+    config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(3, 7, 1)]
     # config.ite.time_steps = [0.001]*3
 
     # Interaction:

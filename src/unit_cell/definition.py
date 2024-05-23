@@ -6,7 +6,6 @@ import numpy as np
 from metrics.distance import tensor_distance
 
 from utils import saveload, strings, iterations, files, assertions
-from physics import density_matrices
 
 UNIT_CELL_SUBFOLDER_NAME = "unit_cells"
 UNIT_CELL_FOLDER_FULLPATH = saveload.DATA_FOLDER + saveload.PATH_SEP + UNIT_CELL_SUBFOLDER_NAME
@@ -107,9 +106,13 @@ class UnitCell:
         self._file_name = filename
 
     def add_noise(self, noise_fraction:float)->None:
+
         def _random_tensor_like(t:np.ndarray)->np.ndarray:
             dims = t.shape
-            m = density_matrices.random_quantum_state_tensor(dims)
+            d = dims[0]
+            D = dims[1]
+            num_virtual_legs = len(dims)-1
+            m = _random_quantum_state_tensor(d=d, D=D, num_virtual_legs=num_virtual_legs)
             return m
 
         def _add_noise(t:np.ndarray)->np.ndarray:
@@ -203,3 +206,20 @@ class BestUnitCellData:
     @staticmethod
     def force_folder_exist() -> None:
         saveload.force_folder_exists(BEST_UNIT_CELL_FOLDER_FULLPATH)
+
+
+
+
+def _random_quantum_state_tensor(d:int, D:int, num_virtual_legs) -> np.ndarray:
+    ## define needed params and functions:
+    dims = [d] + [D]*num_virtual_legs
+    _rand_real_mat = lambda: np.random.rand(*dims)
+
+    ## create a legit tensor by a random tensor and its conjugate:
+    t = _rand_real_mat() + 1j*_rand_real_mat()
+    # t_conj = t.conjugate()
+    t_conj = np.conj(t.transpose([0, 2, 1, 4, 3]))
+    r = (t + t_conj)
+    r /= np.linalg.norm(r)
+
+    return r
