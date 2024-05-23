@@ -44,7 +44,7 @@ def _config_at_measurement(config:Config)->Config:
 
 def main(
     D = 2,
-    N = 2,
+    N = 3,
     chi_factor : int = 1.0,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
@@ -77,14 +77,14 @@ def main(
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 50
     config.bp.allowed_retries = 3
-    config.iterative_process.num_mode_repetitions_per_segment = 2
+    config.iterative_process.num_mode_repetitions_per_segment = 5
     config.iterative_process.num_edge_repetitions_per_mode = 6
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.start_segment_with_new_bp_message = True
     config.iterative_process.use_bp = True
     config.iterative_process.bp_every_edge = True
-    config.ite.normalize_tensors_after_update = True
     config.ite.random_edge_order = True
+    config.ite.normalize_tensors_after_update = True
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = True
     config.ite.add_gaussian_noise_fraction = 1e-6
