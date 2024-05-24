@@ -142,9 +142,7 @@ class UnitCell:
 
         return strings.time_stamp()
 
-        
-
-
+    
 def _zero_state_tensor(D:int)->np.ndarray:
     shape = [2]+[D]*4
     t = np.zeros(shape)
