@@ -4,6 +4,6 @@
     "keep_logs"       : true,
     "save_files_With" : {
         "_comment" : "can be 'dill'/'pickle'/null ",
-        "value" :  "dill"
+        "value" :  "pickle"
     } 
 }

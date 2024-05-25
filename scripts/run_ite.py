@@ -43,8 +43,8 @@ def _config_at_measurement(config:Config)->Config:
 
 
 def main(
-    D = 4,
-    N = 2,
+    D = 2,
+    N = 3,
     chi_factor : int = 1.0,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
@@ -54,7 +54,7 @@ def main(
 )->tuple[float, str]:
 
     ## Choose unit-cell:    
-    # unit_cell = UnitCell.load("2024.04.25_20.17.29 ising --- stable")
+    # unit_cell = UnitCell.load("2024.05.24_13.56.08_KJAV")
     # unit_cell = UnitCell.random(d=d, D=D)
     # unit_cell = UnitCell.load("last")
 
@@ -88,7 +88,7 @@ def main(
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = True
     config.ite.add_gaussian_noise_fraction = 1e-6
-    config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(3, 7, 1)]
+    config.ite.time_steps = [[np.power(10, -float(exp))]*200 for exp in np.arange(4, 7, 1)]
     # config.ite.time_steps = [0.001]*3
 
     # Interaction:

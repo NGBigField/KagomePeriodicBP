@@ -93,6 +93,20 @@ def _common_name(name:str, typ:Literal['data', 'log']='data') -> str:
         return name+"."+target_extension
 
 
+def _default_load_catch_other_load(file:str) -> Any:
+    try:
+        data = pickle.load(file)
+    except Exception as e:
+        # Try the other type:
+        if SAVE_FILES_WITH == "pickle":
+            import dill as crnt_pickle   # A common alias to simplify things
+        elif SAVE_FILES_WITH == "dill":
+            import pickle as crnt_pickle
+        data = crnt_pickle.load(file)
+        
+    return data
+
+
 # ==================================================================================== #
 #|                              Declared Functions                                    |#
 # ==================================================================================== #
@@ -148,7 +162,8 @@ def load(name:str, sub_folder:Optional[str]=None, none_if_not_exist:bool=False) 
     mode = Mode.Read.str()
     file = _open(fullpath, mode)
     # Load:
-    return pickle.load(file)
+    return _default_load_catch_other_load(file)
+
 
 def delete(name:str, sub_folder:Optional[str]=None, if_exist:bool=False)->None:
     if if_exist and not exist(name=name, sub_folder=sub_folder):
@@ -156,6 +171,7 @@ def delete(name:str, sub_folder:Optional[str]=None, if_exist:bool=False)->None:
     # fullpath:
     fullpath = _fullpath(name, sub_folder)   
     os.remove(fullpath)
+
 
 def get_size(name:str, sub_folder:Optional[str]=None, if_exist:bool=False) -> int:
     if if_exist and not exist(name=name, sub_folder=sub_folder):
@@ -173,6 +189,8 @@ def force_subfolder_exists(folder_name:str) -> None:
 def force_folder_exists(folderpath:str) -> None:
     if not os.path.exists(folderpath):
         os.makedirs(folderpath)
+
+
 
 
 # ==================================================================================== #
