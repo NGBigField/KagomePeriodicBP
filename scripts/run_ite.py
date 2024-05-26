@@ -43,7 +43,7 @@ def _config_at_measurement(config:Config)->Config:
 
 
 def main(
-    D = 2,
+    D = 3,
     N = 3,
     chi_factor : int = 1.0,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
@@ -58,8 +58,10 @@ def main(
     # unit_cell = UnitCell.random(d=d, D=D)
     # unit_cell = UnitCell.load("last")
 
+    radom = False
     unit_cell = UnitCell.load_best(D=D)
     if unit_cell is None:
+        radom = True
         unit_cell = UnitCell.random(d=d, D=D)
 
     unit_cell.set_filename(results_filename) 
@@ -89,7 +91,9 @@ def main(
     config.ite.always_use_lowest_energy_state = True
     config.ite.add_gaussian_noise_fraction = 1e-6
     config.ite.time_steps = [[np.power(10, -float(exp))]*200 for exp in np.arange(4, 7, 1)]
-    # config.ite.time_steps = [0.001]*3
+    
+    if radom:
+        config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(1, 6, 1)]
 
     # Interaction:
     match hamiltonian: 

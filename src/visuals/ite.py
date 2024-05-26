@@ -752,13 +752,16 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
 
 def plot_from_log(
     log_name:str = "2024.04.10_10.24.40 VJDEMA - long",
-    save:bool = True
+    save:bool = True,
+    show_health_figure:bool = False
 ):
     
     for _plot_func, name in [
         (_plot_main_figure_from_log, "main"),
         (_plot_health_figure_from_log, "health")
     ]:
+        if name=="health" and not show_health_figure:
+            continue
 
         # Plot
         fig = _plot_func(log_name)
