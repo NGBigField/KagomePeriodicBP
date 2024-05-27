@@ -43,9 +43,9 @@ def _config_at_measurement(config:Config)->Config:
 
 
 def main(
-    D = 3,
+    D = 2,
     N = 3,
-    chi_factor : int = 1.0,
+    chi_factor : int = 1.5,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
@@ -53,16 +53,19 @@ def main(
     damping:float|None = 0.1
 )->tuple[float, str]:
 
-    ## Choose unit-cell:    
-    # unit_cell = UnitCell.load("2024.05.24_13.56.08_KJAV")
-    # unit_cell = UnitCell.random(d=d, D=D)
-    # unit_cell = UnitCell.load("last")
+    _radom_unit_cell = False
 
-    radom = False
-    unit_cell = UnitCell.load_best(D=D)
-    if unit_cell is None:
-        radom = True
-        unit_cell = UnitCell.random(d=d, D=D)
+    ## Choose unit-cell:    
+    # unit_cell = UnitCell.random(d=d, D=D)
+    # _radom_unit_cell = True
+
+    # unit_cell = UnitCell.load("last")
+    unit_cell = UnitCell.load("2024.05.25_15.26.36_SADN")
+
+    # unit_cell = UnitCell.load_best(D=D)
+    # if unit_cell is None:
+    #     radom = True
+    #     unit_cell = UnitCell.random(d=d, D=D)
 
     unit_cell.set_filename(results_filename) 
 
@@ -92,7 +95,7 @@ def main(
     config.ite.add_gaussian_noise_fraction = 1e-6
     config.ite.time_steps = [[np.power(10, -float(exp))]*200 for exp in np.arange(4, 7, 1)]
     
-    if radom:
+    if _radom_unit_cell:
         config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(1, 6, 1)]
 
     # Interaction:

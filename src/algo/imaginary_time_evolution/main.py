@@ -154,7 +154,7 @@ def _initialize_visuals_and_trackers(
     ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, 
                                      config=config, mem_length=config.iterative_process.num_total_errors_threshold,
                                      filename=common_results_name)
-    _log_and_print_starting_message(logger, config, ite_tracker)  # Print and log valuable information: 
+    _log_and_print_starting_message(logger, config, ite_tracker, unit_cell)  # Print and log valuable information: 
     plots = ITEPlots(active=config.visuals.live_plots, config=config)
 
     return ite_tracker, plots

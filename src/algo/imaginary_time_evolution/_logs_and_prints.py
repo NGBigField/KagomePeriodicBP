@@ -7,6 +7,7 @@ from algo.belief_propagation import BPConfig, BPStats
 # Import containers of ite:
 from containers.imaginary_time_evolution import ITEProgressTracker, ITESegmentStats
 from containers import Config
+from unit_cell import UnitCell
 from algo.imaginary_time_evolution import _visualization 
 
 # Common errors:
@@ -37,15 +38,16 @@ def _common_logger_prints(logger:logs.Logger, config:Config, ite_tracker:ITEProg
     for handler in logger.handlers:
         if isinstance(handler, logs.logging.FileHandler):
             path = handler.baseFilename
-            logger_method(f"Logger saved at      {path!r}")    
+            logger.info(f"Logs saved at      {path!r}")    
 
 
-def _log_and_print_starting_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker)->None:
+def _log_and_print_starting_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker, unit_cell:UnitCell)->None:
     _common_logger_prints(logger, config, ite_tracker)
     hamiltonian_func = config.ite.interaction_hamiltonian.func
     if hasattr(hamiltonian_func, "reference"):
         refernce = getattr(hamiltonian_func, "reference")
         logger.debug(f"Hamiltonian's reference energy is {refernce!r}")
+    logger.debug(f"unit_cell file: {unit_cell._file_name}")
     logger.debug(" ")
 
 
