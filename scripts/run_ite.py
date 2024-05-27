@@ -45,7 +45,7 @@ def _config_at_measurement(config:Config)->Config:
 def main(
     D = 2,
     N = 3,
-    chi_factor : int = 1.5,
+    chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
@@ -60,12 +60,17 @@ def main(
     # _radom_unit_cell = True
 
     # unit_cell = UnitCell.load("last")
-    unit_cell = UnitCell.load("2024.05.25_15.26.36_SADN")
+    # unit_cell = UnitCell.load("2024.05.25_15.26.36_SADN")
 
-    # unit_cell = UnitCell.load_best(D=D)
-    # if unit_cell is None:
-    #     radom = True
-    #     unit_cell = UnitCell.random(d=d, D=D)
+    if D>3:
+        unit_cell = UnitCell.random(d=d, D=D)
+        _radom_unit_cell = True
+
+    else:
+        unit_cell = UnitCell.load_best(D=D)
+        if unit_cell is None:
+            _radom_unit_cell = True
+            unit_cell = UnitCell.random(d=d, D=D)
 
     unit_cell.set_filename(results_filename) 
 

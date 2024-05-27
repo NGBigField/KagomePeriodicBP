@@ -120,7 +120,7 @@ class StaticNumOutOfNum():
 
 
 class ProgressBar(StaticNumOutOfNum):
-    def __init__(self, expected_end:int, print_prefix:str="", print_suffix:str="", print_length:int=60, print_out:TextIO=sys.stdout, in_place:bool=False): 
+    def __init__(self, expected_end:int, print_prefix:str="", print_suffix:str="", print_length:int=40, print_out:TextIO=sys.stdout, in_place:bool=False): 
         # Save basic data:        
         self.print_length :int = print_length
         super().__init__(expected_end, print_prefix, print_suffix, print_out, in_place)
