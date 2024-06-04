@@ -478,7 +478,6 @@ class KagomeLattice():
         assert self.num_message_connections == len(boundary_edges)
         return boundary_edges
 
-
     def _row_in_direction(self, triangle_indicse:list[int], triangle_keys:list[str]) -> list[int]:
         node_indices = []
         for triangle_index in triangle_indicse:

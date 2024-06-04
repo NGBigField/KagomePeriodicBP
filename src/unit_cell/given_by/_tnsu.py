@@ -8,12 +8,13 @@ if __name__ == "__main__":
     add_base()
     add_scripts()
 
-from typing import TypeAlias, Any
+from typing import TypeAlias, Callable, Any
+import functools
 from unit_cell import UnitCell
 import numpy as np
 from utils import saveload
 
-from lattices.kagome import UpperTriangle
+from lattices.kagome import UpperTriangle, KagomeLattice, Node, BlockSide
 
 from libs.tnsu.utils import plot_convergence_curve
 from libs.tnsu.tensor_network import TensorNetwork
@@ -35,7 +36,7 @@ pauli_z = np.array([[1, 0],
                     [0, -1]])
 
 
-KAGOME_STRUCTURE_MATRIX  =  np.array(
+_KAGOME_STRUCTURE_MATRIX  =  np.array(
     [[1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # T1
      [0, 0, 0, 0, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # T2
      [0, 0, 0, 0, 1, 0, 0, 0, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # T3
@@ -50,6 +51,87 @@ KAGOME_STRUCTURE_MATRIX  =  np.array(
      [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 3, 0, 4]]  # T12
 )   #E1 E2 E3 E4 E5 E6 E7 E8 E9 E10 E11 E12 E13 E14 E15 E16 E17 E18 E19 E20 E21 E22 E23 E24
 # Taken from Jahromi, Saeed S., and Román Orús. "Universal tensor-network algorithm for any infinite lattice." Physical Review B 99.19 (2019): 195105.
+
+
+def _kagome_sm_value(
+    kagome_lattice:KagomeLattice, node:Node, triangle:UpperTriangle, edge_name:str, edge_tuple:tuple[int, int]
+) -> int:
+    if edge_name not in node.edges:
+        return 0
+    
+    ## basic info:
+    node_index = node.index
+    leg_index = node.edges.index(edge_name) + 1
+
+    ## Check data:
+    assert node_index in edge_tuple
+
+    return leg_index
+    
+    
+
+def _kagome_connect_boundary_edges_periodically(kagome_lattice:KagomeLattice, edge1:str, edge2:str) -> None:
+    ## assert an edge at boundary:
+    assert kagome_lattice.edges[edge1][0] == kagome_lattice.edges[edge1][1]
+    assert kagome_lattice.edges[edge2][0] == kagome_lattice.edges[edge2][1]
+    
+    node1_index = kagome_lattice.edges[edge1][0]
+    node2_index = kagome_lattice.edges[edge2][0]         
+
+    ## replace two dict entries with a single entry for two tensors
+    new_periodic_edge = edge1+"+"+edge2
+    del kagome_lattice.edges[edge1]
+    del kagome_lattice.edges[edge2]
+    kagome_lattice.edges[new_periodic_edge] = (node1_index, node2_index)
+
+    ## Replace in both nodes, as-well:
+    # get nodes:
+    node1 = kagome_lattice.nodes[node1_index]
+    node2 = kagome_lattice.nodes[node2_index]
+    # change edges:
+    node1.edges[node1.edges.index(edge1)] = new_periodic_edge
+    node2.edges[node2.edges.index(edge2)] = new_periodic_edge
+
+
+def _periodic_kagome_structure_matrix(size:int) -> np.ndarray:
+    
+    ## Lattice:
+    kagome_lattice : KagomeLattice = KagomeLattice(N=size)
+    # kagome_lattice.plot_triangles_lattice()
+
+    ## connect periodically:
+    for block_side in [BlockSide.U, BlockSide.UL, BlockSide.DL]:
+        boundary_edges          = kagome_lattice.sorted_boundary_edges(boundary=block_side)
+        opposite_boundary_edges = kagome_lattice.sorted_boundary_edges(boundary=block_side.opposite())
+
+        for edge1, edge2 in zip(boundary_edges, opposite_boundary_edges, strict=True):
+            _kagome_connect_boundary_edges_periodically(kagome_lattice, edge1, edge2)
+
+    ## init structure matrix:
+    m = len(kagome_lattice.nodes)  # num rows
+    n = len(kagome_lattice.edges)  # num columns
+    sm = np.zeros(shape=(m, n), dtype=int)
+
+    ## Complete structure matrix
+    for node, triangle in kagome_lattice.nodes_and_triangles():
+        i = node.index
+        for j, (edge_name, edge_tuple) in enumerate(kagome_lattice.edges.items()):            
+            value = _kagome_sm_value(kagome_lattice, node, triangle, edge_name, edge_tuple)
+            sm[i, j] = value
+        
+        ## check row:
+        row = sm[i, :]
+        non_zero_values = [x for x in row if x!=0]
+        assert len(non_zero_values)==4, f"Node is not completely connected! Must have 4 edges!"
+
+    ## Check columns:
+    for j in range(n):
+        col = sm[:, j]
+        non_zero_values = [x for x in col if x!=0]
+        assert len(non_zero_values)==2, f"Each edge must have only two connected nodes!"
+
+    return sm
+
 
 
 UPPER_TRIANGLES : list[UpperTriangle] = [
@@ -106,11 +188,11 @@ def _parse_tnsu_network_to_unit_cell(D:int, tnsu_network:TnsuReturnType)->UnitCe
     return unit_cell
 
 
-
 def _kagome_afh_peps_ground_state_search(
     d_max: list = 2, 
     error: float = 1e-6,
-    max_iterations: int = 2000, 
+    size: int = 4,
+    max_iterations: int = 500, 
     dts: list = [0.1, 0.01, 0.001, 0.0001, 0.00001],
     plot_results: bool = True, 
     save_network: bool = False,
@@ -146,7 +228,9 @@ def _kagome_afh_peps_ground_state_search(
     s_j = [pauli_x / 2., pauli_y / 2., pauli_z / 2.]
     s_k = [pauli_x / 2.]
 
-    structure_matrix = KAGOME_STRUCTURE_MATRIX
+    # structure matrix:
+    structure_matrix = _periodic_kagome_structure_matrix(size=size)
+
     print(f'There are {structure_matrix.shape[1]} edges, and {structure_matrix.shape[0]} tensors.')
 
     # AFH Hamiltonian interaction parameters

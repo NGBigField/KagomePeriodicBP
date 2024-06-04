@@ -8,6 +8,7 @@
         "cpus",
         "decomp",
         "Dmax",
+        "dtype",
         "expec",
         "Ferro",
         "hamiltonians",
