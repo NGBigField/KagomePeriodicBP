@@ -25,6 +25,7 @@ import libs.tnsu.structure_matrix_constructor as smg
 TnsuReturnType : TypeAlias = TensorNetwork
 
 DATA_SUBFOLDER = "tnsu_results"
+DEFAULT_KAGOME_LATTICE_SIZE = 3
 
 
 # Pauli matrices
@@ -51,6 +52,17 @@ _KAGOME_STRUCTURE_MATRIX  =  np.array(
      [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 3, 0, 4]]  # T12
 )   #E1 E2 E3 E4 E5 E6 E7 E8 E9 E10 E11 E12 E13 E14 E15 E16 E17 E18 E19 E20 E21 E22 E23 E24
 # Taken from Jahromi, Saeed S., and Román Orús. "Universal tensor-network algorithm for any infinite lattice." Physical Review B 99.19 (2019): 195105.
+
+
+# UPPER_TRIANGLES : list[UpperTriangle] = [
+#     UpperTriangle(up=0, left= 3, right= 4),
+#     UpperTriangle(up=6, left= 9, right=10),
+#     UpperTriangle(up=7, left=11, right= 8),
+#     UpperTriangle(up=1, left=5 , right= 2),
+# ]
+
+# FIRST_TRIANGLE_OUR_LEG_ORDER  = UpperTriangle(up=[1,2,3,4], left=[1,2,3,4], right=[1,2,3,4])
+# FIRST_TRIANGLE_TNSU_LEG_ORDER = UpperTriangle(up=[3,1,2,4], left=[2,4,3,1], right=[1,2,4,3])
 
 
 def _kagome_sm_value(
@@ -133,18 +145,6 @@ def _periodic_kagome_structure_matrix(size:int) -> np.ndarray:
     return sm
 
 
-
-UPPER_TRIANGLES : list[UpperTriangle] = [
-    UpperTriangle(up=0, left= 3, right= 4),
-    UpperTriangle(up=6, left= 9, right=10),
-    UpperTriangle(up=7, left=11, right= 8),
-    UpperTriangle(up=1, left=5 , right= 2),
-]
-
-FIRST_TRIANGLE_OUR_LEG_ORDER  = UpperTriangle(up=[1,2,3,4], left=[1,2,3,4], right=[1,2,3,4])
-FIRST_TRIANGLE_TNSU_LEG_ORDER = UpperTriangle(up=[3,1,2,4], left=[2,4,3,1], right=[1,2,4,3])
-
-
 def _common_filename(D:int)->str:
     return f"tnsu_AFH_D={D}.dat"
 
@@ -166,32 +166,36 @@ def _load_or_compute_tnsu_network(D:int=2)->TnsuReturnType:
 
 
 def _parse_tnsu_network_to_unit_cell(D:int, tnsu_network:TnsuReturnType)->UnitCell:
-    triangle_indices = UPPER_TRIANGLES[0]
-    triangle_nodes = UpperTriangle()
+    ## Lattice:
+    kagome_lattice : KagomeLattice = KagomeLattice(N=DEFAULT_KAGOME_LATTICE_SIZE)
 
-    for corner_name in UpperTriangle.field_names():
-        #$ Get tensor:
-        tensor_index = triangle_indices[corner_name] 
-        tnsu_tensor : np.ndarray = tnsu_network.tensors[tensor_index]
 
-        # Permutation from their leg order to our:
-        our_leg_order   = FIRST_TRIANGLE_OUR_LEG_ORDER[corner_name]
-        their_leg_order = FIRST_TRIANGLE_TNSU_LEG_ORDER[corner_name]
-        permutation = [0]+[their_leg_order.index(i)+1 for i in our_leg_order]
-        our_tensor = tnsu_tensor.transpose(permutation)
-        
-        ## save in triangle:
-        triangle_nodes[corner_name] = our_tensor
+    for triangle in kagome_lattice.triangles:
+        triangle_nodes = UpperTriangle()
 
-    # unit_cell = UnitCell(A=triangle_nodes.up, B=triangle_nodes.left, C=triangle_nodes.right)
-    unit_cell = UnitCell.from_upper_triangle(triangle_nodes)
+        for corner_name in UpperTriangle.field_names():
+            #$ Get tensor:
+            node = triangle[corner_name] 
+            tnsu_tensor : np.ndarray = tnsu_network.tensors[node.index]
+
+            # # Permutation from their leg order to our:
+            # our_leg_order   = FIRST_TRIANGLE_OUR_LEG_ORDER[corner_name]
+            # their_leg_order = FIRST_TRIANGLE_TNSU_LEG_ORDER[corner_name]
+            # permutation = [0]+[their_leg_order.index(i)+1 for i in our_leg_order]
+            # our_tensor = tnsu_tensor.transpose(permutation)
+            
+            ## save in triangle:
+            triangle_nodes[corner_name] = tnsu_tensor
+
+        # unit_cell = UnitCell(A=triangle_nodes.up, B=triangle_nodes.left, C=triangle_nodes.right)
+        unit_cell = UnitCell.from_upper_triangle(triangle_nodes)
     return unit_cell
 
 
 def _kagome_afh_peps_ground_state_search(
     d_max: list = 2, 
     error: float = 1e-6,
-    size: int = 4,
+    size: int = DEFAULT_KAGOME_LATTICE_SIZE,
     max_iterations: int = 500, 
     dts: list = [0.1, 0.01, 0.001, 0.0001, 0.00001],
     plot_results: bool = True, 
