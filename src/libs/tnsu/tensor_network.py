@@ -1,7 +1,7 @@
 import numpy as np
-import pickle
 import os
 
+from utils.saveload import pickle
 
 class TensorNetwork:
     """A Tensor-Network object. Used in the field of Quantum Information and Quantum Computation"""

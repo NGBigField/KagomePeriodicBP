@@ -1,7 +1,7 @@
-from lib.tnsu.tensor_network import TensorNetwork
+from libs.tnsu.tensor_network import TensorNetwork
 from scipy import linalg
-from lib.tnsu.utils import l2
-import lib.tnsu.ncon as ncon
+from libs.tnsu.utils import l2
+import libs.tnsu.ncon as ncon
 import numpy as np
 import copy as cp
 import time

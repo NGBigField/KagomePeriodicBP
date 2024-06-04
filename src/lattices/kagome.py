@@ -16,7 +16,7 @@ from _types import EdgeIndicatorType
 from numpy import pi, cos, sin
 from utils import numerics, tuples, lists
 from dataclasses import dataclass, fields
-from typing import Generator
+from typing import Generator, Any
 
 import itertools
 import functools
@@ -62,11 +62,19 @@ class UpperTriangle:
 
     def __getitem__(self, key:str)->Node:
         match key:
-            case 'up': return self.up
-            case 'left': return self.left
+            case 'up'   : return self.up
+            case 'left' : return self.left
             case 'right': return self.right
             case _:
                 raise KeyError(f"Not a valid key {key!r}")
+            
+    def __setitem__(self, key:str, value:Any)->None:
+        match key:
+            case 'up'   : self.up    = value
+            case 'left' : self.left  = value
+            case 'right': self.right = value
+            case _: 
+                raise KeyError("Not an option")
 
     def all_nodes(self)->Generator[Node, None, None]:
         yield self.up

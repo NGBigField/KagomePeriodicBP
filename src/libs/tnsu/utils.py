@@ -1,4 +1,4 @@
-from utils.config import ALLOW_VISUALS
+from _config_reader import ALLOW_VISUALS
 if ALLOW_VISUALS:
     import matplotlib.pyplot as plt
 from os.path import join

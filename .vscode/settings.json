@@ -26,7 +26,8 @@
         "paulis",
         "PESS",
         "rdms",
-        "suptitle"
+        "suptitle",
+        "tnsu"
     ],
     "cSpell.ignoreWords": [
         "arange"

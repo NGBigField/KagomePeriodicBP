@@ -42,6 +42,10 @@ class UnitCell:
         yield UnitCellFlavor.C, self.C
 
     @staticmethod
+    def from_upper_triangle(triangle)->"UnitCell":
+        return UnitCell(A=triangle.up, B=triangle.left, C=triangle.right)
+    
+    @staticmethod
     def all_keys()->list[str]:
         return ["A", "B", "C"]
     
