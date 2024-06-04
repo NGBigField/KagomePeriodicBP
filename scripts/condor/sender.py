@@ -1,12 +1,14 @@
 import pathlib, sys, os
+if __name__ == "__main__":
+    sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
+
+    
 import numpy as np
 from copy import deepcopy
 
 # Import DictWriter class from CSV module
 from csv import DictWriter
 
-if __name__ == "__main__":
-    sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
 
 # for smart iterations:
 from itertools import product

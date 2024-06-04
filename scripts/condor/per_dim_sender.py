@@ -1,3 +1,7 @@
+import pathlib, sys
+if __name__ == "__main__":
+    sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
+
 from sender import main as main_sender
 from sender import DEFAULT_VALS
 from sys import argv
