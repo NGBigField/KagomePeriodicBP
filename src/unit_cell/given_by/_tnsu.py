@@ -12,7 +12,7 @@ from typing import TypeAlias, Callable, Any
 import functools
 from unit_cell import UnitCell
 import numpy as np
-from utils import saveload
+from utils import saveload, numpys
 
 from lattices.kagome import UpperTriangle, KagomeLattice, Node, BlockSide
 
@@ -25,7 +25,7 @@ import libs.tnsu.structure_matrix_constructor as smg
 TnsuReturnType : TypeAlias = TensorNetwork
 
 DATA_SUBFOLDER = "tnsu_results"
-DEFAULT_KAGOME_LATTICE_SIZE = 3
+DEFAULT_KAGOME_LATTICE_SIZE = 2
 
 
 # Pauli matrices
@@ -81,7 +81,6 @@ def _kagome_sm_value(
     return leg_index
     
     
-
 def _kagome_connect_boundary_edges_periodically(kagome_lattice:KagomeLattice, edge1:str, edge2:str) -> None:
     ## assert an edge at boundary:
     assert kagome_lattice.edges[edge1][0] == kagome_lattice.edges[edge1][1]
@@ -165,10 +164,18 @@ def _load_or_compute_tnsu_network(D:int=2)->TnsuReturnType:
     return tnsu_network
 
 
+def _mean_unit_cell(unit_cells:list[UnitCell]) -> UnitCell:
+    A = numpys.tensor_mean( [unit_cell.A for unit_cell in unit_cells] )
+    B = numpys.tensor_mean( [unit_cell.B for unit_cell in unit_cells] )
+    C = numpys.tensor_mean( [unit_cell.C for unit_cell in unit_cells] )
+
+    return UnitCell(A=A, B=B, C=C)
+
+
 def _parse_tnsu_network_to_unit_cell(D:int, tnsu_network:TnsuReturnType)->UnitCell:
     ## Lattice:
     kagome_lattice : KagomeLattice = KagomeLattice(N=DEFAULT_KAGOME_LATTICE_SIZE)
-
+    unit_cells : list[UnitCell] = []
 
     for triangle in kagome_lattice.triangles:
         triangle_nodes = UpperTriangle()
@@ -189,6 +196,10 @@ def _parse_tnsu_network_to_unit_cell(D:int, tnsu_network:TnsuReturnType)->UnitCe
 
         # unit_cell = UnitCell(A=triangle_nodes.up, B=triangle_nodes.left, C=triangle_nodes.right)
         unit_cell = UnitCell.from_upper_triangle(triangle_nodes)
+        unit_cells.append(unit_cell)
+
+    unit_cell = _mean_unit_cell(unit_cells)
+
     return unit_cell
 
 
