@@ -22,7 +22,7 @@ def main():
     print(f"{i}: this_func_name={this_func_name!r}")
 
     i += 1
-    D = argv[i]
+    D = int(argv[i])
     print(f"{i}: D={D!r}")
 
     i += 1  # 2
@@ -33,7 +33,10 @@ def main():
     vals['N'] = [N]
     vals['D'] = [D]
 
-    request_memory_gb = N * D 
+    ## Compute needed memory
+    request_memory_gb = 2**(D-1) 
+    request_memory_gb += N
+    request_memory_gb = int(request_memory_gb)
 
     return main_sender(
         vals=vals,

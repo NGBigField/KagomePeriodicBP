@@ -57,6 +57,8 @@ def main(
     if result_file_name is None:
         result_file_name="results_"+job_type
 
+    request_memory_gb = int(request_memory_gb)
+
     ## Get from job type:
     result_keys = RESULT_KEYS_DICT[job_type]
 
@@ -91,13 +93,15 @@ def main(
             method=method,
             seed=seed,
             job_type=job_type,
-            result_keys=_encode_list_as_str(result_keys)
+            result_keys=_encode_list_as_str(result_keys),
+            request_memory_gb=request_memory_gb
         ))
 
     ## Print:
     for params in job_params:
         params2print = deepcopy(params)
         params2print.pop("outfile")
+        params2print.pop("result_keys")
         _print_inputs(params2print, _max_str_per_key)
 
     ## Prepare output file:    

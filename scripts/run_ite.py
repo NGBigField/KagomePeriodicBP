@@ -71,14 +71,14 @@ def _get_unit_cell(D:int, get_from:str) -> UnitCell:
 
 def main(
     D = 2,
-    N = 2,
-    chi_factor : int = 1,
+    N = 4,
+    chi_factor : int = 2,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
-    unit_cell_from:str = "best"
+    unit_cell_from:str = "less frustrated D2 - 3"
 )->tuple[float, str]:
 
     unit_cell, _radom_unit_cell = _get_unit_cell(D=D, get_from=unit_cell_from)
@@ -109,7 +109,7 @@ def main(
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
     config.ite.add_gaussian_noise_fraction = 1e-5
-    config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(3, 8, 1)]
+    config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(4, 8, 1)]
     
     if _radom_unit_cell:
         config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(1, 6, 1)]

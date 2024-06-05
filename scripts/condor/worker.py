@@ -21,9 +21,12 @@ from scripts.condor import job_parallel_timing
 from scripts.condor import job_bp_convergence 
 from scripts.condor import job_ite_afm
 
+# import numpy for random matrices:
+import numpy as np
 
-NUM_EXPECTED_ARGS = 9
 
+NUM_EXPECTED_ARGS = 10
+SAFETY_BUFFER_FRACTION = 0.8  # 0.8 for safety buffer (adjust based on needs)
 
 # A main function to parse inputs:
 def main():
@@ -54,7 +57,7 @@ def main():
     D = int(argv[i])
     print(f"{i}: D={D}")
 
-    i += 1
+    i += 1  # 5
     N = int(argv[i])
     print(f"{i}: N={N}")
 
@@ -62,14 +65,21 @@ def main():
     chi = int(argv[i])
     print(f"{i}: chi={chi}")
 
-    i += 1  # 6
+    i += 1  # 7
     job_type = argv[i]
     print(f"{i}: job_type={job_type}")
 
-    i += 1  # 7
+    i += 1  # 8
     result_keys = _parse_list_of_strings(argv[i])
     print(f"{i}: result_keys={result_keys}")
 
+    i += 1  # 9
+    request_memory_gb = int(argv[i])
+    print(f"{i}: request_memory_gb={request_memory_gb}")
+
+
+    ## Force usage of requested Giga-bytes:
+    _create_random_array_by_ram(request_memory_gb)
 
     ## Run:
     results : dict[str, Any]
@@ -136,6 +146,35 @@ def _parse_list_of_strings(s:str)->list[str]:
     items = s.split(",")
     items = [_clean_item(item) for item in items]
     return items
+
+
+def _create_random_array_by_ram(ram_gb):
+    """
+    Creates a random NumPy array that utilizes the specified amount of RAM in gigabytes.
+
+    Args:
+        ram_gb (float): The amount of RAM to use in gigabytes.
+
+    Returns:
+        numpy.ndarray: The randomly generated NumPy array.
+
+    Raises:
+        ValueError: If the requested RAM usage exceeds available memory.
+    """
+    # Convert RAM to bytes and consider safety factor (adjust as needed)
+    target_bytes = ram_gb * 1024**3 * SAFETY_BUFFER_FRACTION
+
+    # Calculate element count and data type based on target size
+    element_size = np.dtype(float).itemsize  # Adjust for desired data type if needed
+    max_elements = int(target_bytes // element_size)
+
+    # Create the random array
+    array_shape = (max_elements,)  # Adjust shape as desired for multidimensional arrays
+    array = np.random.random(array_shape)
+
+    ## Do some fake calculations:
+    res1 = np.dot(array*2, array+1)
+    res2 = np.tensordot(array/2, array-1)
 
 
 if __name__ == "__main__":
