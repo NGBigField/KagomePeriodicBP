@@ -7,7 +7,7 @@ class TensorNetwork:
     """A Tensor-Network object. Used in the field of Quantum Information and Quantum Computation"""
     def __init__(self, structure_matrix: np.array = None, tensors: list = None, weights: list = None,
                  spin_dim: int = 2, virtual_dim: int = 3, dir_path='./networks',
-                 network_name='tensor_network'):
+                 network_name='tensor_network', complex_random_tensors:bool = True):
         """
         :param structure_matrix: A 2D numpy array of integers > 0, corresponds to the interconnections between tensors
          and weights in the Tensor Network.
@@ -71,7 +71,7 @@ class TensorNetwork:
                                 tensor_shape[structure_matrix[i, j]] = len(weights[j])
                             else:
                                 tensor_shape[structure_matrix[i, j]] = virtual_dim
-                    tensors[i] = np.random.normal(loc=np.ones(tensor_shape), scale=1.0)
+                    tensors[i] = _random_initial_tensor(tensor_shape, complex_random_tensors)
 
                 # generate a weights list in case didn't get one
                 if weights is None:
@@ -167,3 +167,12 @@ class TensorNetwork:
         except Exception as error:
             print(f'There was an error in loading the tensor network from path:\n {path_to_network}\n'
                   f'with the next exception:\n {error}.')
+
+
+
+def _random_initial_tensor(tensor_shape:tuple[int, ...], complex_random_tensors:bool) -> np.ndarray:
+    _rand_real = lambda: np.random.normal(loc=np.ones(tensor_shape), scale=1.0)
+    if complex_random_tensors:
+        return _rand_real() + 1j*_rand_real()
+    else:
+        return _rand_real()

@@ -25,7 +25,7 @@ import libs.tnsu.structure_matrix_constructor as smg
 TnsuReturnType : TypeAlias = TensorNetwork
 
 DATA_SUBFOLDER = "tnsu_results"
-DEFAULT_KAGOME_LATTICE_SIZE = 2
+DEFAULT_KAGOME_LATTICE_SIZE = 3
 
 
 # Pauli matrices
@@ -205,10 +205,10 @@ def _parse_tnsu_network_to_unit_cell(D:int, tnsu_network:TnsuReturnType)->UnitCe
 
 def _kagome_afh_peps_ground_state_search(
     d_max: list = 2, 
-    error: float = 1e-6,
+    error: float = 1e-7,
     size: int = DEFAULT_KAGOME_LATTICE_SIZE,
     max_iterations: int = 500, 
-    dts: list = [0.1, 0.01, 0.001, 0.0001, 0.00001],
+    dts: list = [0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001],
     plot_results: bool = True, 
     save_network: bool = False,
     print_process: bool = True
