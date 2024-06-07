@@ -1,6 +1,6 @@
 from libs.tnsu.tensor_network import TensorNetwork
 from scipy import linalg
-from libs.tnsu.utils import l2
+from libs.tnsu._utils import l2
 import libs.tnsu.ncon as ncon
 import numpy as np
 import copy as cp

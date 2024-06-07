@@ -16,7 +16,7 @@ from utils import saveload, numpys
 
 from lattices.kagome import UpperTriangle, KagomeLattice, Node, BlockSide
 
-from libs.tnsu.utils import plot_convergence_curve
+from libs.tnsu._utils import plot_convergence_curve
 from libs.tnsu.tensor_network import TensorNetwork
 import libs.tnsu.simple_update as su
 import libs.tnsu.structure_matrix_constructor as smg

@@ -1,8 +1,15 @@
+if __name__ == "__main__":
+    import sys, pathlib
+    sys.path.append(
+        pathlib.Path(__file__).parent.parent.parent.__str__()
+    )
+
+
 import numpy as np
-from tnsu.utils import plot_convergence_curve
-from tnsu.tensor_network import TensorNetwork
-import tnsu.simple_update as su
-import tnsu.structure_matrix_constructor as smg
+from libs.tnsu._utils import plot_convergence_curve
+from  tensor_network import TensorNetwork
+from libs.tnsu import simple_update as su
+from libs.tnsu import structure_matrix_constructor as smg
 
 
 def load_a_tensor_network_from_memory(network_name='AFH_10x10_obc_D_4'):
@@ -147,3 +154,8 @@ def afh_peps_ground_state_experiment(size: int = 4, bc: str = 'obc', d_max_: lis
         networks.append(afh_tn)
 
     return networks
+
+
+
+if __name__ == "__main__":
+    afh_peps_ground_state_experiment()

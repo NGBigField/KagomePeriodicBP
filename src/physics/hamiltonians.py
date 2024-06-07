@@ -1,4 +1,3 @@
-from collections.abc import Iterable
 import numpy as np
 from numpy import tensordot, zeros
 from physics.pauli import x, y, z, id
