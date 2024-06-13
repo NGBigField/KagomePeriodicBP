@@ -260,8 +260,7 @@ def _kagome_afh_peps_ground_state_search(
     size: int = 2,
     max_iterations: int = 20, 
     dts: list = [0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001],
-    plot_results: bool = True, 
-    save_network: bool = False,
+    plot_results: bool = False, 
     print_process: bool = True
 ) -> TnsuReturnType:
     """
@@ -331,6 +330,9 @@ def _kagome_afh_peps_ground_state_search(
     # run Simple Update algorithm over the Tensor Network state
     afh_tn_su.run()
 
+    # Swallow matrices into tebsors:
+    afh_tn_su.absorb_all_weights()
+
     # compute the energy per-site observable
     energy = afh_tn_su.energy_per_site()
     print(f'| D max: {D} | Energy: {energy}\n')
@@ -339,12 +341,6 @@ def _kagome_afh_peps_ground_state_search(
     # plot su convergence / energy curve
     if plot_results:
         plot_convergence_curve(afh_tn_su)
-
-    # save the tensor network
-    if save_network:
-        afh_tn.save_network()
-
-    # add to networks list
 
     return afh_tn
 

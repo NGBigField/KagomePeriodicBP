@@ -24,7 +24,7 @@ d = 2
 
 def main(
     D = 2,
-    sizes = [2, 4, 6, 8, 10],
+    sizes = [2, 3, 4, 5, 6],
 )->None:
 
     ## Config:
