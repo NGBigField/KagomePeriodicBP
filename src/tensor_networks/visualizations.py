@@ -6,7 +6,9 @@ if __name__ == "__main__":
 
 
 # for plotting:
-import matplotlib.pyplot as plt
+from _config_reader import ALLOW_VISUALS
+if ALLOW_VISUALS:
+    import matplotlib.pyplot as plt
 
 # everyone needs numpy:
 import numpy as np

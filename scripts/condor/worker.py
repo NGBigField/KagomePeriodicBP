@@ -26,7 +26,7 @@ import numpy as np
 
 
 NUM_EXPECTED_ARGS = 10
-SAFETY_BUFFER_FRACTION = 0.8  # 0.8 for safety buffer (adjust based on needs)
+SAFETY_BUFFER_FRACTION = 0.4  # safety buffer (adjust based on needs)
 
 # A main function to parse inputs:
 def main():
@@ -174,7 +174,7 @@ def _create_random_array_by_ram(ram_gb):
 
     ## Do some fake calculations:
     res1 = np.dot(array*2, array+1)
-    res2 = np.tensordot(array/2, array-1)
+    res2 = array + res1
 
 
 if __name__ == "__main__":

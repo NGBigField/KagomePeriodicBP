@@ -37,8 +37,8 @@ def constant_global_field(delta_t:float|None)->float:
 
 def _config_at_measurement(config:Config)->Config:
     config.dims.big_lattice_size += 0
-    config.bp.msg_diff_terminate /= 10
-    config.bp.allowed_retries    += 1
+    config.bp.msg_diff_terminate /= 1
+    config.bp.allowed_retries    += 0
     return config
 
 
@@ -70,15 +70,15 @@ def _get_unit_cell(D:int, get_from:str) -> UnitCell:
 
 
 def main(
-    D = 3,
+    D = 2,
     N = 2,
-    chi_factor : int = 2,
+    chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
-    unit_cell_from:str = "tnsu"
+    unit_cell_from:str = "best"
 )->tuple[float, str]:
 
     unit_cell, _radom_unit_cell = _get_unit_cell(D=D, get_from=unit_cell_from)
@@ -89,8 +89,14 @@ def main(
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
-    config.trunc_dim = int((2*D**2+10) * chi_factor)
+
     config.bp.max_swallowing_dim = int(2*D**2 * chi_factor)
+    if D<=3:
+        config.trunc_dim = int((2*D**2+10) * chi_factor)
+    else:
+        config.trunc_dim = int((D**2) * chi_factor)
+
+
     config.bp.damping = damping
     config.bp.parallel_msgs = parallel
     config.bp.msg_diff_terminate = 1e-12
