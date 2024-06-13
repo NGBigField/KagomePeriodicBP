@@ -24,7 +24,7 @@ d = 2
 
 def main(
     D = 2,
-    sizes = [2, 3, 4, 5, 6],
+    sizes = range(2, 30),
 )->None:
 
     ## Config:
@@ -59,6 +59,8 @@ def main(
 
 
 def _per_size(D:int, size:int, config:Config):
+
+    config.dims.big_lattice_size = size
 
     ## Get tnsu results:
     unit_cell = given_by.tnsu(D=D, size=size)
