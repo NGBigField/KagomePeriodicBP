@@ -57,7 +57,7 @@ def main(
     if result_file_name is None:
         result_file_name="results_"+job_type
 
-    request_memory_gb = int(request_memory_gb)
+    request_memory_gb = _legit_memory_sizes(request_memory_gb)
 
     ## Get from job type:
     result_keys = RESULT_KEYS_DICT[job_type]
@@ -159,6 +159,15 @@ def _random_letters(num:int)->str:
     for _ in range(num):
         s += random.choice(string.ascii_letters)
     return s
+
+
+def _legit_memory_sizes(request_memory_gb:int) -> int:
+    request_memory_gb = int(request_memory_gb)
+    for x in range(10):
+        if request_memory_gb <= 2**x:
+            return 2**x
+    raise ValueError(f"request_memory_gb={request_memory_gb}. Not a legit value!")
+
 
 if __name__=="__main__":
     main()
