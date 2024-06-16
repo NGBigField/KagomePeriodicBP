@@ -42,7 +42,7 @@ DEFAULT_VALS['chi'] = [4]
 DEFAULT_VALS['method'] = [5]
 DEFAULT_VALS['seed'] = [6]
 
-Arguments = '$(outfile) $(seed) $(method) $(D) $(N) $(chi) $(job_type) $(result_keys)'
+Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(result_keys)'
 
 
 def main(
@@ -91,12 +91,12 @@ def main(
         job_params_dicts.append( {
             "outfile"       : results_fullpath,                 # outfile
             "job_type"      : job_type,                         # job_type
+            "req_mem_gb"    : req_ram_mem_gb,                   # req_ram_mem_gb
             "seed"          : seed,                             # seed
             "method"        : method,                           # method
             "D"             : D,                                # D
             "N"             : N,                                # N
             "chi"           : chi,                              # chi
-            "mem"           : req_ram_mem_gb,                   # req_ram_mem_gb
             "result_keys"   : _encode_list_as_str(result_keys)  # result_keys
         })
 

@@ -11,7 +11,7 @@ import _import_scripts
 # Import DictWriter class from CSV module
 from time import perf_counter, sleep
 from csv import DictWriter
-from typing import Any
+from typing import Any, Generator
 
 from src.utils import errors
 
@@ -20,6 +20,9 @@ from scripts.condor import job_bp
 from scripts.condor import job_parallel_timing 
 from scripts.condor import job_bp_convergence 
 from scripts.condor import job_ite_afm
+
+from scripts.condor.sender import Arguments
+
 
 # import numpy for random matrices:
 import numpy as np
@@ -48,37 +51,36 @@ def main():
     print(f"{i}: output_file={output_file!r}")
 
     i += 1  # 2
-    seed = int(argv[i])
-    print(f"{i}: seed={seed}")
-
-    i += 1  # 3
-    method = int(argv[i])
-    print(f"{i}: method={method}")
-
-    i += 1  # 4
-    D = int(argv[i])
-    print(f"{i}: D={D}")
-
-    i += 1  # 5
-    N = int(argv[i])
-    print(f"{i}: N={N}")
-
-    i += 1  # 6
-    chi = int(argv[i])
-    print(f"{i}: chi={chi}")
-
-    i += 1  # 7
     job_type = argv[i]
     print(f"{i}: job_type={job_type}")
 
-    i += 1  # 8
-    result_keys = _parse_list_of_strings(argv[i])
-    print(f"{i}: result_keys={result_keys}")
-
-    i += 1  # 9
+    i += 1  # 3
     req_mem_gb = int(argv[i])
     print(f"{i}: req_mem_gb={req_mem_gb}")
 
+    i += 1  # 4
+    seed = int(argv[i])
+    print(f"{i}: seed={seed}")
+
+    i += 1  # 5
+    method = int(argv[i])
+    print(f"{i}: method={method}")
+
+    i += 1  # 6
+    D = int(argv[i])
+    print(f"{i}: D={D}")
+
+    i += 1  # 7
+    N = int(argv[i])
+    print(f"{i}: N={N}")
+
+    i += 1  # 8
+    chi = int(argv[i])
+    print(f"{i}: chi={chi}")
+
+    i += 1  # 9
+    result_keys = _parse_list_of_strings(argv[i])
+    print(f"{i}: result_keys={result_keys}")
 
 
     ## Force usage of requested Giga-bytes:
@@ -132,9 +134,6 @@ def main():
 
 
 
-def _get_keys_from_sender()->list[str]:
-    from scripts.condor.sender import result_keys
-    return result_keys
 
 def _clean_item(s:str)->str:
     s = s.replace(" ", "")
