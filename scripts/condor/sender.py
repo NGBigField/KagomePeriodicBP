@@ -15,14 +15,16 @@ from itertools import product
 
 import string
 import random
-
+import time
 
 from src import project_paths
+
 
 results_dir = project_paths.data/"condor"
 results_dir = results_dir.__str__()
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
+
 
 
 LOCAL_TEST = False
@@ -70,7 +72,7 @@ def main(
     #
     worker_script_fullpath = this_folder_path+sep+"worker.py"
     results_fullpath       = results_dir+sep+result_file_name+".csv"
-    output_files_prefix    = "kagome-bp-"+job_type+"-"+_random_letters(3)
+    output_files_prefix    = "kagome-bp-"+job_type+"-"+_time_stamp()
     #
     print(f"script_fullpath={worker_script_fullpath!r}")
     print(f"results_fullpath={results_fullpath!r}")
@@ -171,6 +173,10 @@ def _print_inputs(inputs:dict[str, str], _max_str_per_key:dict[str, int])->None:
     total_string = total_string.removesuffix(",")
     print(total_string)
         
+
+def _time_stamp():
+    t = time.localtime()
+    return f"{t.tm_year}.{t.tm_mon:02}.{t.tm_mday:02}_{t.tm_hour:02}.{t.tm_min:02}.{t.tm_sec:02}"
 
 def _random_letters(num:int)->str:
     s = ""
