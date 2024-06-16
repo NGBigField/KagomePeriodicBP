@@ -48,7 +48,7 @@ Arguments = '$(outfile) $(seed) $(method) $(D) $(N) $(chi) $(job_type) $(result_
 def main(
     job_type="ite_afm",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
     request_cpus:int=1,
-    request_memory_gb:int=16,
+    request_memory_gb:int=4,
     vals:dict=DEFAULT_VALS,
     result_file_name:str|None=None
 ):
@@ -89,22 +89,22 @@ def main(
         req_ram_mem_gb=f"{request_memory_gb}"
 
         job_params_dicts.append( {
-            "a1" : results_fullpath,                 # outfile
-            "a2" : job_type,                         # job_type
-            "a3" : seed,                             # seed
-            "a4" : method,                           # method
-            "a5" : D,                                # D
-            "a6" : N,                                # N
-            "a7" : chi,                              # chi
-            "a8" : req_ram_mem_gb,                   # req_ram_mem_gb
-            "a9" : _encode_list_as_str(result_keys)  # result_keys
+            "outfile"       : results_fullpath,                 # outfile
+            "job_type"      : job_type,                         # job_type
+            "seed"          : seed,                             # seed
+            "method"        : method,                           # method
+            "D"             : D,                                # D
+            "N"             : N,                                # N
+            "chi"           : chi,                              # chi
+            "req_ram_mem_gb": req_ram_mem_gb,                   # req_ram_mem_gb
+            "result_keys"   : _encode_list_as_str(result_keys)  # result_keys
         })
 
     ## Print:
     for params in job_params_dicts:
         params2print = deepcopy(params)
-        params2print.pop("a1")
-        params2print.pop("a9")
+        params2print.pop("outfile")
+        params2print.pop("result_keys")
         _print_inputs(params2print, _max_str_per_key)
 
     ## Prepare output file:    

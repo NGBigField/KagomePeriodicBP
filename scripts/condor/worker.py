@@ -37,7 +37,7 @@ def main():
         f"Expected {NUM_EXPECTED_ARGS} arguments. Got {len(argv)}."
 
     ## Parse args:
-    print(f"The {NUM_EXPECTED_ARGS} arguments are:")
+    print(f"The {len(argv)} arguments are:")
 
     i = 0  # 0
     this_func_name = argv[i]
