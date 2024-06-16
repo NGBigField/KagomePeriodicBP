@@ -86,7 +86,7 @@ def main(
         method = f"{method}"
         seed = f"{seed}"
         chi = f"{chi}"
-        req_ram_mem_gb=f"{request_memory_gb}"
+        req_ram_mem_gb = f"{request_memory_gb}"
 
         job_params_dicts.append( {
             "outfile"       : results_fullpath,                 # outfile
@@ -96,7 +96,7 @@ def main(
             "D"             : D,                                # D
             "N"             : N,                                # N
             "chi"           : chi,                              # chi
-            "req_mem"       : req_ram_mem_gb,                   # req_ram_mem_gb
+            "mem"           : req_ram_mem_gb,                   # req_ram_mem_gb
             "result_keys"   : _encode_list_as_str(result_keys)  # result_keys
         })
 
@@ -150,7 +150,7 @@ def _encode_list_as_str(lis:list)->str:
 
 def _print_inputs(inputs:dict[str, str], _max_str_per_key:dict[str, int])->None:
 
-    exceptions = ["outfile", "result_keys"]
+    exceptions = {"outfile", "result_keys"}
 
     total_string = ""
     for key, value in inputs.items():
@@ -165,7 +165,9 @@ def _print_inputs(inputs:dict[str, str], _max_str_per_key:dict[str, int])->None:
             pad_length = max_length-crnt_length
             if pad_length>0:
                 s = " "*pad_length + s
+
         total_string += " " + f"{key!r}: " + s + ","
+
     total_string = total_string.removesuffix(",")
     print(total_string)
         
