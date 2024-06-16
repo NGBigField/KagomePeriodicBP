@@ -38,7 +38,7 @@ RESULT_KEYS_DICT = dict(
 DEFAULT_VALS = {}
 DEFAULT_VALS['N'] = [2] 
 DEFAULT_VALS['D'] = [3]
-DEFAULT_VALS['chi'] = [1]
+DEFAULT_VALS['chi'] = [1, 2]
 DEFAULT_VALS['method'] = [1]
 DEFAULT_VALS['seed'] = [0]
 
