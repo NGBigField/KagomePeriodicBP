@@ -32,7 +32,7 @@ SAFETY_BUFFER_FRACTION = 0.4  # safety buffer (adjust based on needs)
 def main():
 
     ## Check function call:
-    assert len(argv)==NUM_EXPECTED_ARGS, f"Expected {NUM_EXPECTED_ARGS} arguments. Got {len(argv)}."
+    # assert len(argv)==NUM_EXPECTED_ARGS, f"Expected {NUM_EXPECTED_ARGS} arguments. Got {len(argv)}."
 
     ## Parse args:
     print(f"The {NUM_EXPECTED_ARGS} arguments are:")

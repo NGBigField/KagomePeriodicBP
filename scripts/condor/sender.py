@@ -67,9 +67,9 @@ def main(
     sep = os.sep
     this_folder_path = pathlib.Path(__file__).parent.__str__()
     #
-    worker_script_fullpath  = this_folder_path+sep+"worker.py"
-    results_fullpath        = results_dir+sep+result_file_name+".csv"
-    output_files_prefix     = "kagome-bp-"+job_type+"-"+_random_letters(3)
+    worker_script_fullpath = this_folder_path+sep+"worker.py"
+    results_fullpath       = results_dir+sep+result_file_name+".csv"
+    output_files_prefix    = "kagome-bp-"+job_type+"-"+_random_letters(3)
     #
     print(f"script_fullpath={worker_script_fullpath!r}")
     print(f"results_fullpath={results_fullpath!r}")
@@ -94,7 +94,7 @@ def main(
             method=method,
             seed=seed,
             job_type=job_type,
-            req_memory_in_gb=f"{request_memory_gb}",
+            req_ram_mem_gb=f"{request_memory_gb}",
             result_keys=_encode_list_as_str(result_keys)
         ))
 

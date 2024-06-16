@@ -28,8 +28,8 @@
                 "2",  //N
                 "1",  //chi
                 "ite_afm",  //job_type
-                "[seed,D,N,chi,iterations,num_tensors,energy,exec_time]",  //result_keys
                 "2",  //req_mem_gb
+                "[seed,D,N,chi,iterations,num_tensors,energy,exec_time]"  //result_keys
             ]
         }
     ]
