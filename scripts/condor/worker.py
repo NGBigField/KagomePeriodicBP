@@ -9,7 +9,7 @@ from sys import argv
 import _import_scripts
 
 # Import DictWriter class from CSV module
-from time import perf_counter
+from time import perf_counter, sleep
 from csv import DictWriter
 from typing import Any
 
@@ -173,8 +173,10 @@ def _create_random_array_by_ram(ram_gb):
     array = np.random.random(array_shape)
 
     ## Do some fake calculations:
-    res1 = np.dot(array*2, array+1)
-    res2 = array + res1
+    array = np.dot(array*2, array+1)
+    array = array + (array/2 - 1)
+    sleep(1)
+    del array
 
 
 if __name__ == "__main__":
