@@ -88,23 +88,23 @@ def main(
         chi = f"{chi}"
         req_ram_mem_gb=f"{request_memory_gb}"
 
-        job_params_dicts.append( dict(
-            outfile=results_fullpath,   # 1
-            job_type=job_type,          # 2
-            seed=seed,                  # 3
-            method=method,              # 4
-            D=D,                        # 5
-            N=N,                        # 6
-            chi=chi,                    # 7
-            req_ram_mem_gb=req_ram_mem_gb,
-            result_keys=_encode_list_as_str(result_keys)
-        ))
+        job_params_dicts.append( {
+            "a1" : results_fullpath,                 # outfile
+            "a2" : job_type,                         # job_type
+            "a3" : seed,                             # seed
+            "a4" : method,                           # method
+            "a5" : D,                                # D
+            "a6" : N,                                # N
+            "a7" : chi,                              # chi
+            "a8" : req_ram_mem_gb,                   # req_ram_mem_gb
+            "a9" : _encode_list_as_str(result_keys)  # result_keys
+        })
 
     ## Print:
     for params in job_params_dicts:
         params2print = deepcopy(params)
-        params2print.pop("outfile")
-        params2print.pop("result_keys")
+        params2print.pop("a1")
+        params2print.pop("a9")
         _print_inputs(params2print, _max_str_per_key)
 
     ## Prepare output file:    
@@ -122,18 +122,6 @@ def main(
     print(f"    Arguments={Arguments}")
 
 
-    # _dict = job_params_dicts[0]
-    # for i, (key, val) in enumerate(_dict.items()):
-    #     print(f"{i}: ", key, val)
-
-    job_params_lists = []
-    for _dict in job_params_dicts:
-        _list = []
-        for key, val in _dict.items():
-            _list.append(val)
-        job_params_lists.append(_list)
-
-
     if LOCAL_TEST:
         import subprocess
         for params_dict in job_params_dicts:
@@ -145,8 +133,7 @@ def main(
         CondorJobSender.send_batch_of_jobs_to_condor(
             worker_script_fullpath,
             output_files_prefix,
-            # job_params_dicts,
-            job_params_lists,
+            job_params_dicts,
             request_cpus=f"{request_cpus}",
             requestMemory=f"{request_memory_gb}gb",
             # requestMemory=f"{request_memory_bytes}",
