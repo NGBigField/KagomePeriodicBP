@@ -36,11 +36,11 @@ RESULT_KEYS_DICT = dict(
 
 ## all values:
 DEFAULT_VALS = {}
-DEFAULT_VALS['N'] = [3] 
-DEFAULT_VALS['D'] = [2, 3]
-DEFAULT_VALS['chi'] = [1, 2]
-DEFAULT_VALS['method'] = [1]
-DEFAULT_VALS['seed'] = range(1)
+DEFAULT_VALS['N'] = [2] 
+DEFAULT_VALS['D'] = [3]
+DEFAULT_VALS['chi'] = [4]
+DEFAULT_VALS['method'] = [5]
+DEFAULT_VALS['seed'] = [6]
 
 Arguments = '$(outfile) $(seed) $(method) $(D) $(N) $(chi) $(job_type) $(result_keys)'
 

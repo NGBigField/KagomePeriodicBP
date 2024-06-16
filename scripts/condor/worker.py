@@ -46,34 +46,34 @@ def main():
     i += 1  # 1
     output_file = argv[i]
     print(f"{i}: output_file={output_file!r}")
-    
-    i += 1  # 2
-    job_type = argv[i]
-    print(f"{i}: job_type={job_type}")
 
-    i += 1  # 3
+    i += 1  # 2
     seed = int(argv[i])
     print(f"{i}: seed={seed}")
 
-    i += 1  # 4
+    i += 1  # 3
     method = int(argv[i])
     print(f"{i}: method={method}")
 
-    i += 1  # 5
+    i += 1  # 4
     D = int(argv[i])
     print(f"{i}: D={D}")
 
-    i += 1  # 6
+    i += 1  # 5
     N = int(argv[i])
     print(f"{i}: N={N}")
 
-    i += 1  # 7
+    i += 1  # 6
     chi = int(argv[i])
     print(f"{i}: chi={chi}")
 
-    i += 1  # 8
+    i += 1  # 7
     req_mem_gb = int(argv[i])
     print(f"{i}: req_mem_gb={req_mem_gb}")
+
+    i += 1  # 8
+    job_type = argv[i]
+    print(f"{i}: job_type={job_type}")
 
     i += 1  # 9
     result_keys = _parse_list_of_strings(argv[i])
