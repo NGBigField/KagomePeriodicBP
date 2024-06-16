@@ -43,7 +43,7 @@ def main():
     this_func_name = argv[i]
     print(f"{i}: this_func_name={this_func_name!r}")
 
-    i += 1
+    i += 1  # 1
     output_file = argv[i]
     print(f"{i}: output_file={output_file!r}")
     

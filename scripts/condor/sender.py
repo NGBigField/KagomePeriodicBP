@@ -96,16 +96,13 @@ def main(
             "D"             : D,                                # D
             "N"             : N,                                # N
             "chi"           : chi,                              # chi
-            "req_ram_mem_gb": req_ram_mem_gb,                   # req_ram_mem_gb
+            "req_mem"       : req_ram_mem_gb,                   # req_ram_mem_gb
             "result_keys"   : _encode_list_as_str(result_keys)  # result_keys
         })
 
     ## Print:
     for params in job_params_dicts:
-        params2print = deepcopy(params)
-        params2print.pop("outfile")
-        params2print.pop("result_keys")
-        _print_inputs(params2print, _max_str_per_key)
+        _print_inputs(params, _max_str_per_key)
 
     ## Prepare output file:    
     with open( results_fullpath ,'a') as f:        
@@ -152,9 +149,16 @@ def _encode_list_as_str(lis:list)->str:
 
 
 def _print_inputs(inputs:dict[str, str], _max_str_per_key:dict[str, int])->None:
+
+    exceptions = ["outfile", "result_keys"]
+
     total_string = ""
     for key, value in inputs.items():
         s = f"{value}"
+        if key in exceptions:
+            total_string += " " + f"{key!r}: " + f"()" + ","
+            continue
+
         if key in _max_str_per_key:
             max_length = _max_str_per_key[key]
             crnt_length = len(f"{value}")
