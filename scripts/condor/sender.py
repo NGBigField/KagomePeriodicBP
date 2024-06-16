@@ -37,7 +37,7 @@ RESULT_KEYS_DICT = dict(
 DEFAULT_VALS = {}
 DEFAULT_VALS['N'] = [3, 5] 
 DEFAULT_VALS['D'] = [2, 3, 4]
-DEFAULT_VALS['chi'] = [1, 2, 3]
+DEFAULT_VALS['chi'] = [1, 2]
 DEFAULT_VALS['method'] = [1]
 DEFAULT_VALS['seed'] = range(1)
 
@@ -46,18 +46,19 @@ Arguments = '$(outfile) $(seed) $(method) $(D) $(N) $(chi) $(job_type) $(result_
 
 def main(
     job_type="ite_afm",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
-    request_cpus:int=2,
+    request_cpus:int=1,
     request_memory_gb:int=16,
     vals:dict=DEFAULT_VALS,
     result_file_name:str|None=None
 ):
 
-    ## Check inputs and 
+    ## Check inputs and fix:
     _max_str_per_key = {key:max((len(str(val)) for val in lis)) for key, lis in vals.items()}
     if result_file_name is None:
         result_file_name="results_"+job_type
-
+    # Memory:
     request_memory_gb = _legit_memory_sizes(request_memory_gb)
+    request_memory_bytes = 1073741824 * request_memory_gb
 
     ## Get from job type:
     result_keys = RESULT_KEYS_DICT[job_type]
@@ -94,7 +95,7 @@ def main(
             seed=seed,
             job_type=job_type,
             result_keys=_encode_list_as_str(result_keys),
-            request_memory_gb=f"{request_memory_gb}"
+            req_mem_gb=f"{request_memory_gb}"
         ))
 
     ## Print:
@@ -115,6 +116,7 @@ def main(
     print(f"    output_files_prefix={output_files_prefix}")
     print(f"    request_cpus={request_cpus}")
     print(f"    requestMemory={request_memory_gb}gb")
+    print(f"    requestMemory={request_memory_bytes}-bytes")
     print(f"    Arguments={Arguments}")
 
     import CondorJobSender
@@ -124,6 +126,7 @@ def main(
         job_params,
         request_cpus=f"{request_cpus}",
         requestMemory=f"{request_memory_gb}gb",
+        # requestMemory=f"{request_memory_bytes}",
         Arguments=Arguments
     )
 

@@ -74,12 +74,12 @@ def main():
     print(f"{i}: result_keys={result_keys}")
 
     i += 1  # 9
-    request_memory_gb = int(argv[i])
-    print(f"{i}: request_memory_gb={request_memory_gb}")
+    req_mem_gb = int(argv[i])
+    print(f"{i}: req_mem_gb={req_mem_gb}")
 
 
     ## Force usage of requested Giga-bytes:
-    _create_random_array_by_ram(request_memory_gb)
+    _create_random_array_by_ram(req_mem_gb)
 
     ## Run:
     results : dict[str, Any]

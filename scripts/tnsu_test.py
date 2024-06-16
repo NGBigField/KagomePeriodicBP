@@ -5,7 +5,7 @@ from containers import Config
 from unit_cell import UnitCell, given_by
 
 from utils import strings
-from utils.visuals import AppendablePlot
+from utils.visuals import AppendablePlot, save_figure
 from typing import Iterable
 
 
@@ -24,7 +24,7 @@ d = 2
 
 def main(
     D = 2,
-    sizes = range(2, 30),
+    sizes = range(2, 20),
 )->None:
 
     ## Config:
@@ -45,20 +45,27 @@ def main(
     ## Increase size for unsu, measure TN and add to plot:
     for size in sizes:
         ## Get unsu result:
-        expectations, energies = _per_size(D=D, size=size, config=config)
+        expectations, energies = _per_size_get_energies(D=D, size=size, config=config)
 
-        ## Measure
-        expectation_plot.append(**{key:(size, val) for key, val in expectations.items()})
-        mean_energy = np.mean([val for val in energies.values()])
-        energies_plot.append(mean=(size, mean_energy))
-        for edge_tuple, energy in energies.items():
-            edge_name = f"({edge_tuple[0]},{edge_tuple[1]})"
-            energies_plot.append(**{edge_name:(size, energy)}, plt_kwargs=dict(alpha=0.5, marker="+"))
+        ## Measure and update plots
+        _log_and_update(size=size, expectation_plot=expectation_plot, energies_plot=energies_plot, expectations=expectations, energies=energies)
 
     print("Done")
 
 
-def _per_size(D:int, size:int, config:Config):
+def _log_and_update(size:int, expectation_plot:AppendablePlot, energies_plot:AppendablePlot, expectations, energies)->None:
+    expectation_plot.append(**{key:(size, val) for key, val in expectations.items()})
+    mean_energy = np.mean([val for val in energies.values()])
+    energies_plot.append(mean=(size, mean_energy))
+    for edge_tuple, energy in energies.items():
+        edge_name = f"({edge_tuple[0]},{edge_tuple[1]})"
+        energies_plot.append(**{edge_name:(size, energy)}, plt_kwargs=dict(alpha=0.5, marker="+"))
+
+    save_figure(expectation_plot.fig, file_name=f"Expectation-size={size}")
+    save_figure(energies_plot.fig, file_name=f"Energies-size={size}")
+
+
+def _per_size_get_energies(D:int, size:int, config:Config):
 
     config.dims.big_lattice_size = size
 
