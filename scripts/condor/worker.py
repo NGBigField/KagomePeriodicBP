@@ -163,6 +163,9 @@ def _create_random_array_by_ram(ram_gb):
     Raises:
         ValueError: If the requested RAM usage exceeds available memory.
     """
+
+    print(f"Writing trash memory of up to {ram_gb}gb")
+
     # Convert RAM to bytes and consider safety factor (adjust as needed)
     target_bytes = ram_gb * 1024**3 * SAFETY_BUFFER_FRACTION
 
@@ -170,15 +173,22 @@ def _create_random_array_by_ram(ram_gb):
     element_size = np.dtype(float).itemsize  # Adjust for desired data type if needed
     max_elements = int(target_bytes // element_size)
 
-    # Create the random array
-    array_shape = (max_elements,)  # Adjust shape as desired for multidimensional arrays
-    array = np.random.random(array_shape)
+    for i, num_elements in enumerate(np.linspace(10, max_elements, 10)):
 
-    ## Do some fake calculations:
-    array = np.dot(array*2, array+1)
-    array = array + (array/2 - 1)
-    sleep(1)
-    del array
+        num_elements = int(num_elements)
+        print(f"    {i+1}/10: Writing trash memory with {num_elements} element")
+
+        # Create the random array
+        array_shape = (num_elements,)  # Adjust shape as desired for multidimensional arrays
+        array = np.random.random(array_shape)
+
+        ## Do some fake calculations:
+        array = np.dot(array*2, array+1)
+        array = array + (array/2 - 1)
+        sleep(1)
+        del array
+    
+    print("    Done writing trash memory")
 
 
 if __name__ == "__main__":
