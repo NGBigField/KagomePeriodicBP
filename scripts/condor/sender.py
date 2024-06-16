@@ -78,7 +78,7 @@ def main(
     print(f"job_type={job_type!r}")
 
     ## Define job params:
-    job_params : list[dict] = []
+    job_params_dicts : list[dict] = []
     for N, D, method, seed, chi in product(vals['N'], vals['D'], vals['method'], vals['seed'], vals['chi'] ):
         # To strings:
         N = f"{N}"
@@ -88,7 +88,7 @@ def main(
         chi = f"{chi}"
         req_ram_mem_gb=f"{request_memory_gb}"
 
-        job_params.append( dict(
+        job_params_dicts.append( dict(
             outfile=results_fullpath,   # 1
             job_type=job_type,          # 2
             seed=seed,                  # 3
@@ -101,7 +101,7 @@ def main(
         ))
 
     ## Print:
-    for params in job_params:
+    for params in job_params_dicts:
         params2print = deepcopy(params)
         params2print.pop("outfile")
         params2print.pop("result_keys")
@@ -122,9 +122,21 @@ def main(
     print(f"    Arguments={Arguments}")
 
 
+    # _dict = job_params_dicts[0]
+    # for i, (key, val) in enumerate(_dict.items()):
+    #     print(f"{i}: ", key, val)
+
+    job_params_lists = []
+    for _dict in job_params_dicts:
+        _list = []
+        for key, val in _dict.items():
+            _list.append(val)
+        job_params_lists.append(_list)
+
+
     if LOCAL_TEST:
         import subprocess
-        for params_dict in job_params:
+        for params_dict in job_params_dicts:
             args = ["python", worker_script_fullpath] + list(params_dict.values())
             subprocess.run(args)
 
@@ -133,7 +145,8 @@ def main(
         CondorJobSender.send_batch_of_jobs_to_condor(
             worker_script_fullpath,
             output_files_prefix,
-            job_params,
+            # job_params_dicts,
+            job_params_lists,
             request_cpus=f"{request_cpus}",
             requestMemory=f"{request_memory_gb}gb",
             # requestMemory=f"{request_memory_bytes}",
