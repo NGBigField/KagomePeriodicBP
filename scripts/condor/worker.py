@@ -68,12 +68,12 @@ def main():
     print(f"{i}: chi={chi}")
 
     i += 1  # 7
-    req_mem_gb = int(argv[i])
-    print(f"{i}: req_mem_gb={req_mem_gb}")
-
-    i += 1  # 8
     job_type = argv[i]
     print(f"{i}: job_type={job_type}")
+
+    i += 1  # 8
+    req_mem_gb = int(argv[i])
+    print(f"{i}: req_mem_gb={req_mem_gb}")
 
     i += 1  # 9
     result_keys = _parse_list_of_strings(argv[i])

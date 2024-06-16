@@ -48,7 +48,7 @@ Arguments = '$(outfile) $(seed) $(method) $(D) $(N) $(chi) $(job_type) $(result_
 def main(
     job_type="ite_afm",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
     request_cpus:int=1,
-    request_memory_gb:int=4,
+    request_memory_gb:int=8,
     vals:dict=DEFAULT_VALS,
     result_file_name:str|None=None
 ):
