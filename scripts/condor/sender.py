@@ -38,9 +38,9 @@ RESULT_KEYS_DICT = dict(
 DEFAULT_VALS = {}
 DEFAULT_VALS['N'] = [2] 
 DEFAULT_VALS['D'] = [3]
-DEFAULT_VALS['chi'] = [4]
-DEFAULT_VALS['method'] = [5]
-DEFAULT_VALS['seed'] = [6]
+DEFAULT_VALS['chi'] = [1]
+DEFAULT_VALS['method'] = [1]
+DEFAULT_VALS['seed'] = [0]
 
 Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(result_keys)'
 

@@ -56,11 +56,11 @@ def _get_unit_cell(D:int, get_from:str) -> UnitCell:
         case "best":
             unit_cell = UnitCell.load_best(D=D)
             if unit_cell is None:
-                is_random = True
-                unit_cell = UnitCell.random(d=d, D=D)
+                return _get_unit_cell(D=D, get_from="tnsu")
 
         case "tnsu":
-            unit_cell = given_by.tnsu(D=D)
+            is_random = True
+            unit_cell = given_by.tnsu(D=D, size=4)
 
         case _:
             unit_cell = UnitCell.load(get_from)
@@ -90,11 +90,12 @@ def main(
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
 
-    config.bp.max_swallowing_dim = int(2*D**2 * chi_factor)
     if D<=3:
         config.trunc_dim = int((2*D**2+10) * chi_factor)
+        config.bp.max_swallowing_dim = int((2*D**2) * chi_factor)
     else:
-        config.trunc_dim = int((D**2) * chi_factor)
+        config.trunc_dim = int((2*D**2) * chi_factor)
+        config.bp.max_swallowing_dim = int((D**2) * chi_factor)
 
 
     config.bp.damping = damping
@@ -118,7 +119,7 @@ def main(
     config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(3, 8, 1)]
     
     if _radom_unit_cell:
-        config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(1, 6, 1)]
+        config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(2, 6, 1)]
 
     # Interaction:
     match hamiltonian: 
