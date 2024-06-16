@@ -31,6 +31,17 @@
                 "2",  //req_mem_gb
                 "[seed,D,N,chi,iterations,num_tensors,energy,exec_time]"  //result_keys
             ]
+        },
+        {
+            "name": "Python: Test per_dim_sender",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "6", "2"
+            ]
         }
     ]
 }
