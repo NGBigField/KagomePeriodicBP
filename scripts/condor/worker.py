@@ -70,12 +70,12 @@ def main():
     print(f"{i}: job_type={job_type}")
 
     i += 1  # 8
-    result_keys = _parse_list_of_strings(argv[i])
-    print(f"{i}: result_keys={result_keys}")
-
-    i += 1  # 9
     req_mem_gb = int(argv[i])
     print(f"{i}: req_mem_gb={req_mem_gb}")
+
+    i += 1  # 9
+    result_keys = _parse_list_of_strings(argv[i])
+    print(f"{i}: result_keys={result_keys}")
 
 
     ## Force usage of requested Giga-bytes:

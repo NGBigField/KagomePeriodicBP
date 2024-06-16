@@ -94,8 +94,8 @@ def main(
             method=method,
             seed=seed,
             job_type=job_type,
-            result_keys=_encode_list_as_str(result_keys),
-            req_mem_gb=f"{request_memory_gb}"
+            req_memory_in_gb=f"{request_memory_gb}",
+            result_keys=_encode_list_as_str(result_keys)
         ))
 
     ## Print:
