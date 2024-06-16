@@ -13,7 +13,6 @@ from csv import DictWriter
 # for smart iterations:
 from itertools import product
 
-
 import string
 import random
 
@@ -25,6 +24,8 @@ results_dir = results_dir.__str__()
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
 
+
+LOCAL_TEST = False
 
 RESULT_KEYS_DICT = dict(
     bp = ["with_bp", 'D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'],
@@ -85,16 +86,17 @@ def main(
         method = f"{method}"
         seed = f"{seed}"
         chi = f"{chi}"
+        req_ram_mem_gb=f"{request_memory_gb}"
 
         job_params.append( dict(
-            outfile=results_fullpath,
-            D=D,
-            N=N,
-            chi=chi,
-            method=method,
-            seed=seed,
-            job_type=job_type,
-            req_ram_mem_gb=f"{request_memory_gb}",
+            outfile=results_fullpath,   # 1
+            job_type=job_type,          # 2
+            seed=seed,                  # 3
+            method=method,              # 4
+            D=D,                        # 5
+            N=N,                        # 6
+            chi=chi,                    # 7
+            req_ram_mem_gb=req_ram_mem_gb,
             result_keys=_encode_list_as_str(result_keys)
         ))
 
@@ -119,18 +121,25 @@ def main(
     print(f"    requestMemory={request_memory_bytes}-bytes")
     print(f"    Arguments={Arguments}")
 
-    import CondorJobSender
-    CondorJobSender.send_batch_of_jobs_to_condor(
-        worker_script_fullpath,
-        output_files_prefix,
-        job_params,
-        request_cpus=f"{request_cpus}",
-        requestMemory=f"{request_memory_gb}gb",
-        # requestMemory=f"{request_memory_bytes}",
-        Arguments=Arguments
-    )
 
-    print("Called condor successfully")
+    if LOCAL_TEST:
+        import subprocess
+        for params_dict in job_params:
+            args = ["python", worker_script_fullpath] + list(params_dict.values())
+            subprocess.run(args)
+
+    else:
+        import CondorJobSender
+        CondorJobSender.send_batch_of_jobs_to_condor(
+            worker_script_fullpath,
+            output_files_prefix,
+            job_params,
+            request_cpus=f"{request_cpus}",
+            requestMemory=f"{request_memory_gb}gb",
+            # requestMemory=f"{request_memory_bytes}",
+            Arguments=Arguments
+        )
+        print("Called condor successfully")
 
 
 def _encode_list_as_str(lis:list)->str:

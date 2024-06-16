@@ -33,6 +33,8 @@ def main():
 
     ## Check function call:
     # assert len(argv)==NUM_EXPECTED_ARGS, f"Expected {NUM_EXPECTED_ARGS} arguments. Got {len(argv)}."
+    if len(argv)!=NUM_EXPECTED_ARGS: 
+        f"Expected {NUM_EXPECTED_ARGS} arguments. Got {len(argv)}."
 
     ## Parse args:
     print(f"The {NUM_EXPECTED_ARGS} arguments are:")
@@ -44,30 +46,30 @@ def main():
     i += 1
     output_file = argv[i]
     print(f"{i}: output_file={output_file!r}")
-
+    
     i += 1  # 2
+    job_type = argv[i]
+    print(f"{i}: job_type={job_type}")
+
+    i += 1  # 3
     seed = int(argv[i])
     print(f"{i}: seed={seed}")
 
-    i += 1  # 3
+    i += 1  # 4
     method = int(argv[i])
     print(f"{i}: method={method}")
 
-    i += 1  # 4
+    i += 1  # 5
     D = int(argv[i])
     print(f"{i}: D={D}")
 
-    i += 1  # 5
+    i += 1  # 6
     N = int(argv[i])
     print(f"{i}: N={N}")
 
-    i += 1
+    i += 1  # 7
     chi = int(argv[i])
     print(f"{i}: chi={chi}")
-
-    i += 1  # 7
-    job_type = argv[i]
-    print(f"{i}: job_type={job_type}")
 
     i += 1  # 8
     req_mem_gb = int(argv[i])
