@@ -34,8 +34,14 @@ def main():
     vals['D'] = [D]
 
     ## Compute needed memory
-    request_memory_gb = (1.9)**(D-1) 
-    request_memory_gb += N
+    match D:
+        case [2,3]:
+            request_memory_gb = 4
+        case 4:
+            request_memory_gb = 8 
+        case [5,6]:
+            request_memory_gb = 16 
+    # request_memory_gb += N
     request_memory_gb = int(request_memory_gb)
     print(f"request_memory_gb: {request_memory_gb}gb")
 

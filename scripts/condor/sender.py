@@ -26,7 +26,7 @@ if not os.path.exists(results_dir):
     os.makedirs(results_dir)
 
 
-
+RAM_MEMORY_IN_2_EXPONENTS = False
 LOCAL_TEST = False
 
 RESULT_KEYS_DICT = dict(
@@ -187,10 +187,15 @@ def _random_letters(num:int)->str:
 
 def _legit_memory_sizes(request_memory_gb:int) -> int:
     request_memory_gb = int(request_memory_gb)
-    for x in range(10):
-        if request_memory_gb <= 2**x:
-            return 2**x
-    raise ValueError(f"request_memory_gb={request_memory_gb}. Not a legit value!")
+
+    if RAM_MEMORY_IN_2_EXPONENTS:
+        for x in range(10):
+            if request_memory_gb <= 2**x:
+                return 2**x
+        raise ValueError(f"request_memory_gb={request_memory_gb}. Not a legit value!")
+    
+    else:
+        return request_memory_gb
 
 
 if __name__=="__main__":
