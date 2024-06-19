@@ -49,16 +49,20 @@ def _get_unit_cell(D:int, get_from:str) -> UnitCell:
         case "random":
             unit_cell = UnitCell.random(d=d, D=D)
             is_random = True
+            print("Got unit_cell as a random tensors")
 
         case "last":
             unit_cell = UnitCell.load("last")
+            print("Got unit_cell from last result")
 
         case "best":
             unit_cell = UnitCell.load_best(D=D)
             if unit_cell is None:
                 return _get_unit_cell(D=D, get_from="tnsu")
+            print("Got unit_cell as the previous best.")
 
         case "tnsu":
+            print("Get unit_cell by simple-update:")
             is_random = True
             unit_cell = given_by.tnsu(D=D, size=3)
 
@@ -116,7 +120,7 @@ def main(
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
     config.ite.add_gaussian_noise_fraction = 1e-5
-    config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(3, 8, 1)]
+    config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(4, 8, 1)]
     
     if _radom_unit_cell:
         config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(2, 6, 1)]
