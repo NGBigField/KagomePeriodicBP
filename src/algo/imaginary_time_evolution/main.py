@@ -613,7 +613,6 @@ def ite_per_delta_t(
     # track "best" unit-cell:
     best_results = SegmentResults(unit_cell=unit_cell, messages=messages, energy=np.inf, stats=segment_stats)
 
-
     ## Perform ITE for all repetitions of this delta_t: 
     for i in range(num_repeats):
         prog_bar.next(extra_str=f"mean-energy={segment_stats.mean_energy}")
@@ -669,8 +668,8 @@ def full_ite(
     )
 
     ## Calculate observables of starting core:
-    # if config.visuals.live_plots: 
-    _compute_and_plot_zero_iteration_(unit_cell, config, logger, ite_tracker, plots)
+    if config.visuals.live_plots: 
+        _compute_and_plot_zero_iteration_(unit_cell, config, logger, ite_tracker, plots)
 
     ## Repetitively perform ITE algo:
     delta_t_list_with_repetitions = list(lists.repeated_items(config.ite.time_steps))
