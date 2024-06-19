@@ -25,7 +25,7 @@ import libs.tnsu.structure_matrix_constructor as smg
 
 TnsuReturnType : TypeAlias = TensorNetwork
 DATA_SUBFOLDER = "tnsu_results"
-PBC = True  # Periodic Boundary Conditions (if False Open Boundary Conditions)
+PBC = False  # Periodic Boundary Conditions (if False Open Boundary Conditions)
 
 
 
@@ -38,7 +38,7 @@ pauli_z = np.array([[1, 0],
                     [0, -1]])
 
 
-_KAGOME_STRUCTURE_MATRIX  =  np.array(
+_FIXED_KAGOME_STRUCTURE_MATRIX  =  np.array(
     [[1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # T1
      [0, 0, 0, 0, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # T2
      [0, 0, 0, 0, 1, 0, 0, 0, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # T3
@@ -55,15 +55,15 @@ _KAGOME_STRUCTURE_MATRIX  =  np.array(
 # Taken from Jahromi, Saeed S., and Román Orús. "Universal tensor-network algorithm for any infinite lattice." Physical Review B 99.19 (2019): 195105.
 
 
-# UPPER_TRIANGLES : list[UpperTriangle] = [
-#     UpperTriangle(up=0, left= 3, right= 4),
-#     UpperTriangle(up=6, left= 9, right=10),
-#     UpperTriangle(up=7, left=11, right= 8),
-#     UpperTriangle(up=1, left=5 , right= 2),
-# ]
+_FIXED_KAGOME_UPPER_TRIANGLES : list[UpperTriangle] = [
+    UpperTriangle(up=0, left= 3, right= 4),
+    UpperTriangle(up=6, left= 9, right=10),
+    UpperTriangle(up=7, left=11, right= 8),
+    UpperTriangle(up=1, left=5 , right= 2),
+]
 
-# FIRST_TRIANGLE_OUR_LEG_ORDER  = UpperTriangle(up=[1,2,3,4], left=[1,2,3,4], right=[1,2,3,4])
-# FIRST_TRIANGLE_TNSU_LEG_ORDER = UpperTriangle(up=[3,1,2,4], left=[2,4,3,1], right=[1,2,4,3])
+_FIXED_KAGOME_FIRST_TRIANGLE_OUR_LEG_ORDER  = UpperTriangle(up=[1,2,3,4], left=[1,2,3,4], right=[1,2,3,4])
+_FIXED_KAGOME_FIRST_TRIANGLE_TNSU_LEG_ORDER = UpperTriangle(up=[3,1,2,4], left=[2,4,3,1], right=[1,2,4,3])
 
 
 def _kagome_sm_value(
@@ -221,12 +221,21 @@ def _mean_unit_cell(unit_cells:list[UnitCell]) -> UnitCell:
     return UnitCell(A=A, B=B, C=C)
 
 
-def _parse_tnsu_network_to_unit_cell(D:int, size:int, tnsu_network:TnsuReturnType)->UnitCell:
-    ## Lattice:
-    kagome_lattice : KagomeLattice = KagomeLattice(N=size)
-    unit_cells : list[UnitCell] = []
 
-    triangles_to_include = kagome_lattice.triangles if PBC else [kagome_lattice.get_center_triangle()]
+def _parse_tnsu_network_to_unit_cell_get_triangles(size:int)->list[UpperTriangle]:
+    if size==0:
+        first_triangle_indices = _FIXED_KAGOME_UPPER_TRIANGLES[0]
+
+    else:
+        ## Lattice:
+        kagome_lattice : KagomeLattice = KagomeLattice(N=size)
+        triangles_to_include = kagome_lattice.triangles if PBC else [kagome_lattice.get_center_triangle()]
+        return triangles_to_include
+
+def _parse_tnsu_network_to_unit_cell(D:int, size:int, tnsu_network:TnsuReturnType)->UnitCell:
+
+    triangles_to_include = _parse_tnsu_network_to_unit_cell_get_triangles(size=size)
+    unit_cells : list[UnitCell] = []
 
     for triangle in triangles_to_include:
         triangle_nodes = UpperTriangle()
@@ -258,7 +267,7 @@ def _kagome_afh_peps_ground_state_search(
     D: list = 2, 
     error: float = 1e-6,
     size: int = 2,
-    max_iterations: int = 500, 
+    max_iterations: int = 2000, 
     dts: list = [0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001],
     plot_results: bool = False, 
     print_process: bool = True
@@ -294,7 +303,10 @@ def _kagome_afh_peps_ground_state_search(
     s_k = [pauli_x / 2.]
 
     # structure matrix:
-    structure_matrix = _kagome_structure_matrix(size=size)
+    if size == 0:
+        structure_matrix = _FIXED_KAGOME_STRUCTURE_MATRIX
+    else:
+        structure_matrix = _kagome_structure_matrix(size=size)
 
     print(f'There are {structure_matrix.shape[1]} edges, and {structure_matrix.shape[0]} tensors.')
 

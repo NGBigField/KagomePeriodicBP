@@ -24,7 +24,7 @@ d = 2
 
 def main(
     D = 2,
-    sizes = range(2, 20),
+    sizes = [0]+list(range(2, 8)),
 )->None:
 
     ## Config:
