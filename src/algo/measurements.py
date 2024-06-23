@@ -173,7 +173,7 @@ def measure_energies_and_observables_together(
 )->tuple[
     dict[tuple[str, str], float],  # energies
     UnitCellExpectationValuesDict,  # expectations
-    dict[tuple[str, str], float]  # entangelment
+    dict[tuple[str, str], float]  # entanglement
 ]:
     ## Prepare outputs and check inputs:
     # inputs:
@@ -186,7 +186,7 @@ def measure_energies_and_observables_together(
 
     # outputs:
     energies = dict()
-    entangelment = dict()
+    entanglement = dict()
     expectations = {
         abc : { xyz : _ValueAndCount() for xyz in ['x', 'y', 'z'] } 
         for abc in ['A', 'B', 'C']
@@ -206,7 +206,7 @@ def measure_energies_and_observables_together(
 
         # keep energies:
         energies[edge_tuple.as_strings] = edge_energy
-        entangelment[edge_tuple.as_strings] = edge_negativity
+        entanglement[edge_tuple.as_strings] = edge_negativity
 
         # Calc expectations:
         per_edge_results = expectation_values_with_rdm(rdm, force_real=force_real)
@@ -227,7 +227,7 @@ def measure_energies_and_observables_together(
             # override value, count tuple with mean:
             expectations[abc][xyz] = sum_/count_  
     
-    return energies, expectations, entangelment
+    return energies, expectations, entanglement
 
 
 def _measurements_everything_on_duplicated_core_specific_size(

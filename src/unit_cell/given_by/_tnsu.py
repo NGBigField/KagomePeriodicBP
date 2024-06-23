@@ -223,14 +223,13 @@ def _mean_unit_cell(unit_cells:list[UnitCell]) -> UnitCell:
 
 
 def _parse_tnsu_network_to_unit_cell_get_triangles(size:int)->list[UpperTriangle]:
-    if size==0:
-        first_triangle_indices = _FIXED_KAGOME_UPPER_TRIANGLES[0]
+    kagome_lattice : KagomeLattice = KagomeLattice(N=size)
+    # if PBC:
+    #     return kagome_lattice.triangles
+    # else:
+    #     return [kagome_lattice.get_center_triangle()]
+    return [kagome_lattice.get_center_triangle()]
 
-    else:
-        ## Lattice:
-        kagome_lattice : KagomeLattice = KagomeLattice(N=size)
-        triangles_to_include = kagome_lattice.triangles if PBC else [kagome_lattice.get_center_triangle()]
-        return triangles_to_include
 
 def _parse_tnsu_network_to_unit_cell(D:int, size:int, tnsu_network:TnsuReturnType)->UnitCell:
 
@@ -238,7 +237,7 @@ def _parse_tnsu_network_to_unit_cell(D:int, size:int, tnsu_network:TnsuReturnTyp
     unit_cells : list[UnitCell] = []
 
     for triangle in triangles_to_include:
-        triangle_nodes = UpperTriangle()
+        triangle_tensors = UpperTriangle()
 
         for corner_name in UpperTriangle.field_names():
             #$ Get tensor:
@@ -252,10 +251,10 @@ def _parse_tnsu_network_to_unit_cell(D:int, size:int, tnsu_network:TnsuReturnTyp
             # our_tensor = tnsu_tensor.transpose(permutation)
             
             ## save in triangle:
-            triangle_nodes[corner_name] = tnsu_tensor
+            triangle_tensors[corner_name] = tnsu_tensor
 
         # unit_cell = UnitCell(A=triangle_nodes.up, B=triangle_nodes.left, C=triangle_nodes.right)
-        unit_cell = UnitCell.from_upper_triangle(triangle_nodes)
+        unit_cell = UnitCell.from_upper_triangle(triangle_tensors)
         unit_cells.append(unit_cell)
 
     unit_cell = _mean_unit_cell(unit_cells)
@@ -291,7 +290,6 @@ def _kagome_afh_peps_ground_state_search(
     """
 
     ## Basic params and inputs:
-    bc: str = 'obc'  #  bc should be in ["obc", "pbc"]
     dir_path: str = saveload.DATA_FOLDER + saveload.PATH_SEP + DATA_SUBFOLDER
     h_k: float = 0.
 

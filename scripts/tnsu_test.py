@@ -4,7 +4,7 @@ import _import_src  ## Needed to import src folders when scripts are called from
 from containers import Config
 from unit_cell import UnitCell, given_by
 
-from utils import strings
+from utils import strings, csvs
 from utils.visuals import AppendablePlot, save_figure
 from typing import Iterable
 
@@ -24,7 +24,7 @@ d = 2
 
 def main(
     D = 2,
-    sizes = [0]+list(range(2, 8)),
+    sizes = list(range(2, 8)),
 )->None:
 
     ## Config:
@@ -36,36 +36,43 @@ def main(
     ## Prepare plots:
     expectation_plot = AppendablePlot()    
     energies_plot = AppendablePlot()    
-    for plot in [expectation_plot, energies_plot]:
+    mean_energy_plot = AppendablePlot()    
+    for plot in [expectation_plot, energies_plot, mean_energy_plot]:
         plot.axis.grid("on")
         plot.axis.set_xlabel("N")
     expectation_plot.axis.set_title("Expectation Values")
     energies_plot.axis.set_title("Energies")
 
-    ## Increase size for unsu, measure TN and add to plot:
+    table = csvs.CSVManager(columns=["N", "energy", "x", "y", "z"])
+
+    ## Increase size for tnsu, measure TN and add to plot:
     for size in sizes:
         ## Get unsu result:
-        expectations, energies = _per_size_get_energies(D=D, size=size, config=config)
+        expectations, energies = _per_size_get_measurements(D=D, size=size, config=config)
 
         ## Measure and update plots
-        _log_and_update(size=size, expectation_plot=expectation_plot, energies_plot=energies_plot, expectations=expectations, energies=energies)
+        _log_and_update(size=size, table=table, expectation_plot=expectation_plot, energies_plot=energies_plot,  mean_energy_plot=mean_energy_plot, expectations=expectations, energies=energies)
 
     print("Done")
 
 
-def _log_and_update(size:int, expectation_plot:AppendablePlot, energies_plot:AppendablePlot, expectations, energies)->None:
+def _log_and_update(size:int, table:csvs.CSVManager, expectation_plot:AppendablePlot, energies_plot:AppendablePlot, mean_energy_plot:AppendablePlot, expectations, energies)->None:
     expectation_plot.append(**{key:(size, val) for key, val in expectations.items()})
     mean_energy = np.mean([val for val in energies.values()])
     energies_plot.append(mean=(size, mean_energy))
+    mean_energy_plot.append(mean=(size, mean_energy))
     for edge_tuple, energy in energies.items():
         edge_name = f"({edge_tuple[0]},{edge_tuple[1]})"
         energies_plot.append(**{edge_name:(size, energy)}, plt_kwargs=dict(alpha=0.5, marker="+"))
 
     save_figure(expectation_plot.fig, file_name=f"Expectation-size={size}")
     save_figure(energies_plot.fig, file_name=f"Energies-size={size}")
+    save_figure(mean_energy_plot.fig, file_name=f"Energies-Mean-size={size}")
+
+    table.append([size, mean_energy, expectations["x"], expectations["y"], expectations["z"] ])
 
 
-def _per_size_get_energies(D:int, size:int, config:Config):
+def _per_size_get_measurements(D:int, size:int, config:Config):
 
     config.dims.big_lattice_size = size
 
@@ -77,7 +84,7 @@ def _per_size_get_energies(D:int, size:int, config:Config):
     _, _ = robust_belief_propagation(full_tn, None, config.bp)
 
     ## Calculate observables:
-    energies, expectations, mean_energy = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
+    energies, expectations, entanglement = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
     expectations = mean_expectation_values(expectations)
 
     return expectations, energies
