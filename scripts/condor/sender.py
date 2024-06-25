@@ -152,7 +152,7 @@ def _encode_list_as_str(lis:list)->str:
 
 def _print_inputs(inputs:dict[str, str], _max_str_per_key:dict[str, int])->None:
 
-    exceptions = {"outfile", "result_keys"}
+    exceptions = {"outfile", "result_keys", "req_mem_gb"}
 
     total_string = ""
     for key, value in inputs.items():
