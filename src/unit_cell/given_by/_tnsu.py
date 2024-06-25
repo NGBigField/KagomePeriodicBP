@@ -25,7 +25,7 @@ import libs.tnsu.structure_matrix_constructor as smg
 
 TnsuReturnType : TypeAlias = TensorNetwork
 DATA_SUBFOLDER = "tnsu_results"
-PBC = False  # Periodic Boundary Conditions (if False Open Boundary Conditions)
+PBC = True  # Periodic Boundary Conditions (if False Open Boundary Conditions)
 
 
 
@@ -64,6 +64,15 @@ _FIXED_KAGOME_UPPER_TRIANGLES : list[UpperTriangle] = [
 
 _FIXED_KAGOME_FIRST_TRIANGLE_OUR_LEG_ORDER  = UpperTriangle(up=[1,2,3,4], left=[1,2,3,4], right=[1,2,3,4])
 _FIXED_KAGOME_FIRST_TRIANGLE_TNSU_LEG_ORDER = UpperTriangle(up=[3,1,2,4], left=[2,4,3,1], right=[1,2,4,3])
+
+
+
+_SINGLE_PERIODIC_CELL_STRUCTURE_MATRIX = np.array([
+    [1, 2, 3, 4, 0, 0],   # A
+    [0, 4, 0, 2, 1, 3],   # B
+    [3, 0, 1, 0, 4, 2],   # C
+]) #E0 E1 E2 E3 E4 E5
+# Taken from Nir Gutman's thesis. 
 
 
 def _kagome_sm_value(
@@ -193,8 +202,16 @@ def _kagome_structure_matrix(size:int) -> np.ndarray:
     return sm
 
 
+@functools.cache
+def _periodicity_str()->str:
+    if PBC:
+        return "PBC"
+    else:
+        return "OBC"
+
 def _common_filename(D:int, size:int)->str:
-    return f"tnsu_AFH_D={D}_size={size}.dat"
+    name = f"tnsu_AFH_D={D}_size={size}_{_periodicity_str()}.dat"
+    return name
 
 
 def load_or_compute_tnsu_unit_cell(D:int=2, size:int=2)->UnitCell:
@@ -231,8 +248,7 @@ def _parse_tnsu_network_to_unit_cell_get_triangles(size:int)->list[UpperTriangle
     return [kagome_lattice.get_center_triangle()]
 
 
-def _parse_tnsu_network_to_unit_cell(D:int, size:int, tnsu_network:TnsuReturnType)->UnitCell:
-
+def _parse_tnsu_network_to_unit_cell_canonical_form(D:int, size:int, tnsu_network:TnsuReturnType)->UnitCell:
     triangles_to_include = _parse_tnsu_network_to_unit_cell_get_triangles(size=size)
     unit_cells : list[UnitCell] = []
 
@@ -258,16 +274,35 @@ def _parse_tnsu_network_to_unit_cell(D:int, size:int, tnsu_network:TnsuReturnTyp
         unit_cells.append(unit_cell)
 
     unit_cell = _mean_unit_cell(unit_cells)
-
     return unit_cell
+
+
+def _parse_tnsu_network_to_unit_cell_single_periodic_single_cell(D:int, tnsu_network:TnsuReturnType)->UnitCell:
+    return UnitCell(
+        A=tnsu_network.tensors[0],
+        B=tnsu_network.tensors[1],
+        C=tnsu_network.tensors[2],
+    )
+
+
+def _parse_tnsu_network_to_unit_cell(D:int, size:int, tnsu_network:TnsuReturnType)->UnitCell:
+
+    if size>=2:
+        return _parse_tnsu_network_to_unit_cell_canonical_form(D=D, size=size, tnsu_network=tnsu_network)
+    
+    elif size==1 and PBC:
+        return _parse_tnsu_network_to_unit_cell_single_periodic_single_cell(D=D, tnsu_network=tnsu_network)
+    
+    elif size==0:
+        raise NotImplementedError("Not yet implemented. size==0 might perhaps be for Roman Orus's version")
 
 
 def _kagome_afh_peps_ground_state_search(
     D: list = 2, 
-    error: float = 1e-6,
+    error: float = 1e-7,
     size: int = 2,
-    max_iterations: int = 2000, 
-    dts: list = [0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001],
+    max_iterations: int = 3000, 
+    dts: list = [0.2, 0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001],
     plot_results: bool = False, 
     print_process: bool = True
 ) -> TnsuReturnType:
@@ -303,6 +338,8 @@ def _kagome_afh_peps_ground_state_search(
     # structure matrix:
     if size == 0:
         structure_matrix = _FIXED_KAGOME_STRUCTURE_MATRIX
+    if size == 1:
+        structure_matrix = _SINGLE_PERIODIC_CELL_STRUCTURE_MATRIX
     else:
         structure_matrix = _kagome_structure_matrix(size=size)
 
