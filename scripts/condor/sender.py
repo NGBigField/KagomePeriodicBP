@@ -152,12 +152,16 @@ def _encode_list_as_str(lis:list)->str:
 
 def _print_inputs(inputs:dict[str, str], _max_str_per_key:dict[str, int])->None:
 
-    exceptions = {"outfile", "result_keys", "req_mem_gb"}
+    expections_reduce = {"outfile", "result_keys"}
+    expections_ommit = {"req_mem_gb"}
 
     total_string = ""
     for key, value in inputs.items():
+        if key in expections_ommit:
+            continue
+
         s = f"{value}"
-        if key in exceptions:
+        if key in expections_reduce:
             total_string += " " + f"{key!r}: " + f"()" + ","
             continue
 
