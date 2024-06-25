@@ -23,12 +23,12 @@
             "args": [
                 "results_test.csv",  //output-file
                 "ite_afm",  //job_type
-                "1",  //seed
-                "0",  //method
+                "2",  //req_mem_gb
+                "0",  //seed
+                "1",  //method
                 "2",  //D
                 "2",  //N
                 "1",  //chi
-                "2",  //req_mem_gb
                 "[seed,D,N,chi,iterations,num_tensors,energy,exec_time]"  //result_keys
             ]
         },

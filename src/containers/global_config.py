@@ -32,14 +32,21 @@ class Config(_StoreConfigClasses, _ConfigClass):
 
     @staticmethod
     def derive_from_physical_dim(D:int)->"Config":
-        return Config(
-            bp=BPConfig(max_swallowing_dim=D**2),
+
+        config = Config(
+            bp=BPConfig(max_swallowing_dim=2*D**2),
             ite=ITEConfig(),
             iterative_process=IterativeProcessConfig(),
             dims=TNDimensions(virtual_dim=D),
             visuals=VisualsConfig(),
             trunc_dim=2*D**2+10
         )
+
+        if D>3:
+            config.bp.max_swallowing_dim = D**2
+            config.trunc_dim = 2*D**2
+
+        return config
 
     def post_creation_fix(self):
         self.__post_init__()

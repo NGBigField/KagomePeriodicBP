@@ -64,7 +64,7 @@ def _get_unit_cell(D:int, get_from:str) -> UnitCell:
         case "tnsu":
             print("Get unit_cell by simple-update:")
             is_random = True
-            unit_cell = given_by.tnsu(D=D, size=3)
+            unit_cell = given_by.tnsu(D=D)
 
         case _:
             unit_cell = UnitCell.load(get_from)
@@ -78,12 +78,18 @@ def main(
     N = 2,
     chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
+    progress_bar:bool=True,
     results_filename:str = strings.time_stamp()+"_"+strings.random(4),
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
     unit_cell_from:str = "best"
 )->tuple[float, str]:
+
+
+    assert N>=2
+    assert D>0
+    assert chi_factor>0
 
     unit_cell, _radom_unit_cell = _get_unit_cell(D=D, get_from=unit_cell_from)
     results_filename += f"_D={D}_N={N}"
@@ -93,17 +99,14 @@ def main(
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
-
-    if D<=3:
-        config.trunc_dim = int((2*D**2+10) * chi_factor)
-        config.bp.max_swallowing_dim = int((2*D**2) * chi_factor)
-    else:
-        config.trunc_dim = int((2*D**2) * chi_factor)
-        config.bp.max_swallowing_dim = int((D**2) * chi_factor)
-
-
+    config.visuals.progress_bars = progress_bar
     config.bp.damping = damping
     config.bp.parallel_msgs = parallel
+
+    # Chi factor:
+    config.trunc_dim = int(config.trunc_dim*chi_factor)
+    config.bp.max_swallowing_dim = int(config.bp.max_swallowing_dim*chi_factor)
+
     config.bp.msg_diff_terminate = 1e-12
     config.bp.msg_diff_good_enough = 1e-5
     config.bp.times_to_deem_failure_when_diff_increases = 4
@@ -123,7 +126,7 @@ def main(
     config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(4, 8, 1)]
     
     if _radom_unit_cell:
-        config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(2, 6, 1)]
+        config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(2, 8, 1)]
 
     # Interaction:
     match hamiltonian: 

@@ -220,7 +220,7 @@ def load_or_compute_tnsu_unit_cell(D:int=2, size:int=2)->UnitCell:
     return unit_cell
 
 
-def _load_or_compute_tnsu_network(D:int=2, size:int=2)->TnsuReturnType:
+def _load_or_compute_tnsu_network(D:int=2, size:int=1)->TnsuReturnType:
     filename = _common_filename(D=D, size=size)
     if saveload.exist(filename, sub_folder=DATA_SUBFOLDER):
         tnsu_network = saveload.load(filename, sub_folder=DATA_SUBFOLDER)
@@ -300,7 +300,7 @@ def _parse_tnsu_network_to_unit_cell(D:int, size:int, tnsu_network:TnsuReturnTyp
 def _kagome_afh_peps_ground_state_search(
     D: list = 2, 
     error: float = 1e-7,
-    size: int = 2,
+    size: int = 1,
     max_iterations: int = 3000, 
     dts: list = [0.2, 0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001],
     plot_results: bool = False, 

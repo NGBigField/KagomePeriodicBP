@@ -29,7 +29,11 @@ def main(
         results_filename += f"_{seed}"
 
     ## Run:
-    energy, unit_cell_file_path = run_ite(N=N, D=D, chi_factor=chi_factor, live_plots=False, parallel=False, results_filename=results_filename)
+    energy, unit_cell_file_path = run_ite(
+        N=N, D=D, chi_factor=chi_factor, 
+        live_plots=False, parallel=False, progress_bar=False,
+        results_filename=results_filename
+    )
     
     # Expected outputs: 
     # ["seed","D", "N", "energy", "path"]
