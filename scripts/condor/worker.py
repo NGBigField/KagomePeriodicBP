@@ -29,7 +29,7 @@ import numpy as np
 
 
 NUM_EXPECTED_ARGS = 10
-SAFETY_BUFFER_FRACTION = 0.4  # safety buffer (adjust based on needs)
+SAFETY_BUFFER_FRACTION = 0.8  # safety buffer (adjust based on needs)
 
 # A main function to parse inputs:
 def main():
