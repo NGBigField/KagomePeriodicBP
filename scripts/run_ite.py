@@ -42,7 +42,7 @@ def _config_at_measurement(config:Config)->Config:
     return config
 
 
-def _get_unit_cell(D:int, get_from:str) -> UnitCell:
+def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
     is_random = False
 
     match get_from:
@@ -79,7 +79,7 @@ def main(
     chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     progress_bar:bool=True,
-    results_filename:str = strings.time_stamp()+"_"+strings.random(4),
+    results_filename:str|None = None,
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
@@ -91,8 +91,10 @@ def main(
     assert D>0
     assert chi_factor>0
 
+    if results_filename is None:
+        results_filename = strings.time_stamp()+"_"+strings.random(4)+f"_D={D}_N={N}"
+
     unit_cell, _radom_unit_cell = _get_unit_cell(D=D, get_from=unit_cell_from)
-    results_filename += f"_D={D}_N={N}"
     unit_cell.set_filename(results_filename) 
 
     ## Config:
