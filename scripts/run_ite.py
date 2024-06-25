@@ -74,7 +74,7 @@ def _get_unit_cell(D:int, get_from:str) -> UnitCell:
 
 
 def main(
-    D = 2,
+    D = 5,
     N = 2,
     chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],

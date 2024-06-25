@@ -34,6 +34,8 @@ SAFETY_BUFFER_FRACTION = 0.4  # safety buffer (adjust based on needs)
 # A main function to parse inputs:
 def main():
 
+    print("\n"*3)
+
     ## Check function call:
     # assert len(argv)==NUM_EXPECTED_ARGS, f"Expected {NUM_EXPECTED_ARGS} arguments. Got {len(argv)}."
     if len(argv)!=NUM_EXPECTED_ARGS: 

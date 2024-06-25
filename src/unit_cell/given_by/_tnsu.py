@@ -214,7 +214,7 @@ def _common_filename(D:int, size:int)->str:
     return name
 
 
-def load_or_compute_tnsu_unit_cell(D:int=2, size:int=2)->UnitCell:
+def load_or_compute_tnsu_unit_cell(D:int=2, size:int=1)->UnitCell:
     tnsu_network = _load_or_compute_tnsu_network(D=D, size=size)
     unit_cell = _parse_tnsu_network_to_unit_cell(D=D, size=size, tnsu_network=tnsu_network)
     return unit_cell
