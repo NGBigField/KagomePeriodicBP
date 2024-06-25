@@ -61,7 +61,7 @@ def main(
         result_file_name="results_"+job_type
     # Memory:
     request_memory_gb = _legit_memory_sizes(request_memory_gb)
-    request_memory_bytes = 1073741824 * request_memory_gb
+    # request_memory_bytes = 1073741824 * request_memory_gb
 
     ## Get from job type:
     result_keys = RESULT_KEYS_DICT[job_type]
@@ -117,7 +117,7 @@ def main(
     print(f"    output_files_prefix={output_files_prefix}")
     print(f"    request_cpus={request_cpus}")
     print(f"    requestMemory={request_memory_gb}gb")
-    print(f"    requestMemory={request_memory_bytes}-bytes")
+    # print(f"    requestMemory={request_memory_bytes}-bytes")
     print(f"    Arguments={Arguments}")
 
 

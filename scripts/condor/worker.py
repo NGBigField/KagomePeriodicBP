@@ -152,7 +152,7 @@ def _parse_list_of_strings(s:str)->list[str]:
     return items
 
 
-def _create_random_array_by_ram(ram_gb):
+def _create_random_array_by_ram(ram_gb, print_each_step:bool=False):
     """
     Creates a random NumPy array that utilizes the specified amount of RAM in gigabytes.
 
@@ -178,7 +178,9 @@ def _create_random_array_by_ram(ram_gb):
     for i, num_elements in enumerate(np.linspace(10, max_elements, 10)):
 
         num_elements = int(num_elements)
-        print(f"    {i+1}/10: Writing trash memory with {num_elements} element")
+        
+        if print_each_step:
+            print(f"    {i+1}/10: Writing trash memory with {num_elements} element")
 
         # Create the random array
         array_shape = (num_elements,)  # Adjust shape as desired for multidimensional arrays
