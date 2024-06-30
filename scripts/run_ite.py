@@ -124,11 +124,12 @@ def main(
     config.ite.normalize_tensors_after_update = True
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
-    config.ite.add_gaussian_noise_fraction = 1e-5
-    config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(4, 8, 1)]
-    
-    if _radom_unit_cell:
+    config.ite.add_gaussian_noise_fraction = 1e-6
+
+    if D>4:
         config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(2, 8, 1)]
+    else:
+        config.ite.time_steps = [[np.power(10, -float(exp))]*150 for exp in np.arange(4, 8, 1)]
 
     # Interaction:
     match hamiltonian: 
