@@ -49,7 +49,7 @@ def infinite_structure_matrix_dict(name: str):
     return structure_matrix[name]
 
 
-def square_peps_pbc(side: np.int):
+def square_peps_pbc(side: int):
     """
     Creates a structure matrix of a square lattice Tensor network with periodic boundary conditions (pbc)
     of shape (side, side). The total number of tensors in the network would be side^2.
@@ -72,7 +72,7 @@ def square_peps_pbc(side: np.int):
     return structure_matrix
 
 
-def rectangular_peps_obc(height: np.int, width: np.int):
+def rectangular_peps_obc(height: int, width: int):
     """
     Creates a structure matrix of a rectangular lattice tensor network with open (non-periodic) boundary
     conditions (obc) of shape (height x width). The total number of tensors in the network would be height x width.
@@ -90,7 +90,7 @@ def rectangular_peps_obc(height: np.int, width: np.int):
                 edge_list.append((i, j, 4, i + 1, j, 2))
             if j < width - 1:
                 edge_list.append((i, j, 3, i, j + 1, 1))
-    structure_matrix = np.zeros(shape=[height * width, len(edge_list)], dtype=np.int)
+    structure_matrix = np.zeros(shape=[height * width, len(edge_list)], dtype=int)
 
     # fill in the structure matrix
     for edge_idx, edge in enumerate(edge_list):

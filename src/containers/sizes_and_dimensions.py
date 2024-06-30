@@ -6,7 +6,7 @@ from containers._meta import _ConfigClass
 class TNDimensions(_ConfigClass): 
     physical_dim : int = 2      # sometimes called `d` 
     virtual_dim : int = 3       # sometimes called `D`
-    big_lattice_size : int = 3  # sometimes called `N`
+    big_lattice_size : int = 2  # sometimes called `N`
                 
     def __repr__(self) -> str:
         return super().__repr__()

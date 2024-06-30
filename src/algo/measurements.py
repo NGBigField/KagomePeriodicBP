@@ -67,6 +67,7 @@ H : np.matrix = np.matrix(
 Z : np.matrix = pauli.z
 
 
+DEFAULT_USING_ROTATION_METHOD_FOR_EXPECTATIONS = False
 MULTIPROCESSING = False
 
 TensorNetworkType = TypeVar("TensorNetworkType", bound=TensorNetwork)
@@ -172,7 +173,7 @@ def measure_energies_and_observables_together(
 )->tuple[
     dict[tuple[str, str], float],  # energies
     UnitCellExpectationValuesDict,  # expectations
-    dict[tuple[str, str], float]  # entangelment
+    dict[tuple[str, str], float]  # entanglement
 ]:
     ## Prepare outputs and check inputs:
     # inputs:
@@ -185,7 +186,7 @@ def measure_energies_and_observables_together(
 
     # outputs:
     energies = dict()
-    entangelment = dict()
+    entanglement = dict()
     expectations = {
         abc : { xyz : _ValueAndCount() for xyz in ['x', 'y', 'z'] } 
         for abc in ['A', 'B', 'C']
@@ -205,7 +206,7 @@ def measure_energies_and_observables_together(
 
         # keep energies:
         energies[edge_tuple.as_strings] = edge_energy
-        entangelment[edge_tuple.as_strings] = edge_negativity
+        entanglement[edge_tuple.as_strings] = edge_negativity
 
         # Calc expectations:
         per_edge_results = expectation_values_with_rdm(rdm, force_real=force_real)
@@ -226,7 +227,7 @@ def measure_energies_and_observables_together(
             # override value, count tuple with mean:
             expectations[abc][xyz] = sum_/count_  
     
-    return energies, expectations, entangelment
+    return energies, expectations, entanglement
 
 
 def _measurements_everything_on_duplicated_core_specific_size(
@@ -577,7 +578,10 @@ def _rotate_rdm(rho:np.matrix, pauli_name:str)->np.matrix:
             raise ValueError("Not an option")
 
 
-def _calc_rdm_projection_in_axis(rho:np.matrix, pauli_name:str, force_real:bool=False, using_rotation_method:bool=False)->complex|float:
+def _calc_rdm_projection_in_axis(
+    rho:np.matrix, pauli_name:str, force_real:bool=False, 
+    using_rotation_method:bool=DEFAULT_USING_ROTATION_METHOD_FOR_EXPECTATIONS
+)->complex|float:
 
     ## Calculate:
     if using_rotation_method:

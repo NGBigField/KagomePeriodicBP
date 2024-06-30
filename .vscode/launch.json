@@ -15,20 +15,32 @@
         },
         {
             "name": "Python: Test Condor Worker",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
                 "results_test.csv",  //output-file
-                "1",  //seed
-                "0",  //method
+                "ite_afm",  //job_type
+                "2",  //req_mem_gb
+                "0",  //seed
+                "1",  //method
                 "2",  //D
                 "2",  //N
                 "1",  //chi
-                "ite_afm",  //job_type
-                "[seed,D,N,chi,iterations,num_tensors,energy,exec_time]",  //result_keys
+                "[seed,D,N,chi,iterations,num_tensors,energy,exec_time]"  //result_keys
+            ]
+        },
+        {
+            "name": "Python: Test per_dim_sender",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "6", "2"
             ]
         }
     ]

@@ -2,7 +2,7 @@ import _import_src  ## Needed to import src folders when scripts are called from
 
 # Types in the code:
 from containers import Config
-from tensor_networks import UnitCell
+from unit_cell import UnitCell, given_by
 
 from utils import strings
 from typing import Iterable
@@ -38,51 +38,98 @@ def constant_global_field(delta_t:float|None)->float:
 def _config_at_measurement(config:Config)->Config:
     config.dims.big_lattice_size += 0
     config.bp.msg_diff_terminate /= 1
-    config.bp.allowed_retries    += 1
+    config.bp.allowed_retries    += 0
     return config
 
 
+def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
+    is_random = False
+
+    match get_from:
+        case "random":
+            unit_cell = UnitCell.random(d=d, D=D)
+            is_random = True
+            print("Got unit_cell as a random tensors")
+
+        case "last":
+            unit_cell = UnitCell.load("last")
+            print("Got unit_cell from last result")
+
+        case "best":
+            unit_cell = UnitCell.load_best(D=D)
+            if unit_cell is None:
+                return _get_unit_cell(D=D, get_from="tnsu")
+            print("Got unit_cell as the previous best.")
+
+        case "tnsu":
+            print("Get unit_cell by simple-update:")
+            is_random = True
+            unit_cell = given_by.tnsu(D=D)
+
+        case _:
+            unit_cell = UnitCell.load(get_from)
+
+
+    return unit_cell, is_random
+
+
 def main(
-    D = 2,
+    D = 5,
     N = 2,
-    chi_factor : int = 1.0,
+    chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
-    results_filename:str = strings.time_stamp()+"_"+strings.random(4),
+    progress_bar:bool=True,
+    results_filename:str|None = None,
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0.1
+    damping:float|None = 0.1,
+    unit_cell_from:str = "best"
 )->tuple[float, str]:
-    
-    unit_cell = UnitCell.load("last")
-    # unit_cell = UnitCell.load("2024.04.25_20.17.29 ising --- stable")
-    # unit_cell = UnitCell.random(d=d, D=D)
+
+
+    assert N>=2
+    assert D>0
+    assert chi_factor>0
+
+    if results_filename is None:
+        results_filename = strings.time_stamp()+"_"+strings.random(4)+f"_D={D}_N={N}"
+
+    unit_cell, _radom_unit_cell = _get_unit_cell(D=D, get_from=unit_cell_from)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
     config = Config.derive_from_physical_dim(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
-    config.trunc_dim = int((4*D**2+20) * chi_factor)
-    config.bp.max_swallowing_dim = int(4*D**2 * chi_factor)
+    config.visuals.progress_bars = progress_bar
     config.bp.damping = damping
     config.bp.parallel_msgs = parallel
-    config.bp.msg_diff_terminate = 1e-10
-    config.bp.msg_diff_good_enough = 1e-4
+
+    # Chi factor:
+    config.trunc_dim = int(config.trunc_dim*chi_factor)
+    config.bp.max_swallowing_dim = int(config.bp.max_swallowing_dim*chi_factor)
+
+    config.bp.msg_diff_terminate = 1e-12
+    config.bp.msg_diff_good_enough = 1e-5
     config.bp.times_to_deem_failure_when_diff_increases = 4
-    config.bp.max_iterations = 50
+    config.bp.max_iterations = 40
     config.bp.allowed_retries = 2
-    config.iterative_process.num_mode_repetitions_per_segment = 2
+    config.iterative_process.num_mode_repetitions_per_segment = 5
     config.iterative_process.num_edge_repetitions_per_mode = 6
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.start_segment_with_new_bp_message = True
     config.iterative_process.use_bp = True
     config.iterative_process.bp_every_edge = False
+    config.ite.random_edge_order = False
     config.ite.normalize_tensors_after_update = True
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
-    config.ite.add_gaussian_noise_fraction = 1e-9
-    config.ite.time_steps = [[10**(-exp)]*25 for exp in range(3, 12, 1)]
-    # config.ite.time_steps = [[[man*10**(-exp)]*10 for man in [5, 2, 1]] for exp in range(3, 5, 1)]
+    config.ite.add_gaussian_noise_fraction = 1e-6
+
+    if D>4:
+        config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(2, 8, 1)]
+    else:
+        config.ite.time_steps = [[np.power(10, -float(exp))]*150 for exp in np.arange(4, 8, 1)]
 
     # Interaction:
     match hamiltonian: 

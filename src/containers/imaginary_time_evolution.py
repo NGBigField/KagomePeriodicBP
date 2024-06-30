@@ -213,6 +213,7 @@ class ITEConfig(_ConfigClass):
     # ITE time steps:
     _time_steps : list[float] = field(default_factory=DEFAULT_TIME_STEPS)
     # Control flags:
+    random_edge_order : bool = True
     random_mode_order : bool = True
     always_use_lowest_energy_state : bool = False
     check_converges : bool = False  # If several steps didn't improve the lowest energy, go to next delta_t
@@ -396,7 +397,7 @@ class ITEProgressTracker():
 
     @staticmethod
     def load(file_name)->"ITEProgressTracker":
-        ite_tracker = saveload.load(file_name, sub_folder=SUB_FOLDER, if_exist=True)        
+        ite_tracker = saveload.load(file_name, sub_folder=SUB_FOLDER, none_if_not_exist=True)        
         return ite_tracker
 
     def save(self)->None:

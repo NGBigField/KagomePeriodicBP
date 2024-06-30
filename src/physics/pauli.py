@@ -1,14 +1,14 @@
 import numpy as np
 from typing import Generator, overload
-
+import functools
 
 x = np.matrix(
     [[0, 1],
      [1, 0]]
 )
-y = 1j*np.matrix(
-    [[0, -1], 
-     [1,  0]]
+y = np.matrix(
+    [[ 0, -1j], 
+     [1j,   0]]
 )
 z = np.matrix(
     [[1,  0],
@@ -39,5 +39,6 @@ def all_paulis(with_names:bool=False)->Generator[tuple[np.matrix, str]|np.matrix
         else:
             yield op
 
+@functools.cache
 def by_name(name:str)->np.matrix:
     return PAULI_OPERATORS[name]

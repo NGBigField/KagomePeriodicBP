@@ -1,6 +1,7 @@
 """A module for the function ncon, which does contractions of several tensors.
 """
-from collections.abc import Iterable
+# from collections.abc import Iterable
+from typing import Iterable
 import numpy as np
 
 

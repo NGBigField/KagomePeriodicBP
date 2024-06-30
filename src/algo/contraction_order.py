@@ -44,7 +44,7 @@ _PosFuncType = Callable[[int, int], tuple[int, int] ]
 _FULL_CONTRACTION_ORDERS_CACHE_KEY_TYPE : TypeAlias = tuple[int, BlockSide, ContractionDepth]
 
 ## Constants:
-CACHE_CONTRACTION_ORDER : bool = False  #TODO please check if neeeded True
+CACHE_CONTRACTION_ORDER : bool = True
 BREAK_MARKER = -100
 Full = ContractionDepth.Full
 ToCore = ContractionDepth.ToCore

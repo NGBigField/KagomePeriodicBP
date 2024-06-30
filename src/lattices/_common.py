@@ -20,6 +20,10 @@ class Node():
         edge_index = self.directions.index(direction)
         self.edges[edge_index] = value
 
+    @property
+    def angles(self)->list[float]:
+        return [dir.angle for dir in self.directions]
+
 
 def plot(lattice:list[Node], node_color:str="red", node_size=40, edge_style:str="b-")->None:
     from matplotlib import pyplot as plt

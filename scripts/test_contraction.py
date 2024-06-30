@@ -136,7 +136,7 @@ def contract_to_edge_test(
     ##Contraction Sequence:
     full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     if with_bp:
-        messages = saveload.load("last_messages", if_exist=True)
+        messages = saveload.load("last_messages", none_if_not_exist=True)
         from algo.belief_propagation import belief_propagation, BPConfig
         bp_config=BPConfig(max_swallowing_dim=chi//2, msg_diff_terminate=1e-6)
         _, messages, _ = belief_propagation(full_tn, messages, bp_config=bp_config)
