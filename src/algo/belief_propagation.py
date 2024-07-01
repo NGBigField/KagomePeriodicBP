@@ -87,12 +87,12 @@ def _message_damping(prev_messages:MessageDictType, out_messages:MessageDictType
 
 def _outgoing_messages(directions_iter:Generator[BlockSide, None, None], multi_processing:bool, fixed_arguments:dict) -> MessageDictType:
     out_messages = parallel_exec.concurrent_or_parallel(
-        func=_signle_outgoing_message, values=directions_iter, value_name="direction", in_parallel=multi_processing, fixed_arguments=fixed_arguments
+        func=_single_outgoing_message, values=directions_iter, value_name="direction", in_parallel=multi_processing, fixed_arguments=fixed_arguments
     ) 
     return MessageDictType(out_messages)
 
 
-def _signle_outgoing_message(
+def _single_outgoing_message(
     tn:KagomeTN, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool
 ) -> Message:
     

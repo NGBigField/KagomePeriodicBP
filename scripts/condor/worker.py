@@ -12,8 +12,9 @@ import _import_scripts
 from time import perf_counter, sleep
 from csv import DictWriter
 from typing import Any, Generator
+import threading
 
-from src.utils import errors
+from src.utils import errors, size
 
 # Import the possible job types:
 from scripts.condor import job_bp
@@ -29,7 +30,7 @@ import numpy as np
 
 
 NUM_EXPECTED_ARGS = 10
-SAFETY_BUFFER_FRACTION = 0.8  # safety buffer (adjust based on needs)
+SAFETY_BUFFER_FRACTION = 0.4  # safety buffer (adjust based on needs)
 
 # A main function to parse inputs:
 def main():
@@ -77,7 +78,7 @@ def main():
     print(f"{i}: N={N}")
 
     i += 1  # 8
-    chi = int(argv[i])
+    chi = float(argv[i])
     print(f"{i}: chi={chi}")
 
     i += 1  # 9
@@ -86,7 +87,9 @@ def main():
 
 
     ## Force usage of requested Giga-bytes:
-    _create_random_array_by_ram(req_mem_gb)
+    _compute_with_random_mat_by_ram(req_mem_gb)
+    thread = threading.Thread(target=_auto_timed_compute_with_random_mat_by_ram, args=(req_mem_gb,))
+    thread.start()
 
     ## Run:
     results : dict[str, Any]
@@ -108,6 +111,8 @@ def main():
             e=errors.get_traceback(e)
         )
     t2 = perf_counter()
+
+    thread.join()
 
     print(f"res={results}")
     
@@ -152,7 +157,13 @@ def _parse_list_of_strings(s:str)->list[str]:
     return items
 
 
-def _create_random_array_by_ram(ram_gb, print_each_step:bool=False):
+def _auto_timed_compute_with_random_mat_by_ram(ram_gb, sleep_time:float|int=60*5):
+    while True:
+        sleep(sleep_time)
+        _compute_with_random_mat_by_ram(ram_gb)
+
+
+def _compute_with_random_mat_by_ram(ram_gb, num_iterations:int=1, progress_bar:bool=True, sleep_time:float|int=0.5):
     """
     Creates a random NumPy array that utilizes the specified amount of RAM in gigabytes.
 
@@ -168,30 +179,36 @@ def _create_random_array_by_ram(ram_gb, print_each_step:bool=False):
 
     print(f"Writing trash memory of up to {ram_gb}gb")
 
-    # Convert RAM to bytes and consider safety factor (adjust as needed)
-    target_bytes = ram_gb * 1024**3 * SAFETY_BUFFER_FRACTION
-
     # Calculate element count and data type based on target size
-    element_size = np.dtype(float).itemsize  # Adjust for desired data type if needed
-    max_elements = int(target_bytes // element_size)
+    target_final_size = ram_gb*SAFETY_BUFFER_FRACTION
 
-    for i, num_elements in enumerate(np.linspace(10, max_elements, 10)):
+    if num_iterations>1:
+        sizes = np.linspace(1e-9, target_final_size, num_iterations)
+    else:
+        sizes = [target_final_size]
+        progress_bar = False
 
-        num_elements = int(num_elements)
-        
-        if print_each_step:
-            print(f"    {i+1}/10: Writing trash memory with {num_elements} element")
+    if progress_bar:
+        from src.utils.prints import ProgressBar
+        prog_bar = ProgressBar(expected_end=num_iterations)
 
-        # Create the random array
-        array_shape = (num_elements,)  # Adjust shape as desired for multidimensional arrays
-        array = np.random.random(array_shape)
+    for i, crnt_size in enumerate(sizes):
+
+        if progress_bar:
+            prog_bar.next(extra_str=f" size = {crnt_size}[gb]")
+            
+        mat1 = size.create_rand_matrix_by_ram_size(crnt_size)        
 
         ## Do some fake calculations:
-        array = np.dot(array*2, array+1)
-        array = array + (array/2 - 1)
-        sleep(1)
-        del array
+        mat2 = np.dot(mat1*2, mat1+1)
+        mat3 = mat1@mat2
+        mat3 += 1
+
+        sleep(sleep_time)
+        del mat1, mat2, mat3
     
+    if progress_bar:
+        prog_bar.clear()
     print("    Done writing trash memory")
 
 

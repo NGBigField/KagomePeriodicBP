@@ -49,3 +49,16 @@ def get_object_size(obj, visited_objects:set|None=None)->int:
     return size
 
     
+def create_rand_matrix_by_ram_size(ram_gb:float)->np.ndarray:
+    # Convert RAM to bytes and consider safety factor (adjust as needed)
+    target_bytes = ram_gb * 1024**3 
+
+    # Calculate element count and data type based on target size
+    element_size = np.dtype(float).itemsize  # Adjust for desired data type if needed
+    num_elements = target_bytes // element_size
+    sqrt_num_elements = int(np.sqrt(num_elements))
+    sqrt_num_elements = max(1, sqrt_num_elements)
+
+    # Create the random matrix
+    array_shape = (sqrt_num_elements, sqrt_num_elements)  # Adjust shape as desired for multidimensional arrays
+    return np.random.random(array_shape)
