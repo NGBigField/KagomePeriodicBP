@@ -15,6 +15,8 @@ from typing import (
     Literal,
 )
 
+from abc import ABC, abstractmethod
+
 from numpy import isin
 
 # Other utilities:
@@ -46,18 +48,22 @@ LOG_EXTENSION = "log"
 #|                                   Classes                                          |#
 # ==================================================================================== #
 
+class _Mode():
+    @classmethod
+    @abstractmethod
+    def str(cls) -> str: ...
 
-class Mode():     
-    class Read():
+class Modes():     
+    class Read(_Mode):
         @classmethod
         def str(cls) -> str:
             return 'rb'
-    class Write():
+    class Write(_Mode):
         @classmethod
         def str(cls) -> str:
             return 'wb'
 
-    class Append():
+    class Append(_Mode):
         @classmethod
         def str(cls) -> str:
             return 'a'
@@ -115,7 +121,7 @@ def append_text(text:str, name:str, sub_folder:Optional[str]=None, in_new_line:b
     if in_new_line:
         text = "\n"+text
     fullpath = _fullpath(name, sub_folder, typ='log')
-    mode = Mode.Append.str()
+    mode = Modes.Append.str()
     flog = open(fullpath, mode)
     flog.write(text)
     flog.close()
@@ -130,23 +136,31 @@ def all_saved_data() -> Generator[Tuple[str, Any], None, None]:
     for path, subdirs, files in os.walk(DATA_FOLDER):
         for name in files:
             fullpath = path + PATH_SEP + name
-            file = _open(fullpath, Mode.Read.str())
+            file = _open(fullpath, Modes.Read.str())
             data = pickle.load(file)
             yield name, data
 
 
+def save_or_load_with_fullpath(fullpath:str, mode:_Mode, var:Any|None=None) -> Any:
+    file = _open(fullpath=fullpath, mode=mode.str())    
+    match mode:
+        case Modes.Write:
+            return pickle.dump(var, file)
+        case Modes.Read: 
+            return _default_load_catch_other_load(file)
+        case _:
+            raise ValueError("Not matching an existing case")
+
+
 def save(var:Any, name:Optional[str]=None, sub_folder:Optional[str]=None, if_not_exist:bool=False, print_:bool=False) -> str:
     if if_not_exist and exist(name=name, sub_folder=sub_folder):
-        return
+        return None
     # Complete missing inputs:
     name = arguments.default_value(name, strings.time_stamp())
     # fullpath:
     fullpath = _fullpath(name, sub_folder)
-    # Prepare pickle inputs:
-    mode = Mode.Write.str()
-    file = _open(fullpath, mode)
-    # Save:
-    pickle.dump(var, file)
+    # Common save or load:
+    save_or_load_with_fullpath(fullpath, mode=Modes.Write, var=var)
     # print:
     if print_:
         print(f"Saved file of type {type(var)!r} in path {fullpath!r}")
@@ -158,11 +172,10 @@ def load(name:str, sub_folder:Optional[str]=None, none_if_not_exist:bool=False) 
         return None
     # fullpath:
     fullpath = _fullpath(name, sub_folder)
-    # Prepare pickle inputs:
-    mode = Mode.Read.str()
-    file = _open(fullpath, mode)
+    # Common save or load:
+    data = save_or_load_with_fullpath(fullpath, mode=Modes.Read)
     # Load:
-    return _default_load_catch_other_load(file)
+    return data
 
 
 def delete(name:str, sub_folder:Optional[str]=None, if_exist:bool=False)->None:

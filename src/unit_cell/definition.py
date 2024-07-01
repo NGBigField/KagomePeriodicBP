@@ -189,6 +189,10 @@ class BestUnitCellData:
         return saveload.save(self, file_name, sub_folder=BEST_UNIT_CELL_DATA_FOLDER_NAME)
     
     @staticmethod
+    def _folder_fullpath() -> str:
+        return BEST_UNIT_CELL_FOLDER_FULLPATH
+
+    @staticmethod
     def _all_files_with_D(D:int) -> Generator[str, None, None]:
         file_names = files.get_all_file_names_in_folder(BEST_UNIT_CELL_FOLDER_FULLPATH)
         for file_name in file_names:
