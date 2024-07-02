@@ -14,7 +14,7 @@ from csv import DictWriter
 from typing import Any, Generator
 import threading
 
-from src.utils import errors, size
+from src.utils import errors
 
 # Import the possible job types:
 from scripts.condor import job_bp
@@ -27,6 +27,8 @@ from scripts.condor.sender import Arguments
 
 # import numpy for random matrices:
 import numpy as np
+
+from utils import sizes
 
 
 NUM_EXPECTED_ARGS = 10
@@ -163,7 +165,7 @@ def _auto_timed_compute_with_random_mat_by_ram(ram_gb, sleep_time:float|int=60*5
         _compute_with_random_mat_by_ram(ram_gb)
 
 
-def _compute_with_random_mat_by_ram(ram_gb, num_growing_sizes:int=3, recursion_depth:int=3, progress_bar:bool=True, sleep_time:float|int=0.5):
+def _compute_with_random_mat_by_ram(ram_gb, num_growing_sizes:int=3, computation_repetitions:int=3, progress_bar:bool=True, sleep_time:float|int=0.5):
     """
     Creates a random NumPy array that utilizes the specified amount of RAM in gigabytes.
 
@@ -183,28 +185,21 @@ def _compute_with_random_mat_by_ram(ram_gb, num_growing_sizes:int=3, recursion_d
     target_final_size = ram_gb*SAFETY_BUFFER_FRACTION
 
     if num_growing_sizes>1:
-        sizes = np.linspace(1e-9, target_final_size, num_growing_sizes)
+        sizes_gb = np.linspace(1e-9, target_final_size, num_growing_sizes)
     else:
-        sizes = [target_final_size]
+        sizes_gb = [target_final_size]
         progress_bar = False
 
     if progress_bar:
         from src.utils.prints import ProgressBar
         prog_bar = ProgressBar(expected_end=num_growing_sizes)
 
-    for i, crnt_size in enumerate(sizes):
+    for i, crnt_size in enumerate(sizes_gb):
 
         if progress_bar:
-            prog_bar.next(extra_str=f" size = {crnt_size}[gb]")
+            prog_bar.next(extra_str=f"size = {crnt_size}[gb]")
             
-        mat0 = size.create_rand_matrix_by_ram_size(crnt_size)        
-
-        for i in range(recursion_depth):
-            ## Do some fake calculations:
-            mat1 = size.create_rand_matrix_by_ram_size(crnt_size)        
-            mat2 = np.dot(mat0*2, mat1+1)
-            mat3 = mat1@mat2
-            mat0 = mat3 + 1
+        sizes.do_computation_by_ram_size(crnt_size, repetitions=computation_repetitions)
 
         sleep(sleep_time)
         del mat1, mat2, mat3

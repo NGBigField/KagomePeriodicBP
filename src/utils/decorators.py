@@ -1,5 +1,5 @@
 from typing import Callable, Any, ParamSpec, TypeVar
-from utils import tuples, errors, prints, size
+from utils import sizes, tuples, errors, prints
 from utils.arguments import Stats
 import time
 from numpy import ndarray as np_ndarray
@@ -46,8 +46,8 @@ def add_stats(
 
     def _update_stats_object_in_outputs(inputs:tuple[list, dict], outputs:_Out, t1:float, t2:float)->_Out:
         if memory_usage:
-            size_of_inputs  = size.get_object_size(inputs)
-            size_of_outputs = size.get_object_size(outputs)
+            size_of_inputs  = sizes.get_object_size(inputs)
+            size_of_outputs = sizes.get_object_size(outputs)
         else:
             size_of_inputs, size_of_outputs = None, None
 
