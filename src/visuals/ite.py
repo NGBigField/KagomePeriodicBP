@@ -8,7 +8,8 @@ if __name__ == "__main__":
 	)
 
 
-from utils import visuals, strings, logs, prints, tuples, lists, saveload, dicts
+from utils import visuals, strings, logs, prints, tuples, lists, saveload, dicts, files
+import project_paths
 
 from tensor_networks import UnitCell
 from containers import Config, ITESegmentStats, UpdateEdge
@@ -47,6 +48,9 @@ NEW_TRACK_POINT_THRESHOLD = 0.02
 
 PLOT_ENTANGLEMENT = True
 PLOT_COMPLEXITY = False
+
+CONFIG_NUM_HEADER_LINES = 41
+
 
 @dataclass
 class COLORS:
@@ -750,12 +754,30 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
         ax.sharex(first_ax)
 
 
+def _get_log_fullpath(log_name:str) -> str:
+    folder = project_paths.logs
+    name_with_extension = saveload._common_name(log_name, typ='log')
+    full_path = str(folder) + files.foldersep + name_with_extension
+    return full_path
+
+
+def _print_log_header(log_name:str) -> None:
+    fullpath = _get_log_fullpath(log_name)
+    with open(fullpath, "r") as file:
+        for i, line in enumerate(file):
+            if i > CONFIG_NUM_HEADER_LINES:
+                break 
+            print(line, end="")
+
+
 def plot_from_log(
     log_name:str = "2024.04.10_10.24.40 VJDEMA - long",
     save:bool = True,
     show_health_figure:bool = False
 ):
     
+    _print_log_header(log_name)
+
     for _plot_func, name in [
         (_plot_main_figure_from_log, "main"),
         (_plot_health_figure_from_log, "health")

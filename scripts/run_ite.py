@@ -74,7 +74,7 @@ def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
 
 
 def main(
-    D = 6,
+    D = 5,
     N = 2,
     chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
@@ -113,7 +113,6 @@ def main(
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 40
     config.bp.allowed_retries = 2
-    config.iterative_process.num_mode_repetitions_per_segment = 5
     config.iterative_process.num_edge_repetitions_per_mode = 6
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.iterative_process.start_segment_with_new_bp_message = True
@@ -124,13 +123,15 @@ def main(
     config.ite.add_gaussian_noise_fraction = 1e-6
 
     if D<4:
-        config.iterative_process.bp_every_edge = True
         config.bp.msg_diff_terminate = 1e-12
-        config.ite.time_steps = [[np.power(10, -float(exp))]*150 for exp in np.arange(4, 8, 1)]
+        config.ite.time_steps = [[np.power(10, -float(exp))]*150 for exp in np.arange(3, 8, 1)]
+        config.iterative_process.bp_every_edge = True
+        config.iterative_process.num_mode_repetitions_per_segment = 1
     else:
-        config.iterative_process.bp_every_edge = False
         config.bp.msg_diff_terminate = 1e-6 
         config.ite.time_steps = [[np.power(10, -float(exp))]*150 for exp in np.arange(2, 6, 1)]
+        config.iterative_process.bp_every_edge = False
+        config.iterative_process.num_mode_repetitions_per_segment = 5
 
     # Interaction:
     match hamiltonian: 
