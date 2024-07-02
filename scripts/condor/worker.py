@@ -32,7 +32,7 @@ from utils import sizes
 
 
 NUM_EXPECTED_ARGS = 10
-SAFETY_BUFFER_FRACTION = 0.4  # safety buffer (adjust based on needs)
+SAFETY_BUFFER_FRACTION = 0.5  # safety buffer (adjust based on needs)
 
 # A main function to parse inputs:
 def main():
@@ -200,9 +200,7 @@ def _compute_with_random_mat_by_ram(ram_gb, num_growing_sizes:int=3, computation
             prog_bar.next(extra_str=f"size = {crnt_size}[gb]")
             
         sizes.do_computation_by_ram_size(crnt_size, repetitions=computation_repetitions)
-
         sleep(sleep_time)
-        del mat1, mat2, mat3
     
     if progress_bar:
         prog_bar.clear()
