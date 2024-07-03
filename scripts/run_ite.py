@@ -74,16 +74,16 @@ def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
 
 
 def main(
-    D = 2,
-    N = 3,
-    chi_factor : int = 2,
+    D = 5,
+    N = 2,
+    chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     progress_bar:bool=True,
     results_filename:str|None = None,
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
-    unit_cell_from:str = "best"
+    unit_cell_from:str = "tnsu"
 )->tuple[float, str]:
 
 
@@ -122,16 +122,16 @@ def main(
     config.ite.always_use_lowest_energy_state = False
     config.ite.add_gaussian_noise_fraction = 1e-6
 
-    if D<4:
-        config.bp.msg_diff_terminate = 1e-12
-        config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(4, 8, 1)]
-        config.iterative_process.bp_every_edge = True
-        config.iterative_process.num_mode_repetitions_per_segment = 1
-    else:
+    if D>=4 or _radom_unit_cell:
         config.bp.msg_diff_terminate = 1e-6 
         config.ite.time_steps = [[np.power(10, -float(exp))]*150 for exp in np.arange(2, 6, 1)]
         config.iterative_process.bp_every_edge = False
         config.iterative_process.num_mode_repetitions_per_segment = 5
+    else:
+        config.bp.msg_diff_terminate = 1e-10
+        config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(4, 8, 1)]
+        config.iterative_process.bp_every_edge = True
+        config.iterative_process.num_mode_repetitions_per_segment = 1
 
     # Interaction:
     match hamiltonian: 

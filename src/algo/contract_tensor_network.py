@@ -174,13 +174,11 @@ def contract_tensor_network(
     else:
         raise TypeError(f"Not an expected type {type(tn)} of input 'tn'")
     
-    ## Choose bubblecon compression rule:
+    # Choose bubblecon compression rule:
     if tn.dimensions.virtual_dim <= 3:
         compression_dict = {'type':'SVD'}
     else:
         compression_dict = {'type':'iter', 'max-iter':10, 'err':1e-6}
-
-    
 
     ## Call main function:
     mps = bubblecon(

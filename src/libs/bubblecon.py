@@ -3059,7 +3059,7 @@ def bubblecon(T_list, edges_list, angles_list, bubble_angle,\
 		mp_edges_list = mp_edges_list[:i0] + v_out_edges_list \
 			+ mp_edges_list[(i1+1):]
 			
-			
+	prog_bar.clear()
 
 
 	if log:
