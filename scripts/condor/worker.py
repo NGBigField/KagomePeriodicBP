@@ -89,7 +89,6 @@ def main():
 
 
     ## Force usage of requested Giga-bytes:
-    _compute_with_random_mat_by_ram(req_mem_gb)
     thread = threading.Thread(target=_auto_timed_compute_with_random_mat_by_ram, args=(req_mem_gb,))
     thread.start()
 
@@ -159,13 +158,14 @@ def _parse_list_of_strings(s:str)->list[str]:
     return items
 
 
-def _auto_timed_compute_with_random_mat_by_ram(ram_gb, sleep_time:float|int=60*5):
+def _auto_timed_compute_with_random_mat_by_ram(ram_gb, starting_sleep_time:float|int=60):
     while True:
-        sleep(sleep_time)
         _compute_with_random_mat_by_ram(ram_gb)
+        sleep(starting_sleep_time)
+        starting_sleep_time *= 2
 
 
-def _compute_with_random_mat_by_ram(ram_gb, num_growing_sizes:int=3, computation_repetitions:int=3, progress_bar:bool=True, sleep_time:float|int=0.5):
+def _compute_with_random_mat_by_ram(ram_gb, num_growing_sizes:int=3, computation_repetitions:int=3, progress_bar:bool=False, sleep_time:float|int=0.5):
     """
     Creates a random NumPy array that utilizes the specified amount of RAM in gigabytes.
 

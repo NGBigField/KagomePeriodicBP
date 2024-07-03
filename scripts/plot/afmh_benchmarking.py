@@ -6,7 +6,7 @@ src = base/"src"
 if src.__str__() not in sys.path:
     sys.path.append(src.__str__())
 
-from utils import visuals, files, saveload
+from utils import visuals, files, saveload, csvs, strings, lists
 from dataclasses import dataclass
 
 from matplotlib import pyplot as plt
@@ -65,8 +65,53 @@ def _plot_line(x, y, linestyle:str="-", label:str|None=None, ) -> Line2D:
     return line[0]
 
 
-def main():
+def _append_row_to_tabular(tabular:str, row:list[object]) -> str:
+    for first, last, item in lists.iterate_with_edge_indicators(row):
 
+        if isinstance(item, str):
+            s = item
+        elif isinstance(item, int):
+            s = f"{item}"
+        elif isinstance(item, float):
+            s = strings.formatted(item, precision=5, signed=True)
+
+        tabular += s
+
+        if last:
+            tabular += " \\\\ "
+        else:
+            tabular += " & "
+
+    return tabular
+
+
+
+
+def _create_csv(Ds, SUs, VUs, Ds_2, energies) -> None:
+
+    csv = csvs.CSVManager(["D", "SU", "VU", "BlockBP"], name="ITE_AFM_H results compare")
+    tabular = _append_row_to_tabular("", csv.columns)
+    tabular += " \\hline"
+    
+    for i, D in enumerate(Ds):
+        SU = SUs[i]
+        VU = VUs[i]
+        row = [D, SU, VU]
+
+        if D in Ds_2:
+            row.append(energies[i])
+        else:
+            row.append("")
+
+        csv.append(row)
+        tabular = _append_row_to_tabular(tabular, row)
+
+    print(f"Created an csv file in {csv.fullpath!r}")
+    print(f"for latex: \n")
+    print(tabular)
+
+
+def main():
     ## Collect reference results
     Ds, SUs, VUs = _collect_references()
 
@@ -75,8 +120,8 @@ def main():
     line2 = _plot_line(Ds, VUs, linestyle=":", label="reference variational-update")
 
     ## collet my results:
-    Ds, energies = _collect_best_results()
-    line3 = _plot_line(Ds, energies, label="BlockBP")
+    Ds_2, energies = _collect_best_results()
+    line3 = _plot_line(Ds_2, energies, label="BlockBP")
 
     ## Pretty plot:
     ax = line1.axes
@@ -84,8 +129,11 @@ def main():
     ax.legend()
 
     visuals.draw_now()
-    print("Done.")
 
+    ## add csv:
+    _create_csv(Ds, SUs, VUs, Ds_2, energies)
+
+    print("Done.")
     
 
 

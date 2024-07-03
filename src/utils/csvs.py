@@ -130,3 +130,4 @@ class CSVManager():
 
     def append(self, row:list)->None:
         append_row_to_csv(row, file_name=self.fullpath)
+

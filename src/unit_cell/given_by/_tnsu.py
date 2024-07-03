@@ -301,8 +301,8 @@ def _kagome_afh_peps_ground_state_search(
     D: list = 2, 
     error: float = 1e-7,
     size: int = 1,
-    max_iterations: int = 3000, 
-    dts: list = [0.2, 0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001],
+    max_iterations: int = 500, 
+    dts: list = [0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001],
     plot_results: bool = False, 
     print_process: bool = True
 ) -> TnsuReturnType:
