@@ -9,6 +9,8 @@ class BubbleConConfig(_ConfigClass):
     # eps=None
     progress_bar=True
     separate_exp=True
+    iterative_compression_max_ier : int =  100
+    iterative_compression_error : float = 1e-7    
                 
     def __repr__(self) -> str:
         return super().__repr__()

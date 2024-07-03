@@ -37,17 +37,23 @@ def get_imaginary_time_evolution_operator(hamiltonian_func:HamiltonianFuncAndInp
     return h, g
 
 
+def _raise_ite_error_or_print_warning(message:str) -> None:
+    if DEBUG_MODE:
+        raise ITEError(message) 
+    else:
+        prints.print_warning(message)
+
+
 def _check_rdms_metrics(rdm:np.ndarray)->MatrixMetrics:
     env_metrics = calc_metrics(rho_ij_to_rho(rdm))    
     ## Check state:
     if env_metrics.hermicity>ENV_HERMICITY_THRESHOLD:
-        raise ITEError(f"env_hermicity={env_metrics.hermicity}")
+        _raise_ite_error_or_print_warning(f"env_hermicity={env_metrics.hermicity}")
     sum_eigenvalues = assertions.real(env_metrics.sum_eigenvalues)
     if abs(sum_eigenvalues-1)>ENV_HERMICITY_THRESHOLD:
-        raise ITEError(f"env is not psd. sum-eigenvalues={sum_eigenvalues}")
+        _raise_ite_error_or_print_warning(f"env is not psd. sum-eigenvalues={sum_eigenvalues}")
     if env_metrics.negativity>0.1:
-        # raise ITEError(f"env is not psd. negativity={env_metrics.negativity}") 
-        prints.print_warning(f"env is not psd. negativity={env_metrics.negativity}")
+        _raise_ite_error_or_print_warning(f"env is not psd. negativity={env_metrics.negativity}")
     return env_metrics
 
 

@@ -10,6 +10,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from metrics.src.numbers_and_indices import dec2binary, binary2dec, BitsType, BitType
 
+from _config_reader import DEBUG_MODE
 
 EPSILON = 0.000000001
 
@@ -89,6 +90,14 @@ def _matrix_dimension_from_optional_num_qubits(num_qubits:typ.Optional[int] = No
         if mat_dim != 2**num_qubits:
             raise ValueError("Mismatched arguments")
     return mat_dim
+
+
+def _assert_or_warning(condition:bool, msg:str) -> None:
+    if condition:
+        if DEBUG_MODE:
+            raise AssertionError(msg)
+        else:
+            prints.print_warning(msg)
 
 class SquareMatrix(np.matrix):
     error_msg = "Square-Matrix is not square"
@@ -213,8 +222,8 @@ class DensityMatrix(SquareMatrix):
         assert _is_square(self), "Density Matrix must be a square matrix"  
         assertions.integer(np.log2(self.shape[0]), reason="Must have indices of 2 to the power of the qubits") 
         assert abs(self.trace()-1)<EPSILON, "Density Matrix must have trace==1"
-        assert _is_hermitian(self, EPSILON), "Density Matrix must be hermitian"
-        assert _is_positive_semidefinite(self, EPSILON), "Density Matrix must be positive semidefinite"
+        _assert_or_warning(_is_hermitian(self, EPSILON), msg="Density Matrix must be hermitian")
+        _assert_or_warning(_is_positive_semidefinite(self, EPSILON), msg="Density Matrix must be positive semi-definite")
 
     def trace(self) -> complex:
         return np.trace(self)
