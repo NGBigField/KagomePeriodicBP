@@ -161,6 +161,8 @@ def contract_tensor_network(
     Returns:
         tuple[ MPS|complex|tuple, list[int], MPSOrientation, ]
     """
+    ## Config:
+    bubblecon_config = BubbleConConfig()  # load global default config. can be changed for more control
 
     ## Derive or load Contraction Order:
     contraction_order = get_contraction_order(tn, direction, depth)
@@ -176,14 +178,7 @@ def contract_tensor_network(
     
     ## Choose bubblecon compression rule:
     D = tn.tensors[0].shape[-1]
-    if D <= 3:
-        compression_dict = {'type':'SVD'}
-    else:
-        compression_dict = {
-            'type' : 'iter', 
-            'max-iter' : BubbleConConfig.iterative_compression_max_ier, 
-            'err' : BubbleConConfig.iterative_compression_error
-        }
+    compression_dict = bubblecon_config.bubblecon_compression(D)    
 
     ## Call main function:
     mps = bubblecon(
@@ -194,8 +189,8 @@ def contract_tensor_network(
         swallow_order=contraction_order, 
         D_trunc=bubblecon_trunc_dim,
         opt='high',
-        progress_bar=BubbleConConfig.progress_bar and print_progress,
-        separate_exp=BubbleConConfig.separate_exp,
+        progress_bar=bubblecon_config.progress_bar and print_progress,
+        separate_exp=bubblecon_config.separate_exp,
         ket_tensors=tn.kets,
         compression=compression_dict
     )

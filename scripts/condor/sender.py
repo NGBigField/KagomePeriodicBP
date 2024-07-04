@@ -12,6 +12,7 @@ from csv import DictWriter
 
 # for smart iterations:
 from itertools import product
+from functools import cache
 
 import string
 import random
@@ -32,25 +33,26 @@ LOCAL_TEST = False
 RESULT_KEYS_DICT = dict(
     bp = ["with_bp", 'D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'],
     parallel_timings = ["parallel", 'D', 'N', 'seed', 'bp-step', 'reduction'],
-    ite_afm = ["seed","D", "N", "chi", "energy", "path"],
+    ite_afm = ["seed","D", "N", "chi", "energy", "parallel", "method", "path"],
     bp_convergence = ['seed', 'D', 'N', 'chi', 'iterations', 'rdm_diff_bp', 'rdm_diff_random', 'z_bp', 'z_random', 'time_bp', 'time_random']
 )
 
 ## all values:
 DEFAULT_VALS = {}
-DEFAULT_VALS['D'] = [4, 5, 6]
+DEFAULT_VALS['D'] = [2, 3, 4, 5, 6]
 DEFAULT_VALS['N'] = [2, 3] 
 DEFAULT_VALS['chi'] = [0.6, 1, 1.5, 2]
 DEFAULT_VALS['method'] = [1, 2, 3]
-DEFAULT_VALS['seed'] = [0, 1]
+DEFAULT_VALS['seed'] = [0]
+DEFAULT_VALS['parallel'] = [0, 1]
 
-Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(result_keys)'
+Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(parallel) $(result_keys)'
 
 
 def main(
     job_type="ite_afm",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
     request_cpus:int=8,
-    request_memory_gb:int=32,
+    request_memory_gb:int=4,
     vals:dict=DEFAULT_VALS,
     result_file_name:str|None=None
 ):
@@ -80,15 +82,16 @@ def main(
     print(f"job_type={job_type!r}")
 
     ## Define job params:
+    req_ram_mem_gb = f"{request_memory_gb}"
     job_params_dicts : list[dict] = []
-    for N, D, method, seed, chi in product(vals['N'], vals['D'], vals['method'], vals['seed'], vals['chi'] ):
+    for N, D, method, seed, chi, parallel in product(vals['N'], vals['D'], vals['method'], vals['seed'], vals['chi'], vals['parallel'] ):
         # To strings:
         N = f"{N}"
         D = f"{D}"
         method = f"{method}"
         seed = f"{seed}"
         chi = f"{chi}"
-        req_ram_mem_gb = f"{request_memory_gb}"
+        parallel = f"{parallel}"
 
         job_params_dicts.append( {
             "outfile"       : results_fullpath,                 # outfile
@@ -99,6 +102,7 @@ def main(
             "D"             : D,                                # D
             "N"             : N,                                # N
             "chi"           : chi,                              # chi
+            "parallel"      : parallel,                         # parallel
             "result_keys"   : _encode_list_as_str(result_keys)  # result_keys
         })
 
@@ -124,8 +128,11 @@ def main(
     if LOCAL_TEST:
         import subprocess
         for params_dict in job_params_dicts:
-            args = ["python", worker_script_fullpath] + list(params_dict.values())
-            subprocess.run(args)
+            arguments = ["python", worker_script_fullpath]
+            for argument_name in _split_argument():
+                argument = params_dict[argument_name]
+                arguments += [argument]
+            subprocess.run(arguments)
 
     else:
         import CondorJobSender
@@ -152,16 +159,18 @@ def _encode_list_as_str(lis:list)->str:
 
 def _print_inputs(inputs:dict[str, str], _max_str_per_key:dict[str, int])->None:
 
-    expections_reduce = {"outfile", "result_keys"}
-    expections_ommit = {"req_mem_gb"}
+    expectations_reduce = {"outfile", "result_keys"}
+    expectations_omit = {"req_mem_gb"}
 
     total_string = ""
     for key, value in inputs.items():
-        if key in expections_ommit:
+        assert key in Arguments, f"key {key!r} is not in input arguments"
+
+        if key in expectations_omit:
             continue
 
         s = f"{value}"
-        if key in expections_reduce:
+        if key in expectations_reduce:
             total_string += " " + f"{key!r}: " + f"()" + ","
             continue
 
@@ -182,11 +191,30 @@ def _time_stamp():
     t = time.localtime()
     return f"{t.tm_year}.{t.tm_mon:02}.{t.tm_mday:02}_{t.tm_hour:02}.{t.tm_min:02}.{t.tm_sec:02}"
 
+
 def _random_letters(num:int)->str:
     s = ""
     for _ in range(num):
         s += random.choice(string.ascii_letters)
     return s
+
+
+@cache
+def _split_argument() -> list[str]:
+    res = []
+    splitted = Arguments.split("$")
+    for i, s in enumerate(splitted):
+
+        # ignore first string:
+        if i==0:
+            continue
+
+        _, s = s.split("(")
+        s, _ = s.split(")")
+
+        res.append(s)
+    return res
+
 
 
 def _legit_memory_sizes(request_memory_gb:int) -> int:
