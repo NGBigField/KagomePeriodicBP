@@ -83,7 +83,7 @@ def main(
     parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
-    unit_cell_from:str = "random"
+    unit_cell_from:str = "best"
 )->tuple[float, str]:
 
 
@@ -126,7 +126,7 @@ def main(
 
     if D>=4 or _radom_unit_cell:
         config.bp.msg_diff_terminate = 1e-10
-        config.ite.time_steps = [[np.power(10, -float(exp))]*150 for exp in np.arange(2, 6, 1)]
+        config.ite.time_steps = [[np.power(10, -float(exp))]*150 for exp in np.arange(3, 6, 1)]
     else:
         config.bp.msg_diff_terminate = 1e-11
         config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(4, 8, 1)]
