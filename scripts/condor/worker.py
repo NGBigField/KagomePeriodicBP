@@ -84,12 +84,17 @@ def main():
     print(f"{i}: chi={chi}")
 
     i += 1  # 9
+    parallel = int(argv[i])
+    print(f"{i}: parallel={parallel}")
+
+    i += 1  # 10
     result_keys = _parse_list_of_strings(argv[i])
     print(f"{i}: result_keys={result_keys}")
 
 
     ## Force usage of requested Giga-bytes:
-    thread = threading.Thread(target=_auto_timed_compute_with_random_mat_by_ram, args=(req_mem_gb,))
+    stop_event = threading.Event()
+    thread = threading.Thread(target=_auto_timed_compute_with_random_mat_by_ram, args=(req_mem_gb, stop_event))
     thread.start()
 
     ## Run:
@@ -104,7 +109,7 @@ def main():
             case "bp_convergence":
                 results = job_bp_convergence.main(D=D, N=N)
             case "ite_afm":
-                results = job_ite_afm.main(D=D, N=N, chi_factor=chi, seed=seed, method=method)
+                results = job_ite_afm.main(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel)
             case _:
                 raise ValueError(f"Not an expected job_type={job_type!r}")
     except Exception as e:
@@ -113,6 +118,8 @@ def main():
         )
     t2 = perf_counter()
 
+    ## Call thread to stop:
+    stop_event.set()
     thread.join()
 
     print(f"res={results}")
@@ -141,12 +148,11 @@ def main():
     print(f"{output_file!r}")
 
 
-
-
 def _clean_item(s:str)->str:
     s = s.replace(" ", "")
     s = s.replace(",", "")
     return s
+
 
 def _parse_list_of_strings(s:str)->list[str]:
     assert isinstance(s, str)
@@ -158,31 +164,28 @@ def _parse_list_of_strings(s:str)->list[str]:
     return items
 
 
-def _auto_timed_compute_with_random_mat_by_ram(ram_gb, starting_sleep_time:float|int=60):
-    while True:
+def _auto_timed_compute_with_random_mat_by_ram(ram_gb:int, stop_event:threading.Event, starting_sleep_time:float|int=60):
+    sleep_time = starting_sleep_time
+    while not stop_event.is_set():
+        # Do task:
         _compute_with_random_mat_by_ram(ram_gb)
-        sleep(starting_sleep_time)
-        starting_sleep_time *= 2
+
+        # wait time, but check for exit message each second:
+        for _ in range(sleep_time):
+            sleep(1)
+            if stop_event.is_set():
+                return
+            
+        # next run, wait more:
+        sleep_time *= 2
 
 
-def _compute_with_random_mat_by_ram(ram_gb, num_growing_sizes:int=3, computation_repetitions:int=3, progress_bar:bool=False, sleep_time:float|int=0.5):
-    """
-    Creates a random NumPy array that utilizes the specified amount of RAM in gigabytes.
+def _compute_with_random_mat_by_ram(ram_gb, num_growing_sizes:int=3, computation_repetitions:int=3, progress_bar:bool=False, sleep_time:float|int=0.1):
 
-    Args:
-        ram_gb (float): The amount of RAM to use in gigabytes.
-
-    Returns:
-        numpy.ndarray: The randomly generated NumPy array.
-
-    Raises:
-        ValueError: If the requested RAM usage exceeds available memory.
-    """
-
-    print(f"Writing trash memory of up to {ram_gb}gb")
 
     # Calculate element count and data type based on target size
     target_final_size = ram_gb*SAFETY_BUFFER_FRACTION
+    print(f"Writing trash memory of up to {target_final_size}gb")
 
     if num_growing_sizes>1:
         sizes_gb = np.linspace(1e-9, target_final_size, num_growing_sizes)

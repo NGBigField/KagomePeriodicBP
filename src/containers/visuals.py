@@ -17,6 +17,9 @@ class VisualsConfig(_ConfigClass):
     
     _plots_to_show : tuple[bool] = _DEFAULT_PLOTS_TO_SHOW
 
+    def __repr__(self) -> str:
+        return super().__repr__()
+
     @property
     def live_plots(self) -> bool:
         return True if any(self._plots_to_show) else False

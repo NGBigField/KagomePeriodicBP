@@ -139,7 +139,7 @@ def _kagome_connect_boundary_edges_periodically(kagome_lattice:KagomeLattice, ed
     node2_index = kagome_lattice.edges[edge2][0]         
 
     ## replace two dict entries with a single entry for two tensors
-    new_periodic_edge = edge1+"+"+edge2
+    new_periodic_edge = _new_periodic_edge_name(edge1, edge2)
     del kagome_lattice.edges[edge1]
     del kagome_lattice.edges[edge2]
     kagome_lattice.edges[new_periodic_edge] = (node1_index, node2_index)
@@ -160,15 +160,19 @@ def _kagome_structure_matrix(size:int) -> np.ndarray:
     # kagome_lattice.plot_triangles_lattice()
 
     ## connect periodically:
-    for block_side in [BlockSide.U, BlockSide.UL, BlockSide.DL]:
+    ordered_half_list = list(BlockSide.all_in_counter_clockwise_order())[0:3]
+    for block_side in ordered_half_list:
         boundary_edges          = kagome_lattice.sorted_boundary_edges(boundary=block_side)
         opposite_boundary_edges = kagome_lattice.sorted_boundary_edges(boundary=block_side.opposite())
+        opposite_boundary_edges.reverse()
 
         for edge1, edge2 in zip(boundary_edges, opposite_boundary_edges, strict=True):
+            ## Choose boundary function:
             if PBC:
                 _kagome_connect_boundary_edges_periodically(kagome_lattice, edge1, edge2)
-            else: 
+            else:
                 _kagome_disconnect_boundary_edges_to_open_nodes(kagome_lattice, edge1, edge2)
+
 
     # Plot lattice:
     # plot_lattice(kagome_lattice.nodes, kagome_lattice.edges)

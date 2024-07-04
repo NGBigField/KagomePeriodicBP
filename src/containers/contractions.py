@@ -1,12 +1,32 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from containers._meta import _ConfigClass
 from lattices.directions import BlockSide, LatticeDirection
+from typing import Callable
+
 
 @dataclass
-class BubbleConConfig: 
+class BubbleConConfig(_ConfigClass): 
     # trunc_dim_2=None
     # eps=None
     progress_bar=True
     separate_exp=True
+    iterative_compression_max_ier : int =  100
+    iterative_compression_error : float = 1e-7    
+    d_threshold_for_compression : int = 1
+
+    def bubblecon_compression(self, D:int) -> dict:
+        if D <= self.d_threshold_for_compression:
+            return {'type':'SVD'}
+        else:
+            return {
+                'type' : 'iter', 
+                'max-iter' : self.iterative_compression_max_ier, 
+                'err' : self.iterative_compression_error
+            }
+
+                
+    def __repr__(self) -> str:
+        return super().__repr__()
 
 
 @dataclass

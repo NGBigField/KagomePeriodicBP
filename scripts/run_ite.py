@@ -75,8 +75,8 @@ def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
 
 def main(
     D = 2,
-    N = 3,
-    chi_factor : int = 2,
+    N = 2,
+    chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     progress_bar:bool=True,
     results_filename:str|None = None,
@@ -121,17 +121,19 @@ def main(
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
     config.ite.add_gaussian_noise_fraction = 1e-6
+    config.iterative_process.bp_every_edge = True
+    config.iterative_process.num_mode_repetitions_per_segment = 1
+    config.bp.msg_diff_terminate = 1e-10
 
-    if D<4:
-        config.bp.msg_diff_terminate = 1e-12
-        config.ite.time_steps = [[np.power(10, -float(exp))]*100 for exp in np.arange(4, 8, 1)]
-        config.iterative_process.bp_every_edge = True
-        config.iterative_process.num_mode_repetitions_per_segment = 1
+    ## time steps:
+    n_per_dt = 100
+    if D>=4 or _radom_unit_cell:
+        e_start = 3
+        e_end   = 7
     else:
-        config.bp.msg_diff_terminate = 1e-6 
-        config.ite.time_steps = [[np.power(10, -float(exp))]*150 for exp in np.arange(2, 6, 1)]
-        config.iterative_process.bp_every_edge = False
-        config.iterative_process.num_mode_repetitions_per_segment = 5
+        e_start = 3
+        e_end   = 7
+    config.ite.time_steps = [[np.power(10, -float(exp))]*n_per_dt for exp in np.arange(e_start, e_end, 1)]
 
     # Interaction:
     match hamiltonian: 

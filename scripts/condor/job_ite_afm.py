@@ -19,7 +19,8 @@ def main(
     N : int = 2,
     chi_factor : int = 1,
     seed : int = -1,
-    method : int = 1
+    method : int = 1,
+    parallel : int = 0
 ) -> dict:
     
 
@@ -41,18 +42,21 @@ def main(
     ## Run:
     energy, unit_cell_file_path = run_ite(
         N=N, D=D, chi_factor=chi_factor, 
-        live_plots=False, parallel=False, progress_bar=False,
+        live_plots=False, 
+        parallel=parallel, 
+        progress_bar=False,
         results_filename=results_filename,
         unit_cell_from=unit_cell_from
     )
     
     # Expected outputs: 
-    # ["seed","D", "N", "energy", "path"]
+    # ["seed","D", "N", "chi", "energy", "parallel", "path", "method"]
     results = dict(
         D=D,
         N=N,
         chi=chi_factor,
         energy=energy,
+        parallel=parallel,
         path=unit_cell_file_path
     )
     
