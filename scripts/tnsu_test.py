@@ -11,7 +11,6 @@ from typing import Iterable
 
 
 # Algos we test here:
-from algo.imaginary_time_evolution import full_ite
 from physics import hamiltonians
 from tensor_networks.construction import kagome_tn_from_unit_cell
 from algo.belief_propagation import robust_belief_propagation
@@ -24,9 +23,57 @@ d = 2
 
 
 
+
+def _log_and_update(
+    D:int, size:int, periodic:bool, table:csvs.CSVManager, \
+    expectation_plot:AppendablePlot, energies_plot:AppendablePlot, mean_energy_plot:AppendablePlot, \
+    expectations, energies, run_time:float, tnsu_energy
+)->None:
+    expectation_plot.append(**{key:(size, val) for key, val in expectations.items()})
+
+    # Mean energy:
+    mean_energy = np.mean([val for val in energies.values()])
+    periodic_str = "PBC" if periodic else "OBC"
+    energies_plot.append(mean=(size, mean_energy))
+    mean_energy_plot.append(**{periodic_str:(size, mean_energy)})
+
+    for edge_tuple, energy in energies.items():
+        edge_name = f"({edge_tuple[0]},{edge_tuple[1]})"
+        energies_plot.append(**{edge_name:(size, energy)}, plt_kwargs=dict(alpha=0.5, marker="+"))
+
+    save_figure(expectation_plot.fig, file_name=f"Expectation-size={size}")
+    save_figure(energies_plot.fig, file_name=f"Energies-size={size}")
+    save_figure(mean_energy_plot.fig, file_name=f"Energies-Mean-size={size}")
+
+    table.append([D, size, periodic, tnsu_energy, mean_energy, expectations["x"], expectations["y"], expectations["z"], run_time])
+
+    print(
+        "size: "+strings.formatted(size, width=2)+" | mean_energy="+strings.formatted(mean_energy, precision=10, width=12, signed=True)+" | run-time="+strings.formatted(run_time, width=8, precision=4)+"[sec]"
+    )
+
+
+def _per_size_get_measurements(D:int, size:int, periodic:bool, config:Config):
+
+    ## Get tnsu results:
+    t1 = time.perf_counter()
+    unit_cell, tnsu_energy = given_by.tnsu(D=D, size=size, periodic=periodic)
+    t2 = time.perf_counter()
+    run_time = t2 - t1
+
+    ## Get :
+    full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
+    _, _ = robust_belief_propagation(full_tn, None, config.bp)
+
+    ## Calculate observables:
+    energies, expectations, entanglement = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
+    expectations = mean_expectation_values(expectations)
+
+    return expectations, energies, run_time, tnsu_energy
+
+
 def main(
     D = 2,
-    sizes = list(range(1, 3)),
+    sizes = list(range(2, 8)),
 )->None:
 
     ## Config:
@@ -45,60 +92,23 @@ def main(
         plot.axis.grid("on")
         plot.axis.set_xlabel("N")
     expectation_plot.axis.set_title("Expectation Values")
-    energies_plot.axis.set_title("Energies")
+    energies_plot.axis.set_title("Energies per edge")
+    mean_energy_plot.axis.set_title("Mean Energies")
 
-    table = csvs.CSVManager(columns=["N", "energy", "x", "y", "z", "run-time"])
+    ## Prepare csv
+    table = csvs.CSVManager(columns=["D", "N", "periodic", "tnsu Energy", "BlockBP energy", "x", "y", "z", "run-time"])
 
     ## Increase size for tnsu, measure TN and add to plot:
     for size in sizes:
-        ## Get unsu result:
-        expectations, energies, run_time = _per_size_get_measurements(D=D, size=size, config=config)
+        for periodic in [True, False]:
+            ## Get tnsu result:
+            expectations, energies, run_time, tnsu_energy = _per_size_get_measurements(D=D, size=size, periodic=periodic, config=config)
 
-        ## Measure and update plots
-        _log_and_update(size=size, table=table, expectation_plot=expectation_plot, energies_plot=energies_plot,  mean_energy_plot=mean_energy_plot, 
-                        expectations=expectations, energies=energies, run_time=run_time)
+            ## Measure and update plots
+            _log_and_update(D=D, size=size, periodic=periodic, table=table, expectation_plot=expectation_plot, energies_plot=energies_plot,  mean_energy_plot=mean_energy_plot, 
+                            expectations=expectations, energies=energies, run_time=run_time, tnsu_energy=tnsu_energy)
 
     print("Done")
-
-
-def _log_and_update(size:int, table:csvs.CSVManager, expectation_plot:AppendablePlot, energies_plot:AppendablePlot, mean_energy_plot:AppendablePlot, expectations, energies, run_time:float)->None:
-    expectation_plot.append(**{key:(size, val) for key, val in expectations.items()})
-    mean_energy = np.mean([val for val in energies.values()])
-    energies_plot.append(mean=(size, mean_energy))
-    mean_energy_plot.append(mean=(size, mean_energy))
-    for edge_tuple, energy in energies.items():
-        edge_name = f"({edge_tuple[0]},{edge_tuple[1]})"
-        energies_plot.append(**{edge_name:(size, energy)}, plt_kwargs=dict(alpha=0.5, marker="+"))
-
-    save_figure(expectation_plot.fig, file_name=f"Expectation-size={size}")
-    save_figure(energies_plot.fig, file_name=f"Energies-size={size}")
-    save_figure(mean_energy_plot.fig, file_name=f"Energies-Mean-size={size}")
-
-    table.append([size, mean_energy, expectations["x"], expectations["y"], expectations["z"], run_time])
-
-    print(
-        "size: "+strings.formatted(size, width=2)+" | mean_energy="+strings.formatted(mean_energy, precision=10, width=12, signed=True)+" | run-time="+strings.formatted(run_time, width=8, precision=4)+"[sec]"
-    )
-
-
-def _per_size_get_measurements(D:int, size:int, config:Config):
-
-    ## Get tnsu results:
-    t1 = time.perf_counter()
-    unit_cell = given_by.tnsu(D=D, size=size)
-    t2 = time.perf_counter()
-    run_time = t2 - t1
-
-    ## Get :
-    full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
-    _, _ = robust_belief_propagation(full_tn, None, config.bp)
-
-    ## Calculate observables:
-    energies, expectations, entanglement = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
-    expectations = mean_expectation_values(expectations)
-
-    return expectations, energies, run_time
-
 
 
 if __name__ == "__main__":

@@ -80,7 +80,7 @@ def main(
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     progress_bar:bool=True,
     results_filename:str|None = None,
-    parallel:bool = 0,
+    parallel:bool = 1,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
     unit_cell_from:str = "best"
@@ -128,7 +128,7 @@ def main(
     ## time steps:
     n_per_dt = 100
     if D>=4 or _radom_unit_cell:
-        e_start = 3
+        e_start = 4
         e_end   = 7
     else:
         e_start = 3

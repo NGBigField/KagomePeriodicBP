@@ -741,7 +741,7 @@ def sort_coordinates_by_direction(items:list[tuple[int, int]], direction:Directi
 	
 
 @functools.cache
-def verices_indices_rows_in_direction(N:int, major_direction:BlockSide, minor_direction:LatticeDirection)->list[list[int]]:
+def vertices_indices_rows_in_direction(N:int, major_direction:BlockSide, minor_direction:LatticeDirection)->list[list[int]]:
 	""" arrange nodes by direction:
 	"""
 	## Arrange indices by position relative to direction, in reverse order

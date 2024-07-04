@@ -15,7 +15,6 @@ import numpy as np
 from utils import saveload, numpys, tuples
 
 from lattices.kagome import UpperTriangle, KagomeLattice, Node, BlockSide
-from lattices.visualizations import plot_lattice
 
 from libs.tnsu._utils import plot_convergence_curve
 from libs.tnsu.tensor_network import TensorNetwork
@@ -25,8 +24,6 @@ import libs.tnsu.structure_matrix_constructor as smg
 
 TnsuReturnType : TypeAlias = TensorNetwork
 DATA_SUBFOLDER = "tnsu_results"
-PBC = True  # Periodic Boundary Conditions (if False Open Boundary Conditions)
-
 
 
 # Pauli matrices
@@ -153,29 +150,16 @@ def _kagome_connect_boundary_edges_periodically(kagome_lattice:KagomeLattice, ed
     node2.edges[node2.edges.index(edge2)] = new_periodic_edge
 
 
-def _kagome_structure_matrix(size:int) -> np.ndarray:
+def _kagome_structure_matrix(size:int, periodic:bool) -> np.ndarray:
     
     ## Lattice:
     kagome_lattice : KagomeLattice = KagomeLattice(N=size)
-    # kagome_lattice.plot_triangles_lattice()
-
-    ## connect periodically:
-    ordered_half_list = list(BlockSide.all_in_counter_clockwise_order())[0:3]
-    for block_side in ordered_half_list:
-        boundary_edges          = kagome_lattice.sorted_boundary_edges(boundary=block_side)
-        opposite_boundary_edges = kagome_lattice.sorted_boundary_edges(boundary=block_side.opposite())
-        opposite_boundary_edges.reverse()
-
-        for edge1, edge2 in zip(boundary_edges, opposite_boundary_edges, strict=True):
-            ## Choose boundary function:
-            if PBC:
-                _kagome_connect_boundary_edges_periodically(kagome_lattice, edge1, edge2)
-            else:
-                _kagome_disconnect_boundary_edges_to_open_nodes(kagome_lattice, edge1, edge2)
-
+    kagome_lattice.change_boundary_conditions(periodic)
 
     # Plot lattice:
-    # plot_lattice(kagome_lattice.nodes, kagome_lattice.edges)
+    # fig = plt.figure()
+    # kagome_lattice.plot()
+    # fig.suptitle(f"periodic={periodic}")
 
     ## init structure matrix:
     m = len(kagome_lattice.nodes)  # num rows
@@ -198,7 +182,7 @@ def _kagome_structure_matrix(size:int) -> np.ndarray:
     for j in range(n):
         col = sm[:, j]
         non_zero_values = [x for x in col if x!=0]
-        if PBC:
+        if periodic:
             assert len(non_zero_values)==2, f"Each edge must have only two connected nodes!"
         else:
             assert len(non_zero_values)<=2, f"Each edge must have at most two connected nodes!"
@@ -206,30 +190,31 @@ def _kagome_structure_matrix(size:int) -> np.ndarray:
     return sm
 
 
-@functools.cache
-def _periodicity_str()->str:
-    if PBC:
+def _periodicity_str(periodic:bool)->str:
+    if periodic:
         return "PBC"
     else:
         return "OBC"
 
-def _common_filename(D:int, size:int)->str:
-    name = f"tnsu_AFH_D={D}_size={size}_{_periodicity_str()}.dat"
+
+def _common_filename(D:int, size:int, periodic:bool)->str:
+    name = f"tnsu_AFH_D={D}_size={size}_{_periodicity_str(periodic)}.dat"
     return name
 
 
-def load_or_compute_tnsu_unit_cell(D:int=2, size:int=1)->UnitCell:
-    tnsu_network = _load_or_compute_tnsu_network(D=D, size=size)
-    unit_cell = _parse_tnsu_network_to_unit_cell(D=D, size=size, tnsu_network=tnsu_network)
-    return unit_cell
+def load_or_compute_tnsu_unit_cell(D:int=2, size:int=1, periodic:bool=True) -> tuple[UnitCell, float]:
+    tnsu_network = _load_or_compute_tnsu_network(D=D, size=size, periodic=periodic)
+    unit_cell = _parse_tnsu_network_to_unit_cell(D=D, size=size, periodic=periodic, tnsu_network=tnsu_network)
+    tnsu_energy = tnsu_network.final_energy
+    return unit_cell, tnsu_energy 
 
 
-def _load_or_compute_tnsu_network(D:int=2, size:int=1)->TnsuReturnType:
-    filename = _common_filename(D=D, size=size)
+def _load_or_compute_tnsu_network(D:int=2, size:int=1, periodic:bool=True)->TnsuReturnType:
+    filename = _common_filename(D=D, size=size, periodic=periodic)
     if saveload.exist(filename, sub_folder=DATA_SUBFOLDER):
         tnsu_network = saveload.load(filename, sub_folder=DATA_SUBFOLDER)
     else:
-        tnsu_network = _kagome_afh_peps_ground_state_search(D=D, size=size)
+        tnsu_network = _kagome_afh_peps_ground_state_search(D=D, size=size, periodic=periodic)
         saveload.save(tnsu_network, name=filename, sub_folder=DATA_SUBFOLDER)
     return tnsu_network
 
@@ -252,7 +237,7 @@ def _parse_tnsu_network_to_unit_cell_get_triangles(size:int)->list[UpperTriangle
     return [kagome_lattice.get_center_triangle()]
 
 
-def _parse_tnsu_network_to_unit_cell_canonical_form(D:int, size:int, tnsu_network:TnsuReturnType)->UnitCell:
+def _parse_tnsu_network_to_unit_cell_canonical_form(D:int, size:int, periodic:bool, tnsu_network:TnsuReturnType)->UnitCell:
     triangles_to_include = _parse_tnsu_network_to_unit_cell_get_triangles(size=size)
     unit_cells : list[UnitCell] = []
 
@@ -289,16 +274,16 @@ def _parse_tnsu_network_to_unit_cell_single_periodic_single_cell(D:int, tnsu_net
     )
 
 
-def _parse_tnsu_network_to_unit_cell(D:int, size:int, tnsu_network:TnsuReturnType)->UnitCell:
+def _parse_tnsu_network_to_unit_cell(D:int, size:int, periodic:bool, tnsu_network:TnsuReturnType)->UnitCell:
 
     if size>=2:
-        return _parse_tnsu_network_to_unit_cell_canonical_form(D=D, size=size, tnsu_network=tnsu_network)
+        return _parse_tnsu_network_to_unit_cell_canonical_form(D=D, size=size, periodic=periodic, tnsu_network=tnsu_network)
     
-    elif size==1 and PBC:
+    elif size==1 and periodic:
         return _parse_tnsu_network_to_unit_cell_single_periodic_single_cell(D=D, tnsu_network=tnsu_network)
     
-    elif size==0:
-        raise NotImplementedError("Not yet implemented. size==0 might perhaps be for Roman Orus's version")
+    else:
+        raise NotImplementedError(f"Not yet implemented. size={size!r}.")
 
 
 def _kagome_afh_peps_ground_state_search(
@@ -308,6 +293,7 @@ def _kagome_afh_peps_ground_state_search(
     max_iterations: int = 500, 
     dts: list = [0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001],
     plot_results: bool = False, 
+    periodic:bool = True,
     print_process: bool = True
 ) -> TnsuReturnType:
     """
@@ -342,10 +328,12 @@ def _kagome_afh_peps_ground_state_search(
     # structure matrix:
     if size == 0:
         structure_matrix = _FIXED_KAGOME_STRUCTURE_MATRIX
-    if size == 1:
+    elif size == 1 and periodic:
         structure_matrix = _SINGLE_PERIODIC_CELL_STRUCTURE_MATRIX
+    elif size > 1:
+        structure_matrix = _kagome_structure_matrix(size=size, periodic=periodic)
     else:
-        structure_matrix = _kagome_structure_matrix(size=size)
+        raise ValueError("Not an option")
 
     print(f'There are {structure_matrix.shape[1]} edges, and {structure_matrix.shape[0]} tensors.')
 
@@ -356,7 +344,7 @@ def _kagome_afh_peps_ground_state_search(
     ## Run Simple Update:
     
     # create Tensor Network name for saving
-    network_name = _common_filename(D=D, size=size)
+    network_name = _common_filename(D=D, size=size, periodic=periodic)
 
     # create the Tensor Network object
     afh_tn = TensorNetwork(structure_matrix=structure_matrix,
@@ -381,13 +369,16 @@ def _kagome_afh_peps_ground_state_search(
     # run Simple Update algorithm over the Tensor Network state
     afh_tn_su.run()
 
-    # Swallow matrices into tebsors:
+    # Swallow matrices into tensors:
     afh_tn_su.absorb_all_weights()
 
     # compute the energy per-site observable
     energy = afh_tn_su.energy_per_site()
     print(f'| D max: {D} | Energy: {energy}\n')
     afh_tn = afh_tn_su.tensor_network
+
+    # Save energy. We might use it later
+    afh_tn.__setattr__("final_energy", energy)
 
     # plot su convergence / energy curve
     if plot_results:
