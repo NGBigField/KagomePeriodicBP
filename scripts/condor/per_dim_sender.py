@@ -35,12 +35,13 @@ def main():
 
     ## Compute needed memory
     match D:
-        case [2,3]:
-            request_memory_gb = 4
-        case 4:
-            request_memory_gb = 8 
-        case [5,6]:
-            request_memory_gb = 16 
+        case 2:     request_memory_gb = 4
+        case 3|4:   request_memory_gb = 8 
+        case 5:     request_memory_gb = 16 
+        case 6:     request_memory_gb = 32
+        case 7:     request_memory_gb = 128
+        case _:     request_memory_gb = 128
+
     # request_memory_gb += N
     request_memory_gb = int(request_memory_gb)
     print(f"request_memory_gb: {request_memory_gb}gb")
