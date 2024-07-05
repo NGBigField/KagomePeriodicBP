@@ -369,14 +369,14 @@ def _kagome_afh_peps_ground_state_search(
     # run Simple Update algorithm over the Tensor Network state
     afh_tn_su.run()
 
+    # compute the energy per-site observable
+    energy = afh_tn_su.energy_per_site()
+
     # Swallow matrices into tensors:
     afh_tn_su.absorb_all_weights()
 
-    # compute the energy per-site observable
-    energy = afh_tn_su.energy_per_site()
     print(f'| D max: {D} | Energy: {energy}\n')
     afh_tn = afh_tn_su.tensor_network
-
     # Save energy. We might use it later
     afh_tn.__setattr__("final_energy", energy)
 
