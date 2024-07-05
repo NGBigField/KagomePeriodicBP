@@ -162,4 +162,7 @@ cython_debug/
 ## Keep best unit-cells:
 !/data/unit_cells/best/
 !/data/unit_cells/best/*
+## Keep tnsu results:
+!/data/tnsu_results/
+!/data/tnsu_results/*
 
