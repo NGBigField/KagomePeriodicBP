@@ -42,6 +42,18 @@ def _config_at_measurement(config:Config)->Config:
     return config
 
 
+def _get_hamiltonian(hamiltonian:str) -> tuple:
+    match hamiltonian: 
+        case "FM":        return (hamiltonians.heisenberg_fm, None, None)
+        case "FM-T":      return (hamiltonians.heisenberg_fm_with_field, "delta_t", constant_global_field)
+        case "AFM":       return (hamiltonians.heisenberg_afm, None, None)
+        case "AFM-T":     return (hamiltonians.heisenberg_afm_with_field, "delta_t", constant_global_field)
+        case "Field":     return (hamiltonians.field, None, None)
+        case "Ising-AFM": return (hamiltonians.ising_with_transverse_field, "delta_t", constant_global_field)
+        case _:
+            raise ValueError("Not matching any option.")
+        
+
 def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
     is_random = False
 
@@ -80,7 +92,7 @@ def main(
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     progress_bar:bool=True,
     results_filename:str|None = None,
-    parallel:bool = 1,
+    parallel:bool = 0,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
     unit_cell_from:str = "best"
@@ -104,12 +116,14 @@ def main(
     config.visuals.progress_bars = progress_bar
     config.bp.damping = damping
     config.bp.parallel_msgs = parallel
+    config.ite.interaction_hamiltonian = _get_hamiltonian(hamiltonian)
 
     # Chi factor:
     config.trunc_dim = int(config.trunc_dim*chi_factor)
     config.bp.max_swallowing_dim = int(config.bp.max_swallowing_dim*chi_factor)
 
     config.bp.msg_diff_good_enough = 1e-4
+    config.bp.msg_diff_terminate = 1e-10
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 40
     config.bp.allowed_retries = 2
@@ -122,31 +136,21 @@ def main(
     config.ite.always_use_lowest_energy_state = False
     config.ite.add_gaussian_noise_fraction = 1e-6
     config.iterative_process.bp_every_edge = True
-    config.iterative_process.num_mode_repetitions_per_segment = 1
-    config.bp.msg_diff_terminate = 1e-10
+    config.iterative_process.num_mode_repetitions_per_segment = 3
 
     ## time steps:
-    n_per_dt = 100
-    if D>=4 or _radom_unit_cell:
+    if D<4:
+        n_per_dt = 200
         e_start = 4
-        e_end   = 7
+        e_end   = 8
     else:
+        n_per_dt = 150
         e_start = 3
         e_end   = 7
+    # 
+    if _radom_unit_cell:
+        e_start = 2
     config.ite.time_steps = [[np.power(10, -float(exp))]*n_per_dt for exp in np.arange(e_start, e_end, 1)]
-
-    # Interaction:
-    match hamiltonian: 
-        case "FM":        h = (hamiltonians.heisenberg_fm, None, None)
-        case "FM-T":      h = (hamiltonians.heisenberg_fm_with_field, "delta_t", constant_global_field)
-        case "AFM":       h = (hamiltonians.heisenberg_afm, None, None)
-        case "AFM-T":     h = (hamiltonians.heisenberg_afm_with_field, "delta_t", constant_global_field)
-        case "Field":     h = (hamiltonians.field, None, None)
-        case "Ising-AFM": h = (hamiltonians.ising_with_transverse_field, "delta_t", constant_global_field)
-        case _:
-            raise ValueError("Not matching any option.")
-        
-    config.ite.interaction_hamiltonian = h
 
     ## Run:
     energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)
