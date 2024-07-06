@@ -205,7 +205,10 @@ def _common_filename(D:int, size:int, periodic:bool)->str:
 def load_or_compute_tnsu_unit_cell(D:int=2, size:int=1, periodic:bool=True) -> tuple[UnitCell, float]:
     tnsu_network = _load_or_compute_tnsu_network(D=D, size=size, periodic=periodic)
     unit_cell = _parse_tnsu_network_to_unit_cell(D=D, size=size, periodic=periodic, tnsu_network=tnsu_network)
-    tnsu_energy = tnsu_network.final_energy
+    try:
+        tnsu_energy = tnsu_network.final_energy
+    except AttributeError:
+        tnsu_energy = None
     return unit_cell, tnsu_energy 
 
 

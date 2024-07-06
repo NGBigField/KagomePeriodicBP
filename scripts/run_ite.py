@@ -76,7 +76,7 @@ def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
         case "tnsu":
             print("Get unit_cell by simple-update:")
             is_random = True
-            unit_cell = given_by.tnsu(D=D)
+            unit_cell, energy = given_by.tnsu(D=D)
 
         case _:
             unit_cell = UnitCell.load(get_from)
