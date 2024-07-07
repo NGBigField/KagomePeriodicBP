@@ -9,7 +9,8 @@ from algo.tn_reduction.core_to_mode import reduce_core_to_mode
 from algo.tn_reduction.mode_to_edge import reduce_mode_to_edge
 
 # Types in the code:
-from tensor_networks import TensorNetwork, KagomeTNRepeatedUnitCell, CoreTN, ModeTN, EdgeTN
+from tensor_networks import KagomeTNRepeatedUnitCell, CoreTN, ModeTN, EdgeTN
+from tensor_networks.abstract_classes import TensorNetwork
 
 # For type hinting:
 from typing import TypeVar, Type, Callable

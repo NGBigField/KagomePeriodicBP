@@ -23,7 +23,8 @@ from libs.ITE import rho_ij
 # Common types in the code:
 from containers import Config, BubbleConConfig, UpdateEdge
 from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
-from tensor_networks import KagomeTNRepeatedUnitCell, TensorNetwork, ModeTN, EdgeTN, TensorNode, MPS
+from tensor_networks import KagomeTNRepeatedUnitCell, ModeTN, EdgeTN, TensorNode, MPS
+from tensor_networks.abstract_classes import TensorNetwork
 from lattices.directions import BlockSide
 from _error_types import TensorNetworkError, BPNotConvergedError
 from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor, UpdateMode

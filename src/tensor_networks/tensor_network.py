@@ -245,15 +245,11 @@ class KagomeTensorNetwork(TensorNetwork, ABC):
     # ================================================= #
     #|                Basic Attributes                 |#
     # ================================================= #
-    def __init__(self, lattice:KagomeLattice) -> None:
+    def __init__(self, lattice:KagomeLattice, dimensions:TNDimensions) -> None:
         # Save data:
-        self.lattice : KagomeLattice  # Must keep a Kagome lattice
+        self.lattice : KagomeLattice = lattice  # Must keep a Kagome lattice
         self.messages : MessageDictType = {}  # Must have a dictionary of messages for each block side
-        self.dimensions : TNDimensions = TNDimensions(  # Must keep its dimensions in a simple dictionary
-            virtual_dim = None,
-            physical_dim = None,
-            big_lattice_size=lattice.N
-        )
+        self.dimensions : TNDimensions = dimensions  # Must keep its dimensions in a simple dictionary
     # ================================================= #
     #|                    messages                     |#
     # ================================================= #
@@ -320,14 +316,13 @@ class KagomeTNRepeatedUnitCell(KagomeTensorNetwork):
         D : int
     ) -> None:
         # Save data:
-        self.lattice : KagomeLattice = lattice
-        self.messages : MessageDictType = {}
-        self.unit_cell : UnitCell = unit_cell
-        self.dimensions : TNDimensions = TNDimensions(
+        dimensions = TNDimensions(
             virtual_dim=D,
             physical_dim=d,
             big_lattice_size=lattice.N
         )
+        super().__init__(lattice=lattice, dimensions=dimensions)
+        self.unit_cell : UnitCell = unit_cell
 
     # ================================================= #
     #|                    messages                     |#
@@ -399,14 +394,13 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
         lattice = KagomeLattice(N)
         d = tensors[0].shape[0]
         D = tensors[0].shape[-1]
-        # Save data:
-        self.lattice : KagomeLattice = lattice
-        self.messages : MessageDictType = {}
-        self.dimensions : TNDimensions = TNDimensions(
+        dimensions = TNDimensions(
             virtual_dim=D,
             physical_dim=d,
             big_lattice_size=lattice.N
         )
+        # Save data:
+        super().__init__(lattice=lattice, dimensions=dimensions)
         self.lattice_nodes : list[TensorNode] = _tensors_to_kagome_lattice_tensor_nodes(tensors, lattice)
 
     # ================================================= #
@@ -414,7 +408,6 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
     # ================================================= #
     def connect_messages(self, messages:MessageDictType) -> None:   
         super().connect_messages(messages)
-        self.clear_cache()
 
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
@@ -1362,11 +1355,5 @@ def _tensors_to_kagome_lattice_tensor_nodes(tensors:list[np.ndarray], lattice:Ka
 
     return tensor_nodes
 
-
-
-## Keep abstract classed in the same place for readability and easy access:
-class arbitrary_classes:
-    TensorNetwork = TensorNetwork
-    KagomeTensorNetwork = KagomeTensorNetwork
 
 

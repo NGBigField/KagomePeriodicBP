@@ -13,7 +13,7 @@ if __name__ == "__main__":
 from _config_reader import DEBUG_MODE
 
 # Import our types and calsses:
-from tensor_networks import KagomeTNRepeatedUnitCell, TensorNode, CoreTN, ModeTN
+from tensor_networks import KagomeTNRepeatedUnitCell, TensorNode, CoreTN, ModeTN, abstract_classes
 from lattices.directions import Direction, BlockSide, LatticeDirection, sort
 from enums import ContractionDepth, NodeFunctionality
 
@@ -601,7 +601,7 @@ def derive_kagome_tn_contraction_order(
 
 
 
-def get_contraction_order(tn:KagomeTNRepeatedUnitCell|CoreTN, direction:BlockSide, depth:ContractionDepth, plot_:bool=False)->list[int]:
+def get_contraction_order(tn:abstract_classes.KagomeTensorNetwork|CoreTN, direction:BlockSide, depth:ContractionDepth, plot_:bool=False)->list[int]:
 
     ## In the case where it's a CoreTN (which has an expected canonical structure)
     if isinstance(tn, CoreTN):
@@ -619,7 +619,7 @@ def get_contraction_order(tn:KagomeTNRepeatedUnitCell|CoreTN, direction:BlockSid
 
     ## In the case where it's a Full Kagome lattice TN:
     ## Get cached contractions or derive them:
-    assert isinstance(tn, KagomeTNRepeatedUnitCell)
+    assert isinstance(tn, abstract_classes.KagomeTensorNetwork)
     assert depth is not ContractionDepth.ToEdge, f"Contraction to edge method does not exist for a full Kagome TN"
     global FULL_CONTRACTION_ORDERS_CACHE
     cache_key = (tn.lattice.N, direction, depth)
