@@ -407,7 +407,7 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
             physical_dim=d,
             big_lattice_size=lattice.N
         )
-        self.lattice_nodes : list[TensorNode] = _tensors_to_kagome_lattice_nodes(tensors, lattice)
+        self.lattice_nodes : list[TensorNode] = _tensors_to_kagome_lattice_tensor_nodes(tensors, lattice)
 
     # ================================================= #
     #|                    messages                     |#
@@ -419,6 +419,7 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
     # ================================================= #
+    @property
     def nodes(self)->list[TensorNode]:
         nodes = self.lattice_nodes
         nodes += _common_kagome_get_message_nodes(self)
@@ -1332,27 +1333,35 @@ def _edge_tn_rearrange_tensors_and_legs_into_canonical_order(
     return tn, permutation_orders
 
 
-def _tensors_to_kagome_lattice_nodes(tensors:list[np.ndarray], lattice:KagomeLattice) -> list[TensorNode]:
-    # Derive common information:
+def _tensors_to_kagome_lattice_tensor_nodes(tensors:list[np.ndarray], lattice:KagomeLattice) -> list[TensorNode]:
+    ## Prepare output:
+    tensor_nodes = []
+
+    ## Derive common information:
     center_triangle = lattice.get_center_triangle()
     center_neighbors = set()
     for node in center_triangle.all_nodes():
         for edge in node.edges:
             neighbors = lattice.get_neighbor(node, edge) 
-            center_neighbors.add(neighbors)
+            center_neighbors.add(neighbors.index)
 
+    ## Iterate over all lattice nodes and tensors:
     for i, (lattice_node, tensor) in enumerate(zip(lattice.nodes, tensors, strict=True)):
         name = f"{i}"
         # Derive information
         if lattice_node in center_triangle:     
             functionality = NodeFunctionality.CenterCore
-        elif lattice_node in center_neighbors:  
+        elif lattice_node.index in center_neighbors:  
             functionality = NodeFunctionality.AroundCore
         else:
             functionality = NodeFunctionality.Padding
         # Create Node:
         tensor_node = TensorNode.from_lattice_node(lattice_node, tensor, name=name, functionality=functionality)
         # Add to list:
+        tensor_nodes.append(tensor_node)
+
+    return tensor_nodes
+
 
 
 ## Keep abstract classed in the same place for readability and easy access:
@@ -1361,6 +1370,3 @@ class arbitrary_classes:
     KagomeTensorNetwork = KagomeTensorNetwork
 
 
-if __name__ == "__main__":
-    from scripts.test_contraction import main_test
-    main_test()

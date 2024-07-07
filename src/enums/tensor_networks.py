@@ -13,7 +13,7 @@ class UnitCellFlavor(Enum):
     A = auto()
     B = auto()
     C = auto()
-    NoneLattice = auto()
+    NoneUnitCell = auto()
 
     def __str__(self) -> str:
         return self.name

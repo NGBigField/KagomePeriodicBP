@@ -5,10 +5,11 @@ from tensor_networks import KagomeTNRepeatedUnitCell, KagomeTNArbitrary
 from utils import saveload
 
 
-def main(size:int) -> dict:
+def main() -> dict:
     tensors = saveload.load("Kagome-PEPS.pkl")
     tn = KagomeTNArbitrary(tensors=tensors)
+    tn.plot()
     print("Done.")
 
 if __name__ == "__main__":
-    main(size=2)
+    main()

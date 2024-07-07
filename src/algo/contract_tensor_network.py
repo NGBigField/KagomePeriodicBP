@@ -72,7 +72,7 @@ def _plot_tn_with_connected_corner(
             is_ket = False
             directions = [Direction(name="rand", angle=a) for a in angles]
             functionality=NodeFunctionality.Message
-            cell_flavor = UnitCellFlavor.NoneLattice
+            cell_flavor = UnitCellFlavor.NoneUnitCell
 
         node = TensorNode(
             index=i,

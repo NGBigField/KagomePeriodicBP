@@ -44,15 +44,14 @@ class TensorNode():
     edges : list[EdgeIndicatorType]
     directions : list[LatticeDirection] 
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
-    cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
+    cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneUnitCell) 
     boundaries : set[BlockSide] = field(default_factory=set) 
 
     @staticmethod
     def from_lattice_node(
         lattice_node:LatticeNode, tensor:np.ndarray, name:str="", 
-        functionality:NodeFunctionality=NodeFunctionality.Undefined, cell_flavor:UnitCellFlavor=UnitCellFlavor.NoneLattice
+        functionality:NodeFunctionality=NodeFunctionality.Undefined, cell_flavor:UnitCellFlavor=UnitCellFlavor.NoneUnitCell
     ) -> "TensorNode":
-        if boundaries is None: boundaries=set()
         return TensorNode(
             # Directly from lattice-node:
             index = lattice_node.index,

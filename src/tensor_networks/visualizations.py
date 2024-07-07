@@ -264,7 +264,7 @@ def plot_network(
                 color = 'green'
             case UnitCellFlavor.C:
                 color = 'blue'
-            case UnitCellFlavor.NoneLattice:
+            case UnitCellFlavor.NoneUnitCell:
                 name = f"{node.name}"
                 if node.functionality is NodeFunctionality.Message:
                     color = "orange"
