@@ -6,7 +6,7 @@
 from _config_reader import DEBUG_MODE
 
 # For common lattice function and classes:
-from tensor_networks.tensor_network import KagomeTNRepeatedUntiCell, TensorDims
+from tensor_networks.tensor_network import KagomeTNRepeatedUnitCell, TensorDims
 from unit_cell import UnitCell
 
 from lattices.kagome import KagomeLattice
@@ -26,7 +26,7 @@ def create_kagome_tn(
     D : int,  # Virutal\Bond dimenstion  
     N : int,  # Lattice-size - Number of upper-triangles at each edge of the hexagon-block
     unit_cell : UnitCell|None = None
-) -> KagomeTNRepeatedUntiCell:
+) -> KagomeTNRepeatedUnitCell:
 
     # Get the kagome lattice without tensors:
     lattice = KagomeLattice(N)
@@ -37,12 +37,12 @@ def create_kagome_tn(
     else:
         assert isinstance(unit_cell, UnitCell)
 
-    tn = KagomeTNRepeatedUntiCell(lattice, unit_cell, d=d, D=D)
+    tn = KagomeTNRepeatedUnitCell(lattice, unit_cell, d=d, D=D)
     
     return tn
 
 
-def kagome_tn_from_unit_cell(unit_cell:UnitCell, dims:TNDimensions) -> KagomeTNRepeatedUntiCell:
+def kagome_tn_from_unit_cell(unit_cell:UnitCell, dims:TNDimensions) -> KagomeTNRepeatedUnitCell:
     return create_kagome_tn(
         d = dims.physical_dim,
         D = dims.virtual_dim,

@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 _T = TypeVar("_T")
 
 # Common types in the code:
-from tensor_networks import KagomeTNRepeatedUntiCell, ArbitraryTN, ModeTN, TensorNode, MPS, CoreTN, get_common_edge
+from tensor_networks import KagomeTNRepeatedUnitCell, ArbitraryTN, ModeTN, TensorNode, MPS, CoreTN, get_common_edge
 
 # Everyone needs numpy:
 import numpy as np
@@ -27,7 +27,7 @@ from libs import bmpslib
 from algo.contract_tensor_network import contract_tensor_network
 
 # Types we need in our module:
-from tensor_networks import KagomeTNRepeatedUntiCell, ArbitraryTN, TensorNode, MPS
+from tensor_networks import KagomeTNRepeatedUnitCell, ArbitraryTN, TensorNode, MPS
 from tensor_networks.node import TensorNode, two_nodes_ordered_by_relative_direction
 from lattices.directions import Direction, LatticeDirection, BlockSide, check
 from enums import ContractionDepth, NodeFunctionality, UpdateMode
@@ -103,7 +103,7 @@ class _PerSide(Generic[_T]):
 
 def _contract_half(
     side_key:str, 
-    tn:KagomeTNRepeatedUntiCell,
+    tn:KagomeTNRepeatedUnitCell,
     directions:_PerSide[BlockSide],
     bubblecon_trunc_dim:int,
     print_progress:bool
@@ -118,7 +118,7 @@ def _contract_half(
 
 
 def _contract_tn_from_sides_and_create_mpss(
-    tn:KagomeTNRepeatedUntiCell,
+    tn:KagomeTNRepeatedUnitCell,
     directions:_PerSide[BlockSide],
     bubblecon_trunc_dim:int,
     parallel:bool
@@ -150,7 +150,7 @@ def _contract_tn_from_sides_and_create_mpss(
     return mpss, con_orders, orientations
 
 def _basic_data(
-    tn:KagomeTNRepeatedUntiCell, parallel:bool, direction:BlockSide|None
+    tn:KagomeTNRepeatedUnitCell, parallel:bool, direction:BlockSide|None
 )->tuple[
     list[TensorNode],
     _PerSide[int],
@@ -316,7 +316,7 @@ def _add_env_tensors_to_open_core(small_tn:ArbitraryTN, env_tensors:list[TensorN
 
 
 
-def reduce_full_kagome_to_core(tn:KagomeTNRepeatedUntiCell, trunc_dim:int, parallel:bool=False, direction:BlockSide|None=None) -> CoreTN:
+def reduce_full_kagome_to_core(tn:KagomeTNRepeatedUnitCell, trunc_dim:int, parallel:bool=False, direction:BlockSide|None=None) -> CoreTN:
     ## 0: Check inputs:
     if DEBUG_MODE:
         tn.validate()

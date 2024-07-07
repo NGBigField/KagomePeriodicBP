@@ -6,7 +6,7 @@ from _config_reader import DEBUG_MODE
 from typing import TypeVar
 
 # Types we need in our module:
-from tensor_networks import KagomeTNRepeatedUntiCell, ArbitraryTN, ModeTN, TensorNode, MPS, CoreTN, get_common_edge
+from tensor_networks import KagomeTNRepeatedUnitCell, ArbitraryTN, ModeTN, TensorNode, MPS, CoreTN, get_common_edge
 from tensor_networks import TensorNode
 from tensor_networks.node import TensorNode
 from enums import ContractionDepth, NodeFunctionality, UpdateMode

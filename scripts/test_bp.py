@@ -11,7 +11,7 @@ from algo.belief_propagation import belief_propagation, robust_belief_propagatio
 
 # Config and containers:
 from containers import BPConfig
-from tensor_networks import KagomeTNRepeatedUntiCell, CoreTN, ModeTN, EdgeTN
+from tensor_networks import KagomeTNRepeatedUnitCell, CoreTN, ModeTN, EdgeTN
 
 # update config
 from enums import UpdateMode, UnitCellFlavor
@@ -339,7 +339,7 @@ def test_bp_convergence_steps_single_run(
     update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
     bp_chi = D**2 
 
-    def _get_rho_i(tn:KagomeTNRepeatedUntiCell)->np.ndarray:
+    def _get_rho_i(tn:KagomeTNRepeatedUnitCell)->np.ndarray:
         edge_tn = reduce_tn(tn , EdgeTN, trunc_dim=chi, mode=update_mode, edge_tuple=update_edge)
         rdm = edge_tn.rdm
         return np.trace(rdm, axis1=2, axis2=3)
@@ -410,7 +410,7 @@ def test_bp_convergence_all_runs(
     update_mode = UpdateMode.A
     update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 
-    def _get_rho_i(tn:KagomeTNRepeatedUntiCell, chi:int)->np.ndarray:
+    def _get_rho_i(tn:KagomeTNRepeatedUnitCell, chi:int)->np.ndarray:
         edge_tn = reduce_tn(tn , EdgeTN, trunc_dim=chi, mode=update_mode, edge_tuple=update_edge)
         rdm = edge_tn.rdm
         return np.trace(rdm, axis1=2, axis2=3)

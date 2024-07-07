@@ -237,7 +237,9 @@ class TensorNetwork(ABC):
         return crnt_suggestion
 
 
-class _CommonKagomeTN(TensorNetwork, ABC):
+class KagomeTensorNetwork(TensorNetwork, ABC):
+    """ Abstract Class to define the behavior of Kagome Tensor Networks
+    """
 
     # ================================================= #
     #|                Basic Attributes                 |#
@@ -304,7 +306,7 @@ class _CommonKagomeTN(TensorNetwork, ABC):
     
 
 
-class KagomeTNRepeatedUntiCell(_CommonKagomeTN):
+class KagomeTNRepeatedUnitCell(KagomeTensorNetwork):
 
     # ================================================= #
     #|                Basic Attributes                 |#
@@ -340,8 +342,8 @@ class KagomeTNRepeatedUntiCell(_CommonKagomeTN):
     def nodes(self)->list[TensorNode]:
         return _derive_nodes_kagome_tn(self)
 
-    def copy(self, with_messages:bool=True)->"KagomeTNRepeatedUntiCell":
-        new = KagomeTNRepeatedUntiCell(
+    def copy(self, with_messages:bool=True)->"KagomeTNRepeatedUnitCell":
+        new = KagomeTNRepeatedUnitCell(
             lattice=self.lattice,
             unit_cell=self.unit_cell.copy(),
             d=self.dimensions.physical_dim,
@@ -376,10 +378,10 @@ class KagomeTNRepeatedUntiCell(_CommonKagomeTN):
         return triangle
 
 
-class KagomeTensorNetwork(_CommonKagomeTN):
-    """This class holds tensors in a Kagome Latice structure.
+class KagomeTNArbitrary(KagomeTensorNetwork):
+    """This class holds tensors in a Kagome Lattice structure.
     
-    It differs from the ```KagomeTNRepeatedUntiCell``` class in that it can hold 
+    It differs from the ```KagomeTNRepeatedUnitCell``` class in that it can hold 
     various different tensors without forcing a repeated unit-cell.
     """
 
@@ -417,10 +419,11 @@ class KagomeTensorNetwork(_CommonKagomeTN):
     # ================================================= #
     def nodes(self)->list[TensorNode]:
         nodes = self.lattice_nodes
-        for
+        nodes += _common_kagome_get_message_nodes(self)
+        return nodes
 
-    def copy(self, with_messages:bool=True)->"KagomeTensorNetwork":
-        new = KagomeTensorNetwork(
+    def copy(self, with_messages:bool=True)->"KagomeTNArbitrary":
+        new = KagomeTNArbitrary(
             lattice=self.lattice
         )
         if with_messages:
@@ -711,7 +714,7 @@ def _derive_message_node_position(nodes_on_boundary:list[Node], edge:EdgeIndicat
 
 
 def _message_nodes(
-    tn : KagomeTNRepeatedUntiCell,
+    tn : KagomeTNRepeatedUnitCell,
     message : Message,
     boundary_side : BlockSide,
     first_node_index : int
@@ -788,7 +791,21 @@ def _message_nodes(
     return res
 
 
-def  _derive_nodes_kagome_tn(tn:KagomeTNRepeatedUntiCell)->list[TensorNode]:
+
+def _common_kagome_get_message_nodes(tn:KagomeTensorNetwork) -> list[Node]:
+    nodes = []
+    if len(tn.messages)>0:
+        crnt_node_index = tn.lattice.size
+        for side in BlockSide.all_in_counter_clockwise_order():
+            if side in tn.messages:
+                message = tn.messages[side]
+                message_nodes = _message_nodes(tn, message, side, crnt_node_index)
+                nodes.extend(message_nodes)
+                crnt_node_index += len(message_nodes)
+    return nodes
+
+
+def  _derive_nodes_kagome_tn(tn:KagomeTNRepeatedUnitCell)->list[TensorNode]:
     # init lists and iterators:
     unit_cell_tensors = itertools.cycle(tn.unit_cell.items())
     
@@ -830,14 +847,7 @@ def  _derive_nodes_kagome_tn(tn:KagomeTNRepeatedUntiCell)->list[TensorNode]:
             neighbor.functionality = NodeFunctionality.AroundCore
 
     ## Add messages:
-    if len(tn.messages)>0:
-        crnt_node_index = tn.lattice.size
-        for side in BlockSide.all_in_counter_clockwise_order():
-            if side in tn.messages:
-                message = tn.messages[side]
-                message_nodes = _message_nodes(tn, message, side, crnt_node_index)
-                nodes.extend(message_nodes)
-                crnt_node_index += len(message_nodes)
+    nodes += _common_kagome_get_message_nodes(tn)
 
     return nodes
 
@@ -849,8 +859,6 @@ def _replace_items(s:set[_T]|list[_T], old:_T, new:_T)->None:
         i = s.index(old)
         s.insert(i, new)
         s.pop(i+1)
-
-
 
 
 def _fuse_double_legs(n1:TensorNode, n2:TensorNode, changed_leg_index:None|int)->None:
@@ -931,7 +939,7 @@ def _derive_sub_tn(tn:TensorNetwork, indices:list[int])->ArbitraryTN:
     new.original_lattice_dims = ( int(max_y-min_y+1), int(max_x-min_x+1) )
     return new
 
-def _derive_edges_kagome_tn(self:KagomeTNRepeatedUntiCell)->dict[str, tuple[int, int]]:
+def _derive_edges_kagome_tn(self:KagomeTNRepeatedUnitCell)->dict[str, tuple[int, int]]:
     ## Lattice edges:
     edges = self.lattice.edges
 
@@ -1321,6 +1329,12 @@ def _edge_tn_rearrange_tensors_and_legs_into_canonical_order(
 
     return tn, permutation_orders
 
+
+
+## Keep abstract classed in the same place for readability and easy access:
+class arbitrary_classes:
+    TensorNetwork = TensorNetwork
+    KagomeTensorNetwork = KagomeTensorNetwork
 
 
 if __name__ == "__main__":

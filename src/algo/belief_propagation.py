@@ -14,7 +14,7 @@ from _config_reader import DEBUG_MODE
 import numpy as np
 
 # other used types in our code:
-from tensor_networks import KagomeTNRepeatedUntiCell, MPS, mps_distance
+from tensor_networks import KagomeTNRepeatedUnitCell, MPS, mps_distance
 from lattices.directions import BlockSide
 from enums import ContractionDepth
 from containers import BPStats, BPConfig, MessageDictType, Message
@@ -93,7 +93,7 @@ def _outgoing_messages(directions_iter:Generator[BlockSide, None, None], multi_p
 
 
 def _single_outgoing_message(
-    tn:KagomeTNRepeatedUntiCell, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool
+    tn:KagomeTNRepeatedUnitCell, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool
 ) -> Message:
     
     ## use bubble con to compute outgoing message:
@@ -120,7 +120,7 @@ def _bp_error_str(error:float|None):
 
 
 def _belief_propagation_step(
-    tn:KagomeTNRepeatedUntiCell,
+    tn:KagomeTNRepeatedUnitCell,
     prev_error:float|None,
     config:BPConfig,
     prog_bar_obj:prints.ProgressBar,
@@ -170,7 +170,7 @@ def _belief_propagation_step(
 
 @decorators.add_stats()
 def belief_propagation(
-    tn:KagomeTNRepeatedUntiCell, 
+    tn:KagomeTNRepeatedUnitCell, 
     messages:MessageDictType|None=None, # initial messages
     config:BPConfig=BPConfig(),
     update_plots_between_steps:bool=False,
@@ -259,7 +259,7 @@ def belief_propagation(
 
 @decorators.add_stats()
 def robust_belief_propagation(
-    tn:KagomeTNRepeatedUntiCell, 
+    tn:KagomeTNRepeatedUnitCell, 
     messages:MessageDictType|None=None, # initial messages
     config:BPConfig=BPConfig(),
     update_plots_between_steps:bool=False,

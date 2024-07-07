@@ -23,7 +23,7 @@ from containers import Config
 # Import other needed types:
 from enums import UpdateMode
 from containers import MessageDictType, UpdateEdge, BestUnitCellData
-from tensor_networks import KagomeTNRepeatedUntiCell, CoreTN, ModeTN, EdgeTN, UnitCell
+from tensor_networks import KagomeTNRepeatedUnitCell, CoreTN, ModeTN, EdgeTN, UnitCell
 from tensor_networks.construction import kagome_tn_from_unit_cell
 from _error_types import BPNotConvergedError, ITEError
 
@@ -557,7 +557,7 @@ def ite_per_segment(
     config_in:Config,
     prev_stats:ITESegmentStats
 )->tuple[
-    KagomeTNRepeatedUntiCell,         # core
+    KagomeTNRepeatedUnitCell,         # core
     MessageDictType,  # messages
     EnergiesOfEdgesDuringUpdateType,  # edge_energies_at_updates
     ITESegmentStats   # stats
@@ -596,7 +596,7 @@ def ite_per_delta_t(
     unit_cell:UnitCell, messages:MessageDictType|None, delta_t:float, num_repeats:int, config_in:Config, 
     plots:ITEPlots, logger:logs.Logger, tracker:ITEProgressTracker, segment_stats:ITESegmentStats
 ) -> tuple[
-    KagomeTNRepeatedUntiCell, MessageDictType|None, bool, ITESegmentStats
+    KagomeTNRepeatedUnitCell, MessageDictType|None, bool, ITESegmentStats
     # core, messages, at_least_one_successful_run, step_stats
 ]:
 
@@ -692,11 +692,11 @@ def full_ite(
 
 
 def robust_full_ite(
-    initial_core:KagomeTNRepeatedUntiCell|None=None,
+    initial_core:KagomeTNRepeatedUnitCell|None=None,
     config:Config|None=None,
     logger:logs.Logger|None=None
 )->tuple[
-    KagomeTNRepeatedUntiCell,          # core
+    KagomeTNRepeatedUnitCell,          # core
     ITEProgressTracker,     # ITE-Tracker
     logs.Logger             # Logger
 ]:
@@ -705,7 +705,7 @@ def robust_full_ite(
         assert isinstance(config, Config)
         config = deepcopy(config)
     if initial_core is not None:
-        assert isinstance(initial_core, KagomeTNRepeatedUntiCell)
+        assert isinstance(initial_core, KagomeTNRepeatedUnitCell)
         initial_core = initial_core.copy()
         initial_core.normalize_tensors()
 
