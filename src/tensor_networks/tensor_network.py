@@ -237,7 +237,74 @@ class TensorNetwork(ABC):
         return crnt_suggestion
 
 
-class KagomeTN(TensorNetwork):
+class _CommonKagomeTN(TensorNetwork, ABC):
+
+    # ================================================= #
+    #|                Basic Attributes                 |#
+    # ================================================= #
+    def __init__(self, lattice:KagomeLattice) -> None:
+        # Save data:
+        self.lattice : KagomeLattice  # Must keep a Kagome lattice
+        self.messages : MessageDictType = {}  # Must have a dictionary of messages for each block side
+        self.dimensions : TNDimensions = TNDimensions(  # Must keep its dimensions in a simple dictionary
+            virtual_dim = None,
+            physical_dim = None,
+            big_lattice_size=lattice.N
+        )
+    # ================================================= #
+    #|                    messages                     |#
+    # ================================================= #
+    @property
+    def has_messages(self)->bool:
+        return len(self.messages)==6
+
+    def connect_messages(self, messages:MessageDictType) -> None:   
+        # Fuse:
+        for block_side, message in messages.items():
+            self.messages[block_side] = message
+
+    def connect_random_messages(self) -> None:
+        return self._connect_messages_of_specific_initial_model(msg_model=MessageModel.RANDOM_QUANTUM)
+
+    def connect_uniform_messages(self) -> None:
+        return self._connect_messages_of_specific_initial_model(msg_model=MessageModel.UNIFORM_QUANTUM)
+
+    def _connect_messages_of_specific_initial_model(self, msg_model:MessageModel) -> None:
+        D = self.dimensions.virtual_dim
+        message_length = self.num_message_connections
+        messages = { 
+            edge_side : Message(
+                mps=initial_message(D=D, N=message_length, message_model=msg_model), 
+                orientation=MPSOrientation.standard(edge_side.opposite())
+            ) 
+            for edge_side in BlockSide.all_in_counter_clockwise_order()  \
+        }
+        self.connect_messages(messages)
+
+    def message_indices(self, direction:BlockSide)->list[int]:
+        return _kagome_lattice_derive_message_indices(self.lattice.N, direction)
+    
+    # ================================================= #
+    #|              Geometry Functions                 |#
+    # ================================================= #
+    @property
+    def num_message_connections(self)->int:
+        return self.lattice.num_message_connections
+    
+    def num_boundary_nodes(self, boundary:BlockSide)->int:
+        return self.lattice.num_boundary_nodes(boundary)
+    
+    def positions_min_max(self)->tuple[int, ...]:
+        min_x, max_x = lists.min_max([node.pos[0] for node in self.nodes])
+        min_y, max_y = lists.min_max([node.pos[1] for node in self.nodes])
+        return min_x, max_x, min_y, max_y
+    
+    def get_center_triangle(self)->UpperTriangle:
+        return self.lattice.get_center_triangle()
+    
+
+
+class KagomeTNRepeatedUntiCell(_CommonKagomeTN):
 
     # ================================================= #
     #|                Basic Attributes                 |#
@@ -260,20 +327,28 @@ class KagomeTN(TensorNetwork):
         )
 
     # ================================================= #
+    #|                    messages                     |#
+    # ================================================= #
+    def connect_messages(self, messages:MessageDictType) -> None:   
+        super().connect_messages(messages)
+        self.clear_cache()
+
+    # ================================================= #
     #|       Mandatory Implementations of ABC          |#
     # ================================================= #
     @functools.cached_property
     def nodes(self)->list[TensorNode]:
         return _derive_nodes_kagome_tn(self)
 
-    def copy(self, with_messages:bool=True)->"KagomeTN":
-        new = KagomeTN(
+    def copy(self, with_messages:bool=True)->"KagomeTNRepeatedUntiCell":
+        new = KagomeTNRepeatedUntiCell(
             lattice=self.lattice,
             unit_cell=self.unit_cell.copy(),
             d=self.dimensions.physical_dim,
             D=self.dimensions.virtual_dim,
         )
         if with_messages:
+            raise NotImplementedError("Should we deep copy here?")
             new.messages = self.messages
 
         if DEBUG_MODE: 
@@ -288,65 +363,78 @@ class KagomeTN(TensorNetwork):
         if arguments.property_is_chached(self, "nodes"):
             del self.nodes
 
-
-    # ================================================= #
-    #|                    messages                     |#
-    # ================================================= #
-
-    @property
-    def has_messages(self)->bool:
-        return len(self.messages)==6
-
-    def connect_messages(self, messages:MessageDictType) -> None:   
-        # Fuse:
-        for block_side, message in messages.items():
-            self.messages[block_side] = message
-        # Clear cache so that nodes are derived again
-        self.clear_cache()
-
-    def connect_random_messages(self) -> None:
-        return self._connect_messages_of_specific_initial_model(msg_model=MessageModel.RANDOM_QUANTUM)
-
-    def connect_uniform_messages(self) -> None:
-        return self._connect_messages_of_specific_initial_model(msg_model=MessageModel.UNIFORM_QUANTUM)
-
-    def _connect_messages_of_specific_initial_model(self, msg_model:MessageModel) -> None:
-        D = self.dimensions.virtual_dim
-        message_length = self.num_message_connections
-        messages = { 
-            edge_side : Message(
-                mps=initial_message(D=D, N=message_length, message_model=msg_model), 
-                orientation=MPSOrientation.standard(edge_side.opposite())
-            ) 
-            for edge_side in BlockSide.all_in_counter_clockwise_order()  \
-        }
-        self.connect_messages(messages)
-
-    def message_indices(self, direction:BlockSide)->list[int]:
-        return _derive_message_indices(self.lattice.N, direction)
-
     # ================================================= #
     #|              Geometry Functions                 |#
     # ================================================= #
-    @property
-    def num_message_connections(self)->int:
-        return self.lattice.num_message_connections
-    
-    def num_boundary_nodes(self, boundary:BlockSide)->int:
-        return self.lattice.num_boundary_nodes(boundary)
-    
-    def positions_min_max(self)->tuple[int, ...]:
-        min_x, max_x = lists.min_max([node.pos[0] for node in self.nodes])
-        min_y, max_y = lists.min_max([node.pos[1] for node in self.nodes])
-        return min_x, max_x, min_y, max_y
-    
     def get_center_triangle(self)->UpperTriangle:
-        triangle = self.lattice.get_center_triangle()
+        triangle = super().get_center_triangle()
         if DEBUG_MODE:
             unit_cell_indices = [node.index for node in self.get_center_core_nodes()]
             assert len(unit_cell_indices)==3
             for node in triangle.all_nodes():
                 assert node.index in unit_cell_indices
+        return triangle
+
+
+class KagomeTensorNetwork(_CommonKagomeTN):
+    """This class holds tensors in a Kagome Latice structure.
+    
+    It differs from the ```KagomeTNRepeatedUntiCell``` class in that it can hold 
+    various different tensors without forcing a repeated unit-cell.
+    """
+
+    # ================================================= #
+    #|                Basic Attributes                 |#
+    # ================================================= #
+    def __init__(
+        self, 
+        lattice : KagomeLattice,
+        lattice_nodes : list[TensorNode]
+    ) -> None:
+        ## Derive basic data:
+        some_ket_tensor = next(iter(node for node in lattice_nodes if node.is_ket))
+        d = some_ket_tensor.tensor.shape[0]
+        D = some_ket_tensor.tensor.shape[-1]
+        # Save data:
+        self.lattice : KagomeLattice = lattice
+        self.messages : MessageDictType = {}
+        self.dimensions : TNDimensions = TNDimensions(
+            virtual_dim=D,
+            physical_dim=d,
+            big_lattice_size=lattice.N
+        )
+        self.lattice_nodes = lattice_nodes
+
+    # ================================================= #
+    #|                    messages                     |#
+    # ================================================= #
+    def connect_messages(self, messages:MessageDictType) -> None:   
+        super().connect_messages(messages)
+        self.clear_cache()
+
+    # ================================================= #
+    #|       Mandatory Implementations of ABC          |#
+    # ================================================= #
+    def nodes(self)->list[TensorNode]:
+        nodes = self.lattice_nodes
+        for
+
+    def copy(self, with_messages:bool=True)->"KagomeTensorNetwork":
+        new = KagomeTensorNetwork(
+            lattice=self.lattice
+        )
+        if with_messages:
+            new.messages = deepcopy(self.messages)
+
+        if DEBUG_MODE: 
+            new.validate()
+        return new
+
+    # ================================================= #
+    #|              Geometry Functions                 |#
+    # ================================================= #
+    def get_center_triangle(self)->UpperTriangle:
+        triangle = super().get_center_triangle()
         return triangle
 
 
@@ -623,7 +711,7 @@ def _derive_message_node_position(nodes_on_boundary:list[Node], edge:EdgeIndicat
 
 
 def _message_nodes(
-    tn : KagomeTN,
+    tn : KagomeTNRepeatedUntiCell,
     message : Message,
     boundary_side : BlockSide,
     first_node_index : int
@@ -700,7 +788,7 @@ def _message_nodes(
     return res
 
 
-def  _derive_nodes_kagome_tn(tn:KagomeTN)->list[TensorNode]:
+def  _derive_nodes_kagome_tn(tn:KagomeTNRepeatedUntiCell)->list[TensorNode]:
     # init lists and iterators:
     unit_cell_tensors = itertools.cycle(tn.unit_cell.items())
     
@@ -791,7 +879,7 @@ def _is_open_edge(edge:tuple[int, int])->bool:
     else:                   return False
 
 functools.cache
-def _derive_message_indices(N:int, direction:BlockSide)->list[int]:
+def _kagome_lattice_derive_message_indices(N:int, direction:BlockSide)->list[int]:
     # Get info:
     num_lattice_nodes = triangle_lattice.total_vertices(N)*3
     message_size = 2*N - 1
@@ -843,7 +931,7 @@ def _derive_sub_tn(tn:TensorNetwork, indices:list[int])->ArbitraryTN:
     new.original_lattice_dims = ( int(max_y-min_y+1), int(max_x-min_x+1) )
     return new
 
-def _derive_edges_kagome_tn(self:KagomeTN)->dict[str, tuple[int, int]]:
+def _derive_edges_kagome_tn(self:KagomeTNRepeatedUntiCell)->dict[str, tuple[int, int]]:
     ## Lattice edges:
     edges = self.lattice.edges
 

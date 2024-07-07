@@ -23,7 +23,7 @@ from libs.ITE import rho_ij
 # Common types in the code:
 from containers import Config, BubbleConConfig, UpdateEdge
 from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
-from tensor_networks import KagomeTN, TensorNetwork, ModeTN, EdgeTN, TensorNode, MPS
+from tensor_networks import KagomeTNRepeatedUntiCell, TensorNetwork, ModeTN, EdgeTN, TensorNode, MPS
 from lattices.directions import BlockSide
 from _error_types import TensorNetworkError, BPNotConvergedError
 from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor, UpdateMode
@@ -231,7 +231,7 @@ def measure_energies_and_observables_together(
 
 
 def _measurements_everything_on_duplicated_core_specific_size(
-    core:KagomeTN, 
+    core:KagomeTNRepeatedUntiCell, 
     repeats:int,
     config:Config,
     logger:logs.Logger,
@@ -279,7 +279,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
 
 
 def measurements_everything_on_duplicated_core(
-    core:KagomeTN, 
+    core:KagomeTNRepeatedUntiCell, 
     repeats:int,
     config:Config,
     logger:logs.Logger|None = None
@@ -441,7 +441,7 @@ def _per_pauli_expectation_values_with_two_rdm(
 
 
 #TODO assert used
-def calc_interaction_energies_in_core(tn:KagomeTN, interaction_hamiltonain:np.ndarray, bubblecon_trunc_dim:int) -> list[float]:
+def calc_interaction_energies_in_core(tn:KagomeTNRepeatedUntiCell, interaction_hamiltonain:np.ndarray, bubblecon_trunc_dim:int) -> list[float]:
     energies = []
     reduced_tn = reduce_tn_to_core_and_environment(tn, bubblecon_trunc_dim, swallow_corners_=False)
     for side in Direction:

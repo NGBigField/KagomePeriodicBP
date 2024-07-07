@@ -1,5 +1,5 @@
 # Common types in the code:
-from tensor_networks import KagomeTN, MPS
+from tensor_networks import KagomeTNRepeatedUntiCell, MPS
 
 # Everyone needs numpy:
 import numpy as np
@@ -8,7 +8,7 @@ import numpy as np
 from libs import bmpslib
 
 # Types we need in our module:
-from tensor_networks import KagomeTN, CoreTN, ModeTN, MPS, TensorNode
+from tensor_networks import KagomeTNRepeatedUntiCell, CoreTN, ModeTN, MPS, TensorNode
 from tensor_networks.node import NodeFunctionality, UnitCellFlavor
 from lattices.directions import LatticeDirection, BlockSide, check
 from lattices.edges import edges_dict_from_edges_list
@@ -41,7 +41,7 @@ def _plot_tn_with_connected_corner(
     edges_list  : list[list[str]],      
     angles_list : list[list[float]],  
     positions   : list[tuple[float, float]],
-    tn          : KagomeTN 
+    tn          : KagomeTNRepeatedUntiCell 
 )->None:
 
     from tensor_networks.visualizations import plot_network
@@ -92,7 +92,7 @@ def _plot_tn_with_connected_corner(
 
 
 def connect_corner_messages(
-    tn:KagomeTN, outgoing_dir:BlockSide
+    tn:KagomeTNRepeatedUntiCell, outgoing_dir:BlockSide
 )->tuple[
     list[np.ndarray], list[list[EdgeIndicatorType]], list[list[float]]
 ]:
@@ -139,7 +139,7 @@ def connect_corner_messages(
     
 
 def contract_tensor_network(
-    tn:KagomeTN|CoreTN|ModeTN, 
+    tn:KagomeTNRepeatedUntiCell|CoreTN|ModeTN, 
     direction:BlockSide,
     depth:ContractionDepth,
     bubblecon_trunc_dim:int,
@@ -168,7 +168,7 @@ def contract_tensor_network(
     contraction_order = get_contraction_order(tn, direction, depth)
 
     ## Connect first MPS message to a side tensor, to allow efficient contraction:
-    if isinstance(tn, KagomeTN):
+    if isinstance(tn, KagomeTNRepeatedUntiCell):
         tensors, edges_list, angles = connect_corner_messages(tn, direction)
         # _plot_tn_with_connected_corner(tensors, edges_list, angles, tn.positions, tn)
     elif isinstance(tn, CoreTN|ModeTN):

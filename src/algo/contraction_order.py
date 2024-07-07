@@ -13,7 +13,7 @@ if __name__ == "__main__":
 from _config_reader import DEBUG_MODE
 
 # Import our types and calsses:
-from tensor_networks import KagomeTN, TensorNode, CoreTN, ModeTN
+from tensor_networks import KagomeTNRepeatedUntiCell, TensorNode, CoreTN, ModeTN
 from lattices.directions import Direction, BlockSide, LatticeDirection, sort
 from enums import ContractionDepth, NodeFunctionality
 
@@ -210,7 +210,7 @@ class _UpToCoreControl:
         "core_indices", "terminal_indices", "stop_next_iterations", "seen_break"
     )
     
-    def __init__(self, tn:KagomeTN, major_direction:BlockSide) -> None:        
+    def __init__(self, tn:KagomeTNRepeatedUntiCell, major_direction:BlockSide) -> None:        
         self.core_indices : set[int] = {node.index for node in tn.get_core_nodes()}
         self.terminal_indices : set[int] = _derive_terminal_indices(tn, major_direction)
         self.stop_next_iterations : bool = False
@@ -223,7 +223,7 @@ class _UpToCoreControl:
             self.seen_break.right = True
         
 
-def _derive_terminal_indices(tn:KagomeTN, major_direction:BlockSide)->set[int]:
+def _derive_terminal_indices(tn:KagomeTNRepeatedUntiCell, major_direction:BlockSide)->set[int]:
     """derive_terminal_indices
     The convention is that the base of the center upper triangle defines the terminal row for the contraction up to core
     """
@@ -249,7 +249,7 @@ def _derive_terminal_indices(tn:KagomeTN, major_direction:BlockSide)->set[int]:
         
 
 def _sorted_side_outer_edges(
-    tn:KagomeTN, direction:BlockSide, with_break:bool=False
+    tn:KagomeTNRepeatedUntiCell, direction:BlockSide, with_break:bool=False
 )->tuple[
     list[str],
     list[str]
@@ -329,7 +329,7 @@ def _message_break_next_order_logic(
 
 
 def _find_all_side_neighbors( 
-    tn:KagomeTN, first_last:_Bound,
+    tn:KagomeTNRepeatedUntiCell, first_last:_Bound,
     nodes:_PerSide[TensorNode], side_order:_PerBound[_Side], 
     side_edges:_SideEdges
 )->tuple[
@@ -353,7 +353,7 @@ def _find_all_side_neighbors(
 
 
 def _derive_message_neighbors(
-    tn:KagomeTN, row:list[int], depth:ContractionDepth,
+    tn:KagomeTNRepeatedUntiCell, row:list[int], depth:ContractionDepth,
     reverse_order_tracker:_ReverseOrder,
     side_edges:_SideEdges
 ) -> tuple[
@@ -533,7 +533,7 @@ def derive_mode_tn_full_contraction_order(
 
 
 def derive_kagome_tn_contraction_order(
-    tn:KagomeTN,  
+    tn:KagomeTNRepeatedUntiCell,  
     direction:BlockSide,
     depth:BlockSide
 )->list[int]:
@@ -601,7 +601,7 @@ def derive_kagome_tn_contraction_order(
 
 
 
-def get_contraction_order(tn:KagomeTN|CoreTN, direction:BlockSide, depth:ContractionDepth, plot_:bool=False)->list[int]:
+def get_contraction_order(tn:KagomeTNRepeatedUntiCell|CoreTN, direction:BlockSide, depth:ContractionDepth, plot_:bool=False)->list[int]:
 
     ## In the case where it's a CoreTN (which has an expected canonical structure)
     if isinstance(tn, CoreTN):
@@ -619,7 +619,7 @@ def get_contraction_order(tn:KagomeTN|CoreTN, direction:BlockSide, depth:Contrac
 
     ## In the case where it's a Full Kagome lattice TN:
     ## Get cached contractions or derive them:
-    assert isinstance(tn, KagomeTN)
+    assert isinstance(tn, KagomeTNRepeatedUntiCell)
     assert depth is not ContractionDepth.ToEdge, f"Contraction to edge method does not exist for a full Kagome TN"
     global FULL_CONTRACTION_ORDERS_CACHE
     cache_key = (tn.lattice.N, direction, depth)
