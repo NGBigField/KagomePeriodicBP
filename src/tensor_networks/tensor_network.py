@@ -20,6 +20,7 @@ from lattices.directions import check, create, sort
 from tensor_networks.node import TensorNode
 from unit_cell import UnitCell
 from lattices.edges import edges_dict_from_edges_list, same_dicts
+from lattices import kagome
 from lattices.kagome import KagomeLattice, Node, UpperTriangle
 import lattices.triangle as triangle_lattice
 
@@ -390,13 +391,14 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
     # ================================================= #
     def __init__(
         self, 
-        lattice : KagomeLattice,
-        lattice_nodes : list[TensorNode]
+        tensors : list[np.ndarray]
     ) -> None:
         ## Derive basic data:
-        some_ket_tensor = next(iter(node for node in lattice_nodes if node.is_ket))
-        d = some_ket_tensor.tensor.shape[0]
-        D = some_ket_tensor.tensor.shape[-1]
+        # Lattice size:
+        N = kagome.lattice_size_by_num_nodes(len(tensors))
+        lattice = KagomeLattice(N)
+        d = tensors[0].shape[0]
+        D = tensors[0].shape[-1]
         # Save data:
         self.lattice : KagomeLattice = lattice
         self.messages : MessageDictType = {}
@@ -405,7 +407,7 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
             physical_dim=d,
             big_lattice_size=lattice.N
         )
-        self.lattice_nodes = lattice_nodes
+        self.lattice_nodes : list[TensorNode] = _tensors_to_kagome_lattice_nodes(tensors, lattice)
 
     # ================================================= #
     #|                    messages                     |#
@@ -1329,6 +1331,28 @@ def _edge_tn_rearrange_tensors_and_legs_into_canonical_order(
 
     return tn, permutation_orders
 
+
+def _tensors_to_kagome_lattice_nodes(tensors:list[np.ndarray], lattice:KagomeLattice) -> list[TensorNode]:
+    # Derive common information:
+    center_triangle = lattice.get_center_triangle()
+    center_neighbors = set()
+    for node in center_triangle.all_nodes():
+        for edge in node.edges:
+            neighbors = lattice.get_neighbor(node, edge) 
+            center_neighbors.add(neighbors)
+
+    for i, (lattice_node, tensor) in enumerate(zip(lattice.nodes, tensors, strict=True)):
+        name = f"{i}"
+        # Derive information
+        if lattice_node in center_triangle:     
+            functionality = NodeFunctionality.CenterCore
+        elif lattice_node in center_neighbors:  
+            functionality = NodeFunctionality.AroundCore
+        else:
+            functionality = NodeFunctionality.Padding
+        # Create Node:
+        tensor_node = TensorNode.from_lattice_node(lattice_node, tensor, name=name, functionality=functionality)
+        # Add to list:
 
 
 ## Keep abstract classed in the same place for readability and easy access:

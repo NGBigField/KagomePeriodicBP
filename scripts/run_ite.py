@@ -136,7 +136,7 @@ def main(
     config.ite.always_use_lowest_energy_state = False
     config.ite.add_gaussian_noise_fraction = 1e-6
     config.iterative_process.bp_every_edge = True
-    config.iterative_process.num_mode_repetitions_per_segment = 3
+    config.iterative_process.num_mode_repetitions_per_segment = 1
 
     ## time steps:
     if D<4:

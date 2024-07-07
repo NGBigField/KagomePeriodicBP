@@ -85,6 +85,12 @@ class UpperTriangle:
             case 'right': self.right = value
             case _: 
                 raise KeyError("Not an option")
+            
+    def __contains__(self, item) -> bool:
+        for node in self.all_nodes():
+            if item is node:
+                return True
+        return False
 
     def all_nodes(self)->Generator[Node, None, None]:
         yield self.up
@@ -534,6 +540,7 @@ class KagomeLattice():
             x, y = triangle_lattice.get_node_position(i, j, N)
             plt.scatter(x, y, marker="^")
             plt.text(x, y, f" [{ind}]")
+
         
 
 def _kagome_connect_boundary_edges_to_dummy_nodes(kagome_lattice:KagomeLattice, edge1:str, edge2:str) -> None:
@@ -618,6 +625,49 @@ def _kagome_connect_boundary_edges_periodically(kagome_lattice:KagomeLattice, ed
     node1.edges[node1.edges.index(edge1)] = new_periodic_edge
     node2.edges[node2.edges.index(edge2)] = new_periodic_edge
 
+
+
+## Cached results for lattices sizes:
+NUM_NODES_TO_LATTICE_SIZE = {}
+LATTICE_SIZE_TO_NUM_NODES = {}
+
+
+def _update_size_caches(num_nodes:int, lattice_size:int) -> None:
+    NUM_NODES_TO_LATTICE_SIZE[num_nodes] = lattice_size
+    LATTICE_SIZE_TO_NUM_NODES[lattice_size] = num_nodes
+
+
+def num_nodes_by_lattice_size(N:int) -> int:
+    # Look in cache
+    if N in LATTICE_SIZE_TO_NUM_NODES:
+        num_nodes = LATTICE_SIZE_TO_NUM_NODES[N]
+    else:
+        # Compute:
+        num_nodes = 3*triangle_lattice.total_vertices(N)
+        # Update cache:
+        _update_size_caches(num_nodes=num_nodes, lattice_size=N)
+    return num_nodes
+
+
+def lattice_size_by_num_nodes(num_nodes:int, _max_attempted_size:int=20) -> int:
+    # Look in cache
+    if num_nodes in NUM_NODES_TO_LATTICE_SIZE:
+        N = NUM_NODES_TO_LATTICE_SIZE[num_nodes]
+    else:
+        # Compute:
+        N = _search_lattice_size_by_num_nodes(num_nodes, _max_attempted_size)
+        # Update cache:
+        _update_size_caches(num_nodes=num_nodes, lattice_size=N)
+    return N
+
+
+def _search_lattice_size_by_num_nodes(num_nodes:int, _max_attempted_size:int=20) -> int:
+    for size in range(2, _max_attempted_size+1):
+        crnt_num_nodes = num_nodes_by_lattice_size(size)
+        if num_nodes == crnt_num_nodes:
+            return size
+        
+    raise ValueError(f"num_nodes={num_nodes} does not match any Kagome lattice size.")
 
 
 def plot_lattice(all_nodes:list[Node], node_color:str="red", node_size=40, edge_style:str="b-", periodic:bool=False)->None:
