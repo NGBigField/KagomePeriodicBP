@@ -116,7 +116,7 @@ def _measures_on_edge(t1_new, t2_new, mps_env, h:np.ndarray=None, eigen_values=N
         energy = None
     else:
         energy = np.dot(rdm.flatten(),  h.flatten())
-        energy /= 2  # Divide by 2 to get effective energy per site
+        # energy /= 2  # Divide by 2 to get effective energy per site  #TODO Check
 
     metrics = _check_rdms_metrics(rdm)
     if eigen_values is not None:

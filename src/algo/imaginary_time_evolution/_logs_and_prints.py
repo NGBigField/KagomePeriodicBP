@@ -45,8 +45,8 @@ def _log_and_print_starting_message(logger:logs.Logger, config:Config, ite_track
     _common_logger_prints(logger, config, ite_tracker)
     hamiltonian_func = config.ite.interaction_hamiltonian.func
     if hasattr(hamiltonian_func, "reference"):
-        refernce = getattr(hamiltonian_func, "reference")
-        logger.debug(f"Hamiltonian's reference energy is {refernce!r}")
+        reference = getattr(hamiltonian_func, "reference")
+        logger.debug(f"Hamiltonian's reference energy is {reference!r}")
     logger.debug(f"unit_cell file: {unit_cell._file_name}")
     logger.debug(" ")
 

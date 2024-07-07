@@ -135,7 +135,7 @@ def _get_edge_rdm_and_energy(edge_tn:EdgeTN, h:np.ndarray, force_real:bool)->flo
 
     # Calc energy:
     energy  = np.dot(rdm.flatten(),  h.flatten()) 
-    energy  /= 2  # Divide by 2 to get energy per site instead of per edge
+    # energy  /= 2  # Divide by 2 to get energy per site instead of per edge  #TODO Check
     if DEBUG_MODE and force_real:
         energy = assertions.real(energy)
     elif force_real:
@@ -243,7 +243,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
 
     ## Get small stable network:
     tn_open = repeat_core(core, repeats)
-    # Beliefe Propagation:
+    # Belief Propagation:
     tn_stable, _, bp_stats = belief_propagation(tn_open, messages=None, bp_config=config.bp)
     if bp_stats.final_error>config.bp.msg_diff_terminate:
         raise BPNotConvergedError("")

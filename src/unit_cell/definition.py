@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Generator
+from dataclasses import dataclass, field
+from typing import Generator, Final
 from numpy import ndarray as np_ndarray
 from enums import UnitCellFlavor
 import numpy as np
