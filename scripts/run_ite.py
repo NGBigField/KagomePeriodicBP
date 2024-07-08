@@ -86,8 +86,8 @@ def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
 
 
 def main(
-    D = 2,
-    N = 2,
+    D = 3,
+    N = 3,
     chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     progress_bar:bool=True,
@@ -123,7 +123,7 @@ def main(
     config.bp.max_swallowing_dim = int(config.bp.max_swallowing_dim*chi_factor)
 
     config.bp.msg_diff_good_enough = 1e-4
-    config.bp.msg_diff_terminate = 1e-5#  1e-10  #TODO
+    config.bp.msg_diff_terminate = 1e-10
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 40
     config.bp.allowed_retries = 2
@@ -132,11 +132,11 @@ def main(
     config.iterative_process.start_segment_with_new_bp_message = True
     config.iterative_process.use_bp = True
     config.ite.random_edge_order = False
-    config.ite.symmetric_product_formula = False   # True #TODO
+    config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
     config.ite.add_gaussian_noise_fraction = 1e-6
     config.iterative_process.bp_every_edge = True
-    config.iterative_process.num_mode_repetitions_per_segment = 1
+    config.iterative_process.num_mode_repetitions_per_segment = 3
 
     ## time steps:
     if D<4:

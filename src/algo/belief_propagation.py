@@ -192,8 +192,6 @@ def belief_propagation(
     else:
         tn.connect_messages(messages)
 
-    tn.plot()
-
     ## Visualizations:
     if allow_prog_bar:
         if max_iterations is None:  steps_iterator = prints.ProgressBar.unlimited( "Performing BlockBP...  ")

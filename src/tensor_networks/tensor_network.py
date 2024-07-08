@@ -336,7 +336,7 @@ class KagomeTNRepeatedUnitCell(KagomeTensorNetwork):
     # ================================================= #
     @functools.cached_property
     def nodes(self)->list[TensorNode]:
-        return _derive_nodes_kagome_tn(self)
+        return _derive_nodes_kagome_tn_repeated_unit_cell(self)
 
     def copy(self, with_messages:bool=True)->"KagomeTNRepeatedUnitCell":
         new = KagomeTNRepeatedUnitCell(
@@ -414,7 +414,8 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
     # ================================================= #
     @property
     def nodes(self)->list[TensorNode]:
-        nodes = self.lattice_nodes
+        nodes = []
+        nodes += self.lattice_nodes
         nodes += _common_kagome_get_message_nodes(self)
         return nodes
 
@@ -801,7 +802,7 @@ def _common_kagome_get_message_nodes(tn:KagomeTensorNetwork) -> list[Node]:
     return nodes
 
 
-def  _derive_nodes_kagome_tn(tn:KagomeTNRepeatedUnitCell)->list[TensorNode]:
+def  _derive_nodes_kagome_tn_repeated_unit_cell(tn:KagomeTNRepeatedUnitCell)->list[TensorNode]:
     # init lists and iterators:
     unit_cell_tensors = itertools.cycle(tn.unit_cell.items())
     

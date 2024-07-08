@@ -5,6 +5,7 @@ if __name__ == "__main__":
 	)
 
 # For multiprocessing:
+from _config_reader import PARALLEL_METHOD  #TODO Implement
 from multiprocessing import Pool
 
 # Use our utilities:
