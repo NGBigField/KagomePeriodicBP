@@ -10,24 +10,24 @@ if __name__ == "__main__":
     )
 
 
-from scripts.test_parallel import test_parallel_execution_time
+from scripts.tests.parallel import test_parallel_execution_time, _single_test_parallel_execution_time_single_bp_step
 
 
 def main(
     D : int = 2,
     N : int = 2,
-    method : int = 0   
+    parallel : int = 0   
 ) -> dict:
     
     ## Parse:
-    if method==0:
+    if parallel==0:
         parallel = False
     else:
         parallel = True
 
 
     ## Run:
-    bp_time, reduction_time = test_parallel_execution_time(D=D, N=N, parallel=parallel)
+    bp_step_time = _single_test_parallel_execution_time_single_bp_step(D=D, N=N, parallel=parallel)
 
     ## Collect as a dict:
     # res_keys = ["parallel", 'D', 'N', 'seed', 'bp-step', 'reduction']
@@ -35,8 +35,7 @@ def main(
         "parallel" : parallel,
         'D' : D,
         'N' : N, 
-        'bp-step' : bp_time,
-        'reduction' : reduction_time
+        'bp_step' : bp_step_time
     }
 
     return results

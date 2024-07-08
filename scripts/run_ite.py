@@ -141,7 +141,7 @@ def main(
     ## time steps:
     if D<4:
         n_per_dt = 200
-        e_start = 4
+        e_start = 5
         e_end   = 8
     else:
         n_per_dt = 150

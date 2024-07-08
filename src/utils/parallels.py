@@ -7,7 +7,13 @@ if __name__ == "__main__":
 
 # For multiprocessing:
 from _config_reader import PARALLEL_METHOD  #TODO Implement
-from multiprocessing import Pool
+match PARALLEL_METHOD:
+    case "mpi":
+        raise NotImplementedError("Not yet implemented")
+    case "multiprocessing_pool":
+        import multiprocessing
+    case "multithreading":
+        import threading 
 
 # Use our utilities:
 from utils import decorators
@@ -34,19 +40,36 @@ class _FunctionObject(Generic[_InType, _OtherInputs, _OutType]):
     def __call__(self, single_arg) -> _OutType:
         kwargs = self.fixed_arguments
         kwargs[self.single_arg_name] = single_arg 
-        res : _OutType = self.func(**kwargs) #type: ignore  
-        return res
+        return self.func(**kwargs) 
   
 
 def _parallel_with_pool(f:_FunctionObject[_InType, _OtherInputs, _OutType], values:list[_InType]) -> dict[_InType, _OutType]:
-    with Pool() as pool:
+    with multiprocessing.Pool() as pool:
         results = pool.map(f, values)  
     assert len(results)==len(values)      
     return {input:output for input, output in zip(values, results, strict=True) }  
 
 
 def _parallel_with_multithreading(f:_FunctionObject[_InType, _OtherInputs, _OutType], values:list[_InType]) -> dict[_InType, _OutType]:
-    pass
+    ## Init results memory, shared with all threads:
+    results : dict[_InType, _OutType] = {}
+    
+    ## Create all thread:
+    threads : list[threading.Thread] = [threading.Thread(target=_thread_job, args=(f, value, results)) for value in values]
+
+    ## Start all threads:
+    for thread in threads:
+        thread.start()
+
+    ## Stop and Collect results from all threads:
+    for thread in threads:
+        thread.join()
+
+    return results
+
+
+def _thread_job(f:_FunctionObject[_InType, _OtherInputs, _OutType], value:_InType, results:dict[_InType, _OutType]) -> None:
+    results[value] = f(value)
 
 
 def concurrent(
@@ -106,4 +129,4 @@ if __name__ == "__main__":
     sys.path.append(base.__str__())
 
     from scripts.tests import parallel as parallel_test
-    parallel_test.test_parallel_execution_time_single_input()
+    parallel_test._single_test_parallel_execution_time_single_bp_step()

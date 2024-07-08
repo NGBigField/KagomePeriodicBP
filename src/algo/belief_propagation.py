@@ -227,7 +227,7 @@ def belief_propagation(
             success = True
             break
 
-        # Check if this message is better than the previois
+        # Check if this message is better than the previous 
         if error<min_error:
             min_error = error
             min_messages = deepcopy(messages)

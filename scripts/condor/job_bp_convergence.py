@@ -10,7 +10,7 @@ if __name__ == "__main__":
     )
 
 
-from scripts.test_bp import test_bp_convergence_steps_single_run
+from scripts.tests.bp import test_bp_convergence_steps_single_run
 
 
 def main(

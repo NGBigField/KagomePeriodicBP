@@ -105,7 +105,7 @@ def get_saved_figures_folder()->Path:
     return folder
 
 
-def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None ) -> None:
+def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None, extensions:list[str]=["png", "svg"], ) -> None:
     # Figure:
     if fig is None:
         fig = plt.gcf()
@@ -116,7 +116,7 @@ def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None ) -> Non
     folder = get_saved_figures_folder()
     # Full path:
     fullpath = folder.joinpath(file_name)
-    for ext in ["png", "svg"]:
+    for ext in extensions:
         fullpath_str = str(fullpath.resolve())+"."+ext
         # Save:
         fig.savefig(fullpath_str)
@@ -144,8 +144,10 @@ def random_uniform_spray(num_coordinates:int, origin:Optional[Tuple[float, ...]]
         coordinates[-1]["far"] = [x0+1.1*dx, y0+1.1*dy]
     return coordinates
 
+
 def close_all():
     plt.close('all')
+
 
 def draw_now():
     plt.show(block=False)
@@ -171,7 +173,6 @@ def matplotlib_wrapper(on:bool=True) -> Callable[[Callable[_InputType, _OutputTy
     return decorator
 
 
- 
 def hsv_to_rgb(h, s, v): 
     (r, g, b) = colorsys.hsv_to_rgb(h, s, v) 
     if RGB_VALUE_IN_RANGE_1_0:
@@ -179,6 +180,7 @@ def hsv_to_rgb(h, s, v):
     else:
         return (int(255*r), int(255*g), int(255*b)) 
  
+
 def distinct_colors(n:int) -> Generator[Tuple[float, float, float], None, None]: 
     hue_fraction = 1.0 / (n + 1) 
     return (hsv_to_rgb(hue_fraction * i, 1.0, 1.0) for i in range(0, n)) 
