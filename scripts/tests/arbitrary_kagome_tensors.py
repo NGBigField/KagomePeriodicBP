@@ -12,9 +12,6 @@ from algo.belief_propagation import belief_propagation, BPStats
 from algo.measurements import measure_energies_and_observables_together
 
 
-D = 4
-
-
 def _print_success(stats:BPStats) -> None:
     if stats.success:
         s = f"Succeeded to converge on an error below {stats.final_config.msg_diff_good_enough!r}"
@@ -26,10 +23,15 @@ def _print_success(stats:BPStats) -> None:
 
 def main(
     parallel_msgs : bool = False,
-    filename : str = "Kagome-PEPS-n2-D3.pkl"  # /Kagome-PEPS.pkl
+    filename : str = "Kagome-PEPS.pkl"  # /Kagome-PEPS.pkl / Kagome-PEPS-n2-D3.pkl
 ) -> dict:
     
+    ## Create tensor network:
+    tensors = saveload.load(filename)
+    tn = KagomeTNArbitrary(tensors=tensors)
+
     ## Config:
+    D = tn.dimensions.virtual_dim
     bp_config = Config.BPConfig(
         damping=0.1,
         max_swallowing_dim=D**2,
@@ -37,9 +39,6 @@ def main(
     )
     h = hamiltonians.heisenberg_afm()
 
-    ## Create tensor network:
-    tensors = saveload.load(filename)
-    tn = KagomeTNArbitrary(tensors=tensors)
     # tn.plot()
 
     ## Perform algorithms:
