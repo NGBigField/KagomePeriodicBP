@@ -24,11 +24,15 @@ def _print_success(stats:BPStats) -> None:
     print(s)
 
 
-def main() -> dict:
+def main(
+    parallel_msgs : bool = True
+) -> dict:
+    
     ## Config:
     bp_config = Config.BPConfig(
         damping=0.2,
-        max_swallowing_dim=4*D**2
+        max_swallowing_dim=D,
+        parallel_msgs=parallel_msgs
     )
     h = hamiltonians.heisenberg_afm()
 

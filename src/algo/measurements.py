@@ -46,7 +46,7 @@ from libs.TenQI import op_to_mat
 from metrics import negativity
 
 # Utils:
-from utils import assertions, logs, errors, lists, parallel_exec, prints, strings
+from utils import assertions, logs, errors, lists, parallels, prints, strings
 
 # A bit of OOP:
 from copy import deepcopy
@@ -543,7 +543,7 @@ def _calc_mean_value_by_bracket_tn(
         fixed_arguments["print_progress"] = print_progress
 
     ## Calculate Numerators:
-    numerators = parallel_exec.concurrent_or_parallel(
+    numerators = parallels.concurrent_or_parallel(
         func=_sandwich_with_operator_and_contract_fully, 
         values=node_indices, value_name="node_ind", 
         fixed_arguments=fixed_arguments,

@@ -1,6 +1,5 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 
-
 # useful utils:
 from utils import visuals, dicts, saveload, csvs
 
@@ -26,9 +25,9 @@ import numpy as np
 d=2
 
 
-def test_parallel_execution_time(
+def test_parallel_execution_time_single_input(
     D = 3,
-    N = 6,
+    N = 3,
     parallel : bool = 1
 )->tuple[float, float]:
     
@@ -41,7 +40,7 @@ def test_parallel_execution_time(
 
     ## Prepare config:
     config = BPConfig(
-        max_iterations=10, max_swallowing_dim=D**2, msg_diff_terminate=1e-10, parallel_msgs=parallel
+        max_iterations=10, max_swallowing_dim=D**2, msg_diff_terminate=1e-8, parallel_msgs=parallel
     )
 
     ## Test BlockBP Performance:
@@ -53,14 +52,14 @@ def test_parallel_execution_time(
     bp_step_time = stats.execution_time / stats.iterations
     print(f"bp-step average_time   = {bp_step_time}")
 
-    ## Test contraction:
-    t1 = perf_counter()
-    _ = reduce_tn(full_tn, CoreTN, trunc_dim=2*D**2, parallel=parallel)
-    t2 = perf_counter()
-    reduction_step_time = t2-t1
-    print(f"reduction average_time = {reduction_step_time}")
+    # ## Test contraction:
+    # t1 = perf_counter()
+    # _ = reduce_tn(full_tn, CoreTN, trunc_dim=2*D**2, parallel=parallel)
+    # t2 = perf_counter()
+    # reduction_step_time = t2-t1
+    # print(f"reduction average_time = {reduction_step_time}")
 
-    return bp_step_time, reduction_step_time
+    return bp_step_time
 
 
 
@@ -117,8 +116,8 @@ def arrange_res_table():
 
 
 def main_test():
-    # test_parallel_execution_time()
-    arrange_res_table()
+    test_parallel_execution_time_single_input()
+    # arrange_res_table()
 
 
 if __name__ == "__main__":

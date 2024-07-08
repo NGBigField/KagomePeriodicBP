@@ -41,8 +41,8 @@ from copy import deepcopy
 from algo.imaginary_time_evolution._logs_and_prints import print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, \
                                                             print_or_log_ite_segment_progress, get_progress_bar
 from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
-from algo.imaginary_time_evolution._visualization import ITEPlots
 from algo.imaginary_time_evolution._tn_update import ite_update_unit_cell
+from visualizations.ite import ITEPlots
 
 # Import belief propagation code:
 from algo.belief_propagation import robust_belief_propagation, belief_propagation, BPStats

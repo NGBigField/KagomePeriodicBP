@@ -34,7 +34,7 @@ from enums import ContractionDepth, NodeFunctionality, UpdateMode
 from containers import MPSOrientation, UpdateEdge
 
 # Our utilities:
-from utils import tuples, lists, assertions, prints, parallel_exec
+from utils import parallels, tuples, lists, assertions, prints
 
 
 
@@ -136,7 +136,7 @@ def _contract_tn_from_sides_and_create_mpss(
         print_progress = not parallel
     )
     values = list(_PerSide.side_names())
-    res = parallel_exec.concurrent_or_parallel(_contract_half, values=values, value_name="side_key", in_parallel=parallel, fixed_arguments=fixed_arguments)
+    res = parallels.concurrent_or_parallel(_contract_half, values=values, value_name="side_key", in_parallel=parallel, fixed_arguments=fixed_arguments)
 
     ## Unpack Results:
     mpss         : _PerSide[MPS]            = _PerSide()

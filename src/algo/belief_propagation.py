@@ -27,7 +27,7 @@ from libs import ITE as ite
 from libs import bmpslib
 
 # Common used utilities:
-from utils import decorators, parallel_exec, lists, visuals, prints
+from utils import decorators, lists, parallels, visuals, prints
 
 # OOP:
 from copy import deepcopy
@@ -86,7 +86,7 @@ def _message_damping(prev_messages:MessageDictType, out_messages:MessageDictType
 
 
 def _outgoing_messages(directions_iter:Generator[BlockSide, None, None], multi_processing:bool, fixed_arguments:dict) -> MessageDictType:
-    out_messages = parallel_exec.concurrent_or_parallel(
+    out_messages = parallels.concurrent_or_parallel(
         func=_single_outgoing_message, values=directions_iter, value_name="direction", in_parallel=multi_processing, fixed_arguments=fixed_arguments
     ) 
     return MessageDictType(out_messages)

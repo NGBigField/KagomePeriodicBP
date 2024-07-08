@@ -384,7 +384,7 @@ class InactiveDescriptor():
     def __setattr__(self, name: str, value: Any) -> None: ...
 
 
-def InactiveMethoedWrapper(func):
+def InactiveMethodWrapper(func):
     def wrapper(*args, **kwargs):
         return None
     return wrapper
@@ -412,7 +412,7 @@ class InactiveAppendablePlot(AppendablePlot):
 
         for method in self.all_method():
             name = method.__name__
-            method = InactiveMethoedWrapper(method)
+            method = InactiveMethodWrapper(method)
             try:
                 assert isinstance(name, str)
             except Exception as e:
