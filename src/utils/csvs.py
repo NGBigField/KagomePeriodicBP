@@ -3,14 +3,14 @@ from typing import Any, TypeVar
 import os, sys
 from pathlib import Path
 from utils import strings
-from project_paths import data
+from project_paths import data as DATA_FOLDER
 from utils.saveload import force_folder_exists
 _T = TypeVar("_T")
 
 
 PATH_SEP = os.sep
 DEFAULT_RESULTS_CSV_FILE_NAME = "temp_results.csv" 
-DEFAULT_RESULTS_CSV_FOLDER = (data/"results").__str__()
+DEFAULT_RESULTS_CSV_FOLDER = (DATA_FOLDER/"results").__str__()
 
 
 def _standard_filename(file_name:str)->str:

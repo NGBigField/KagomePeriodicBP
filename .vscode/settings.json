@@ -5,6 +5,7 @@
         "Appendable",
         "bmpslib",
         "bubblecon",
+        "capstyle",
         "cpus",
         "decomp",
         "Dmax",
@@ -30,6 +31,7 @@
         "paulis",
         "PESS",
         "rdms",
+        "stds",
         "suptitle",
         "tnsu"
     ],

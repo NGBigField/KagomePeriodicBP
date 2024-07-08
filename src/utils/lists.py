@@ -164,6 +164,12 @@ def copy(l:List[_T]) -> List[_T]:
         return [deepcopy(item) for item in l] 
 
 
+def common_items(l1:list[_T], l2:list[_T]) -> list[_T]:
+    s1 = set(l1) 
+    s2 = set(l2) 
+    return list(s1.intersection(s2))
+ 
+
 def common_super_class(lis:List[Any]) -> type:
     classes = [type(x).mro() for x in lis]
     for x in classes[0]:

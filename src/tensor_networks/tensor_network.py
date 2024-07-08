@@ -261,6 +261,8 @@ class KagomeTensorNetwork(TensorNetwork, ABC):
         # Fuse:
         for block_side, message in messages.items():
             self.messages[block_side] = message
+        # Clear cache so that Next time self.nodes is called, new nodes will appear
+        self.clear_cache()
 
     def connect_random_messages(self) -> None:
         return self._connect_messages_of_specific_initial_model(msg_model=MessageModel.RANDOM_QUANTUM)
@@ -301,6 +303,14 @@ class KagomeTensorNetwork(TensorNetwork, ABC):
     def get_center_triangle(self)->UpperTriangle:
         return self.lattice.get_center_triangle()
     
+    # ================================================= #
+    #|                 Cache Control                   |#
+    # ================================================= #
+    def clear_cache(self)->None:
+        # clear nodes
+        if arguments.property_is_cached(self, "nodes"):
+            del self.nodes
+    
 
 
 class KagomeTNRepeatedUnitCell(KagomeTensorNetwork):
@@ -322,14 +332,7 @@ class KagomeTNRepeatedUnitCell(KagomeTensorNetwork):
             big_lattice_size=lattice.N
         )
         super().__init__(lattice=lattice, dimensions=dimensions)
-        self.unit_cell : UnitCell = unit_cell
-
-    # ================================================= #
-    #|                    messages                     |#
-    # ================================================= #
-    def connect_messages(self, messages:MessageDictType) -> None:   
-        super().connect_messages(messages)
-        self.clear_cache()
+        self.unit_cell : UnitCell = unit_cell        
 
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
@@ -352,14 +355,6 @@ class KagomeTNRepeatedUnitCell(KagomeTensorNetwork):
         if DEBUG_MODE: 
             new.validate()
         return new
-
-    # ================================================= #
-    #|                 Cache Control                   |#
-    # ================================================= #
-    def clear_cache(self)->None:
-        # clear nodes
-        if arguments.property_is_chached(self, "nodes"):
-            del self.nodes
 
     # ================================================= #
     #|              Geometry Functions                 |#
@@ -404,15 +399,9 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
         self.lattice_nodes : list[TensorNode] = _tensors_to_kagome_lattice_tensor_nodes(tensors, lattice)
 
     # ================================================= #
-    #|                    messages                     |#
-    # ================================================= #
-    def connect_messages(self, messages:MessageDictType) -> None:   
-        super().connect_messages(messages)
-
-    # ================================================= #
     #|       Mandatory Implementations of ABC          |#
     # ================================================= #
-    @property
+    @functools.cached_property
     def nodes(self)->list[TensorNode]:
         nodes = []
         nodes += self.lattice_nodes
@@ -436,7 +425,16 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
     def get_center_triangle(self)->UpperTriangle:
         triangle = super().get_center_triangle()
         return triangle
-
+    
+    def deal_cell_flavors(self) -> None:
+        for triangle in self.lattice.triangles:
+            for field_name in triangle.field_names():
+                lattice_node = triangle[field_name]
+                tensor_node = self.nodes[lattice_node.index]
+                match field_name:
+                    case 'up':    tensor_node.cell_flavor = UnitCellFlavor.A
+                    case 'left':  tensor_node.cell_flavor = UnitCellFlavor.B
+                    case 'right': tensor_node.cell_flavor = UnitCellFlavor.C
 
 
 class ArbitraryTN(TensorNetwork):
@@ -666,6 +664,20 @@ class EdgeTN(_FrozenSpecificNetwork):
     @property
     def unit_cell_flavors(self)->tuple[UnitCellFlavor, UnitCellFlavor]:
         return self.core1.cell_flavor, self.core2.cell_flavor
+    
+    @property
+    def edge_name(self) -> EdgeIndicatorType:
+        ## Get common edge connecting the two nodes
+        c1, c2 = self.core1, self.core2
+        common_edges = lists.common_items(c1.edges, c2.edges)
+        _edge_name = common_edges[0]
+        ## Check:
+        assert len(common_edges)==1, "Only a single common edge"
+        n1, n2 = self.nodes_connected_to_edge(_edge_name)
+        assert c1 is n1
+        assert c2 is n2
+        ## Return:
+        return _edge_name
 
     # ================================================= #
     #|              Edge params for ITE                |#
