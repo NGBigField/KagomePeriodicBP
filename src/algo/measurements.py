@@ -23,7 +23,7 @@ from libs.ITE import rho_ij
 # Common types in the code:
 from containers import Config, BubbleConConfig, UpdateEdge
 from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
-from tensor_networks import KagomeTNRepeatedUnitCell, ModeTN, EdgeTN, TensorNode, MPS
+from tensor_networks import KagomeTNRepeatedUnitCell, KagomeTNArbitrary, ModeTN, EdgeTN, TensorNode, MPS
 from tensor_networks.abstract_classes import TensorNetwork
 from lattices.directions import BlockSide
 from _error_types import TensorNetworkError, BPNotConvergedError
@@ -37,7 +37,6 @@ from containers.results import Measurements, Expectations
 from algo.tn_reduction import reduce_full_kagome_to_core, reduce_tn
 from algo.belief_propagation import belief_propagation
 from algo.contract_tensor_network import contract_tensor_network
-from algo.imaginary_time_evolution._tn_update import get_imaginary_time_evolution_operator
 
 # For energy estimation:
 from libs.ITE import rho_ij
@@ -149,7 +148,7 @@ def _get_hamiltonian_tensor(hamiltonian)->np.ndarray:
     elif callable(hamiltonian):
         h = hamiltonian()
     elif isinstance(hamiltonian, tuple|HamiltonianFuncAndInputs):
-        h, _ = get_imaginary_time_evolution_operator(hamiltonian, None)
+        h, _ = _get_imaginary_time_evolution_operator(hamiltonian, None)
     else:
         raise TypeError(f"Not a valid type for input 'hamiltonian' of type {hamiltonian!r}")    
     return h
@@ -178,6 +177,12 @@ def measure_energies_and_observables_together(
     # inputs:
     if DEBUG_MODE: tn.validate()
 
+    if isinstance(tn, KagomeTNArbitrary):
+        tn.deal_cell_flavors()
+        return_by_flavor = False
+    else:
+        return_by_flavor = True
+
     if mode is None:
         mode = UpdateMode.random()
 
@@ -204,8 +209,12 @@ def measure_energies_and_observables_together(
         edge_negativity = compute_negativity_of_rdm(rdm)
 
         # keep energies:
-        energies[edge_tuple.as_strings] = edge_energy
-        entanglement[edge_tuple.as_strings] = edge_negativity
+        if return_by_flavor:
+            key = edge_tuple.as_strings
+        else:
+            key = edge_tn.edge_name 
+        energies[key] = edge_energy
+        entanglement[key] = edge_negativity
 
         # Calc expectations:
         per_edge_results = expectation_values_with_rdm(rdm, force_real=force_real)
@@ -439,18 +448,6 @@ def _per_pauli_expectation_values_with_two_rdm(
     return projection_i, projection_j
 
 
-#TODO assert used
-def calc_interaction_energies_in_core(tn:KagomeTNRepeatedUnitCell, interaction_hamiltonain:np.ndarray, bubblecon_trunc_dim:int) -> list[float]:
-    energies = []
-    reduced_tn = reduce_tn_to_core_and_environment(tn, bubblecon_trunc_dim, swallow_corners_=False)
-    for side in Direction:
-        core1, core2, environment_tensors, tn_env = calc_edge_environment(reduced_tn, side, bubblecon_trunc_dim)
-        rdm = rho_ij(core1.physical_tensor, core2.physical_tensor, mps_env=environment_tensors)
-        energy  = np.dot(rdm.flatten(),  interaction_hamiltonain.flatten())
-        energies.append(energy)
-    return energies
-
-
 def calc_unit_cell_expectation_values_from_tn(
     tn:TensorNetwork, 
     operators:list[np.matrix], 
@@ -563,6 +560,13 @@ def _calc_mean_value_by_bracket_tn(
 
 def _get_z_projection(rho:np.ndarray)->complex:
     return rho[0,0] - rho[1,1] 
+
+
+def _get_imaginary_time_evolution_operator(hamiltonian_func:HamiltonianFuncAndInputs, delta_t:float|None) -> tuple[np.ndarray, np.ndarray]: 
+    hamiltonian_func = HamiltonianFuncAndInputs.standard(hamiltonian_func)
+    h = hamiltonian_func.call(delta_t=0.0)
+    g = None
+    return h, g
 
 
 def _rotate_rdm(rho:np.matrix, pauli_name:str)->np.matrix:

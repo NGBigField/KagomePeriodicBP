@@ -17,7 +17,7 @@ import numpy as np
 d = 2
 
 
-force_values = np.logspace(-14, -20, 500*6)
+force_values = np.logspace(-3, -10, 200*12*3)
 iter_force_value = iter(force_values)
 enter_counter = 0
 def decreasing_global_field_func(delta_t:float|None)->float:
@@ -47,7 +47,7 @@ def _get_hamiltonian(hamiltonian:str) -> tuple:
         case "FM":        return (hamiltonians.heisenberg_fm, None, None)
         case "FM-T":      return (hamiltonians.heisenberg_fm_with_field, "delta_t", constant_global_field)
         case "AFM":       return (hamiltonians.heisenberg_afm, None, None)
-        case "AFM-T":     return (hamiltonians.heisenberg_afm_with_field, "delta_t", constant_global_field)
+        case "AFM-T":     return (hamiltonians.heisenberg_afm_with_field, "delta_t", decreasing_global_field_func)
         case "Field":     return (hamiltonians.field, None, None)
         case "Ising-AFM": return (hamiltonians.ising_with_transverse_field, "delta_t", constant_global_field)
         case _:
@@ -87,13 +87,13 @@ def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
 
 def main(
     D = 2,
-    N = 3,
-    chi_factor : int = 2,
+    N = 2,
+    chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     progress_bar:bool=True,
     results_filename:str|None = None,
     parallel:bool = 0,
-    hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
     unit_cell_from:str = "best"
 )->tuple[float, str]:
