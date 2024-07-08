@@ -27,6 +27,7 @@ from tensor_networks import KagomeTNRepeatedUnitCell, ModeTN, EdgeTN, TensorNode
 from tensor_networks.abstract_classes import TensorNetwork
 from lattices.directions import BlockSide
 from _error_types import TensorNetworkError, BPNotConvergedError
+from _types import UnitCellExpectationValuesDict
 from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor, UpdateMode
 from physics import pauli
 from unit_cell import UnitCell
@@ -54,8 +55,6 @@ from typing import TypeVar, TypeAlias
 from dataclasses import dataclass
 
 _T = TypeVar('_T')
-
-UnitCellExpectationValuesDict : TypeAlias = dict[str, dict[str, float]]
 
 
 all_paulis = list(pauli.all_paulis(with_names=False))
@@ -162,7 +161,6 @@ def mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[str
         for xyz, value in xyz_dict.items():
             mean_per_direction[xyz] += value/3
     return mean_per_direction
-
 
 
 def measure_energies_and_observables_together(

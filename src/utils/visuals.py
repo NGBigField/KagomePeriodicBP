@@ -276,7 +276,7 @@ class AppendablePlot():
 
 
     @classmethod
-    def inacive(cls)->"InactiveAppendablePlot":
+    def inactive(cls)->"InactiveAppendablePlot":
         return InactiveAppendablePlot()
 
     def _next_x(self, name:str) -> float|int:
@@ -422,6 +422,31 @@ class InactiveAppendablePlot(AppendablePlot):
                 print(method)
                 print(e)
             setattr(self, name, method)
+
+
+def plot_with_spread(x_y_values_dict:dict[float|int, list[float|int]], plt_kwargs:dict):
+    # Convert y_values_matrix to a NumPy array for easier manipulation
+    y_means = []
+    y_stds  = []
+    x_values = sorted(list(x_y_values_dict.keys()))
+    for x in x_values:
+        y_values = x_y_values_dict[x]
+        y_values = np.array(y_values)
+
+        # Calculate the mean and standard deviation along the 1st axis (columns)
+        y_means.append(np.mean(y_values))
+        y_stds.append(np.std(y_values))
+    
+    # Plotting the mean values
+    line = plt.plot(x_values, y_means, **plt_kwargs)
+    color = line[0].get_color()
+    
+    # Adding a shaded region to represent the spread (1 standard deviation here)
+    y_means = np.array(y_means)
+    y_stds = np.array(y_stds)
+    fill = plt.fill_between(x_values, y_means - y_stds, y_means + y_stds, color=color, alpha=0.2)
+    
+    return line, fill
 
 
 class matplotlib_colors(Enum):

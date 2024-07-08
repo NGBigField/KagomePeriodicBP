@@ -86,9 +86,9 @@ def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
 
 
 def main(
-    D = 3,
+    D = 2,
     N = 3,
-    chi_factor : int = 1,
+    chi_factor : int = 2,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     progress_bar:bool=True,
     results_filename:str|None = None,
@@ -97,7 +97,6 @@ def main(
     damping:float|None = 0.1,
     unit_cell_from:str = "best"
 )->tuple[float, str]:
-
 
     assert N>=2
     assert D>0
@@ -141,7 +140,7 @@ def main(
     ## time steps:
     if D<4:
         n_per_dt = 200
-        e_start = 5
+        e_start = 3
         e_end   = 8
     else:
         n_per_dt = 150

@@ -7,3 +7,4 @@ EnergyPerEdgeDictType           : TypeAlias = dict[str, float]
 EnergiesOfEdgesDuringUpdateType : TypeAlias = list[EnergyPerEdgeDictType]
 PosScalarType                   : TypeAlias = int
 PermutationOrdersType           : TypeAlias = dict[str, list[int]]
+UnitCellExpectationValuesDict   : TypeAlias = dict[str, dict[str, float]]
