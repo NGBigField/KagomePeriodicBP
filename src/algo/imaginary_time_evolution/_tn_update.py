@@ -3,7 +3,8 @@ from _config_reader import DEBUG_MODE
 
 from containers import TNDimensions, ITEConfig, Config, MatrixMetrics
 from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
-from tensor_networks import TensorNetwork, TensorNode, KagomeTN, EdgeTN, UnitCell, create_kagome_tn
+from tensor_networks import TensorNode, KagomeTNRepeatedUnitCell, EdgeTN, UnitCell, create_kagome_tn
+from tensor_networks.abstract_classes import TensorNetwork
 from utils import lists, logs, assertions, prints
 from enums import UnitCellFlavor
 from _types import PermutationOrdersType
@@ -116,7 +117,7 @@ def _measures_on_edge(t1_new, t2_new, mps_env, h:np.ndarray=None, eigen_values=N
         energy = None
     else:
         energy = np.dot(rdm.flatten(),  h.flatten())
-        energy /= 2  # Divide by 2 to get effective energy per site
+        # energy /= 2  # Divide by 2 to get effective energy per site  #TODO Check
 
     metrics = _check_rdms_metrics(rdm)
     if eigen_values is not None:

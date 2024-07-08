@@ -9,7 +9,8 @@ from algo.tn_reduction.core_to_mode import reduce_core_to_mode
 from algo.tn_reduction.mode_to_edge import reduce_mode_to_edge
 
 # Types in the code:
-from tensor_networks import TensorNetwork, KagomeTN, CoreTN, ModeTN, EdgeTN
+from tensor_networks import KagomeTNRepeatedUnitCell, CoreTN, ModeTN, EdgeTN
+from tensor_networks.abstract_classes import TensorNetwork
 
 # For type hinting:
 from typing import TypeVar, Type, Callable
@@ -36,7 +37,7 @@ def _remove_unneeded_kwargs(func:callable, kwargs:dict[str, object])->TensorNetw
 
 
 def _next_reduction_function(tn:TensorNetwork)->Callable[[TensorNetwork, dict], TensorNetwork]:
-    if isinstance(tn, KagomeTN):
+    if isinstance(tn, KagomeTNRepeatedUnitCell):
         return reduce_full_kagome_to_core
     if isinstance(tn, CoreTN):
         return reduce_core_to_mode

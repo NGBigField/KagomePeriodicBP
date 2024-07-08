@@ -166,3 +166,4 @@ cython_debug/
 !/data/tnsu_results/
 !/data/tnsu_results/*
 
+*.pkl

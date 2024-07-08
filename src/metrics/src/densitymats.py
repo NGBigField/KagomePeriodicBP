@@ -93,7 +93,7 @@ def _matrix_dimension_from_optional_num_qubits(num_qubits:typ.Optional[int] = No
 
 
 def _assert_or_warning(condition:bool, msg:str) -> None:
-    if condition:
+    if not condition:
         if DEBUG_MODE:
             raise AssertionError(msg)
         else:

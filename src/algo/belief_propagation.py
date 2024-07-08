@@ -14,7 +14,7 @@ from _config_reader import DEBUG_MODE
 import numpy as np
 
 # other used types in our code:
-from tensor_networks import KagomeTN, MPS, mps_distance
+from tensor_networks import KagomeTNRepeatedUnitCell, MPS, mps_distance
 from lattices.directions import BlockSide
 from enums import ContractionDepth
 from containers import BPStats, BPConfig, MessageDictType, Message
@@ -27,7 +27,7 @@ from libs import ITE as ite
 from libs import bmpslib
 
 # Common used utilities:
-from utils import decorators, parallel_exec, lists, visuals, prints
+from utils import decorators, lists, parallels, visuals, prints
 
 # OOP:
 from copy import deepcopy
@@ -86,14 +86,14 @@ def _message_damping(prev_messages:MessageDictType, out_messages:MessageDictType
 
 
 def _outgoing_messages(directions_iter:Generator[BlockSide, None, None], multi_processing:bool, fixed_arguments:dict) -> MessageDictType:
-    out_messages = parallel_exec.concurrent_or_parallel(
+    out_messages = parallels.concurrent_or_parallel(
         func=_single_outgoing_message, values=directions_iter, value_name="direction", in_parallel=multi_processing, fixed_arguments=fixed_arguments
     ) 
     return MessageDictType(out_messages)
 
 
 def _single_outgoing_message(
-    tn:KagomeTN, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool
+    tn:KagomeTNRepeatedUnitCell, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool
 ) -> Message:
     
     ## use bubble con to compute outgoing message:
@@ -120,7 +120,7 @@ def _bp_error_str(error:float|None):
 
 
 def _belief_propagation_step(
-    tn:KagomeTN,
+    tn:KagomeTNRepeatedUnitCell,
     prev_error:float|None,
     config:BPConfig,
     prog_bar_obj:prints.ProgressBar,
@@ -170,7 +170,7 @@ def _belief_propagation_step(
 
 @decorators.add_stats()
 def belief_propagation(
-    tn:KagomeTN, 
+    tn:KagomeTNRepeatedUnitCell, 
     messages:MessageDictType|None=None, # initial messages
     config:BPConfig=BPConfig(),
     update_plots_between_steps:bool=False,
@@ -227,7 +227,7 @@ def belief_propagation(
             success = True
             break
 
-        # Check if this message is better than the previois
+        # Check if this message is better than the previous 
         if error<min_error:
             min_error = error
             min_messages = deepcopy(messages)
@@ -259,7 +259,7 @@ def belief_propagation(
 
 @decorators.add_stats()
 def robust_belief_propagation(
-    tn:KagomeTN, 
+    tn:KagomeTNRepeatedUnitCell, 
     messages:MessageDictType|None=None, # initial messages
     config:BPConfig=BPConfig(),
     update_plots_between_steps:bool=False,

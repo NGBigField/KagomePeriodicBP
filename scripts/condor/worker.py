@@ -11,7 +11,7 @@ import _import_scripts
 # Import DictWriter class from CSV module
 from time import perf_counter, sleep
 from csv import DictWriter
-from typing import Any, Generator
+from typing import Any, Generator, Final
 import threading
 
 from src.utils import errors
@@ -32,7 +32,7 @@ from utils import sizes
 
 
 NUM_EXPECTED_ARGS = 10
-SAFETY_BUFFER_FRACTION = 0.5  # safety buffer (adjust based on needs)
+SAFETY_BUFFER_FRACTION : Final[float|None] = None  # safety buffer (adjust based on needs)
 
 # A main function to parse inputs:
 def main():
@@ -105,7 +105,7 @@ def main():
             case "bp":  
                 results = job_bp.main(D=D, N=N, method=method)
             case "parallel_timings":             
-                results = job_parallel_timing.main(D=D, N=N, method=method)
+                results = job_parallel_timing.main(D=D, N=N, parallel=parallel)
             case "bp_convergence":
                 results = job_bp_convergence.main(D=D, N=N)
             case "ite_afm":
@@ -165,6 +165,10 @@ def _parse_list_of_strings(s:str)->list[str]:
 
 
 def _auto_timed_compute_with_random_mat_by_ram(ram_gb:int, stop_event:threading.Event, starting_sleep_time:float|int=60):
+    ## In cases were this is redundant, exit:
+    if SAFETY_BUFFER_FRACTION is None:
+        return
+
     sleep_time = starting_sleep_time
     while not stop_event.is_set():
         # Do task:

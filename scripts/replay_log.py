@@ -2,7 +2,7 @@ import _import_src  ## Needed to import src folders when scripts are called from
 
 # Types in the code:
 from utils import logs, visuals, files
-from visuals.ite import plot_from_log
+from visualizations.ite import plot_from_log
 from sys import argv
 import os
 

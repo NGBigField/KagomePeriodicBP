@@ -23,7 +23,8 @@ from libs.ITE import rho_ij
 # Common types in the code:
 from containers import Config, BubbleConConfig, UpdateEdge
 from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
-from tensor_networks import KagomeTN, TensorNetwork, ModeTN, EdgeTN, TensorNode, MPS
+from tensor_networks import KagomeTNRepeatedUnitCell, ModeTN, EdgeTN, TensorNode, MPS
+from tensor_networks.abstract_classes import TensorNetwork
 from lattices.directions import BlockSide
 from _error_types import TensorNetworkError, BPNotConvergedError
 from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor, UpdateMode
@@ -45,7 +46,7 @@ from libs.TenQI import op_to_mat
 from metrics import negativity
 
 # Utils:
-from utils import assertions, logs, errors, lists, parallel_exec, prints, strings
+from utils import assertions, logs, errors, lists, parallels, prints, strings
 
 # A bit of OOP:
 from copy import deepcopy
@@ -135,7 +136,7 @@ def _get_edge_rdm_and_energy(edge_tn:EdgeTN, h:np.ndarray, force_real:bool)->flo
 
     # Calc energy:
     energy  = np.dot(rdm.flatten(),  h.flatten()) 
-    energy  /= 2  # Divide by 2 to get energy per site instead of per edge
+    # energy  /= 2  # Divide by 2 to get energy per site instead of per edge  #TODO Check
     if DEBUG_MODE and force_real:
         energy = assertions.real(energy)
     elif force_real:
@@ -231,7 +232,7 @@ def measure_energies_and_observables_together(
 
 
 def _measurements_everything_on_duplicated_core_specific_size(
-    core:KagomeTN, 
+    core:KagomeTNRepeatedUnitCell, 
     repeats:int,
     config:Config,
     logger:logs.Logger,
@@ -243,7 +244,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
 
     ## Get small stable network:
     tn_open = repeat_core(core, repeats)
-    # Beliefe Propagation:
+    # Belief Propagation:
     tn_stable, _, bp_stats = belief_propagation(tn_open, messages=None, bp_config=config.bp)
     if bp_stats.final_error>config.bp.msg_diff_terminate:
         raise BPNotConvergedError("")
@@ -279,7 +280,7 @@ def _measurements_everything_on_duplicated_core_specific_size(
 
 
 def measurements_everything_on_duplicated_core(
-    core:KagomeTN, 
+    core:KagomeTNRepeatedUnitCell, 
     repeats:int,
     config:Config,
     logger:logs.Logger|None = None
@@ -441,7 +442,7 @@ def _per_pauli_expectation_values_with_two_rdm(
 
 
 #TODO assert used
-def calc_interaction_energies_in_core(tn:KagomeTN, interaction_hamiltonain:np.ndarray, bubblecon_trunc_dim:int) -> list[float]:
+def calc_interaction_energies_in_core(tn:KagomeTNRepeatedUnitCell, interaction_hamiltonain:np.ndarray, bubblecon_trunc_dim:int) -> list[float]:
     energies = []
     reduced_tn = reduce_tn_to_core_and_environment(tn, bubblecon_trunc_dim, swallow_corners_=False)
     for side in Direction:
@@ -542,7 +543,7 @@ def _calc_mean_value_by_bracket_tn(
         fixed_arguments["print_progress"] = print_progress
 
     ## Calculate Numerators:
-    numerators = parallel_exec.concurrent_or_parallel(
+    numerators = parallels.concurrent_or_parallel(
         func=_sandwich_with_operator_and_contract_fully, 
         values=node_indices, value_name="node_ind", 
         fixed_arguments=fixed_arguments,

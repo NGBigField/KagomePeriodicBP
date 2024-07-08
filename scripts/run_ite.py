@@ -86,8 +86,8 @@ def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
 
 
 def main(
-    D = 2,
-    N = 2,
+    D = 3,
+    N = 3,
     chi_factor : int = 1,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     progress_bar:bool=True,
@@ -141,7 +141,7 @@ def main(
     ## time steps:
     if D<4:
         n_per_dt = 200
-        e_start = 4
+        e_start = 5
         e_end   = 8
     else:
         n_per_dt = 150

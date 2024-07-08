@@ -31,7 +31,7 @@ if ALLOW_VISUALS:
 else:
     Axes3D, Quiver, Line3D, Text = None, None, None, None
 
-from visuals import constants as visual_constants
+from visualizations import constants as visual_constants
 
 from copy import deepcopy
 

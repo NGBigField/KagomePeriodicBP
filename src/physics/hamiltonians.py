@@ -1,6 +1,7 @@
 import numpy as np
 from numpy import tensordot, zeros
 from physics.pauli import x, y, z, id
+from physics.spin_operators import Sx, Sy, Sz
 from functools import cache
 
 # For type hinting:
@@ -18,9 +19,9 @@ def ferromagnetic_with_transverse_field(direction:Literal['x', 'y', 'z'], streng
 
 def field_in_direction(direction:Literal['x', 'y', 'z'], strength:float=0.0)->np.ndarray:
 	match direction:
-		case 'x'|'X': op = x
-		case 'y'|'Y': op = y
-		case 'z'|'Z': op = z
+		case 'x'|'X': op = Sx
+		case 'y'|'Y': op = Sy
+		case 'z'|'Z': op = Sz
 		case _:
 			raise ValueError(f"Not an option {direction!r}")
 	return strength*_tensor_product(op, id) + strength*_tensor_product(id, op)
@@ -54,9 +55,9 @@ def heisenberg_afm()->np.ndarray:
 	"""Heisenberg Anti-FerroMagnetic model
 	"""
 	if FULLY_SYMMETRIC:
-		return 1.0*_tensor_product(x,x) + 1.0*_tensor_product(y,y) + 1.0*_tensor_product(z,z) 
+		return 1.0*_tensor_product(Sx,Sx) + 1.0*_tensor_product(Sy,Sy) + 1.0*_tensor_product(Sz,Sz) 
 	else:
-		return 1.0001*_tensor_product(x,x) + 0.9998*_tensor_product(y,y) + 0.9999*_tensor_product(z,z) 
+		return 1.0001*_tensor_product(Sx,Sx) + 0.9998*_tensor_product(Sy,Sy) + 0.9999*_tensor_product(Sz,Sz) 
 # heisenberg_afm.reference = -0.438703897456
 heisenberg_afm.reference = -0.40454  # -0.38620
 
@@ -72,7 +73,7 @@ def ising_with_transverse_field(B:float)->np.ndarray:
 	z_coef = -1
 	x_coef = -B/4
 	
-	hamiltonian = z_coef*_tensor_product(z, z) + x_coef*_tensor_product(x, id) + x_coef*_tensor_product(id, x)
+	hamiltonian = z_coef*_tensor_product(Sz, Sz) + x_coef*_tensor_product(Sx, id) + x_coef*_tensor_product(id, Sx)
 	return hamiltonian
 
 

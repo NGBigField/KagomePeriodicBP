@@ -1,5 +1,5 @@
 from typing import Callable, Any, ParamSpec, TypeVar
-from utils import sizes, tuples, errors, prints
+from utils import sizes, tuples, errors
 from utils.arguments import Stats
 import time
 from numpy import ndarray as np_ndarray
@@ -21,7 +21,7 @@ def when_fails_do(func_secondary:Callable[_In, _Out])->Callable[[Callable[_In, _
             try:
                 results = func_primary(*args, **kwargs)
             except Exception as e:
-                prints.print_warning(
+                _print_warning(
                     f"Function {func_primary.__name__!r} failed because of error:"+
                     f"\n{errors.get_traceback(e)}"+
                     f"\nRunning {func_secondary.__name__!r} in its stead."
@@ -86,20 +86,6 @@ def add_stats(
     return decorator
 
 
-def ignore_first_method_call(func:Callable)->Callable: # decorator that returns a wrapper:
-    objects_that_already_called : list[tuple[object, Callable]] = []
-
-    def wrapper(self, *args, **kwargs)->Any: # wrapeer that cals the function            
-        nonlocal objects_that_already_called
-        if (self, func) in objects_that_already_called:
-            results = func(self, *args, **kwargs)
-        else:
-            objects_that_already_called.append((self, func))
-            results = None
-        return results
-    return wrapper
-
-
 def multiple_tries(num:int)->Callable[[Callable[_In, _Out]], Callable[_In, _Out]]: # function that returns a decorator
     # Return decorator:
     def decorator(func:Callable[_In, _Out])->Callable[_In, _Out]: # decorator that returns a wrapper:
@@ -136,6 +122,20 @@ def list_tries(list_:list)->Callable[[Callable], Callable]: # function that retu
     return decorator
 
 
+def ignore_first_method_call(func:Callable)->Callable: # decorator that returns a wrapper:
+    objects_that_already_called : list[tuple[object, Callable]] = []
+
+    def wrapper(self, *args, **kwargs)->Any: # wrapeer that cals the function            
+        nonlocal objects_that_already_called
+        if (self, func) in objects_that_already_called:
+            results = func(self, *args, **kwargs)
+        else:
+            objects_that_already_called.append((self, func))
+            results = None
+        return results
+    return wrapper
+
+
 # def conditional(dec, condition:bool, otherwise=None)->Callable[[Callable[_In, _Out]], Callable[_In, _Out]]:
 #     def decorator(func:Callable[_In, _Out])->Callable[_In, _Out]:
 #         if condition:
@@ -145,3 +145,11 @@ def list_tries(list_:list)->Callable[[Callable], Callable]: # function that retu
 #         else:
 #             return func  # Return the function unchanged, not decorated.
 #     return decorator
+
+
+def _print_warning(s:str)->None:
+    from utils.prints import PrintColors, add_color
+    warn1color = PrintColors.HIGHLIGHTED_YELLOW
+    warn2color = PrintColors.YELLOW_DARK
+    s = add_color("Warning: ", warn1color)+add_color(s, warn2color)
+    print(s)
