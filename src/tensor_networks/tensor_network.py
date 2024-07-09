@@ -899,7 +899,7 @@ def _is_open_edge(edge:tuple[int, int])->bool:
     if edge[0]==edge[1]:    return True
     else:                   return False
 
-functools.cache
+@functools.cache
 def _kagome_lattice_derive_message_indices(N:int, direction:BlockSide)->list[int]:
     # Get info:
     num_lattice_nodes = triangle_lattice.total_vertices(N)*3
