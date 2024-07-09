@@ -6,7 +6,7 @@ if __name__ == "__main__":
 
 from lattices import triangle as triangle_lattice
 from lattices import edges
-from lattices._common import Node
+from lattices._common import Node, sorted_boundary_nodes
 from lattices import directions
 from lattices.directions import LatticeDirection, BlockSide, Direction
 
@@ -279,22 +279,7 @@ def _connect_kagome_nodes_between_triangles(triangle1:UpperTriangle, triangle2:U
     n1.edges[leg_index1] = edge_name
     n2.edges[leg_index2] = edge_name
 
-def _sorted_boundary_nodes(nodes:list[Node], boundary:BlockSide)->list[Node]:
-    # Get relevant nodes:
-    boundary_nodes = [node for node in nodes if boundary in node.boundaries]
 
-    # Choose sorting key:
-    if   boundary is BlockSide.U:     sorting_key = lambda node: -node.pos[0]
-    elif boundary is BlockSide.UR:    sorting_key = lambda node: +node.pos[1] 
-    elif boundary is BlockSide.DR:    sorting_key = lambda node: +node.pos[1]
-    elif boundary is BlockSide.UL:    sorting_key = lambda node: -node.pos[1]
-    elif boundary is BlockSide.DL:    sorting_key = lambda node: -node.pos[1]
-    elif boundary is BlockSide.D:     sorting_key = lambda node: +node.pos[0]
-    else:
-        raise DirectionError(f"Impossible direction {boundary!r}")
-
-    # Sort:
-    return sorted(boundary_nodes, key=sorting_key)
 
 
 def get_upper_triangle(node_index:int, nodes:list[Node], N:int)->UpperTriangle:
@@ -354,11 +339,11 @@ def create_kagome_lattice(
 
     ## Use ordered nodes to name Outer Edges
     for boundary in BlockSide.all_in_counter_clockwise_order():
-        sorted_nodes = _sorted_boundary_nodes(kagome_lattice, boundary)
+        sorted_nodes = sorted_boundary_nodes(kagome_lattice, boundary)
         for i, node in enumerate(sorted_nodes):
             _name_outer_edges(node, i, boundary, kagome_lattice, N)
     # The bottom-left node is falsely on its DL leg, fix it:
-    bottom_left_corner_node = _sorted_boundary_nodes(kagome_lattice, BlockSide.D)[0]
+    bottom_left_corner_node = sorted_boundary_nodes(kagome_lattice, BlockSide.D)[0]
     bottom_left_corner_node.set_edge_in_direction(DL, f"{BlockSide.D}-0")
 
     return kagome_lattice, triangular_lattice_of_upper_triangles
@@ -480,7 +465,7 @@ class KagomeLattice():
         
     @functools.cache
     def sorted_boundary_nodes(self, boundary:BlockSide)->list[Node]:
-        return _sorted_boundary_nodes(self.nodes, boundary)
+        return sorted_boundary_nodes(self.nodes, boundary)
     
     @functools.cache
     def sorted_boundary_edges(self, boundary:BlockSide)->list[EdgeIndicatorType]:

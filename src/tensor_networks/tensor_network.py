@@ -436,6 +436,10 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
                     case 'left':  tensor_node.cell_flavor = UnitCellFlavor.B
                     case 'right': tensor_node.cell_flavor = UnitCellFlavor.C
 
+    def shift_periodically_in_direction(self, direction:LatticeDirection) -> None:
+        triangles_permutation_list = triangle_lattice.shift_periodically_in_direction(self.lattice.N, direction)
+        print(triangles_permutation_list)
+
 
 class ArbitraryTN(TensorNetwork):
     def __init__(self, nodes:list[TensorNode], copy=True) -> None:

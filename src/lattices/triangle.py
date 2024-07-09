@@ -1,6 +1,6 @@
 # Import types used in the code:
-from lattices._common import Node
-from lattices.directions import LatticeDirection, BlockSide, Direction
+from lattices._common import Node, sorted_boundary_nodes
+from lattices.directions import LatticeDirection, BlockSide, Direction, DirectionError
 from _error_types import LatticeError, OutsideLatticeError
 
 # For type hinting:
@@ -27,6 +27,20 @@ def total_vertices(N):
 	"""
 	return 3*N*N - 3*N + 1
 
+
+@functools.cache
+def linear_size_from_total_vertices(NT:int) -> int:
+	## Solving a quadratic roots formula:
+	# Two options:
+	for sign in [+1, -1]:
+		N = ( 3 + sign*np.sqrt(9 - 12*(1 - NT)) )/6 
+		if N<0:
+			continue
+		N = int(N)
+		if NT!=total_vertices(N):
+			continue
+		return N
+	raise ValueError("No solution")
 
 @functools.cache
 def center_vertex_index(N):
@@ -128,7 +142,7 @@ def get_neighbor_coordinates_in_direction(i:int, j:int, direction:LatticeDirecti
 	return i2, j2
 
 
-def get_neighbor(i:int, j:int, direction:LatticeDirection, N:int)->tuple[int, int]:	
+def get_neighbor(i:int, j:int, direction:LatticeDirection, N:int)->int:	
 	i2, j2 = get_neighbor_coordinates_in_direction(i, j, direction, N)
 	return get_vertex_index(i2, j2, N)
 
@@ -154,7 +168,7 @@ def get_vertex_coordinates(index, N)->tuple[int, int]:
 	raise TriangularLatticeError("Not found")
 
 
-def get_vertex_index(i,j,N):
+def get_vertex_index(i:int, j:int, N:int) -> int:
 	"""
 	Given a location (i,j) of a vertex in the hexagon, return its 
 	index number. The vertices are ordered left->right, up->down.
@@ -764,3 +778,91 @@ def vertices_indices_rows_in_direction(N:int, major_direction:BlockSide, minor_d
 		list_of_rows.append(indices)
 
 	return list_of_rows
+
+
+def _assign_boundaries_to_nodes(lattice:list[Node]) -> None:
+	N = linear_size_from_total_vertices(len(lattice))
+	for node in lattice:
+		boundaries = check_boundary_vertex(node.index, N)
+		node.boundaries = set(boundaries)
+
+
+def _sorted_boundary_edges(lattice:list[Node], boundary:BlockSide) -> list:
+	# Basic info:
+	N = linear_size_from_total_vertices(len(lattice))
+	_assign_boundaries_to_nodes(lattice)
+	boundary_nodes = sorted_boundary_nodes(lattice, boundary)
+	assert len(boundary_nodes)==N
+
+	# Logic of participating directions:
+	participating_directions = boundary.matching_lattice_directions()
+
+	# Logic of participating edges and nodes:
+	omit_last_edge = N==self.N
+	omit_last_node = not omit_last_edge
+	
+	# Get all edges in order:
+	boundary_edges = []
+	for _, is_last_node, node in lists.iterate_with_edge_indicators(boundary_nodes):
+		if omit_last_node and is_last_node:
+			break
+
+		for _, is_last_direction, direction in lists.iterate_with_edge_indicators(participating_directions):
+			if omit_last_edge and is_last_node and is_last_direction:
+				break
+
+			if direction in node.directions:
+				boundary_edges.append(node.get_edge_in_direction(direction))
+
+	assert self.num_message_connections == len(boundary_edges)
+	return boundary_edges
+
+
+def change_boundary_conditions_to_periodic(lattice:list[Node]) -> list[Node]:
+	## connect per two opposite faces:
+	ordered_half_list = list(BlockSide.all_in_counter_clockwise_order())[0:3]
+	for block_side in ordered_half_list:
+		boundary_edges          = _sorted_boundary_edges(lattice, boundary=block_side)
+		opposite_boundary_edges = _sorted_boundary_edges(lattice, boundary=block_side.opposite())
+		opposite_boundary_edges.reverse()
+
+		for edge1, edge2 in zip(boundary_edges, opposite_boundary_edges, strict=True):
+			## Choose boundary function:
+			if periodic:
+				_kagome_connect_boundary_edges_periodically(self, edge1, edge2)
+			else:
+				_kagome_connect_boundary_edges_to_dummy_nodes(self, edge1, edge2)
+
+
+def shift_periodically_in_direction(N:int, direction:LatticeDirection) -> list[int]:
+	"""Return the permutation list of of a triangular lattice when shifting periodically in a direction.
+
+	Args:
+		N (int): Size of lattice
+		direction (LatticeDirection): Direction in which to move the lattice.
+
+	Returns:
+		list[int]: Permutation list
+	"""
+	## Get basic data that will help later:
+	open_lattice = create_triangle_lattice(N)
+	periodic_lattice = change_boundary_conditions_to_periodic(open_lattice)
+
+	## Define inner functions:
+	def _get_new_index(old_index:int) -> int:
+		i_old, j_old = get_vertex_coordinates(old_index, N)
+		i, j = _get_neighbor_coordinates_in_direction_no_boundary_check(i_old, j_old, direction, N)
+		if i<0:  # Drifted up
+			pass
+		elif i>=num_rows(N):  # Drifted down
+			pass
+		elif j<0:  # Drifted left
+			pass
+		elif j>=row_width(i, N):  # Drifted right
+			pass
+
+		return get_vertex_index(i, j, N)
+
+	## Produce output:
+	permutation_list = [_get_new_index(old_index) for old_index in range(N)]
+	return permutation_list

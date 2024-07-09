@@ -110,6 +110,7 @@ def _single_outgoing_message(
     ## right canonical and normalize mantissa and exponent kept in MPS :
     mps.right_canonical(nr_bulk=True)
     mps.reset_nr()
+    # TODO flip order
 
     ## Out message:
     return Message(mps, mps_direction)
@@ -149,7 +150,10 @@ def _belief_propagation_step(
         fixed_arguments["print_progress"] = False
 
     # Compute outgoing messages:
-    out_messages = _outgoing_messages(directions_iter=directions_iter, multi_processing=multi_processing, fixed_arguments=fixed_arguments)
+    out_messages = parallels.concurrent_or_parallel(
+        func=_single_outgoing_message, values=directions_iter, value_name="direction", in_parallel=multi_processing, fixed_arguments=fixed_arguments
+    ) 
+    out_messages = MessageDictType(out_messages)
 
     ## Next incoming messages are the outgoing messages after applying periodic boundaries:
     out_messages = MessageDictType({side.opposite() : message for side, message in out_messages.items()})

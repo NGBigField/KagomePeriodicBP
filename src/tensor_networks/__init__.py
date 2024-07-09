@@ -9,3 +9,5 @@ from tensor_networks.tensor_network import (
     get_common_edge, get_common_edge_legs  # Functions on TNs
 )
 from tensor_networks.construction import create_kagome_tn
+# Directions:
+from tensor_networks.tensor_network import LatticeDirection, BlockSide, Direction

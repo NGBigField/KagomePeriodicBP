@@ -3,7 +3,7 @@ import _import_src  ## Needed to import src folders when scripts are called from
 # Import utils:
 from utils import saveload
 # Import our kagome structure functions:
-from tensor_networks import KagomeTNRepeatedUnitCell, KagomeTNArbitrary
+from tensor_networks import KagomeTNRepeatedUnitCell, KagomeTNArbitrary, LatticeDirection
 # Config and Hamiltonians:
 from containers import Config
 from physics import hamiltonians
@@ -23,7 +23,7 @@ def _print_success(stats:BPStats) -> None:
 
 def main(
     parallel_msgs : bool = False,
-    filename : str = "Kagome-PEPS.pkl"  # /Kagome-PEPS.pkl / Kagome-PEPS-n2-D3.pkl
+    filename : str = "Kagome-PEPS-n2-D3.pkl"  # /Kagome-PEPS.pkl / Kagome-PEPS-n2-D3.pkl
 ) -> dict:
     
     ## Create tensor network:
@@ -39,7 +39,10 @@ def main(
     )
     h = hamiltonians.heisenberg_afm()
 
-    # tn.plot()
+    
+    ## For each shift in some direction:
+    direction = LatticeDirection.R
+    shifted_tn = tn.shift_periodically_in_direction(direction)
 
     ## Perform algorithms:
     messages = saveload.load("messages", none_if_not_exist=True)

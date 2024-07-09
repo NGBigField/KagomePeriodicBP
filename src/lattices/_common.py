@@ -1,5 +1,5 @@
 from _types import EdgeIndicatorType, PosScalarType
-from lattices.directions import Direction, BlockSide
+from lattices.directions import Direction, BlockSide, DirectionError
 from utils import tuples
 from dataclasses import dataclass, field
 
@@ -62,3 +62,22 @@ def plot(lattice:list[Node], node_color:str="red", node_size=40, edge_style:str=
 
     visuals.draw_now()
     print("Done")
+
+
+
+def sorted_boundary_nodes(nodes:list[Node], boundary:BlockSide)->list[Node]:
+    # Get relevant nodes:
+    boundary_nodes = [node for node in nodes if boundary in node.boundaries]
+
+    # Choose sorting key:
+    if   boundary is BlockSide.U:     sorting_key = lambda node: -node.pos[0]
+    elif boundary is BlockSide.UR:    sorting_key = lambda node: +node.pos[1] 
+    elif boundary is BlockSide.DR:    sorting_key = lambda node: +node.pos[1]
+    elif boundary is BlockSide.UL:    sorting_key = lambda node: -node.pos[1]
+    elif boundary is BlockSide.DL:    sorting_key = lambda node: -node.pos[1]
+    elif boundary is BlockSide.D:     sorting_key = lambda node: +node.pos[0]
+    else:
+        raise DirectionError(f"Impossible direction {boundary!r}")
+
+    # Sort:
+    return sorted(boundary_nodes, key=sorting_key)

@@ -17,7 +17,7 @@ import numpy as np
 d = 2
 
 
-force_values = np.logspace(-3, -10, 200*12*3)
+force_values = np.logspace(-2, -8, 200*12)
 iter_force_value = iter(force_values)
 enter_counter = 0
 def decreasing_global_field_func(delta_t:float|None)->float:
@@ -87,15 +87,15 @@ def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
 
 def main(
     D = 2,
-    N = 2,
-    chi_factor : int = 1,
+    N = 3,
+    chi_factor : int = 1.5,
     live_plots:bool|Iterable[bool] = [0, 0, 0],
     progress_bar:bool=True,
     results_filename:str|None = None,
     parallel:bool = 0,
     hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
-    unit_cell_from:str = "best"
+    unit_cell_from:str = "last"
 )->tuple[float, str]:
 
     assert N>=2
