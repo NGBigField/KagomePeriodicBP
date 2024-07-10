@@ -115,9 +115,9 @@ def _plot_field_over_time() -> None:
 
 def main(
     D = 2,
-    N = 3,
-    chi_factor : int = 1.5,
-    live_plots:bool|Iterable[bool] = [0, 0, 0],
+    N = 2,
+    chi_factor : int|float = 1,
+    live_plots:bool|Iterable[bool] = [0, 0, 0],   #type: ignore
     progress_bar:bool=True,
     results_filename:str|None = None,
     parallel:bool = 0,

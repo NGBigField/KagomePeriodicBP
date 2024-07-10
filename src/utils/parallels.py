@@ -40,7 +40,7 @@ class _FunctionObject(Generic[_InType, _OtherInputs, _OutType]):
     def __call__(self, single_arg) -> _OutType:
         kwargs = self.fixed_arguments
         kwargs[self.single_arg_name] = single_arg 
-        return self.func(**kwargs) 
+        return self.func(**kwargs)  #type: ignore
   
 
 def _parallel_with_pool(f:_FunctionObject[_InType, _OtherInputs, _OutType], values:list[_InType]) -> dict[_InType, _OutType]:
@@ -105,6 +105,8 @@ def parallel(
             return _parallel_with_pool(f, values)
         case "multithreading":
             return _parallel_with_multithreading(f, values)
+        case _:
+            raise ValueError(f"{PARALLEL_METHOD!r} is not an option")
         
 
 def concurrent_or_parallel(

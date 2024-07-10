@@ -272,7 +272,7 @@ class ITEConfig(_ConfigClass):
     
 
 class ITEPerModeStats(Stats):
-    bp_stats : list[BPStats] = None 
+    bp_stats : list[BPStats] 
     env_metrics : list[MatrixMetrics]
 
     def __post_init__(self):

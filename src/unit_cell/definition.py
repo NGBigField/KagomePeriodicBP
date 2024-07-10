@@ -89,7 +89,7 @@ class UnitCell:
              C = tensor.copy()
         )
     
-    def save(self, file_name:str|None=None)->None:
+    def save(self, file_name:str|None=None) -> str:
         file_name = self._derive_file_name(file_name)
         return saveload.save(self, name=file_name, sub_folder=UNIT_CELL_SUBFOLDER_NAME)
 
@@ -99,6 +99,7 @@ class UnitCell:
             file_name = files.get_last_file_in_folder(UNIT_CELL_FOLDER_FULLPATH)
         return saveload.load(file_name, sub_folder=UNIT_CELL_SUBFOLDER_NAME, none_if_not_exist=if_exist)
     
+    @staticmethod
     def load_best(D:int, none_if_not_exist:bool=True) -> "UnitCell":
         data = BestUnitCellData.load(D=D, none_if_not_exist=none_if_not_exist)
         if data is None and none_if_not_exist:

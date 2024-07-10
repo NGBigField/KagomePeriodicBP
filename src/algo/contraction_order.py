@@ -601,7 +601,7 @@ def derive_kagome_tn_contraction_order(
 
 
 
-def get_contraction_order(tn:abstract_classes.KagomeTensorNetwork|CoreTN, direction:BlockSide, depth:ContractionDepth, plot_:bool=False)->list[int]:
+def get_contraction_order(tn:abstract_classes.KagomeTensorNetwork|ModeTN|CoreTN, direction:BlockSide, depth:ContractionDepth, plot_:bool=False)->list[int]:
 
     ## In the case where it's a CoreTN (which has an expected canonical structure)
     if isinstance(tn, CoreTN):

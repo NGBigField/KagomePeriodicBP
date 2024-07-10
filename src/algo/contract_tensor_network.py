@@ -26,6 +26,10 @@ from algo.contraction_order import get_contraction_order
 # Other modules we made and need here   
 from libs.bubblecon import bubblecon
 
+# type hints:
+from typing import TypeAlias
+_PosTuple : TypeAlias = tuple[float|int, float|int]
+
 
 def _cell_flavor_from_index(i:int) -> UnitCellFlavor:
     m = i%3
@@ -41,7 +45,7 @@ def _plot_tn_with_connected_corner(
     tensors     : list[np.ndarray],  
     edges_list  : list[list[str]],      
     angles_list : list[list[float]],  
-    positions   : list[tuple[float, float]],
+    positions   : list[_PosTuple],
     tn          : KagomeTNRepeatedUnitCell 
 )->None:
 

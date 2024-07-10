@@ -7,9 +7,6 @@ if __name__ == "__main__":
     from project_paths import add_scripts; add_scripts()
 
 
-# Get Global-Config:
-from _config_reader import DEBUG_MODE
-
 # Everyone needs numpy:
 import numpy as np
 
@@ -36,7 +33,7 @@ from typing import Generator
 
 
 def _hermitize_messages(messages:MessageDictType) -> MessageDictType:
-    hermitized_dict = {}
+    hermitized_dict = MessageDictType({})
     for side, message in messages.items():
         mps = ite.hermitize_a_message(message.mps)
         hermitized_dict[side] = Message(mps=mps, orientation=message.orientation)
@@ -46,7 +43,7 @@ def _hermitize_messages(messages:MessageDictType) -> MessageDictType:
 
 def _compute_error(prev_messages:MessageDictType, out_messages:MessageDictType, msg_diff_squared:bool)->float:
     # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:
-    distances = [ 
+    distances: list[float] = [ 
         mps_distance(prev_messages[direction].mps, out_messages[direction].mps) 
         for direction in BlockSide.all_in_counter_clockwise_order() 
     ]
@@ -56,7 +53,7 @@ def _compute_error(prev_messages:MessageDictType, out_messages:MessageDictType, 
         return np.sqrt( sum(distances) )/len(distances)
     
 
-def _single_mps_damping(old_mps:Message, new_mps:Message, damping:float, trunc_dim:int):
+def _single_mps_damping(old_mps:MPS, new_mps:MPS, damping:float, trunc_dim:int):
     inner_prod = bmpslib.mps_inner_product(new_mps, old_mps, conjB=True)
 
     if inner_prod.real>0:
@@ -74,7 +71,7 @@ def _single_mps_damping(old_mps:Message, new_mps:Message, damping:float, trunc_d
     return combined_mps
 
 
-def _message_damping(prev_messages:MessageDictType, out_messages:MessageDictType, damping:float|None, trunc_dim:int)->MessageDictType:
+def _message_damping(prev_messages:MessageDictType, out_messages:MessageDictType, damping:float, trunc_dim:int)->MessageDictType:
 
     next_messages = {}
     for side, new_message in out_messages.items():
@@ -87,15 +84,8 @@ def _message_damping(prev_messages:MessageDictType, out_messages:MessageDictType
     return MessageDictType(next_messages)
 
 
-def _outgoing_messages(directions_iter:Generator[BlockSide, None, None], multi_processing:bool, fixed_arguments:dict) -> MessageDictType:
-    out_messages = parallels.concurrent_or_parallel(
-        func=_single_outgoing_message, values=directions_iter, value_name="direction", in_parallel=multi_processing, fixed_arguments=fixed_arguments
-    ) 
-    return MessageDictType(out_messages)
-
-
 def _single_outgoing_message(
-    tn:KagomeTensorNetwork, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool
+    direction:BlockSide, tn:KagomeTensorNetwork, bubblecon_trunc_dim:int, print_progress:bool
 ) -> Message:
     
     ## use bubble con to compute outgoing message:
@@ -121,8 +111,7 @@ def _fix_messages(messages:MessageDictType) -> None:
     """ right canonical and normalize mantissa and exponent kept in MPS """
     for key in messages.keys():
         messages[key].mps.right_canonical(nr_bulk=True)
-        messages[key].mps.reset_nr()
-    return messages
+        messages[key].mps.reset_nr() 
 
 
 def _out_going_messages(
@@ -147,8 +136,8 @@ def _out_going_messages(
         fixed_arguments["print_progress"] = False
 
     # Compute outgoing messages:
-    out_messages : MessageDictType = parallels.concurrent_or_parallel(
-        func=_single_outgoing_message, values=directions_iter, value_name="direction", in_parallel=multi_processing, fixed_arguments=fixed_arguments
+    out_messages : dict[BlockSide, Message] = parallels.concurrent_or_parallel(
+        func=_single_outgoing_message, values=directions_iter, value_name="direction", in_parallel=multi_processing, fixed_arguments=fixed_arguments  # type: ignore
     ) 
 
     ## Next incoming messages are the outgoing messages after applying periodic boundaries:
@@ -163,17 +152,16 @@ def _out_going_messages(
 
 def _belief_propagation_step(
     tn:KagomeTensorNetwork,
+    prev_messages:MessageDictType,
     prev_error:float|None,
     config:BPConfig,
     prog_bar_obj:prints.ProgressBar,
     allow_prog_bar:bool=True
 )->tuple[
+    MessageDictType,   # out_messages
     MessageDictType,   # next_messages
     float              # next_error
 ]:
-
-    ## Keep old messages for comparison (error calculation):
-    prev_messages : MessageDictType = deepcopy(tn.messages)
 
     ## Compute out-going message for all possible block-sides:
     out_messages = _out_going_messages(tn, config, prev_error, prog_bar_obj, allow_prog_bar)
@@ -186,10 +174,6 @@ def _belief_propagation_step(
         next_messages = out_messages
     else:
         next_messages = _message_damping(prev_messages, out_messages, config.damping, config.max_swallowing_dim)
-    
-    ## Connect new incoming massages to tensor-network:
-    tn.connect_messages(next_messages)
-
 
     return out_messages, next_messages, next_error
 
@@ -214,17 +198,17 @@ def belief_propagation(
     ## Connect or randomize messages:
     if messages is None:
         tn.connect_random_messages()
-        messages = tn.messages
     else:
         tn.connect_messages(messages)
-
+    messages = tn.messages
+    
     ## Visualizations:
     if allow_prog_bar:
         if max_iterations is None:  steps_iterator = prints.ProgressBar.unlimited( "Performing BlockBP...  ")
         else:                       steps_iterator = prints.ProgressBar(max_iterations, "Performing BlockBP...  ")
     else:
         if max_iterations is None:  steps_iterator = prints.ProgressBar.inactive()
-        else:                       steps_iterator = prints.ProgressBar(max_iterations, print_out=None)
+        else:                       steps_iterator = prints.ProgressBar(max_iterations, print_out=False)
         
 
     ## Initial values (In case no iteration will perform, these are the default values)
@@ -237,13 +221,16 @@ def belief_propagation(
     
     ## Track best result in-case failure with error increasing:
     min_error = np.inf
-    min_messages = messages
+    min_messages = next_messages = messages
  
     ## Compute outgoing messages until max_iterations or max_error:
     for i in steps_iterator:
                
-        # Preform BP step:
-        messages, error = _belief_propagation_step(tn, error, config, steps_iterator, allow_prog_bar)
+
+        ## Preform BP step:
+        out_messages, next_messages, error = _belief_propagation_step(tn, next_messages, error, config, steps_iterator, allow_prog_bar)
+        # out_messages are what we would return out of the algorithm
+        # next_messages is a damped starting-point for the next bp_step
         
         if update_plots_between_steps:
             visuals.refresh()
@@ -253,10 +240,13 @@ def belief_propagation(
             success = True
             break
 
+        ## Connect incoming massages to tensor-network for next step:
+        tn.connect_messages(next_messages)
+
         # Check if this message is better than the previous 
         if error<min_error:
             min_error = error
-            min_messages = deepcopy(messages)
+            min_messages = deepcopy(out_messages)
         
         # Check premature-failure conditions:
         errors.append(error)
@@ -268,19 +258,19 @@ def belief_propagation(
         
     ## Check failure:         
     if not success:
-        messages = min_messages     
+        out_messages = min_messages     
         error = min_error
-        tn.connect_messages(messages)
 
     ## Hermitize messages:
     if config.hermitize_msgs_when_finished:
-        messages = _hermitize_messages(messages)
+        out_messages = _hermitize_messages(out_messages)
 
+    ## Arrange Results
+    # tn gets the output messages:
+    tn.connect_messages(out_messages)
     stats = BPStats(iterations=i+1, final_error=error, final_config=config, success=success)  
-  
 
-    # Check result and finish:
-    return messages, stats
+    return out_messages, stats
     
 
 @decorators.add_stats()
@@ -338,10 +328,11 @@ def robust_belief_propagation(
     else:  # if never had success
         messages_out = min_messages
         error_out = min_error
-        tn.connect_messages(min_messages)
 
     ## Did we succeed?
     success = error_out < good_enough_error
+    assert isinstance(messages_out, MessageDictType)
+    tn.connect_messages(messages_out)
 
     ## Return stats
     overall_stats = BPStats(
@@ -357,5 +348,4 @@ def robust_belief_propagation(
 
 
 if __name__ == "__main__":
-    from scripts.test_bp import main_test
-    main_test()
+    pass

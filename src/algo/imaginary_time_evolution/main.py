@@ -464,7 +464,7 @@ def _mode_order_without_repetitions(prev_order:list[UpdateMode], ite_config:ITEC
 def _from_unit_cell_to_stable_mode(
     unit_cell:UnitCell, messages:MessageDictType, config:Config, logger:logs.Logger, mode:UpdateMode
 )->tuple[
-    ModeTN, MessageDictType, BPStats, Config
+    ModeTN, MessageDictType, BPStats|None, Config
 ]:
     ## Duplicate core into a big tensor-network:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)

@@ -10,9 +10,9 @@ from numpy import inf
 
 class StaticPrinter():
 
-    def __init__(self, print_out:TextIO=sys.stdout, in_place:bool=False) -> None:
+    def __init__(self, print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False) -> None:
         self.printed_lines_lengths : List[int] = []
-        self.print_out : TextIO = print_out
+        self.print_out : TextIO|Literal[False] = print_out
         self.in_place : bool = in_place
 
     @property
@@ -24,6 +24,8 @@ class StaticPrinter():
 
     def _print(self, s:str, end:Optional[str]=None)->None:
         end = arguments.default_value(end, default=self.end_char)
+        if self.print_out is False:
+            return
         file = self.print_out
         print(s, end=end, file=file)
     
@@ -50,7 +52,7 @@ class StaticPrinter():
         self.printed_lines_lengths = []
                 
     def print(self, s:str) -> None:
-        if self.print_out is None:
+        if self.print_out == False:
             return
         self.clear()
         print_lines = s.split(SpecialChars.NewLine)
@@ -60,7 +62,7 @@ class StaticPrinter():
 
 
 class StaticNumOutOfNum():
-    def __init__(self, expected_end:int, print_prefix:str="", print_suffix:str="", print_out:TextIO=sys.stdout, in_place:bool=False) -> None:
+    def __init__(self, expected_end:int, print_prefix:str="", print_suffix:str="", print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False) -> None:
         self.static_printer : StaticPrinter = StaticPrinter(print_out=print_out, in_place=in_place)
         self.expected_end :int = expected_end    
         self.print_prefix :str = print_prefix
@@ -120,7 +122,7 @@ class StaticNumOutOfNum():
 
 
 class ProgressBar(StaticNumOutOfNum):
-    def __init__(self, expected_end:int, print_prefix:str="", print_suffix:str="", print_length:int=40, print_out:TextIO=sys.stdout, in_place:bool=False): 
+    def __init__(self, expected_end:int, print_prefix:str="", print_suffix:str="", print_length:int=40, print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False): 
         # Save basic data:        
         self.print_length :int = print_length
         super().__init__(expected_end, print_prefix, print_suffix, print_out, in_place)

@@ -42,7 +42,7 @@ class TensorNode():
     is_ket : bool
     pos : Tuple[PosScalarType, ...]
     edges : list[EdgeIndicatorType]
-    directions : list[LatticeDirection] 
+    directions : list[Direction]   # preferably: LatticeDirection:s are used
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
     cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneUnitCell) 
     boundaries : set[BlockSide] = field(default_factory=set) 
