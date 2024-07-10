@@ -1,13 +1,14 @@
 # Import types used in the code:
-from lattices._common import Node, sorted_boundary_nodes
+from lattices._common import Node, sorted_boundary_nodes, plot
 from lattices.directions import LatticeDirection, BlockSide, Direction, DirectionError
 from _error_types import LatticeError, OutsideLatticeError
 
 # For type hinting:
 from typing import Generator
+from dataclasses import dataclass
 
 # some of our utils:
-from utils import tuples
+from utils import tuples, lists, strings
 
 # For caching results:
 import functools 
@@ -637,8 +638,93 @@ def rotate_ACW(N, ijs, ij_to_hex, hex_to_ij):
 		new_ijs.append(new_ij)
 		
 	return new_ijs
-			
 
+
+@dataclass
+class _EdgeDataForShifting:
+	vertex_ind : int
+	edge_ind : int
+	crnt_name : str
+	new_name : str  = ""
+
+
+
+def _is_boundary_edge(edge:str)->bool:
+	if isinstance(edge, int):
+		return False
+	assert edge[0].isalpha
+	return True
+
+
+def _divide_boundary_edge_name_to_side_and_order(edge_name:str) -> tuple[str, int]:
+	c0 : str = edge_name[0]
+	c1 : str = edge_name[1]
+	# Derive side name string:
+	assert c0.isalpha, "First string in boundary edge must be a 'd' or 'u'"
+	if c1.isalpha():  
+		side_name = c0+c1  # second char is also alphabetical 
+		order = edge_name[2:]
+	else: 			  
+		side_name = c0
+		order = edge_name[1:]
+
+	return side_name, int(order)
+
+
+def _boundary_edge_order_by_num_order(edge_data:_EdgeDataForShifting) -> int:
+	side_name, order = _divide_boundary_edge_name_to_side_and_order(edge_data.crnt_name)
+	return order
+
+
+def _boundary_edge_order_by_side(edge_data:_EdgeDataForShifting) -> int:
+	side_name, order = _divide_boundary_edge_name_to_side_and_order(edge_data.crnt_name)
+	# direction by oderr:
+	for i, side in enumerate(BlockSide.all_in_counter_clockwise_order()):
+		crnt_side_name = str(side).casefold()
+		if crnt_side_name == side_name:
+			return i
+	raise ValueError("Not found")
+
+
+
+def _shift_boundary_edges_clockwise(edges_list:list[str|int], N:int) -> list[str]:
+	""" First, find all the edges and keep their order in the following format:
+
+	During the algorithm, a list is created and sorted containing boundary edges:
+	[(i_1, j_1, e_1, n_1), (i_2, j_2, e_2, n_2), ..., (i_N, j_N, e_N, n_N)]
+	Where i is the index of the vertex
+	and j is the index of its leg where the edge is.
+	and e is the name of the edge
+
+	Retuns a list with all ordered edges
+	"""
+	## Define basic data:
+	# How many edges per edge do we expect:
+	num_outer_edges = 2*N-1
+
+	## Define helper functions:
+
+	## Search for all boundary edges:
+	boundary_edges = [
+		[_EdgeDataForShifting(vertex_ind=i, edge_ind=j, crnt_name=edge) for j, edge in enumerate(edges) if _is_boundary_edge(edge)] 
+		for i, edges in enumerate(edges_list)
+	]
+	boundary_edges = lists.join_sub_lists(boundary_edges)
+
+	## Sort edges:
+	# Sort by number:
+	boundary_edges.sort(key=_boundary_edge_order_by_num_order)
+	# sort by direction:
+	boundary_edges.sort(key=_boundary_edge_order_by_side)
+
+	## Cyclicly assign new names according to next in order:
+	for prev, crnt, next in lists.iterate_with_periodic_prev_next_items(boundary_edges):
+		crnt.new_name = next.crnt_name
+	
+	## Change names:
+	
+	print("")
+	
     
 
 def create_triangle_lattice(N)->list[Node]:
@@ -674,10 +760,11 @@ def create_triangle_lattice(N)->list[Node]:
 	# Create the list of edges. 
 	#
 	edges_list = []
-	for i in range(2*N-1):
+	h = num_rows(N)
+	for i in range(h):
 		w = row_width(i,N)
-		for j in range(w):
 
+		for j in range(w):
 			eL  = get_edge_index(i,j,'L' , N)
 			eR  = get_edge_index(i,j,'R' , N)
 			eUL = get_edge_index(i,j,'UL', N)
@@ -686,6 +773,14 @@ def create_triangle_lattice(N)->list[Node]:
 			eDR = get_edge_index(i,j,'DR', N)
 
 			edges_list.append([eL, eR, eUL, eUR, eDL, eDR])
+
+	#
+	# Rotate edges at boundary clockwise.
+	# 	Done because the canonical form in the original triangular blockBP
+	#	code, does not the shape of the block in this code:
+	#
+	edges_list = _shift_boundary_edges_clockwise(edges_list, N)
+
 	#
 	# Create the list of nodes:
 	#
@@ -796,21 +891,11 @@ def _sorted_boundary_edges(lattice:list[Node], boundary:BlockSide) -> list:
 
 	# Logic of participating directions:
 	participating_directions = boundary.matching_lattice_directions()
-
-	# Logic of participating edges and nodes:
-	omit_last_edge = N==self.N
-	omit_last_node = not omit_last_edge
 	
 	# Get all edges in order:
 	boundary_edges = []
 	for _, is_last_node, node in lists.iterate_with_edge_indicators(boundary_nodes):
-		if omit_last_node and is_last_node:
-			break
-
 		for _, is_last_direction, direction in lists.iterate_with_edge_indicators(participating_directions):
-			if omit_last_edge and is_last_node and is_last_direction:
-				break
-
 			if direction in node.directions:
 				boundary_edges.append(node.get_edge_in_direction(direction))
 
@@ -827,11 +912,8 @@ def change_boundary_conditions_to_periodic(lattice:list[Node]) -> list[Node]:
 		opposite_boundary_edges.reverse()
 
 		for edge1, edge2 in zip(boundary_edges, opposite_boundary_edges, strict=True):
-			## Choose boundary function:
-			if periodic:
-				_kagome_connect_boundary_edges_periodically(self, edge1, edge2)
-			else:
-				_kagome_connect_boundary_edges_to_dummy_nodes(self, edge1, edge2)
+			_kagome_connect_boundary_edges_periodically(self, edge1, edge2)
+
 
 
 def shift_periodically_in_direction(N:int, direction:LatticeDirection) -> list[int]:
