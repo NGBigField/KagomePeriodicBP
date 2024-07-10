@@ -5,8 +5,8 @@ from containers import Config
 from unit_cell import UnitCell, given_by
 
 from utils import strings, lists
-from typing import Iterable
-
+from typing import Iterable, TypeAlias
+_Bool : TypeAlias = bool|int
 
 # Algos we test here:
 from algo.imaginary_time_evolution import full_ite
@@ -20,11 +20,15 @@ d = 2
 crnt_force_value = 1e-2
 def decreasing_global_field_func(delta_t:float|None)->float:
     global crnt_force_value
+    if delta_t is None:
+        return 0
     if delta_t>1e-5:
-        r = 0.95
+        r = 0.96
     else:
-        r = 0.6
+        r = 0.90
     crnt_force_value *= r
+    if crnt_force_value < 1e-16:
+        crnt_force_value = 0.0
     return crnt_force_value
 
 
@@ -40,7 +44,7 @@ def _config_at_measurement(config:Config)->Config:
     return config
 
 
-def _get_time_steps(e_start:int, e_end:int, n_per_dt:int)->list[list[float]]:
+def _get_time_steps(e_start:int, e_end:int, n_per_dt:int)->list[float]:
     time_steps = [[np.power(10, -float(exp))]*n_per_dt for exp in np.arange(e_start, e_end, 1)]
     time_steps = lists.join_sub_lists(time_steps)
     return time_steps
@@ -107,9 +111,25 @@ def _plot_field_over_time() -> None:
         values.append(value)
 
     ## Plot:
-    plt.plot(values)
-    plt.show()
+    lines = plt.plot(values, linewidth=4)
+    ax1 : plt.Axes = lines[0].axes
+    ax2 : plt.Axes = ax1.twinx()
+    ax1.set_yscale('log')
+    ax2.set_yscale('log')
+    ax2.plot(time_steps, linewidth=2)
+    ax1.grid()
 
+    ax1.set_ylabel("force",   color=     "tab:red")
+    ax1.tick_params(axis='y', labelcolor="tab:red")
+    for line in ax1.lines:
+        line.set_color("tab:red")
+
+    ax2.set_ylabel("delta-t",      color="tab:blue")
+    ax2.tick_params(axis='y', labelcolor="tab:blue")
+    for line in ax2.lines:
+        line.set_color("tab:blue")
+
+    plt.show()
     print("Done.")
 
 
@@ -117,10 +137,10 @@ def main(
     D = 2,
     N = 2,
     chi_factor : int|float = 1,
-    live_plots:bool|Iterable[bool] = [0, 0, 0],   #type: ignore
+    live_plots:_Bool|Iterable[_Bool] = [0, 0, 0],   #type: ignore
     progress_bar:bool=True,
     results_filename:str|None = None,
-    parallel:bool = 0,
+    parallel:_Bool = 0,
     hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
     unit_cell_from:str = "last"
@@ -189,6 +209,6 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
     # _plot_field_over_time()
+    main()
 

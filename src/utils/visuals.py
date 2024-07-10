@@ -268,7 +268,7 @@ class AppendablePlot():
             fig = axis.figure
         # save data:
         self.fig  = fig
-        self.axis = axis
+        self.axis : plt.Axes = axis
         self.values : dict[str, tuple[list[float], list[float], dict] ] = dict()
         self.axis.get_yaxis().get_major_formatter().set_useOffset(False)  # Stop the weird pyplot tendency to give a "string" offset to graphs
         self.legend_on : bool = legend_on

@@ -33,7 +33,8 @@
         "rdms",
         "stds",
         "suptitle",
-        "tnsu"
+        "tnsu",
+        "twinx"
     ],
     "cSpell.ignoreWords": [
         "arange"

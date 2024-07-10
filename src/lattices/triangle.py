@@ -4,7 +4,7 @@ from lattices.directions import LatticeDirection, BlockSide, Direction, Directio
 from _error_types import LatticeError, OutsideLatticeError
 
 # For type hinting:
-from typing import Generator
+from typing import Generator, Final, Iterable, TypeGuard
 from dataclasses import dataclass
 
 # some of our utils:
@@ -18,6 +18,9 @@ import numpy as np
 
 
 class TriangularLatticeError(LatticeError): ...
+
+
+CACHED_ORDERED_BOUNDARY_EDGES_PER_LATTICE_SIZE : Final[dict[int, list[str]]] = {}
 
 
 @functools.cache
@@ -128,7 +131,6 @@ def check_boundary_vertex(index:int, N)->list[BlockSide]:
 			on_boundaries.append(BlockSide.DR)
 	
 	return on_boundaries
-
 
 
 def get_neighbor_coordinates_in_direction(i:int, j:int, direction:LatticeDirection, N:int)->tuple[int, int]:
@@ -648,15 +650,15 @@ class _EdgeDataForShifting:
 	new_name : str  = ""
 
 
-
-def _is_boundary_edge(edge:str)->bool:
+def _is_boundary_edge(edge:str|int) -> TypeGuard[str]:
 	if isinstance(edge, int):
 		return False
+	assert isinstance(edge, str)
 	assert edge[0].isalpha
 	return True
 
 
-def _divide_boundary_edge_name_to_side_and_order(edge_name:str) -> tuple[str, int]:
+def _split_boundary_edge_name_to_side_and_order(edge_name:str) -> tuple[str, int]:
 	c0 : str = edge_name[0]
 	c1 : str = edge_name[1]
 	# Derive side name string:
@@ -672,13 +674,13 @@ def _divide_boundary_edge_name_to_side_and_order(edge_name:str) -> tuple[str, in
 
 
 def _boundary_edge_order_by_num_order(edge_data:_EdgeDataForShifting) -> int:
-	side_name, order = _divide_boundary_edge_name_to_side_and_order(edge_data.crnt_name)
+	side_name, order = _split_boundary_edge_name_to_side_and_order(edge_data.crnt_name)
 	return order
 
 
 def _boundary_edge_order_by_side(edge_data:_EdgeDataForShifting) -> int:
-	side_name, order = _divide_boundary_edge_name_to_side_and_order(edge_data.crnt_name)
-	# direction by oderr:
+	side_name, order = _split_boundary_edge_name_to_side_and_order(edge_data.crnt_name)
+	# direction by order:
 	for i, side in enumerate(BlockSide.all_in_counter_clockwise_order()):
 		crnt_side_name = str(side).casefold()
 		if crnt_side_name == side_name:
@@ -687,7 +689,7 @@ def _boundary_edge_order_by_side(edge_data:_EdgeDataForShifting) -> int:
 
 
 
-def _shift_boundary_edges_clockwise(edges_list:list[str|int], N:int) -> list[str]:
+def _shift_boundary_edges_clockwise(edges_list:list[list[str|int]], N:int) -> list[str]:
 	""" First, find all the edges and keep their order in the following format:
 
 	During the algorithm, a list is created and sorted containing boundary edges:
@@ -696,7 +698,7 @@ def _shift_boundary_edges_clockwise(edges_list:list[str|int], N:int) -> list[str
 	and j is the index of its leg where the edge is.
 	and e is the name of the edge
 
-	Retuns a list with all ordered edges
+	Returns a list with all ordered edges
 	"""
 	## Define basic data:
 	# How many edges per edge do we expect:
@@ -722,8 +724,15 @@ def _shift_boundary_edges_clockwise(edges_list:list[str|int], N:int) -> list[str
 		crnt.new_name = next.crnt_name
 	
 	## Change names:
+	for edge_data in boundary_edges:
+		i = edge_data.vertex_ind
+		j = edge_data.edge_ind
+		## Apply on original data-structure:
+		edges_list[i][j] = edge_data.new_name 
 	
-	print("")
+	## For output:
+	return [edge_data.new_name for edge_data in boundary_edges]
+	
 	
     
 
@@ -779,7 +788,8 @@ def create_triangle_lattice(N)->list[Node]:
 	# 	Done because the canonical form in the original triangular blockBP
 	#	code, does not the shape of the block in this code:
 	#
-	edges_list = _shift_boundary_edges_clockwise(edges_list, N)
+	boundary_edges = _shift_boundary_edges_clockwise(edges_list, N)  
+	CACHED_ORDERED_BOUNDARY_EDGES_PER_LATTICE_SIZE[N] = boundary_edges
 
 	#
 	# Create the list of nodes:
@@ -839,7 +849,7 @@ def unit_vector_corrected_for_sorting_triangular_lattice(direction:Direction)->t
 		raise TypeError(f"Not a supported typee")
 
 
-def sort_coordinates_by_direction(items:list[tuple[int, int]], direction:Direction, N:int)->list[tuple[int, int]]:
+def sort_coordinates_by_direction(items:Iterable[tuple[int, int]], direction:Direction, N:int)->list[tuple[int, int]]:
 	# unit_vector = direction.unit_vector  # This basic logic break at bigger lattices
 	unit_vector = unit_vector_corrected_for_sorting_triangular_lattice(direction)
 	def key(ij:tuple[int, int])->float:
@@ -882,28 +892,64 @@ def _assign_boundaries_to_nodes(lattice:list[Node]) -> None:
 		node.boundaries = set(boundaries)
 
 
-def _sorted_boundary_edges(lattice:list[Node], boundary:BlockSide) -> list:
+def _sorted_boundary_edges(lattice:list[Node], boundary:BlockSide) -> list[str]:
 	# Basic info:
 	N = linear_size_from_total_vertices(len(lattice))
-	_assign_boundaries_to_nodes(lattice)
+	_expected_num_outgoing_edges = 2*N-1
+
+	## Get all boundary nodes:
 	boundary_nodes = sorted_boundary_nodes(lattice, boundary)
 	assert len(boundary_nodes)==N
-
-	# Logic of participating directions:
-	participating_directions = boundary.matching_lattice_directions()
 	
-	# Get all edges in order:
-	boundary_edges = []
-	for _, is_last_node, node in lists.iterate_with_edge_indicators(boundary_nodes):
-		for _, is_last_direction, direction in lists.iterate_with_edge_indicators(participating_directions):
-			if direction in node.directions:
-				boundary_edges.append(node.get_edge_in_direction(direction))
-
-	assert self.num_message_connections == len(boundary_edges)
+	## Get all edges in order
+	boundary_edges_set : set[tuple[str, int]] = set()
+	for edge in CACHED_ORDERED_BOUNDARY_EDGES_PER_LATTICE_SIZE[N]:
+		side, order = _split_boundary_edge_name_to_side_and_order(edge)
+		if side==boundary.__str__().casefold():
+			boundary_edges_set.add((side, order))
+	# Sort by oder and keep list of name+order:
+	boundary_edges : list[str] = [f"{_tuple[0]}{_tuple[1]}" for _tuple in sorted(boundary_edges_set, key=lambda _tuple: _tuple[1])]
+	assert _expected_num_outgoing_edges == len(boundary_edges_set)
+	
 	return boundary_edges
 
 
+def _find_node_by_outer_edge(lattice:list[Node], edge:str) -> tuple[Node, int]:
+	"""Looks for a node that has a certain outgoing edge.
+	Return a node and the index of the leg associated with the edge
+	"""
+	for node in lattice:
+		if edge in node.edges:
+			return node, node.edges.index(edge)
+	raise LatticeError("Node not found in lattice")
+
+
+def _new_name_for_periodic_edge(edge1:str, edge2:str) -> str:
+	d1, o1 = _split_boundary_edge_name_to_side_and_order(edge1)
+	d2, o2 = _split_boundary_edge_name_to_side_and_order(edge2)
+	if d1[0]=="d":
+		return f"{d1}-{d2}-{o1}"
+	elif d2[0]=="d":
+		return f"{d2}-{d1}-{o2}"
+	else:
+		raise ValueError("Not a valid option")
+
+
+def _kagome_connect_boundary_edges_periodically(lattice:list[Node], edge1:str, edge2:str) -> None:
+	## Get basic data:
+	n1, e1 = _find_node_by_outer_edge(lattice, edge1)
+	n2, e2 = _find_node_by_outer_edge(lattice, edge2)
+	new_edge_name = _new_name_for_periodic_edge(edge1, edge2)
+
+	## Change edge name for both nodes:
+	lattice[n1.index].edges[e1] = new_edge_name
+	lattice[n2.index].edges[e2] = new_edge_name
+
+
 def change_boundary_conditions_to_periodic(lattice:list[Node]) -> list[Node]:
+	## Make sure that all boundary nodes are marked:
+	_assign_boundaries_to_nodes(lattice)
+
 	## connect per two opposite faces:
 	ordered_half_list = list(BlockSide.all_in_counter_clockwise_order())[0:3]
 	for block_side in ordered_half_list:
@@ -912,8 +958,9 @@ def change_boundary_conditions_to_periodic(lattice:list[Node]) -> list[Node]:
 		opposite_boundary_edges.reverse()
 
 		for edge1, edge2 in zip(boundary_edges, opposite_boundary_edges, strict=True):
-			_kagome_connect_boundary_edges_periodically(self, edge1, edge2)
+			_kagome_connect_boundary_edges_periodically(lattice, edge1, edge2)
 
+	return lattice
 
 
 def shift_periodically_in_direction(N:int, direction:LatticeDirection) -> list[int]:
