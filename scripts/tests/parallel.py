@@ -94,7 +94,7 @@ def _single_test_parallel_execution_time_single_bp_step(
 
 
 
-TASK_DATA_KEYS = ["bp-step", "reduction"]
+TASK_DATA_KEYS = ["bp_step", "reduction"]
 
 
 def _get_cell(table, N, D, parallel, task):    
@@ -108,48 +108,11 @@ def _get_cell(table, N, D, parallel, task):
 
 
 
-def arrange_res_table():
-    ## load table:
-    f_name = "results_parallel_timings.csv"
-    fullpath = csvs.data / "condor" / f_name
-    original_table = csvs.read_csv_table(fullpath)
-
-    ## Parse common keys:
-    def _sorted_unique_list(s:str)->list[str]:
-        set_ = set(original_table[s])
-        list_ = list(set_)
-        list_.sort()
-
-        return list_
-    Ns = _sorted_unique_list("D")
-    Ds = _sorted_unique_list("N")
-
-    ## arranged table: 
-    N_repeats = [N for N in Ns for _ in Ds]
-    D_repeats = [D for _ in Ns for D in Ds]
-    new_table = csvs.CSVManager(columns=["task", "parallel", "N"]+N_repeats, name="arranged_timing_results")
-    first_row = ["", "", "D"]+D_repeats
-    new_table.append(first_row)
-    for task in TASK_DATA_KEYS:
-        for parallel in ["False", "True"]:
-            row = [task, parallel, ""]
-
-            for N in Ns:
-                for D in Ds:
-                    cell = _get_cell(original_table, N, D, parallel, task)
-                    row.append(cell)
-
-            assert len(row)==len(new_table.columns)
-            new_table.append(row)
-    print(f"new table saved at {new_table.fullpath!r}")
-
-
-
 
 def main_test():
     # _single_test_parallel_execution_time_single_bp_step()
-    test_parallel_execution_time()
-    # arrange_res_table()
+    # test_parallel_execution_time()
+    plot_results_from_table()
 
 
 if __name__ == "__main__":

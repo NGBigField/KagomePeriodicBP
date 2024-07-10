@@ -59,7 +59,7 @@ def mps_distance(mps1:MPS, mps2:MPS) -> float:
 	ip = mps_inner_product(mps1, mps2, conjB)
 
 	# old version:
-	distance2 = 2 - 2*ip.real
+	# distance2 = 2 - 2*ip.real
 
 	# New version:
 	distance2 = 1 - abs(ip)

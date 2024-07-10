@@ -22,7 +22,9 @@ class BPConfig(_ConfigClass):
     parallel_msgs : bool = False
     damping : float|None = None  # The `learning-step` of the messages. 
     # damping=0 will take 100% the new message while damping=1 will keep the old message.
-    hermitize_msgs : bool = True
+    hermitize_msgs_when_finished : bool = True
+    fix_msg_each_step : bool = True
+
     
     def __repr__(self) -> str:
         return super().__repr__()

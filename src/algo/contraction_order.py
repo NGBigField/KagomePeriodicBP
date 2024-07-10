@@ -210,7 +210,7 @@ class _UpToCoreControl:
         "core_indices", "terminal_indices", "stop_next_iterations", "seen_break"
     )
     
-    def __init__(self, tn:KagomeTNRepeatedUnitCell, major_direction:BlockSide) -> None:        
+    def __init__(self, tn:abstract_classes.KagomeTensorNetwork, major_direction:BlockSide) -> None:        
         self.core_indices : set[int] = {node.index for node in tn.get_core_nodes()}
         self.terminal_indices : set[int] = _derive_terminal_indices(tn, major_direction)
         self.stop_next_iterations : bool = False
@@ -223,7 +223,7 @@ class _UpToCoreControl:
             self.seen_break.right = True
         
 
-def _derive_terminal_indices(tn:KagomeTNRepeatedUnitCell, major_direction:BlockSide)->set[int]:
+def _derive_terminal_indices(tn:abstract_classes.KagomeTensorNetwork, major_direction:BlockSide)->set[int]:
     """derive_terminal_indices
     The convention is that the base of the center upper triangle defines the terminal row for the contraction up to core
     """

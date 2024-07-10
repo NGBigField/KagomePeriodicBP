@@ -14,7 +14,8 @@ from _config_reader import DEBUG_MODE
 import numpy as np
 
 # other used types in our code:
-from tensor_networks import KagomeTNRepeatedUnitCell, MPS, mps_distance
+from tensor_networks import MPS, mps_distance
+from tensor_networks.abstract_classes import KagomeTensorNetwork
 from lattices.directions import BlockSide
 from enums import ContractionDepth
 from containers import BPStats, BPConfig, MessageDictType, Message
@@ -63,13 +64,14 @@ def _single_mps_damping(old_mps:Message, new_mps:Message, damping:float, trunc_d
     else:
         sign_inP = -1
         
-    next_mps = bmpslib.add_two_MPSs(new_mps, 1-damping, old_mps, sign_inP*damping)
+    combined_mps = bmpslib.add_two_MPSs(new_mps, 1-damping, old_mps, sign_inP*damping)
     
     # normalize the combined messages and make them right-canonical
-    next_mps.left_canonical_QR()
-    next_mps.right_canonical(maxD=trunc_dim, nr_bulk=True)
+    combined_mps.left_canonical_QR()
+    combined_mps.right_canonical(maxD=trunc_dim, nr_bulk=True)
+    combined_mps.reset_nr()
 
-    return next_mps
+    return combined_mps
 
 
 def _message_damping(prev_messages:MessageDictType, out_messages:MessageDictType, damping:float|None, trunc_dim:int)->MessageDictType:
@@ -93,7 +95,7 @@ def _outgoing_messages(directions_iter:Generator[BlockSide, None, None], multi_p
 
 
 def _single_outgoing_message(
-    tn:KagomeTNRepeatedUnitCell, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool
+    tn:KagomeTensorNetwork, direction:BlockSide, bubblecon_trunc_dim:int, print_progress:bool
 ) -> Message:
     
     ## use bubble con to compute outgoing message:
@@ -107,11 +109,6 @@ def _single_outgoing_message(
 
     assert isinstance(mps, MPS)
 
-    ## right canonical and normalize mantissa and exponent kept in MPS :
-    mps.right_canonical(nr_bulk=True)
-    mps.reset_nr()
-    # TODO flip order
-
     ## Out message:
     return Message(mps, mps_direction)
 
@@ -120,8 +117,52 @@ def _bp_error_str(error:float|None):
     return f"{error}" if error is not None else "NaN"
 
 
+def _fix_messages(messages:MessageDictType) -> None:
+    """ right canonical and normalize mantissa and exponent kept in MPS """
+    for key in messages.keys():
+        messages[key].mps.right_canonical(nr_bulk=True)
+        messages[key].mps.reset_nr()
+    return messages
+
+
+def _out_going_messages(
+    tn:KagomeTensorNetwork, 
+    config:BPConfig,
+    prev_error:float|None,
+    prog_bar_obj:prints.ProgressBar,
+    allow_prog_bar:bool=True
+)->MessageDictType:
+    ## prepare inputs:
+    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=config.max_swallowing_dim)
+    multi_processing = config.parallel_msgs 
+
+    ## Different behavior between parallel or concurrent comp:
+    if not multi_processing and allow_prog_bar:
+        str_func = lambda s: prog_bar_obj.append_extra_str(s+f" error={_bp_error_str(prev_error)}")
+        directions_iter=BlockSide.iterator_with_str_output(str_func)  # append prog-bar msg after each sub-step
+        fixed_arguments["print_progress"] = allow_prog_bar
+    else:
+        prog_bar_obj.append_extra_str(f" error={_bp_error_str(prev_error)}")  # append prog-bar msg now
+        directions_iter=BlockSide.all_in_counter_clockwise_order()
+        fixed_arguments["print_progress"] = False
+
+    # Compute outgoing messages:
+    out_messages : MessageDictType = parallels.concurrent_or_parallel(
+        func=_single_outgoing_message, values=directions_iter, value_name="direction", in_parallel=multi_processing, fixed_arguments=fixed_arguments
+    ) 
+
+    ## Next incoming messages are the outgoing messages after applying periodic boundaries:
+    out_messages = MessageDictType({side.opposite() : message for side, message in out_messages.items()})
+
+    ## Apply message corrections:
+    if config.fix_msg_each_step:
+        _fix_messages(out_messages)
+
+    return out_messages
+
+
 def _belief_propagation_step(
-    tn:KagomeTNRepeatedUnitCell,
+    tn:KagomeTensorNetwork,
     prev_error:float|None,
     config:BPConfig,
     prog_bar_obj:prints.ProgressBar,
@@ -135,29 +176,12 @@ def _belief_propagation_step(
     prev_messages : MessageDictType = deepcopy(tn.messages)
 
     ## Compute out-going message for all possible block-sides:
-    # prepare inputs:
-    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=config.max_swallowing_dim)
-    multi_processing = config.parallel_msgs 
+    out_messages = _out_going_messages(tn, config, prev_error, prog_bar_obj, allow_prog_bar)
 
-    # Different behavior between parallel or concurrent comp:
-    if not multi_processing and allow_prog_bar:
-        str_func = lambda s: prog_bar_obj.append_extra_str(s+f" error={_bp_error_str(prev_error)}")
-        directions_iter=BlockSide.iterator_with_str_output(str_func)  # append prog-bar msg after each sub-step
-        fixed_arguments["print_progress"] = allow_prog_bar
-    else:
-        prog_bar_obj.append_extra_str(f" error={_bp_error_str(prev_error)}")  # append prog-bar msg now
-        directions_iter=BlockSide.all_in_counter_clockwise_order()
-        fixed_arguments["print_progress"] = False
+    ## Check error between messages:
+    next_error = _compute_error(prev_messages, out_messages, config.msg_diff_squared)
 
-    # Compute outgoing messages:
-    out_messages = parallels.concurrent_or_parallel(
-        func=_single_outgoing_message, values=directions_iter, value_name="direction", in_parallel=multi_processing, fixed_arguments=fixed_arguments
-    ) 
-    out_messages = MessageDictType(out_messages)
-
-    ## Next incoming messages are the outgoing messages after applying periodic boundaries:
-    out_messages = MessageDictType({side.opposite() : message for side, message in out_messages.items()})
-    # Apply damping
+    ## Apply damping?
     if config.damping is None or config.damping==0:
         next_messages = out_messages
     else:
@@ -166,15 +190,13 @@ def _belief_propagation_step(
     ## Connect new incoming massages to tensor-network:
     tn.connect_messages(next_messages)
 
-    ## Check error between messages:
-    next_error = _compute_error(prev_messages, out_messages, config.msg_diff_squared)
 
-    return next_messages, next_error
+    return out_messages, next_messages, next_error
 
 
 @decorators.add_stats()
 def belief_propagation(
-    tn:KagomeTNRepeatedUnitCell, 
+    tn:KagomeTensorNetwork, 
     messages:MessageDictType|None=None, # initial messages
     config:BPConfig=BPConfig(),
     update_plots_between_steps:bool=False,
@@ -251,7 +273,7 @@ def belief_propagation(
         tn.connect_messages(messages)
 
     ## Hermitize messages:
-    if config.hermitize_msgs:
+    if config.hermitize_msgs_when_finished:
         messages = _hermitize_messages(messages)
 
     stats = BPStats(iterations=i+1, final_error=error, final_config=config, success=success)  
@@ -263,7 +285,7 @@ def belief_propagation(
 
 @decorators.add_stats()
 def robust_belief_propagation(
-    tn:KagomeTNRepeatedUnitCell, 
+    tn:KagomeTensorNetwork, 
     messages:MessageDictType|None=None, # initial messages
     config:BPConfig=BPConfig(),
     update_plots_between_steps:bool=False,

@@ -4,7 +4,7 @@ import _import_src  ## Needed to import src folders when scripts are called from
 from containers import Config
 from unit_cell import UnitCell, given_by
 
-from utils import strings
+from utils import strings, lists
 from typing import Iterable
 
 
@@ -17,17 +17,15 @@ import numpy as np
 d = 2
 
 
-force_values = np.logspace(-2, -8, 200*12)
-iter_force_value = iter(force_values)
-enter_counter = 0
+crnt_force_value = 1e-2
 def decreasing_global_field_func(delta_t:float|None)->float:
-    global enter_counter 
-    enter_counter += 1
-    try:
-        next_force_value = next(iter_force_value)
-    except StopIteration:
-        next_force_value = 0
-    return next_force_value
+    global crnt_force_value
+    if delta_t>1e-5:
+        r = 0.95
+    else:
+        r = 0.6
+    crnt_force_value *= r
+    return crnt_force_value
 
 
 GLOBAL_FIELD = 0.0
@@ -40,6 +38,12 @@ def _config_at_measurement(config:Config)->Config:
     config.bp.msg_diff_terminate /= 1
     config.bp.allowed_retries    += 0
     return config
+
+
+def _get_time_steps(e_start:int, e_end:int, n_per_dt:int)->list[list[float]]:
+    time_steps = [[np.power(10, -float(exp))]*n_per_dt for exp in np.arange(e_start, e_end, 1)]
+    time_steps = lists.join_sub_lists(time_steps)
+    return time_steps
 
 
 def _get_hamiltonian(hamiltonian:str) -> tuple:
@@ -83,6 +87,30 @@ def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
 
 
     return unit_cell, is_random
+
+
+def _plot_field_over_time() -> None:
+    ## Imports:
+    from matplotlib import pyplot as plt
+
+    ## Config:
+    n_per_dt = 200
+    e_start = 3
+    e_end   = 8
+    time_steps = _get_time_steps(e_start=e_start, e_end=e_end, n_per_dt=n_per_dt)
+
+    ## Get values:
+    values = [ ]
+    value = None
+    for dt in time_steps:
+        value = decreasing_global_field_func(dt)
+        values.append(value)
+
+    ## Plot:
+    plt.plot(values)
+    plt.show()
+
+    print("Done.")
 
 
 def main(
@@ -149,7 +177,7 @@ def main(
     # 
     if _radom_unit_cell:
         e_start = 2
-    config.ite.time_steps = [[np.power(10, -float(exp))]*n_per_dt for exp in np.arange(e_start, e_end, 1)]
+    config.ite.time_steps = _get_time_steps(e_start, e_end, n_per_dt)
 
     ## Run:
     energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)
@@ -162,4 +190,5 @@ def main(
 
 if __name__ == "__main__":
     main()
+    # _plot_field_over_time()
 
