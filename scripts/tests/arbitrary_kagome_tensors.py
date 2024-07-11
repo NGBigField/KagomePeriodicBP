@@ -1,7 +1,7 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 
 # Import utils:
-from utils import saveload
+from utils import saveload, lists
 # Import our kagome structure functions:
 from tensor_networks import KagomeTNRepeatedUnitCell, KagomeTNArbitrary, LatticeDirection
 # Config and Hamiltonians:
@@ -10,6 +10,8 @@ from physics import hamiltonians
 # Import our algorithms:
 from algo.belief_propagation import belief_propagation, BPStats
 from algo.measurements import measure_energies_and_observables_together
+# help types:
+from enums import UpdateMode
 
 
 def _print_success(stats:BPStats) -> None:
@@ -21,9 +23,18 @@ def _print_success(stats:BPStats) -> None:
     print(s)
 
 
+def _get_energy_per_site(shifted_tn:KagomeTNArbitrary, messages, h, D, bp_config, mode:UpdateMode):
+    messages, stats = belief_propagation(shifted_tn, messages=None, config=bp_config)
+    _print_success(stats)
+    energies, expectations, entanglement = measure_energies_and_observables_together(shifted_tn, h, trunc_dim=2*D**2, mode=mode)
+    print(energies)
+    energy_per_site = sum(energies.values())/3
+    return energy_per_site, messages
+
+
 def main(
     parallel_msgs : bool = False,
-    filename : str = "Kagome-PEPS-n2-D3.pkl"  # /Kagome-PEPS.pkl / Kagome-PEPS-n2-D3.pkl
+    filename : str = "Kagome-PEPS.pkl"  # /Kagome-PEPS.pkl / Kagome-PEPS-n2-D3.pkl
 ) -> dict:
     
     ## Create tensor network:
@@ -38,18 +49,29 @@ def main(
         parallel_msgs=parallel_msgs
     )
     h = hamiltonians.heisenberg_afm()
+    mode = UpdateMode.A
 
     
-    ## For each shift in some direction:
-    direction = LatticeDirection.UL
-    shifted_tn = tn.shift_periodically_in_direction(direction)
+    directions = [None]+list(LatticeDirection.all_in_counter_clockwise_order())
 
-    ## Perform algorithms:
-    messages = saveload.load("messages", none_if_not_exist=True)
-    messages, stats = belief_propagation(tn, messages=messages, config=bp_config)
-    _print_success(stats)
-    energies, expectations, entanglement = measure_energies_and_observables_together(tn, h, trunc_dim=2*D**2)
-    energy_per_site = sum(energies.values())/3
+    # For the crnt network: Get energy:
+    energies = []
+    messages = None
+    ## For each shift in some direction:
+    for direction in directions:
+        print(f"direction = {direction.__str__()}")
+        if direction is None:
+            shifted_tn = tn
+        else:
+            shifted_tn = tn.shift_periodically_in_direction(direction)
+        # for the shifted network: Get energy:
+        energy, messages = _get_energy_per_site(shifted_tn, messages, h, D, bp_config, mode)
+        energies.append(energy)
+    
+    print(energies)
+    mean_energy = lists.average(energies)
+
+    print(f"mean_energy={mean_energy}")
     print("Done.")
 
 if __name__ == "__main__":

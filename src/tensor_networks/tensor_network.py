@@ -418,7 +418,7 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
 
     def copy(self, with_messages:bool=True)->"KagomeTNArbitrary":
         new = KagomeTNArbitrary(
-            self.tensors
+            deepcopy(self.tensors)
         )
         if with_messages:
             new.messages = deepcopy(self.messages)
@@ -444,17 +444,16 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
                     case 'left':  tensor_node.cell_flavor = UnitCellFlavor.B
                     case 'right': tensor_node.cell_flavor = UnitCellFlavor.C
 
-    def shift_periodically_in_direction(self, direction:LatticeDirection, _plot:bool=True) -> None:
-        ## First get the permutation for triangular lattice, which defined shifting of upper-trinagles
+    def shift_periodically_in_direction(self, direction:LatticeDirection, _plot:bool=True) -> "KagomeTNArbitrary":
+        ## First get the permutation for triangular lattice, which defined shifting of upper-triangles
         triangles_permutation_list = triangle_lattice.shift_periodically_in_direction(self.lattice.N, direction)
         if DEBUG_MODE:
             assert indices.valid_permutation_list(triangles_permutation_list)
-        
+
         ## Collect permutation list for nodes, bunched in upper-triangles:        
         permutation_list : list[_PermuteTuple] = []
-
-        ## Shift triangles according to permutation list:
         for prev_triangle_i, next_triangle_i in enumerate(triangles_permutation_list):
+            ## Based on shift-triangles according to base permutation list:
             prev_triangle = self.lattice.triangles[prev_triangle_i]
             next_triangle = self.lattice.triangles[next_triangle_i]   
             for corner in UpperTriangle.field_names():
@@ -462,12 +461,18 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
                     prev = prev_triangle[corner].index,
                     next = next_triangle[corner].index
                 ))
-        print(permutation_list)
-
+                
         if _plot:
             _plot_shifting_lattice(self, permutation_list)
 
-        print("Done.")
+        ## Permute:
+        # Sort according to new order:
+        permutation_list.sort(key=lambda perm: perm.next)
+        # New tensors are in the "new" order, by indexing the old list with its "old" indices:
+        new_tensors = [self.tensors[perm.prev] for perm in permutation_list]
+
+        new_tn = KagomeTNArbitrary(tensors=new_tensors)
+        return new_tn
 
 
 
