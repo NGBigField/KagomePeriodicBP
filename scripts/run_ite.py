@@ -134,7 +134,7 @@ def _plot_field_over_time() -> None:
 
 
 def main(
-    D = 2,
+    D = 3,
     N = 2,
     chi_factor : int|float = 1,
     live_plots:_Bool|Iterable[_Bool] = [0, 0, 0],   #type: ignore
@@ -143,7 +143,7 @@ def main(
     parallel:_Bool = 0,
     hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
-    unit_cell_from:str = "last"
+    unit_cell_from:str = "best"
 )->tuple[float, str]:
 
     assert N>=2
@@ -187,8 +187,8 @@ def main(
 
     ## time steps:
     if D<4:
-        n_per_dt = 200
-        e_start = 3
+        n_per_dt = 300
+        e_start = 4
         e_end   = 8
     else:
         n_per_dt = 150

@@ -468,6 +468,7 @@ def _from_unit_cell_to_stable_mode(
 ]:
     ## Duplicate core into a big tensor-network:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
+    if DEBUG_MODE: full_tn.validate()
 
     ## Perform BlockBP:
     if config.iterative_process.use_bp:

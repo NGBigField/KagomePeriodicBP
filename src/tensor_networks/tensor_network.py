@@ -331,7 +331,11 @@ class KagomeTNRepeatedUnitCell(KagomeTensorNetwork):
             physical_dim=d,
             big_lattice_size=lattice.N
         )
+        # Call common constructor:
         super().__init__(lattice=lattice, dimensions=dimensions)
+        ## Verify unit cell and save
+        if DEBUG_MODE:
+            assert _check_unit_cell_matches_dimensions(unit_cell, dimensions), f"Unit-cell doesn't match dimensions {dimensions}"
         self.unit_cell : UnitCell = unit_cell        
 
     # ================================================= #
@@ -1047,6 +1051,14 @@ def get_common_edge(n1:TensorNode, n2:TensorNode)->EdgeIndicatorType:
             return edge
     raise NetworkConnectionError(f"Nodes '{n1}' and '{n2}' don't have a common edge.")
 
+
+def _check_unit_cell_matches_dimensions(unit_cell:UnitCell, dimensions:TNDimensions) -> bool:
+    for _, tensor in unit_cell.items():
+        d = tensor.shape[0]
+        D = tensor.shape[-1]
+        if d != dimensions.physical_dim or D != dimensions.virtual_dim:
+            return False
+    return True
 
 def _derive_node_data_from_contracted_nodes_and_fix_neighbors(tn:ArbitraryTN, n1:TensorNode, n2:TensorNode):
     contraction_edge = get_common_edge(n1, n2)
