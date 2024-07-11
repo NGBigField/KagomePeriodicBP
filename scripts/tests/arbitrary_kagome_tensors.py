@@ -41,7 +41,7 @@ def main(
 
     
     ## For each shift in some direction:
-    direction = LatticeDirection.R
+    direction = LatticeDirection.UL
     shifted_tn = tn.shift_periodically_in_direction(direction)
 
     ## Perform algorithms:

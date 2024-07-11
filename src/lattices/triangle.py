@@ -1,6 +1,7 @@
 # Import types used in the code:
-from lattices._common import Node, sorted_boundary_nodes, plot
+from lattices._common import Node, sorted_boundary_nodes, plot_lattice
 from lattices.directions import LatticeDirection, BlockSide, Direction, DirectionError
+from lattices.edges import edges_dict_from_edges_list
 from _error_types import LatticeError, OutsideLatticeError
 
 # For type hinting:
@@ -160,6 +161,7 @@ def all_neighbors(index:int, N:int)->Generator[tuple[Node, LatticeDirection], No
 		yield neighbor, direction
 
 
+@functools.cache
 def get_vertex_coordinates(index, N)->tuple[int, int]:
 	running_index = 0 
 	for i in range(num_rows(N)):
@@ -973,25 +975,24 @@ def shift_periodically_in_direction(N:int, direction:LatticeDirection) -> list[i
 	Returns:
 		list[int]: Permutation list
 	"""
-	## Get basic data that will help later:
+
+	## Create periodic triangular lattice:
 	open_lattice = create_triangle_lattice(N)
 	periodic_lattice = change_boundary_conditions_to_periodic(open_lattice)
+	# plot_lattice(periodic_lattice, periodic=True)
 
-	## Define inner functions:
-	def _get_new_index(old_index:int) -> int:
-		i_old, j_old = get_vertex_coordinates(old_index, N)
-		i, j = _get_neighbor_coordinates_in_direction_no_boundary_check(i_old, j_old, direction, N)
-		if i<0:  # Drifted up
-			pass
-		elif i>=num_rows(N):  # Drifted down
-			pass
-		elif j<0:  # Drifted left
-			pass
-		elif j>=row_width(i, N):  # Drifted right
-			pass
+	## Collect a comfortable dict of all edges:
+	edges = edges_dict_from_edges_list([node.edges for node in periodic_lattice])
 
-		return get_vertex_index(i, j, N)
-
+	## Help functions:
+	def _get_new_index(node:Node) -> int:
+		edge = node.get_edge_in_direction(direction)
+		_indices = edges[edge]
+		if   _indices[0] == node.index:	return _indices[1]
+		elif _indices[1] == node.index:	return _indices[0]
+		else:
+			raise LatticeError("Impossible situation")
+			
 	## Produce output:
-	permutation_list = [_get_new_index(old_index) for old_index in range(N)]
+	permutation_list = [_get_new_index(node) for node in periodic_lattice]
 	return permutation_list

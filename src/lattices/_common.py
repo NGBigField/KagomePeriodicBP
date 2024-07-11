@@ -25,16 +25,43 @@ class Node():
         return [dir.angle for dir in self.directions]
 
 
-def plot(lattice:list[Node], node_color:str="red", node_size=40, edge_style:str="b-")->None:
+def plot_lattice(
+    lattice:list[Node], edges_dict:dict[str, tuple[int, int]]|None=None, 
+    node_color:str="red", node_size=40, edge_style:str="b-", periodic:bool=False
+)->None:
     from matplotlib import pyplot as plt
-    from utils import visuals
 
+    ## Plot node positions:
+    for node in lattice:
+        x, y = node.pos
+        plt.scatter(x, y, c=node_color, s=node_size)
+        plt.text(x,y, s=node.index)
 
+    ## Plot edges:
     edges_list = [node.edges for node in lattice]
     for edges in edges_list:
         for edge in edges:
             nodes = [node for node in lattice if edge in node.edges]
-            if len(nodes)==2:
+
+            ## Assert with edges_dict, if given:
+            if edges_dict is not None:
+                indices = edges_dict[edge]
+                assert set(indices) == set((node.index for node in nodes))
+            
+            if isinstance(edge, str) and edge.count("-")==2 and not edge[0]=='M':
+                assert periodic==True
+                assert len(nodes)==2
+                for node in nodes:
+                    direction = node.directions[ node.edges.index(edge) ]
+                    x1, y1 = node.pos
+                    x2, y2 = tuples.add((x1, y1), direction.unit_vector)
+                    x_text = x2
+                    y_text = y2
+                    plt.plot([x1, x2], [y1, y2], edge_style)
+                    plt.text(x_text, y_text, edge, color="green")
+                continue
+
+            elif len(nodes)==2:
                 n1, n2 = nodes
                 x1, y1 = n1.pos
                 x2, y2 = n2.pos
@@ -55,14 +82,6 @@ def plot(lattice:list[Node], node_color:str="red", node_size=40, edge_style:str=
             plt.plot([x1, x2], [y1, y2], edge_style)
             plt.text(x_text, y_text, edge, color="green")
             
-    for node in lattice:
-        x, y = node.pos
-        plt.scatter(x, y, c=node_color, s=node_size)
-        plt.text(x,y, s=node.index)
-
-    visuals.draw_now()
-    print("Done")
-
 
 
 def sorted_boundary_nodes(nodes:list[Node], boundary:BlockSide)->list[Node]:
