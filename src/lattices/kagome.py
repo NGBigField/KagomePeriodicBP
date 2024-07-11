@@ -6,17 +6,20 @@ if __name__ == "__main__":
 
 from lattices import triangle as triangle_lattice
 from lattices import edges
-from lattices._common import Node
+from lattices._common import Node, sorted_boundary_nodes
 from lattices import directions
-from lattices.directions import LatticeDirection, BlockSide
+from lattices.directions import LatticeDirection, BlockSide, Direction
 
 from _error_types import LatticeError, DirectionError
 from _types import EdgeIndicatorType
 
 from numpy import pi, cos, sin
 from utils import numerics, tuples, lists
-from dataclasses import dataclass, fields
 from typing import Generator, Any
+
+# OOP:
+from dataclasses import dataclass, fields
+from enum import Enum, unique, auto
 
 import itertools
 import functools
@@ -30,7 +33,7 @@ _CONSTANT_X_SHIFT = 3
 _CONSTANT_y_SHIFT = 1
 
 """
-An Upper Triagle:
+An Upper Triangle:
      Up
       |
       |
@@ -50,6 +53,13 @@ DR = LatticeDirection.DR
 
 
 class KagomeLatticeError(LatticeError):...
+
+
+@unique
+class BlockBoundaryCondition(Enum):
+    OPEN        = auto()  # The block has unique leg names on its boundaries. These edges are not connected
+    CLOSED      = auto()  # Same as OPEN, but each edge gets a tensor of dim=1.
+    PERIODIC    = auto()  # Edges on the boundary get fused to the edges from the opposite boundary.
 
 
 @dataclass(frozen=False, slots=True)
@@ -75,6 +85,12 @@ class UpperTriangle:
             case 'right': self.right = value
             case _: 
                 raise KeyError("Not an option")
+            
+    def __contains__(self, item) -> bool:
+        for node in self.all_nodes():
+            if item is node:
+                return True
+        return False
 
     def all_nodes(self)->Generator[Node, None, None]:
         yield self.up
@@ -263,22 +279,7 @@ def _connect_kagome_nodes_between_triangles(triangle1:UpperTriangle, triangle2:U
     n1.edges[leg_index1] = edge_name
     n2.edges[leg_index2] = edge_name
 
-def _sorted_boundary_nodes(nodes:list[Node], boundary:BlockSide)->list[Node]:
-    # Get relevant nodes:
-    boundary_nodes = [node for node in nodes if boundary in node.boundaries]
 
-    # Choose sorting key:
-    if   boundary is BlockSide.U:     sorting_key = lambda node: -node.pos[0]
-    elif boundary is BlockSide.UR:    sorting_key = lambda node: +node.pos[1] 
-    elif boundary is BlockSide.DR:    sorting_key = lambda node: +node.pos[1]
-    elif boundary is BlockSide.UL:    sorting_key = lambda node: -node.pos[1]
-    elif boundary is BlockSide.DL:    sorting_key = lambda node: -node.pos[1]
-    elif boundary is BlockSide.D:     sorting_key = lambda node: +node.pos[0]
-    else:
-        raise DirectionError(f"Impossible direction {boundary!r}")
-
-    # Sort:
-    return sorted(boundary_nodes, key=sorting_key)
 
 
 def get_upper_triangle(node_index:int, nodes:list[Node], N:int)->UpperTriangle:
@@ -338,33 +339,29 @@ def create_kagome_lattice(
 
     ## Use ordered nodes to name Outer Edges
     for boundary in BlockSide.all_in_counter_clockwise_order():
-        sorted_nodes = _sorted_boundary_nodes(kagome_lattice, boundary)
+        sorted_nodes = sorted_boundary_nodes(kagome_lattice, boundary)
         for i, node in enumerate(sorted_nodes):
             _name_outer_edges(node, i, boundary, kagome_lattice, N)
     # The bottom-left node is falsely on its DL leg, fix it:
-    bottom_left_corner_node = _sorted_boundary_nodes(kagome_lattice, BlockSide.D)[0]
+    bottom_left_corner_node = sorted_boundary_nodes(kagome_lattice, BlockSide.D)[0]
     bottom_left_corner_node.set_edge_in_direction(DL, f"{BlockSide.D}-0")
-
-    ## Plot test:
-    if False:
-        from lattices._common import plot
-        plot(kagome_lattice)
-        plot(original_triangular_lattice, node_color="black", edge_style="y--", node_size=5)
 
     return kagome_lattice, triangular_lattice_of_upper_triangles
 
 
 class KagomeLattice():
-    __slots__ =  "N", "nodes", "triangles", "edges"
+    __slots__ =  "N", "nodes", "triangles", "edges", "_boundary_condition"
     
     def __init__(self, N:int) -> None:
         kagome_lattice, triangular_lattice_of_upper_triangles = create_kagome_lattice(N)
-        self.N : int = N
+        self.N         : int = N
         self.nodes     : list[Node] = kagome_lattice
         self.triangles : list[UpperTriangle]   = triangular_lattice_of_upper_triangles
         self.edges     : dict[str, tuple[int, int]] = edges.edges_dict_from_edges_list(
             [node.edges for node in kagome_lattice]
         )
+        self._boundary_condition : BlockBoundaryCondition = BlockBoundaryCondition.OPEN
+
                     
     # ================================================= #
     #|              Basic Derived Properties           |#
@@ -380,6 +377,28 @@ class KagomeLattice():
     # ================================================= #
     #|              Geometry Functions                 |#
     # ================================================= #
+    def change_boundary_conditions(self, periodic:bool) -> None:
+        # Change inner attribute:
+        if periodic:
+            self._boundary_condition = BlockBoundaryCondition.PERIODIC
+        else:
+            self._boundary_condition = BlockBoundaryCondition.CLOSED
+
+        ## connect per two opposite faces:
+        ordered_half_list = list(BlockSide.all_in_counter_clockwise_order())[0:3]
+        for block_side in ordered_half_list:
+            boundary_edges          = self.sorted_boundary_edges(boundary=block_side)
+            opposite_boundary_edges = self.sorted_boundary_edges(boundary=block_side.opposite())
+            opposite_boundary_edges.reverse()
+
+            for edge1, edge2 in zip(boundary_edges, opposite_boundary_edges, strict=True):
+                ## Choose boundary function:
+                if periodic:
+                    _kagome_connect_boundary_edges_periodically(self, edge1, edge2)
+                else:
+                    _kagome_connect_boundary_edges_to_dummy_nodes(self, edge1, edge2)
+
+
     def num_boundary_nodes(self, boundary:BlockSide)->int:
         if boundary in [BlockSide.U, BlockSide.DR, BlockSide.DL]:
             return self.N
@@ -397,9 +416,9 @@ class KagomeLattice():
         crnt_vertices_order = get_upper_triangle_vertices_order(major_direction, minor_direction)
 
         ## Get Upper-Triangles sorted in wanted direction:
-        triangle_indices_in_order = triangle_lattice.verices_indices_rows_in_direction(N, major_direction, minor_direction)
+        triangle_indices_in_order = triangle_lattice.vertices_indices_rows_in_direction(N, major_direction, minor_direction)
 
-        ## The resuts, are each row of upper-triangles, twice, taking the relevant node from the upper-triangle:
+        ## The results, are each row of upper-triangles, twice, taking the relevant node from the upper-triangle:
         list_of_rows = []
         for row in triangle_indices_in_order:    # Upper-Triangle order:
             for vertices_names in crnt_vertices_order:
@@ -446,7 +465,7 @@ class KagomeLattice():
         
     @functools.cache
     def sorted_boundary_nodes(self, boundary:BlockSide)->list[Node]:
-        return _sorted_boundary_nodes(self.nodes, boundary)
+        return sorted_boundary_nodes(self.nodes, boundary)
     
     @functools.cache
     def sorted_boundary_edges(self, boundary:BlockSide)->list[EdgeIndicatorType]:
@@ -478,9 +497,9 @@ class KagomeLattice():
         assert self.num_message_connections == len(boundary_edges)
         return boundary_edges
 
-    def _row_in_direction(self, triangle_indicse:list[int], triangle_keys:list[str]) -> list[int]:
+    def _row_in_direction(self, triangle_indices:list[int], triangle_keys:list[str]) -> list[int]:
         node_indices = []
-        for triangle_index in triangle_indicse:
+        for triangle_index in triangle_indices:
             triangle = self.triangles[triangle_index]
             for key in triangle_keys:
                 node : Node = triangle.__getattribute__(key)
@@ -490,12 +509,15 @@ class KagomeLattice():
     # ================================================= #
     #|                    Visuals                      |#
     # ================================================= #
-    def plot_triangles_lattice(self)->None:
+    def plot(self) -> None:
+        plot_lattice(self.nodes, periodic=self._boundary_condition==BlockBoundaryCondition.PERIODIC)        
+
+    def plot_triangles_lattice(self) -> None:
         # Visuals import:
         from utils import visuals
         from matplotlib import pyplot as plt
         # basic data:
-        N = self.N
+        N = self.size
         # Plot triangles:
         for upper_triangle in self.triangles:
             ind = upper_triangle.index
@@ -503,17 +525,190 @@ class KagomeLattice():
             x, y = triangle_lattice.get_node_position(i, j, N)
             plt.scatter(x, y, marker="^")
             plt.text(x, y, f" [{ind}]")
-        
-            
+
         
 
-def main_test():
-    from project_paths import add_base, add_scripts
-    add_base()
-    add_scripts()
-    from scripts.build_tn import main_test
-    main_test()
+def _kagome_connect_boundary_edges_to_dummy_nodes(kagome_lattice:KagomeLattice, edge1:str, edge2:str) -> None:
+    ## assert an edge at boundary:
+    assert kagome_lattice.edges[edge1][0] == kagome_lattice.edges[edge1][1]
+    assert kagome_lattice.edges[edge2][0] == kagome_lattice.edges[edge2][1]
+
+    ## Define node creation function:
+    new_node_index = kagome_lattice.size
+    def _kagome_disconnect_boundary_edges_to_open_nodes_create_node(edge:str)->Node:
+        nonlocal new_node_index
+
+        # Find neighbor and its orientation to the open leg:
+        neighbor_index = kagome_lattice.edges[edge][0]
+        neighbor = kagome_lattice.nodes[neighbor_index]
+        neighbor_leg_index = neighbor.edges.index(edge)
+        neighbor_leg_direction = neighbor.directions[neighbor_leg_index]
+
+        # Create node:
+        open_node = Node(
+            index=new_node_index,
+            pos=tuples.add(neighbor.pos, neighbor_leg_direction.unit_vector), 
+            edges=[edge], 
+            directions=[neighbor_leg_direction.opposite()]
+        )
+        new_node_index += 1
+
+        return open_node
+
+    ## Create two new tensors:
+    n1 = _kagome_disconnect_boundary_edges_to_open_nodes_create_node(edge1)
+    n2 = _kagome_disconnect_boundary_edges_to_open_nodes_create_node(edge2)
+    
+    ## connect new nodes to lattice:
+    kagome_lattice.nodes.append(n1)
+    kagome_lattice.nodes.append(n2)
+    kagome_lattice.edges[edge1]  = tuples.copy_with_replaced_val_at_index(kagome_lattice.edges[edge1], 1, n1.index)
+    kagome_lattice.edges[edge2]  = tuples.copy_with_replaced_val_at_index(kagome_lattice.edges[edge2], 1, n2.index)
+
+
+def _new_periodic_edge_name(edge1:str, edge2:str) -> str:
+    side1, num1 = edge1.split("-")
+    side2, num2 = edge2.split("-")
+
+    # First letter:
+    D_or_U_1 = side1[0]
+    D_or_U_2 = side2[0]
+    assert D_or_U_1 != D_or_U_2
+    if D_or_U_1 == "D":
+        one_first = True
+    elif D_or_U_2 == "D":
+        one_first = False
+    else:
+        raise ValueError("Not an expected case!")
+    
+    # Order with Down side first
+    if one_first:
+        return side1+"-"+side2+"-"+num1
+    else:
+        return side2+"-"+side1+"-"+num2
+    
+
+def _kagome_connect_boundary_edges_periodically(kagome_lattice:KagomeLattice, edge1:str, edge2:str) -> None:
+    ## assert an edge at boundary:
+    assert kagome_lattice.edges[edge1][0] == kagome_lattice.edges[edge1][1]
+    assert kagome_lattice.edges[edge2][0] == kagome_lattice.edges[edge2][1]
+    
+    node1_index = kagome_lattice.edges[edge1][0]
+    node2_index = kagome_lattice.edges[edge2][0]         
+
+    ## replace two dict entries with a single entry for two tensors
+    new_periodic_edge = _new_periodic_edge_name(edge1, edge2)
+    del kagome_lattice.edges[edge1]
+    del kagome_lattice.edges[edge2]
+    kagome_lattice.edges[new_periodic_edge] = (node1_index, node2_index)
+
+    ## Replace in both nodes, as-well:
+    # get nodes:
+    node1 = kagome_lattice.nodes[node1_index]
+    node2 = kagome_lattice.nodes[node2_index]
+    # change edges:
+    node1.edges[node1.edges.index(edge1)] = new_periodic_edge
+    node2.edges[node2.edges.index(edge2)] = new_periodic_edge
+
+
+
+## Cached results for lattices sizes:
+NUM_NODES_TO_LATTICE_SIZE = {}
+LATTICE_SIZE_TO_NUM_NODES = {}
+
+
+def _update_size_caches(num_nodes:int, lattice_size:int) -> None:
+    NUM_NODES_TO_LATTICE_SIZE[num_nodes] = lattice_size
+    LATTICE_SIZE_TO_NUM_NODES[lattice_size] = num_nodes
+
+
+def num_nodes_by_lattice_size(N:int) -> int:
+    # Look in cache
+    if N in LATTICE_SIZE_TO_NUM_NODES:
+        num_nodes = LATTICE_SIZE_TO_NUM_NODES[N]
+    else:
+        # Compute:
+        num_nodes = 3*triangle_lattice.total_vertices(N)
+        # Update cache:
+        _update_size_caches(num_nodes=num_nodes, lattice_size=N)
+    return num_nodes
+
+
+def lattice_size_by_num_nodes(num_nodes:int, _max_attempted_size:int=20) -> int:
+    # Look in cache
+    if num_nodes in NUM_NODES_TO_LATTICE_SIZE:
+        N = NUM_NODES_TO_LATTICE_SIZE[num_nodes]
+    else:
+        # Compute:
+        N = _search_lattice_size_by_num_nodes(num_nodes, _max_attempted_size)
+        # Update cache:
+        _update_size_caches(num_nodes=num_nodes, lattice_size=N)
+    return N
+
+
+def _search_lattice_size_by_num_nodes(num_nodes:int, _max_attempted_size:int=20) -> int:
+    for size in range(2, _max_attempted_size+1):
+        crnt_num_nodes = num_nodes_by_lattice_size(size)
+        if num_nodes == crnt_num_nodes:
+            return size
+        
+    raise ValueError(f"num_nodes={num_nodes} does not match any Kagome lattice size.")
+
+
+def plot_lattice(all_nodes:list[Node], node_color:str="red", node_size=40, edge_style:str="b-", periodic:bool=False)->None:
+    from matplotlib import pyplot as plt
+
+    ## Plot node positions:
+    for node in all_nodes:
+        x, y = node.pos
+        plt.scatter(x, y, c=node_color, s=node_size)
+        plt.text(x,y, s=node.index)
+
+    ## Plot edges:
+    edges_list = [node.edges for node in all_nodes]
+    for edges in edges_list:
+        for edge in edges:
+            nodes = [node for node in all_nodes if edge in node.edges]
+            
+            if edge.count("-")==2:
+                assert periodic==True
+                assert len(nodes)==2
+                for node in nodes:
+                    direction = node.directions[ node.edges.index(edge) ]
+                    x1, y1 = node.pos
+                    x2, y2 = tuples.add((x1, y1), direction.unit_vector)
+                    x_text = x2
+                    y_text = y2
+                    plt.plot([x1, x2], [y1, y2], edge_style)
+                    plt.text(x_text, y_text, edge, color="green")
+                continue
+
+            elif len(nodes)==2:
+                n1, n2 = nodes
+                x1, y1 = n1.pos
+                x2, y2 = n2.pos
+                x_text = (x1+x2)/2
+                y_text = (y1+y2)/2
+
+            elif len(nodes)>2:
+                raise ValueError(f"len(nodes) = {len(nodes)}")
+            
+            elif len(nodes)==1:
+                node = nodes[0]
+                direction = node.directions[ node.edges.index(edge) ] 
+                x1, y1 = node.pos
+                x2, y2 = tuples.add((x1, y1), direction.unit_vector)
+                x_text = x2
+                y_text = y2
+
+            plt.plot([x1, x2], [y1, y2], edge_style)
+            plt.text(x_text, y_text, edge, color="green")
+            
+
+    print("Done")
 
 
 if __name__ == "__main__":
-    main_test()
+    kagome_lattice = KagomeLattice(N=2)
+    kagome_lattice.change_boundary_conditions("periodic")
+    kagome_lattice.plot()

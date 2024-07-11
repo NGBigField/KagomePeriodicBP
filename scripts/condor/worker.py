@@ -11,7 +11,8 @@ import _import_scripts
 # Import DictWriter class from CSV module
 from time import perf_counter, sleep
 from csv import DictWriter
-from typing import Any, Generator
+from typing import Any, Generator, Final
+import threading
 
 from src.utils import errors
 
@@ -27,9 +28,11 @@ from scripts.condor.sender import Arguments
 # import numpy for random matrices:
 import numpy as np
 
+from utils import sizes
+
 
 NUM_EXPECTED_ARGS = 10
-SAFETY_BUFFER_FRACTION = 0.8  # safety buffer (adjust based on needs)
+SAFETY_BUFFER_FRACTION : Final[float|None] = None  # safety buffer (adjust based on needs)
 
 # A main function to parse inputs:
 def main():
@@ -77,16 +80,22 @@ def main():
     print(f"{i}: N={N}")
 
     i += 1  # 8
-    chi = int(argv[i])
+    chi = float(argv[i])
     print(f"{i}: chi={chi}")
 
     i += 1  # 9
+    parallel = int(argv[i])
+    print(f"{i}: parallel={parallel}")
+
+    i += 1  # 10
     result_keys = _parse_list_of_strings(argv[i])
     print(f"{i}: result_keys={result_keys}")
 
 
     ## Force usage of requested Giga-bytes:
-    _create_random_array_by_ram(req_mem_gb)
+    stop_event = threading.Event()
+    thread = threading.Thread(target=_auto_timed_compute_with_random_mat_by_ram, args=(req_mem_gb, stop_event))
+    thread.start()
 
     ## Run:
     results : dict[str, Any]
@@ -96,11 +105,11 @@ def main():
             case "bp":  
                 results = job_bp.main(D=D, N=N, method=method)
             case "parallel_timings":             
-                results = job_parallel_timing.main(D=D, N=N, method=method)
+                results = job_parallel_timing.main(D=D, N=N, parallel=parallel)
             case "bp_convergence":
                 results = job_bp_convergence.main(D=D, N=N)
             case "ite_afm":
-                results = job_ite_afm.main(D=D, N=N, chi_factor=chi, seed=seed)
+                results = job_ite_afm.main(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel)
             case _:
                 raise ValueError(f"Not an expected job_type={job_type!r}")
     except Exception as e:
@@ -108,6 +117,10 @@ def main():
             e=errors.get_traceback(e)
         )
     t2 = perf_counter()
+
+    ## Call thread to stop:
+    stop_event.set()
+    thread.join()
 
     print(f"res={results}")
     
@@ -135,12 +148,11 @@ def main():
     print(f"{output_file!r}")
 
 
-
-
 def _clean_item(s:str)->str:
     s = s.replace(" ", "")
     s = s.replace(",", "")
     return s
+
 
 def _parse_list_of_strings(s:str)->list[str]:
     assert isinstance(s, str)
@@ -152,46 +164,53 @@ def _parse_list_of_strings(s:str)->list[str]:
     return items
 
 
-def _create_random_array_by_ram(ram_gb, print_each_step:bool=False):
-    """
-    Creates a random NumPy array that utilizes the specified amount of RAM in gigabytes.
+def _auto_timed_compute_with_random_mat_by_ram(ram_gb:int, stop_event:threading.Event, starting_sleep_time:float|int=60):
+    ## In cases were this is redundant, exit:
+    if SAFETY_BUFFER_FRACTION is None:
+        return
 
-    Args:
-        ram_gb (float): The amount of RAM to use in gigabytes.
+    sleep_time = starting_sleep_time
+    while not stop_event.is_set():
+        # Do task:
+        _compute_with_random_mat_by_ram(ram_gb)
 
-    Returns:
-        numpy.ndarray: The randomly generated NumPy array.
+        # wait time, but check for exit message each second:
+        for _ in range(sleep_time):
+            sleep(1)
+            if stop_event.is_set():
+                return
+            
+        # next run, wait more:
+        sleep_time *= 2
 
-    Raises:
-        ValueError: If the requested RAM usage exceeds available memory.
-    """
 
-    print(f"Writing trash memory of up to {ram_gb}gb")
+def _compute_with_random_mat_by_ram(ram_gb, num_growing_sizes:int=3, computation_repetitions:int=3, progress_bar:bool=False, sleep_time:float|int=0.1):
 
-    # Convert RAM to bytes and consider safety factor (adjust as needed)
-    target_bytes = ram_gb * 1024**3 * SAFETY_BUFFER_FRACTION
 
     # Calculate element count and data type based on target size
-    element_size = np.dtype(float).itemsize  # Adjust for desired data type if needed
-    max_elements = int(target_bytes // element_size)
+    target_final_size = ram_gb*SAFETY_BUFFER_FRACTION
+    print(f"Writing trash memory of up to {target_final_size}gb")
 
-    for i, num_elements in enumerate(np.linspace(10, max_elements, 10)):
+    if num_growing_sizes>1:
+        sizes_gb = np.linspace(1e-9, target_final_size, num_growing_sizes)
+    else:
+        sizes_gb = [target_final_size]
+        progress_bar = False
 
-        num_elements = int(num_elements)
-        
-        if print_each_step:
-            print(f"    {i+1}/10: Writing trash memory with {num_elements} element")
+    if progress_bar:
+        from src.utils.prints import ProgressBar
+        prog_bar = ProgressBar(expected_end=num_growing_sizes)
 
-        # Create the random array
-        array_shape = (num_elements,)  # Adjust shape as desired for multidimensional arrays
-        array = np.random.random(array_shape)
+    for i, crnt_size in enumerate(sizes_gb):
 
-        ## Do some fake calculations:
-        array = np.dot(array*2, array+1)
-        array = array + (array/2 - 1)
-        sleep(1)
-        del array
+        if progress_bar:
+            prog_bar.next(extra_str=f"size = {crnt_size}[gb]")
+            
+        sizes.do_computation_by_ram_size(crnt_size, repetitions=computation_repetitions)
+        sleep(sleep_time)
     
+    if progress_bar:
+        prog_bar.clear()
     print("    Done writing trash memory")
 
 

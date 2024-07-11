@@ -10,6 +10,7 @@ from typing import Any, Final, Mapping
 from utils import strings, saveload, prints, tuples, lists
 from enum import Enum, auto
 import types, project_paths
+from project_paths import logs as logs_path
 
 from typing import Iterable
 
@@ -24,7 +25,7 @@ DEFAULT_DATE_TIME_FORMAT : Final = "%H:%M:%S" # "%Y-%m-%d %H:%M:%S"
 
 # File system:
 PATH_SEP = os.sep
-LOGS_FOLDER = os.getcwd()+PATH_SEP+"logs"
+LOGS_FOLDER = logs_path.__str__()
 
 
 class LoggerLevels(Enum):

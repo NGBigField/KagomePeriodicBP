@@ -41,3 +41,12 @@ def index_of_first_appearance(it:Iterable[_T], item:_T) -> int:
         if val==item:
             return i
     raise ValueError("Not found")
+
+
+def valid_permutation_list(permutation_lits:list[int], must_permute:bool=False) -> bool:
+    for prev_i, next_i in enumerate(permutation_lits):
+        if permutation_lits.count(next_i) != 1:
+            return False
+        if must_permute and prev_i == next_i:
+            return False
+    return True

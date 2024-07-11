@@ -3,14 +3,15 @@
 # ============================================================================ #
 
 import numpy as np
-from enum import Enum
-from typing import Generator, Callable, Any, Final, TypeGuard
-from numpy import pi, random
+from numpy import pi
 from utils import strings, lists, numerics, tuples
-from functools import cache, cached_property
-from abc import ABC, abstractclassmethod
 
 from _error_types import DirectionError
+
+# For typing annotations:
+from typing import Generator, Callable, Any, Final, TypeGuard, Iterator, TypeVar, Type, TypeAlias, Dict
+_PosTuple : TypeAlias = tuple[float|int, float|int]
+
 
 # ============================================================================ #
 #|                             Constants                                      |#
@@ -30,16 +31,18 @@ def _angle_dist(x:float, y:float)->float:
     return abs(x-y)
     
 
-def _unit_vector_from_angle(angle:float)->tuple[int, int]:
-    x = numerics.force_integers_on_close_to_round(np.cos(angle))
-    y = numerics.force_integers_on_close_to_round(np.sin(angle))
+def _unit_vector_from_angle(angle:float)->_PosTuple:
+    x : float|int  = numerics.force_integers_on_close_to_round(np.cos(angle))
+    y : float|int  = numerics.force_integers_on_close_to_round(np.sin(angle))
     return (x, y)
 
 # ============================================================================ #
-#|                           Class Defimition                                 |#
+#|                           Class Definition                                 |#
 # ============================================================================ #    
 
 
+_DirType = TypeVar('_DirType', bound='Direction')
+_SpecificDir = TypeVar('_SpecificDir', "LatticeDirection", "BlockSide")
 
 class Direction():
     __slots__ = 'name', 'angle', "unit_vector"
@@ -47,7 +50,7 @@ class Direction():
     def __init__(self, name:str, angle:float) -> None:
         self.name = name
         self.angle = numerics.force_between_0_and_2pi(angle)
-        self.unit_vector : tuple[int, int] = _unit_vector_from_angle(angle)
+        self.unit_vector : _PosTuple = _unit_vector_from_angle(angle)
 
     def __str__(self)->str:
         return self.name
@@ -67,25 +70,25 @@ class Direction():
         # return check.is_equal(self, other)
 
     ## Get other by relation:
-    def opposite(self)->"Direction":
-        try:
+    def opposite(self:_DirType)->_DirType:
+        if isinstance(self, (LatticeDirection,BlockSide)):
             res = OPPOSITE_DIRECTIONS[self]
-        except KeyError:
+        else:
             cls = type(self)
             res = cls(name=self.name, angle=self.angle+np.pi)
         return res
     
-    def next_clockwise(self)->"Direction":
-        return lists.prev_item_cyclic(ORDERED_LISTS[type(self)], self)
+    def next_clockwise(self:_DirType)->_DirType:
+        return lists.prev_item_cyclic(ordered_lists(type(self)), self)
 
-    def next_counterclockwise(self)->"Direction":
-        return lists.next_item_cyclic(ORDERED_LISTS[type(self)], self)
+    def next_counterclockwise(self:_DirType)->_DirType:
+        return lists.next_item_cyclic(ordered_lists(type(self)), self)
     
     ## Creation method:
     @classmethod
     def from_angle(cls, angle:float, eps:float=EPSILON)->"Direction":
         ## Where to look
-        possible_directions = ORDERED_LISTS[cls]
+        possible_directions = ordered_lists(cls)
         # look:
         for dir in possible_directions:
             if _angle_dist(dir.angle, angle)<eps:
@@ -93,25 +96,25 @@ class Direction():
         raise DirectionError(f"Given angle does not match with any known side")
     
     @classmethod
-    def random(cls)->"Direction":
-        return lists.random_item(ORDERED_LISTS[cls])
+    def random(cls:Type[_DirType]) -> _DirType:
+        return lists.random_item(ordered_lists(cls))
     
     ## iterators over all members:
     @classmethod
-    def all_in_counter_clockwise_order(cls)->Generator["Direction", None, None]:
-        return iter(ORDERED_LISTS[cls])
+    def all_in_counter_clockwise_order(cls:Type[_DirType])->Iterator[_DirType]:
+        return iter(ordered_lists(cls))
     
     @classmethod
-    def all_in_clockwise_order(cls)->Generator["Direction", None, None]:
-        return reversed(ORDERED_LISTS[cls])
+    def all_in_clockwise_order(cls:Type[_DirType])->Iterator[_DirType]:
+        return reversed(ordered_lists(cls))
     
     @classmethod
-    def all_in_random_order(cls)->Generator["Direction", None, None]:
-        return iter(lists.shuffle(ORDERED_LISTS[cls]))
+    def all_in_random_order(cls:Type[_DirType])->Iterator[_DirType]:
+        return iter(lists.shuffle(ordered_lists(cls)))
     
     @classmethod
-    def iterator_with_str_output(cls, output_func:Callable[[str], Any])->Generator["Direction", None, None]:
-        for i, side in enumerate(ORDERED_LISTS[cls]):
+    def iterator_with_str_output(cls:Type[_DirType], output_func:Callable[[str], Any])->Generator[_DirType, None, None]:
+        for i, side in enumerate(ordered_lists(cls)):
             s = " " + strings.num_out_of_num(i+1, NUM_MAIN_DIRECTIONS) + " " + f"{side.name:<{MAX_DIRECTIONS_STR_LENGTH}}"
             output_func(s)
             yield side
@@ -141,7 +144,7 @@ class Direction():
         plt.grid(color='gray', linestyle=':')
 
         print(f"Plotted direction {self.name!r}")
-    
+
 
 class LatticeDirection(Direction): 
     R  : "LatticeDirection"
@@ -178,6 +181,7 @@ class BlockSide(Direction):
 #|                            Main Directions                                 |#
 # ============================================================================ #    
 
+
 # Main direction in the Kagome lattice:
 LatticeDirection.R  = LatticeDirection("R" , 0)
 LatticeDirection.UR = LatticeDirection("UR", pi/3)
@@ -196,25 +200,43 @@ BlockSide.DR  = BlockSide("DR", 3*pi/2+pi/3)
 
 
 
+class _AnnotatedSelfKeyValueTypeDict:
+    """ Type annotated that when the key is of type T, so is the value.
+    """
+    def __init__(self, d:dict={}):
+        self._data = d
+
+    def get_item(self, key:_SpecificDir) -> _SpecificDir:
+        value : _SpecificDir = self._data.get(key)  # type: ignore
+        return value
+
+    def __getitem__(self, key:_SpecificDir) -> _SpecificDir:
+        return self.get_item(key)
+    
+
 
 # ============================================================================ #
 #|                        Relations between Directions                        |#
 # ============================================================================ #    
 
-LATTICE_DIRECTIONS_COUNTER_CLOCKWISE : Final[list[Direction]] = [
+LATTICE_DIRECTIONS_COUNTER_CLOCKWISE : Final[list[LatticeDirection]] = [
     LatticeDirection.DL, LatticeDirection.DR, LatticeDirection.R, LatticeDirection.UR, LatticeDirection.UL, LatticeDirection.L
 ]
 
-BLOCK_SIDES_COUNTER_CLOCKWISE : Final[list[Direction]] = [
+BLOCK_SIDES_COUNTER_CLOCKWISE : Final[list[BlockSide]] = [
     BlockSide.D, BlockSide.DR, BlockSide.UR, BlockSide.U, BlockSide.UL, BlockSide.DL
 ]
 
-ORDERED_LISTS = {
-    LatticeDirection : LATTICE_DIRECTIONS_COUNTER_CLOCKWISE,
-    BlockSide : BLOCK_SIDES_COUNTER_CLOCKWISE
-}
 
-OPPOSITE_DIRECTIONS : Final[dict[Direction, Direction]] = {
+def ordered_lists(cls:Type[_DirType]) -> list[_DirType]:
+    if cls is LatticeDirection:
+        return LATTICE_DIRECTIONS_COUNTER_CLOCKWISE  # type: ignore
+    elif cls is BlockSide:
+        return BLOCK_SIDES_COUNTER_CLOCKWISE   # type: ignore
+    raise TypeError("Not an expected type")
+
+
+OPPOSITE_DIRECTIONS : Final[_AnnotatedSelfKeyValueTypeDict] = _AnnotatedSelfKeyValueTypeDict({
     # Lattice:
     LatticeDirection.R  : LatticeDirection.L ,
     LatticeDirection.UR : LatticeDirection.DL,
@@ -229,7 +251,7 @@ OPPOSITE_DIRECTIONS : Final[dict[Direction, Direction]] = {
     BlockSide.DL : BlockSide.UR,
     BlockSide.UL : BlockSide.DR,
     BlockSide.DR : BlockSide.UL
-}
+})
 
 ORTHOGONAL_LATTICE_DIRECTIONS_TO_BLOCK_SIDES : Final[dict[BlockSide, LatticeDirection]] = {
     BlockSide.D  : LatticeDirection.R,
@@ -269,17 +291,20 @@ def next_clockwise_or_counterclockwise(dir:Direction, clockwise:bool=True)->Dire
 
 
 class create:
+    @staticmethod
     def mean_direction(directions:list[Direction])->Direction:
         angles = [dir.angle for dir in directions]
         angle = sum(angles)/len(angles)
         return Direction(name="mean", angle=angle)
     
+    @staticmethod
     def direction_from_positions(p1:tuple[float, float], p2:tuple[float, float])->Direction:
         angle = tuples.angle(p1, p2)
         return Direction(name="relative", angle=angle)
 
 
 class check:
+    @staticmethod
     def is_orthogonal(dir1:Direction, dir2:Direction)->bool:
         dir1_ortho_options = [dir1.angle+pi/2, dir1.angle-pi/2]
         for dir1_ortho in dir1_ortho_options:
@@ -287,6 +312,7 @@ class check:
                 return True
         return False
     
+    @staticmethod
     def is_opposite(dir1:Direction, dir2:Direction)->bool:
         if isinstance(dir1, BlockSide) and isinstance(dir2, LatticeDirection):
             lattice_options = dir1.opposite_lattice_directions()
@@ -308,6 +334,7 @@ class check:
         else:
             return check.is_equal(dir1.opposite(), dir2)
 
+    @staticmethod
     def is_equal(dir1:Direction, dir2:Direction) -> bool:
         # Type check:
         assert issubclass(type(dir2), Direction)
@@ -323,6 +350,7 @@ class check:
             return _angle_dist(dir1.angle, dir2.angle)<EPSILON
         return False
     
+    @staticmethod
     def all_same(l:list[Direction]) -> bool:
         dummy = l[0]
         for item in l:
@@ -330,6 +358,7 @@ class check:
                 return False                
         return True
 
+    @staticmethod
     def is_non_specific_direction(dir:Direction) -> TypeGuard[Direction]:
         if isinstance(dir, LatticeDirection) or isinstance(dir, BlockSide):
             return False
@@ -339,6 +368,7 @@ class check:
 
 class sort:
 
+    @staticmethod
     def specific_typed_directions_by_clock_order(directions:list[Direction], clockwise:bool=True)->list[Direction]:
         ## Try different first directions:
         for dir_first in directions:
@@ -351,7 +381,7 @@ class sort:
                 return final_order
         raise DirectionError("Directions are not related")
 
-
+    @staticmethod
     def arbitrary_directions_by_clock_order(first_direction:Direction, directions:list[Direction], clockwise:bool=True)->list[Direction]:
         """Given many arbitrary directions, order them in clockwise order as a continuation of a given starting direction.
 

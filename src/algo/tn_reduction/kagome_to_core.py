@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 _T = TypeVar("_T")
 
 # Common types in the code:
-from tensor_networks import KagomeTN, ArbitraryTN, ModeTN, TensorNode, MPS, CoreTN, get_common_edge
+from tensor_networks import KagomeTNRepeatedUnitCell, ArbitraryTN, ModeTN, TensorNode, MPS, CoreTN, get_common_edge
 
 # Everyone needs numpy:
 import numpy as np
@@ -27,14 +27,14 @@ from libs import bmpslib
 from algo.contract_tensor_network import contract_tensor_network
 
 # Types we need in our module:
-from tensor_networks import KagomeTN, ArbitraryTN, TensorNode, MPS
+from tensor_networks import KagomeTNRepeatedUnitCell, ArbitraryTN, TensorNode, MPS
 from tensor_networks.node import TensorNode, two_nodes_ordered_by_relative_direction
 from lattices.directions import Direction, LatticeDirection, BlockSide, check
 from enums import ContractionDepth, NodeFunctionality, UpdateMode
 from containers import MPSOrientation, UpdateEdge
 
 # Our utilities:
-from utils import tuples, lists, assertions, prints, parallel_exec
+from utils import parallels, tuples, lists, assertions, prints
 
 
 
@@ -103,7 +103,7 @@ class _PerSide(Generic[_T]):
 
 def _contract_half(
     side_key:str, 
-    tn:KagomeTN,
+    tn:KagomeTNRepeatedUnitCell,
     directions:_PerSide[BlockSide],
     bubblecon_trunc_dim:int,
     print_progress:bool
@@ -118,7 +118,7 @@ def _contract_half(
 
 
 def _contract_tn_from_sides_and_create_mpss(
-    tn:KagomeTN,
+    tn:KagomeTNRepeatedUnitCell,
     directions:_PerSide[BlockSide],
     bubblecon_trunc_dim:int,
     parallel:bool
@@ -136,7 +136,7 @@ def _contract_tn_from_sides_and_create_mpss(
         print_progress = not parallel
     )
     values = list(_PerSide.side_names())
-    res = parallel_exec.concurrent_or_parallel(_contract_half, values=values, value_name="side_key", in_parallel=parallel, fixed_arguments=fixed_arguments)
+    res = parallels.concurrent_or_parallel(_contract_half, values=values, value_name="side_key", in_parallel=parallel, fixed_arguments=fixed_arguments)
 
     ## Unpack Results:
     mpss         : _PerSide[MPS]            = _PerSide()
@@ -150,7 +150,7 @@ def _contract_tn_from_sides_and_create_mpss(
     return mpss, con_orders, orientations
 
 def _basic_data(
-    tn:KagomeTN, parallel:bool, direction:BlockSide|None
+    tn:KagomeTNRepeatedUnitCell, parallel:bool, direction:BlockSide|None
 )->tuple[
     list[TensorNode],
     _PerSide[int],
@@ -316,7 +316,7 @@ def _add_env_tensors_to_open_core(small_tn:ArbitraryTN, env_tensors:list[TensorN
 
 
 
-def reduce_full_kagome_to_core(tn:KagomeTN, trunc_dim:int, parallel:bool=False, direction:BlockSide|None=None) -> CoreTN:
+def reduce_full_kagome_to_core(tn:KagomeTNRepeatedUnitCell, trunc_dim:int, parallel:bool=False, direction:BlockSide|None=None) -> CoreTN:
     ## 0: Check inputs:
     if DEBUG_MODE:
         tn.validate()

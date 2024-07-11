@@ -188,6 +188,9 @@ def float_list_to_str(l:list[float], num_decimals:int|None=None)->str:
     return s
 
 
+def str_equal_case_insensitive(s1:str, s2:str) -> bool:
+    return s1.casefold()==s2.casefold()
+
 
 def _compute_lps_array_for_kmp(pattern):
 	"""

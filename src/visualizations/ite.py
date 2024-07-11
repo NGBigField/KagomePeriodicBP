@@ -8,16 +8,18 @@ if __name__ == "__main__":
 	)
 
 
-from utils import visuals, strings, logs, prints, tuples, lists, saveload, dicts
+from utils import visuals, strings, logs, prints, tuples, lists, saveload, dicts, files
+import project_paths
 
 from tensor_networks import UnitCell
 from containers import Config, ITESegmentStats, UpdateEdge
 import numpy as np
 from dataclasses import dataclass, fields
-from typing import TypeVar, Generic, Generator, Optional
+from typing import TypeVar, Generic, Generator, Optional, Callable
 _T = TypeVar('_T')
 
-from algo.measurements import mean_expectation_values, UnitCellExpectationValuesDict
+from _types import UnitCellExpectationValuesDict
+
 
 # Control flags:
 from _config_reader import ALLOW_VISUALS
@@ -30,9 +32,7 @@ if ALLOW_VISUALS:
 else:
     Axes3D, Quiver, Line3D, Text = None, None, None, None
 
-from visuals import constants as visual_constants
-
-from copy import deepcopy
+from visualizations import constants as visual_constants
 
 
 default_marker_style = visual_constants.SCATTER_STYLE_FOR_ITE.default
@@ -47,6 +47,9 @@ NEW_TRACK_POINT_THRESHOLD = 0.02
 
 PLOT_ENTANGLEMENT = True
 PLOT_COMPLEXITY = False
+
+CONFIG_NUM_HEADER_LINES = 40
+
 
 @dataclass
 class COLORS:
@@ -152,7 +155,7 @@ class BlockSpherePlot():
             p.remove()  # remove from plot
             
 
-        ## Prepare iteartion varaibles:
+        ## Prepare iteration variables:
         track = self._track
         n = len(track)-1
         if n<0:
@@ -316,7 +319,7 @@ class ITEPlots():
                 p_memory_use.axis.set_ylabel("space [bytes]", color=COLORS.space_complexity)
                 p_memory_use.axis.tick_params(axis='y', labelcolor=COLORS.space_complexity)
             else:
-                p_exec_t, p_memory_use = visuals.AppendablePlot.inacive(), visuals.AppendablePlot.inacive()
+                p_exec_t, p_memory_use = visuals.AppendablePlot.inactive(), visuals.AppendablePlot.inactive()
             #
             if PLOT_ENTANGLEMENT:
                 p_entanglement = visuals.AppendablePlot(axis=axes_main["N"])
@@ -324,7 +327,7 @@ class ITEPlots():
                 p_entanglement.axis.set_ylabel("Negativity")
                 p_entanglement.axis.set_xlabel("iteration")
             else:
-                p_entanglement = visuals.AppendablePlot.inacive()
+                p_entanglement = visuals.AppendablePlot.inactive()
             #
             self.plots.main = dict(
                 energies=p_energies, 
@@ -422,7 +425,7 @@ class ITEPlots():
         delta_t : float, 
         expectations : UnitCellExpectationValuesDict, 
         unit_cell : UnitCell, 
-        entangelment : list[dict[str, float]],
+        entanglement : list[dict[str, float]],
         _initial:bool=False,
         _draw_now:bool=True
     ):
@@ -432,7 +435,7 @@ class ITEPlots():
         if not _initial:
             self._iteration += 1  # index beginning at 1 (not 0)
 
-        mean_expec_vals = mean_expectation_values(expectations)
+        mean_expec_vals = _mean_expectation_values(expectations)
 
         def _small_scatter(plot:visuals.AppendablePlot, x:float, y:float, style:visual_constants.ScatterStyle=default_marker_style)->None:
             plot.axis.scatter(x=x, y=y, c=style.color, s=style.size, alpha=style.alpha, marker=style.marker)
@@ -489,7 +492,7 @@ class ITEPlots():
                 plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
 
             ## Entanglement
-            _scatter_plot_at_main_per_edge(results_dict=entangelment, iteration=i, base_style=energies_after_segment_style, axis_name="entanglement", alpha=1.0)
+            _scatter_plot_at_main_per_edge(results_dict=entanglement, iteration=i, base_style=energies_after_segment_style, axis_name="entanglement", alpha=1.0)
             self.plots.main["entanglement"].axis.set_ylim(bottom=0)
 
 
@@ -554,7 +557,7 @@ class ITEPlots():
 
 
 
-def _values_from_values_str_lne(line:str)->list[float]:
+def _values_from_values_str_line(line:str)->list[float]:
     _, line = line.split(sep='[')
     line, _ = line.split(sep=']')
     vals = line.split(", ")
@@ -564,11 +567,15 @@ def _values_from_values_str_lne(line:str)->list[float]:
 
 def _scatter_values(
     ax:Axes,    
-    values_line:str, i:int, style:visual_constants.ScatterStyle=default_marker_style, label:str=None,  is_first:bool=None
+    values_line:str, i:int, style:visual_constants.ScatterStyle=default_marker_style, label:str=None,  is_first:bool=None, value_func:Callable|None=None
 )->None:
     
-    values = _values_from_values_str_lne(values_line)
+    values = _values_from_values_str_line(values_line)
     for value in values:
+
+        if value_func is not None:
+            value = value_func(value)
+
         if is_first is None or not is_first:
             label = None
         ax.scatter(i, value, s=style.size, c=style.color, alpha=style.alpha, marker=style.marker, label=label)
@@ -663,13 +670,17 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
     ## Plot energy per edge:
     is_first = True
     
+    # Energies per edge are half than the energy per site:
+    value_func = lambda v: v*2
+
+    # Plot:
     for i in range(num_segments):
-        _scatter_values(ax, values_line=edge_energies_for_mean_strs.pop(0), i=i, style=energies_after_segment_style, label="energies per edge", is_first=is_first)
+        _scatter_values(ax, values_line=edge_energies_for_mean_strs.pop(0), i=i, style=energies_after_segment_style, label="energies per edge", is_first=is_first, value_func=value_func)
 
 
         for j in range(num_mode_repetitions_per_segment):
             index = i + j/num_mode_repetitions_per_segment
-            _scatter_values(ax, values_line=edge_energies_during_strs.pop(0), i=index, style=energies_at_update_style, label="energies at update", is_first=is_first)
+            _scatter_values(ax, values_line=edge_energies_during_strs.pop(0), i=index, style=energies_at_update_style, label="energies at update", is_first=is_first, value_func=value_func)
             is_first = False
 
                 
@@ -750,12 +761,38 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
         ax.sharex(first_ax)
 
 
+def _get_log_fullpath(log_name:str) -> str:
+    folder = project_paths.logs
+    name_with_extension = saveload._common_name(log_name, typ='log')
+    full_path = str(folder) + files.foldersep + name_with_extension
+    return full_path
+
+
+def _print_log_header(log_name:str) -> None:
+    fullpath = _get_log_fullpath(log_name)
+    with open(fullpath, "r") as file:
+        for i, line in enumerate(file):
+            if i > CONFIG_NUM_HEADER_LINES:
+                break 
+            print(line, end="")
+
+def _mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[str, float]:
+    mean_per_direction : dict[str, float] = dict(x=0, y=0, z=0)
+    # Add
+    for abc, xyz_dict in expectation.items():
+        for xyz, value in xyz_dict.items():
+            mean_per_direction[xyz] += value/3
+    return mean_per_direction
+
+
 def plot_from_log(
     log_name:str = "2024.04.10_10.24.40 VJDEMA - long",
     save:bool = True,
     show_health_figure:bool = False
 ):
     
+    _print_log_header(log_name)
+
     for _plot_func, name in [
         (_plot_main_figure_from_log, "main"),
         (_plot_health_figure_from_log, "health")

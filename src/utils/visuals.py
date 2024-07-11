@@ -105,7 +105,7 @@ def get_saved_figures_folder()->Path:
     return folder
 
 
-def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None ) -> None:
+def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None, extensions:list[str]=["png", "svg"], ) -> None:
     # Figure:
     if fig is None:
         fig = plt.gcf()
@@ -116,7 +116,7 @@ def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None ) -> Non
     folder = get_saved_figures_folder()
     # Full path:
     fullpath = folder.joinpath(file_name)
-    for ext in ["png", "svg"]:
+    for ext in extensions:
         fullpath_str = str(fullpath.resolve())+"."+ext
         # Save:
         fig.savefig(fullpath_str)
@@ -144,8 +144,10 @@ def random_uniform_spray(num_coordinates:int, origin:Optional[Tuple[float, ...]]
         coordinates[-1]["far"] = [x0+1.1*dx, y0+1.1*dy]
     return coordinates
 
+
 def close_all():
     plt.close('all')
+
 
 def draw_now():
     plt.show(block=False)
@@ -171,7 +173,6 @@ def matplotlib_wrapper(on:bool=True) -> Callable[[Callable[_InputType, _OutputTy
     return decorator
 
 
- 
 def hsv_to_rgb(h, s, v): 
     (r, g, b) = colorsys.hsv_to_rgb(h, s, v) 
     if RGB_VALUE_IN_RANGE_1_0:
@@ -179,6 +180,7 @@ def hsv_to_rgb(h, s, v):
     else:
         return (int(255*r), int(255*g), int(255*b)) 
  
+
 def distinct_colors(n:int) -> Generator[Tuple[float, float, float], None, None]: 
     hue_fraction = 1.0 / (n + 1) 
     return (hsv_to_rgb(hue_fraction * i, 1.0, 1.0) for i in range(0, n)) 
@@ -266,7 +268,7 @@ class AppendablePlot():
             fig = axis.figure
         # save data:
         self.fig  = fig
-        self.axis = axis
+        self.axis : plt.Axes = axis
         self.values : dict[str, tuple[list[float], list[float], dict] ] = dict()
         self.axis.get_yaxis().get_major_formatter().set_useOffset(False)  # Stop the weird pyplot tendency to give a "string" offset to graphs
         self.legend_on : bool = legend_on
@@ -274,7 +276,7 @@ class AppendablePlot():
 
 
     @classmethod
-    def inacive(cls)->"InactiveAppendablePlot":
+    def inactive(cls)->"InactiveAppendablePlot":
         return InactiveAppendablePlot()
 
     def _next_x(self, name:str) -> float|int:
@@ -384,7 +386,7 @@ class InactiveDescriptor():
     def __setattr__(self, name: str, value: Any) -> None: ...
 
 
-def InactiveMethoedWrapper(func):
+def InactiveMethodWrapper(func):
     def wrapper(*args, **kwargs):
         return None
     return wrapper
@@ -412,7 +414,7 @@ class InactiveAppendablePlot(AppendablePlot):
 
         for method in self.all_method():
             name = method.__name__
-            method = InactiveMethoedWrapper(method)
+            method = InactiveMethodWrapper(method)
             try:
                 assert isinstance(name, str)
             except Exception as e:
@@ -420,6 +422,31 @@ class InactiveAppendablePlot(AppendablePlot):
                 print(method)
                 print(e)
             setattr(self, name, method)
+
+
+def plot_with_spread(x_y_values_dict:dict[float|int, list[float|int]], plt_kwargs:dict):
+    # Convert y_values_matrix to a NumPy array for easier manipulation
+    y_means = []
+    y_stds  = []
+    x_values = sorted(list(x_y_values_dict.keys()))
+    for x in x_values:
+        y_values = x_y_values_dict[x]
+        y_values = np.array(y_values)
+
+        # Calculate the mean and standard deviation along the 1st axis (columns)
+        y_means.append(np.mean(y_values))
+        y_stds.append(np.std(y_values))
+    
+    # Plotting the mean values
+    line = plt.plot(x_values, y_means, **plt_kwargs)
+    color = line[0].get_color()
+    
+    # Adding a shaded region to represent the spread (1 standard deviation here)
+    y_means = np.array(y_means)
+    y_stds = np.array(y_stds)
+    fill = plt.fill_between(x_values, y_means - y_stds, y_means + y_stds, color=color, alpha=0.2)
+    
+    return line, fill
 
 
 class matplotlib_colors(Enum):

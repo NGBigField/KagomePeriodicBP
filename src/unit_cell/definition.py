@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Generator
+from dataclasses import dataclass, field
+from typing import Generator, Final
 from numpy import ndarray as np_ndarray
 from enums import UnitCellFlavor
 import numpy as np
@@ -89,7 +89,7 @@ class UnitCell:
              C = tensor.copy()
         )
     
-    def save(self, file_name:str|None=None)->None:
+    def save(self, file_name:str|None=None) -> str:
         file_name = self._derive_file_name(file_name)
         return saveload.save(self, name=file_name, sub_folder=UNIT_CELL_SUBFOLDER_NAME)
 
@@ -99,6 +99,7 @@ class UnitCell:
             file_name = files.get_last_file_in_folder(UNIT_CELL_FOLDER_FULLPATH)
         return saveload.load(file_name, sub_folder=UNIT_CELL_SUBFOLDER_NAME, none_if_not_exist=if_exist)
     
+    @staticmethod
     def load_best(D:int, none_if_not_exist:bool=True) -> "UnitCell":
         data = BestUnitCellData.load(D=D, none_if_not_exist=none_if_not_exist)
         if data is None and none_if_not_exist:
@@ -188,6 +189,10 @@ class BestUnitCellData:
         file_name = self._canonical_file_name()
         return saveload.save(self, file_name, sub_folder=BEST_UNIT_CELL_DATA_FOLDER_NAME)
     
+    @staticmethod
+    def _folder_fullpath() -> str:
+        return BEST_UNIT_CELL_FOLDER_FULLPATH
+
     @staticmethod
     def _all_files_with_D(D:int) -> Generator[str, None, None]:
         file_names = files.get_all_file_names_in_folder(BEST_UNIT_CELL_FOLDER_FULLPATH)

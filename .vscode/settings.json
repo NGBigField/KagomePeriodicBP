@@ -5,12 +5,14 @@
         "Appendable",
         "bmpslib",
         "bubblecon",
+        "capstyle",
         "cpus",
         "decomp",
         "Dmax",
         "dtype",
         "expec",
         "Ferro",
+        "foldersep",
         "hamiltonians",
         "Hasik",
         "hermicity",
@@ -23,13 +25,16 @@
         "ketbra",
         "kets",
         "mpss",
+        "Negativities",
         "numpys",
         "objsize",
         "paulis",
         "PESS",
         "rdms",
+        "stds",
         "suptitle",
-        "tnsu"
+        "tnsu",
+        "twinx"
     ],
     "cSpell.ignoreWords": [
         "arange"

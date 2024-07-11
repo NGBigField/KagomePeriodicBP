@@ -1,13 +1,15 @@
 # Import types used in the code:
-from lattices._common import Node
-from lattices.directions import LatticeDirection, BlockSide, Direction
+from lattices._common import Node, sorted_boundary_nodes, plot_lattice
+from lattices.directions import LatticeDirection, BlockSide, Direction, DirectionError
+from lattices.edges import edges_dict_from_edges_list
 from _error_types import LatticeError, OutsideLatticeError
 
 # For type hinting:
-from typing import Generator
+from typing import Generator, Final, Iterable, TypeGuard
+from dataclasses import dataclass
 
 # some of our utils:
-from utils import tuples
+from utils import tuples, lists, strings
 
 # For caching results:
 import functools 
@@ -19,6 +21,9 @@ import numpy as np
 class TriangularLatticeError(LatticeError): ...
 
 
+CACHED_ORDERED_BOUNDARY_EDGES_PER_LATTICE_SIZE : Final[dict[int, list[str]]] = {}
+
+
 @functools.cache
 def total_vertices(N):
 	"""
@@ -27,6 +32,20 @@ def total_vertices(N):
 	"""
 	return 3*N*N - 3*N + 1
 
+
+@functools.cache
+def linear_size_from_total_vertices(NT:int) -> int:
+	## Solving a quadratic roots formula:
+	# Two options:
+	for sign in [+1, -1]:
+		N = ( 3 + sign*np.sqrt(9 - 12*(1 - NT)) )/6 
+		if N<0:
+			continue
+		N = int(N)
+		if NT!=total_vertices(N):
+			continue
+		return N
+	raise ValueError("No solution")
 
 @functools.cache
 def center_vertex_index(N):
@@ -115,7 +134,6 @@ def check_boundary_vertex(index:int, N)->list[BlockSide]:
 	return on_boundaries
 
 
-
 def get_neighbor_coordinates_in_direction(i:int, j:int, direction:LatticeDirection, N:int)->tuple[int, int]:
 	i2, j2 = _get_neighbor_coordinates_in_direction_no_boundary_check(i, j, direction, N)
 
@@ -128,7 +146,7 @@ def get_neighbor_coordinates_in_direction(i:int, j:int, direction:LatticeDirecti
 	return i2, j2
 
 
-def get_neighbor(i:int, j:int, direction:LatticeDirection, N:int)->tuple[int, int]:	
+def get_neighbor(i:int, j:int, direction:LatticeDirection, N:int)->int:	
 	i2, j2 = get_neighbor_coordinates_in_direction(i, j, direction, N)
 	return get_vertex_index(i2, j2, N)
 
@@ -143,6 +161,7 @@ def all_neighbors(index:int, N:int)->Generator[tuple[Node, LatticeDirection], No
 		yield neighbor, direction
 
 
+@functools.cache
 def get_vertex_coordinates(index, N)->tuple[int, int]:
 	running_index = 0 
 	for i in range(num_rows(N)):
@@ -154,7 +173,7 @@ def get_vertex_coordinates(index, N)->tuple[int, int]:
 	raise TriangularLatticeError("Not found")
 
 
-def get_vertex_index(i,j,N):
+def get_vertex_index(i:int, j:int, N:int) -> int:
 	"""
 	Given a location (i,j) of a vertex in the hexagon, return its 
 	index number. The vertices are ordered left->right, up->down.
@@ -623,8 +642,100 @@ def rotate_ACW(N, ijs, ij_to_hex, hex_to_ij):
 		new_ijs.append(new_ij)
 		
 	return new_ijs
-			
 
+
+@dataclass
+class _EdgeDataForShifting:
+	vertex_ind : int
+	edge_ind : int
+	crnt_name : str
+	new_name : str  = ""
+
+
+def _is_boundary_edge(edge:str|int) -> TypeGuard[str]:
+	if isinstance(edge, int):
+		return False
+	assert isinstance(edge, str)
+	assert edge[0].isalpha
+	return True
+
+
+def _split_boundary_edge_name_to_side_and_order(edge_name:str) -> tuple[str, int]:
+	c0 : str = edge_name[0]
+	c1 : str = edge_name[1]
+	# Derive side name string:
+	assert c0.isalpha, "First string in boundary edge must be a 'd' or 'u'"
+	if c1.isalpha():  
+		side_name = c0+c1  # second char is also alphabetical 
+		order = edge_name[2:]
+	else: 			  
+		side_name = c0
+		order = edge_name[1:]
+
+	return side_name, int(order)
+
+
+def _boundary_edge_order_by_num_order(edge_data:_EdgeDataForShifting) -> int:
+	side_name, order = _split_boundary_edge_name_to_side_and_order(edge_data.crnt_name)
+	return order
+
+
+def _boundary_edge_order_by_side(edge_data:_EdgeDataForShifting) -> int:
+	side_name, order = _split_boundary_edge_name_to_side_and_order(edge_data.crnt_name)
+	# direction by order:
+	for i, side in enumerate(BlockSide.all_in_counter_clockwise_order()):
+		crnt_side_name = str(side).casefold()
+		if crnt_side_name == side_name:
+			return i
+	raise ValueError("Not found")
+
+
+
+def _shift_boundary_edges_clockwise(edges_list:list[list[str|int]], N:int) -> list[str]:
+	""" First, find all the edges and keep their order in the following format:
+
+	During the algorithm, a list is created and sorted containing boundary edges:
+	[(i_1, j_1, e_1, n_1), (i_2, j_2, e_2, n_2), ..., (i_N, j_N, e_N, n_N)]
+	Where i is the index of the vertex
+	and j is the index of its leg where the edge is.
+	and e is the name of the edge
+
+	Returns a list with all ordered edges
+	"""
+	## Define basic data:
+	# How many edges per edge do we expect:
+	num_outer_edges = 2*N-1
+
+	## Define helper functions:
+
+	## Search for all boundary edges:
+	boundary_edges = [
+		[_EdgeDataForShifting(vertex_ind=i, edge_ind=j, crnt_name=edge) for j, edge in enumerate(edges) if _is_boundary_edge(edge)] 
+		for i, edges in enumerate(edges_list)
+	]
+	boundary_edges = lists.join_sub_lists(boundary_edges)
+
+	## Sort edges:
+	# Sort by number:
+	boundary_edges.sort(key=_boundary_edge_order_by_num_order)
+	# sort by direction:
+	boundary_edges.sort(key=_boundary_edge_order_by_side)
+
+	## Cyclicly assign new names according to next in order:
+	for prev, crnt, next in lists.iterate_with_periodic_prev_next_items(boundary_edges):
+		crnt.new_name = next.crnt_name
+	
+	## Change names:
+	for edge_data in boundary_edges:
+		i = edge_data.vertex_ind
+		j = edge_data.edge_ind
+		## Apply on original data-structure:
+		edges_list[i][j] = edge_data.new_name 
+	
+	## For output:
+	return [edge_data.new_name for edge_data in boundary_edges]
+	
+	
     
 
 def create_triangle_lattice(N)->list[Node]:
@@ -660,10 +771,11 @@ def create_triangle_lattice(N)->list[Node]:
 	# Create the list of edges. 
 	#
 	edges_list = []
-	for i in range(2*N-1):
+	h = num_rows(N)
+	for i in range(h):
 		w = row_width(i,N)
-		for j in range(w):
 
+		for j in range(w):
 			eL  = get_edge_index(i,j,'L' , N)
 			eR  = get_edge_index(i,j,'R' , N)
 			eUL = get_edge_index(i,j,'UL', N)
@@ -672,6 +784,15 @@ def create_triangle_lattice(N)->list[Node]:
 			eDR = get_edge_index(i,j,'DR', N)
 
 			edges_list.append([eL, eR, eUL, eUR, eDL, eDR])
+
+	#
+	# Rotate edges at boundary clockwise.
+	# 	Done because the canonical form in the original triangular blockBP
+	#	code, does not the shape of the block in this code:
+	#
+	boundary_edges = _shift_boundary_edges_clockwise(edges_list, N)  
+	CACHED_ORDERED_BOUNDARY_EDGES_PER_LATTICE_SIZE[N] = boundary_edges
+
 	#
 	# Create the list of nodes:
 	#
@@ -730,7 +851,7 @@ def unit_vector_corrected_for_sorting_triangular_lattice(direction:Direction)->t
 		raise TypeError(f"Not a supported typee")
 
 
-def sort_coordinates_by_direction(items:list[tuple[int, int]], direction:Direction, N:int)->list[tuple[int, int]]:
+def sort_coordinates_by_direction(items:Iterable[tuple[int, int]], direction:Direction, N:int)->list[tuple[int, int]]:
 	# unit_vector = direction.unit_vector  # This basic logic break at bigger lattices
 	unit_vector = unit_vector_corrected_for_sorting_triangular_lattice(direction)
 	def key(ij:tuple[int, int])->float:
@@ -741,7 +862,7 @@ def sort_coordinates_by_direction(items:list[tuple[int, int]], direction:Directi
 	
 
 @functools.cache
-def verices_indices_rows_in_direction(N:int, major_direction:BlockSide, minor_direction:LatticeDirection)->list[list[int]]:
+def vertices_indices_rows_in_direction(N:int, major_direction:BlockSide, minor_direction:LatticeDirection)->list[list[int]]:
 	""" arrange nodes by direction:
 	"""
 	## Arrange indices by position relative to direction, in reverse order
@@ -764,3 +885,114 @@ def verices_indices_rows_in_direction(N:int, major_direction:BlockSide, minor_di
 		list_of_rows.append(indices)
 
 	return list_of_rows
+
+
+def _assign_boundaries_to_nodes(lattice:list[Node]) -> None:
+	N = linear_size_from_total_vertices(len(lattice))
+	for node in lattice:
+		boundaries = check_boundary_vertex(node.index, N)
+		node.boundaries = set(boundaries)
+
+
+def _sorted_boundary_edges(lattice:list[Node], boundary:BlockSide) -> list[str]:
+	# Basic info:
+	N = linear_size_from_total_vertices(len(lattice))
+	_expected_num_outgoing_edges = 2*N-1
+
+	## Get all boundary nodes:
+	boundary_nodes = sorted_boundary_nodes(lattice, boundary)
+	assert len(boundary_nodes)==N
+	
+	## Get all edges in order
+	boundary_edges_set : set[tuple[str, int]] = set()
+	for edge in CACHED_ORDERED_BOUNDARY_EDGES_PER_LATTICE_SIZE[N]:
+		side, order = _split_boundary_edge_name_to_side_and_order(edge)
+		if side==boundary.__str__().casefold():
+			boundary_edges_set.add((side, order))
+	# Sort by oder and keep list of name+order:
+	boundary_edges : list[str] = [f"{_tuple[0]}{_tuple[1]}" for _tuple in sorted(boundary_edges_set, key=lambda _tuple: _tuple[1])]
+	assert _expected_num_outgoing_edges == len(boundary_edges_set)
+	
+	return boundary_edges
+
+
+def _find_node_by_outer_edge(lattice:list[Node], edge:str) -> tuple[Node, int]:
+	"""Looks for a node that has a certain outgoing edge.
+	Return a node and the index of the leg associated with the edge
+	"""
+	for node in lattice:
+		if edge in node.edges:
+			return node, node.edges.index(edge)
+	raise LatticeError("Node not found in lattice")
+
+
+def _new_name_for_periodic_edge(edge1:str, edge2:str) -> str:
+	d1, o1 = _split_boundary_edge_name_to_side_and_order(edge1)
+	d2, o2 = _split_boundary_edge_name_to_side_and_order(edge2)
+	if d1[0]=="d":
+		return f"{d1}-{d2}-{o1}"
+	elif d2[0]=="d":
+		return f"{d2}-{d1}-{o2}"
+	else:
+		raise ValueError("Not a valid option")
+
+
+def _kagome_connect_boundary_edges_periodically(lattice:list[Node], edge1:str, edge2:str) -> None:
+	## Get basic data:
+	n1, e1 = _find_node_by_outer_edge(lattice, edge1)
+	n2, e2 = _find_node_by_outer_edge(lattice, edge2)
+	new_edge_name = _new_name_for_periodic_edge(edge1, edge2)
+
+	## Change edge name for both nodes:
+	lattice[n1.index].edges[e1] = new_edge_name
+	lattice[n2.index].edges[e2] = new_edge_name
+
+
+def change_boundary_conditions_to_periodic(lattice:list[Node]) -> list[Node]:
+	## Make sure that all boundary nodes are marked:
+	_assign_boundaries_to_nodes(lattice)
+
+	## connect per two opposite faces:
+	ordered_half_list = list(BlockSide.all_in_counter_clockwise_order())[0:3]
+	for block_side in ordered_half_list:
+		boundary_edges          = _sorted_boundary_edges(lattice, boundary=block_side)
+		opposite_boundary_edges = _sorted_boundary_edges(lattice, boundary=block_side.opposite())
+		opposite_boundary_edges.reverse()
+
+		for edge1, edge2 in zip(boundary_edges, opposite_boundary_edges, strict=True):
+			_kagome_connect_boundary_edges_periodically(lattice, edge1, edge2)
+
+	return lattice
+
+
+def shift_periodically_in_direction(N:int, direction:LatticeDirection) -> list[int]:
+	"""Return the permutation list of of a triangular lattice when shifting periodically in a direction.
+
+	Args:
+		N (int): Size of lattice
+		direction (LatticeDirection): Direction in which to move the lattice.
+
+	Returns:
+		list[int]: Permutation list
+	"""
+
+	## Create periodic triangular lattice:
+	open_lattice = create_triangle_lattice(N)
+	periodic_lattice = change_boundary_conditions_to_periodic(open_lattice)
+	# plot_lattice(periodic_lattice, periodic=True)
+
+	## Collect a comfortable dict of all edges:
+	edges = edges_dict_from_edges_list([node.edges for node in periodic_lattice])
+
+	## Help functions:
+	def _get_new_index(node:Node) -> int:
+		edge = node.get_edge_in_direction(direction)
+		_indices = edges[edge]
+		if   _indices[0] == node.index:	return _indices[1]
+		elif _indices[1] == node.index:	return _indices[0]
+		else:
+			raise LatticeError("Impossible situation")
+			
+	## Produce output:
+	permutation_list = [_get_new_index(node) for node in periodic_lattice]
+	return permutation_list

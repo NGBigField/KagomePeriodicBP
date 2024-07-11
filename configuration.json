@@ -5,5 +5,9 @@
     "save_files_With" : {
         "_comment" : "can be 'dill'/'pickle'/null ",
         "value" :  "dill"
+    },
+    "parallel_method" : {
+        "_comment" : "can be 'multiprocessing_pool'/'multithreading'/'mpi'",
+        "value" :  "multithreading"
     } 
 }

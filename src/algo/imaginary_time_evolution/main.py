@@ -1,4 +1,4 @@
-# For allowing tests and scripts to run while debuging this module
+# For allowing tests and scripts to run while debugging this module
 if __name__ == "__main__":
     import sys, pathlib
     sys.path.append(
@@ -23,7 +23,7 @@ from containers import Config
 # Import other needed types:
 from enums import UpdateMode
 from containers import MessageDictType, UpdateEdge, BestUnitCellData
-from tensor_networks import KagomeTN, CoreTN, ModeTN, EdgeTN, UnitCell
+from tensor_networks import KagomeTNRepeatedUnitCell, CoreTN, ModeTN, EdgeTN, UnitCell
 from tensor_networks.construction import kagome_tn_from_unit_cell
 from _error_types import BPNotConvergedError, ITEError
 
@@ -41,8 +41,8 @@ from copy import deepcopy
 from algo.imaginary_time_evolution._logs_and_prints import print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, \
                                                             print_or_log_ite_segment_progress, get_progress_bar
 from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
-from algo.imaginary_time_evolution._visualization import ITEPlots
 from algo.imaginary_time_evolution._tn_update import ite_update_unit_cell
+from visualizations.ite import ITEPlots
 
 # Import belief propagation code:
 from algo.belief_propagation import robust_belief_propagation, belief_propagation, BPStats
@@ -70,7 +70,7 @@ def _edge_order_per_mode(
     ## for each edge in the mode, once
     num_edges = config.iterative_process.num_edge_repetitions_per_mode
 
-    ## Randon?
+    ## Random?
     if config.ite.random_edge_order:
         edge_tuples = list(UpdateEdge.all_in_random_order(num_edges=num_edges))
     else:
@@ -175,7 +175,7 @@ def _calculate_crnt_observables(
 )->tuple[
     dict[tuple[str, str], float],  # energies
     dict[str, dict[str, float]],  # expectations
-    dict[tuple[str, str], float],  # entangelment
+    dict[tuple[str, str], float],  # entanglement
     MessageDictType  # messages
 ]:
     ## Unpack inputs:
@@ -196,12 +196,13 @@ def _calculate_crnt_observables(
         full_tn.connect_uniform_messages()
 
     ## Calculate observables:
-    energies, expectations, entangelment = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
+    energies, expectations, entanglement = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
 
-    return energies, expectations, entangelment, messages
+    return energies, expectations, entanglement, messages
 
-def _mean_energy_from_energies_dict(energies:dict[str, float])->float:
-    return lists.average(list(energies.values()))
+def _mean_energy_per_site_from_energies_dict(energies:dict[str, float], num_sites_per_unit_cell:int)->float:
+    _sum = lists.sum(list(energies.values()))
+    return _sum / num_sites_per_unit_cell
 
 def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:logs.Logger, ite_tracker:ITEProgressTracker, plots:ITEPlots)->None:
     # Inputs:
@@ -213,12 +214,12 @@ def _compute_and_plot_zero_iteration_(unit_cell:UnitCell, config:Config, logger:
     logger.info("Calculating measurements of initial core...")
 
     ## Calculate observables:
-    energies, expectations, entangelment, messages = _calculate_crnt_observables(unit_cell, config, messages)
-    mean_energy = _mean_energy_from_energies_dict(energies)
+    energies, expectations, entanglement, messages = _calculate_crnt_observables(unit_cell, config, messages)
+    mean_energy = _mean_energy_per_site_from_energies_dict(energies)
 
     ## Save data, print performance and plot graphs:
     ite_tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
-    plots.update(energies, [], segment_stats, delta_t, expectations, unit_cell, entangelment, _initial=True)
+    plots.update(energies, [], segment_stats, delta_t, expectations, unit_cell, entanglement, _initial=True)
     logger.info(f"Mean energy at iteration 0: {mean_energy}")
 
 def _log_per_mode_results(
@@ -292,17 +293,17 @@ def _log_plot_and_print_segment_results(
     segment_stats:ITESegmentStats, mean_energy, config,
     energies_at_end:EnergyPerEdgeDictType, 
     energies_at_updates:EnergiesOfEdgesDuringUpdateType, 
-    entangelment
+    entanglement
 )->None:
     ## Tracker and plot objects:
     tracker.log_segment(delta_t=delta_t, energy=mean_energy, unit_cell=unit_cell, messages=messages, expectation_values=expectations, stats=segment_stats)
-    plots.update(energies_at_end, energies_at_updates, segment_stats, delta_t, expectations, unit_cell, entangelment)
+    plots.update(energies_at_end, energies_at_updates, segment_stats, delta_t, expectations, unit_cell, entanglement)
 
     ## Print and log:
     num_decimals = config.visuals.energies_print_decimal_point_length
     xyz_means = mean_expectation_values(expectations)
     energies_str     = strings.float_list_to_str(list(energies_at_end.values()), num_decimals=num_decimals)
-    entanglement_str = strings.float_list_to_str(list(entangelment.values())   , num_decimals=num_decimals)
+    entanglement_str = strings.float_list_to_str(list(entanglement.values())   , num_decimals=num_decimals)
     xyz_str          = strings.float_dict_to_str(xyz_means                     , num_decimals=num_decimals)
     logger_method(f"        Edge-Energies after segment =   "+energies_str)
     logger_method(f"        Edge-Negativities           =   "+entanglement_str)
@@ -330,8 +331,8 @@ def _post_segment_measurements_checks_and_visuals(
     should_break = False
 
     ## Calculate observables:
-    energies_after_segment, expectations, entangelment, messages = _calculate_crnt_observables(unit_cell, config, messages)
-    mean_energy = _mean_energy_from_energies_dict(energies_after_segment)
+    energies_after_segment, expectations, entanglement, messages = _calculate_crnt_observables(unit_cell, config, messages)
+    mean_energy = _mean_energy_per_site_from_energies_dict(energies_after_segment, unit_cell.size())
 
     ## If bp struggled, we will use the harder config for next times:
     if config.iterative_process.keep_harder_bp_config_between_segments:
@@ -341,7 +342,7 @@ def _post_segment_measurements_checks_and_visuals(
     segment_stats.mean_energy = mean_energy
     _log_plot_and_print_segment_results(
         plots, tracker, delta_t, unit_cell, messages, expectations, logger_method, segment_stats, mean_energy, config,
-        energies_after_segment, energies_at_updates, entangelment
+        energies_after_segment, energies_at_updates, entanglement
     )
 
     ## Check stopping criteria:
@@ -463,10 +464,11 @@ def _mode_order_without_repetitions(prev_order:list[UpdateMode], ite_config:ITEC
 def _from_unit_cell_to_stable_mode(
     unit_cell:UnitCell, messages:MessageDictType, config:Config, logger:logs.Logger, mode:UpdateMode
 )->tuple[
-    ModeTN, MessageDictType, BPStats, Config
+    ModeTN, MessageDictType, BPStats|None, Config
 ]:
     ## Duplicate core into a big tensor-network:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
+    if DEBUG_MODE: full_tn.validate()
 
     ## Perform BlockBP:
     if config.iterative_process.use_bp:
@@ -557,7 +559,7 @@ def ite_per_segment(
     config_in:Config,
     prev_stats:ITESegmentStats
 )->tuple[
-    KagomeTN,         # core
+    KagomeTNRepeatedUnitCell,         # core
     MessageDictType,  # messages
     EnergiesOfEdgesDuringUpdateType,  # edge_energies_at_updates
     ITESegmentStats   # stats
@@ -596,7 +598,7 @@ def ite_per_delta_t(
     unit_cell:UnitCell, messages:MessageDictType|None, delta_t:float, num_repeats:int, config_in:Config, 
     plots:ITEPlots, logger:logs.Logger, tracker:ITEProgressTracker, segment_stats:ITESegmentStats
 ) -> tuple[
-    KagomeTN, MessageDictType|None, bool, ITESegmentStats
+    KagomeTNRepeatedUnitCell, MessageDictType|None, bool, ITESegmentStats
     # core, messages, at_least_one_successful_run, step_stats
 ]:
 
@@ -692,11 +694,11 @@ def full_ite(
 
 
 def robust_full_ite(
-    initial_core:KagomeTN|None=None,
+    initial_core:KagomeTNRepeatedUnitCell|None=None,
     config:Config|None=None,
     logger:logs.Logger|None=None
 )->tuple[
-    KagomeTN,          # core
+    KagomeTNRepeatedUnitCell,          # core
     ITEProgressTracker,     # ITE-Tracker
     logs.Logger             # Logger
 ]:
@@ -705,7 +707,7 @@ def robust_full_ite(
         assert isinstance(config, Config)
         config = deepcopy(config)
     if initial_core is not None:
-        assert isinstance(initial_core, KagomeTN)
+        assert isinstance(initial_core, KagomeTNRepeatedUnitCell)
         initial_core = initial_core.copy()
         initial_core.normalize_tensors()
 

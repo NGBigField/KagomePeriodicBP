@@ -2,6 +2,9 @@ from numpy import ndarray as np_ndarray
 from dataclasses import fields
 from copy import deepcopy
 
+# For type annotations
+from typing import TypeVar
+_SpecificConfigClass = TypeVar("_SpecificConfigClass", bound="_ConfigClass")
 
 def container_repr(obj)->str:
     s = f"{obj.__class__.__name__}:"
@@ -27,5 +30,5 @@ class _ConfigClass():
     def __repr__(self) -> str:
         return container_repr(self)
     
-    def copy(self)->"_ConfigClass":
+    def copy(self:_SpecificConfigClass)->_SpecificConfigClass:
         return deepcopy(self)

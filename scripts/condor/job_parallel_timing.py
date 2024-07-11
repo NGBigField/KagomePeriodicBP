@@ -10,24 +10,24 @@ if __name__ == "__main__":
     )
 
 
-from scripts.test_parallel import test_parallel_execution_time
+from scripts.tests.parallel import test_parallel_execution_time, _single_test_parallel_execution_time_single_bp_step
 
 
 def main(
     D : int = 2,
     N : int = 2,
-    method : int = 0   
+    parallel : int = 0   
 ) -> dict:
     
     ## Parse:
-    if method==0:
+    if parallel==0:
         parallel = False
     else:
         parallel = True
 
 
     ## Run:
-    bp_time, reduction_time = test_parallel_execution_time(D=D, N=N, parallel=parallel)
+    bp_step_time = _single_test_parallel_execution_time_single_bp_step(D=D, N=N, parallel=parallel)
 
     ## Collect as a dict:
     # res_keys = ["parallel", 'D', 'N', 'seed', 'bp-step', 'reduction']
@@ -35,13 +35,68 @@ def main(
         "parallel" : parallel,
         'D' : D,
         'N' : N, 
-        'bp-step' : bp_time,
-        'reduction' : reduction_time
+        'bp_step' : bp_step_time
     }
 
     return results
 
 
 
+def plot_results(
+    target_D = 4,
+) -> None:
+    from utils.csvs import read_csv_table, PATH_SEP, DATA_FOLDER
+    from utils import lists, visuals, strings
+    from matplotlib import pyplot as plt
+
+    ## Get data:
+    fullpath = str(DATA_FOLDER)+PATH_SEP+"condor"+PATH_SEP+"results_parallel_timings.csv"
+    results = read_csv_table(fullpath)
+
+    ## Prepare plots:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.grid()
+    visuals.draw_now()
+    fig.suptitle(f"Parallel Timing Test\nD={target_D}")
+    ax.set_xlabel("N")
+    ax.set_ylabel("time [sec]")
+
+    ## Parse data:
+    Ns = lists.deep_unique(results["N"])
+    Ns = sorted(Ns)
+    num_res = len(results["N"])
+
+    ## Plot results:
+    for target_parallel in ["False", "True"]:
+        values_dict : dict[int, list[float]] = {}
+        print(f"parallel={target_parallel}:")
+
+        for target_N in Ns:
+            values_dict[target_N] = []
+
+            for i in range(num_res):
+                N = results["N"][i]
+                D = results["D"][i]
+                seed = results["seed"][i]
+                bp_step_time = results["bp_step"][i]
+                parallel = results["parallel"][i]
+
+                if N!=target_N or D!=target_D or not strings.str_equal_case_insensitive(parallel, target_parallel):
+                    continue
+
+                values_dict[target_N].append(bp_step_time)
+            
+            print(f"    N={int(target_N):>2}: {len(values_dict[target_N]):>2} results")
+
+        visuals.plot_with_spread(values_dict, plt_kwargs=dict(linewidth=6, label=target_parallel))
+    
+
+    ax.legend()
+    visuals.draw_now()
+
+    print("Done.")
+
+
 if __name__ == "__main__":    
-    main(h=2.2, method=2)
+    plot_results()

@@ -8,7 +8,6 @@ from algo.belief_propagation import BPConfig, BPStats
 from containers.imaginary_time_evolution import ITEProgressTracker, ITESegmentStats
 from containers import Config
 from unit_cell import UnitCell
-from algo.imaginary_time_evolution import _visualization 
 
 # Common errors:
 from _error_types import BPNotConvergedError
@@ -16,8 +15,6 @@ from _error_types import BPNotConvergedError
 # Import our shared utilities
 from utils import lists, logs, strings, prints
 
-# For useful tracking plots:
-# from algo.imaginary_time_evolution._visuals import ITEPlots  #TODO
 
 
 def get_progress_bar(config:Config, num_repeats:int, print_prefix:str)->prints.ProgressBar:
@@ -45,13 +42,13 @@ def _log_and_print_starting_message(logger:logs.Logger, config:Config, ite_track
     _common_logger_prints(logger, config, ite_tracker)
     hamiltonian_func = config.ite.interaction_hamiltonian.func
     if hasattr(hamiltonian_func, "reference"):
-        refernce = getattr(hamiltonian_func, "reference")
-        logger.debug(f"Hamiltonian's reference energy is {refernce!r}")
+        reference = getattr(hamiltonian_func, "reference")
+        logger.debug(f"Hamiltonian's reference energy is {reference!r}")
     logger.debug(f"unit_cell file: {unit_cell._file_name}")
     logger.debug(" ")
 
 
-def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker, plots:_visualization.ITEPlots)->None: #TODO ITEPlots
+def _log_and_print_finish_message(logger:logs.Logger, config:Config, ite_tracker:ITEProgressTracker, plots)->None:
 
     logger.info("\n")
     _common_logger_prints(logger, config, ite_tracker)

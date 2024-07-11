@@ -4,7 +4,7 @@ from containers.sizes_and_dimensions import TNDimensions
 from containers.imaginary_time_evolution import ITEConfig, IterativeProcessConfig
 from containers.visuals import VisualsConfig
 from containers._meta import _ConfigClass
-from utils import size, prints
+from utils import prints, sizes
 from copy import deepcopy
 
 # Control flags:

@@ -140,9 +140,41 @@
 #
 #
 #  5-Mar-2024: added the method reset_nr() to the mps class
-#              
+#
+#  19-Apr-2024: In the MPO class, changed the indices order to
+#               [L, U, D, R]. Changed corresponding funtions: 
+#               mpo_shape, applyMPO, updateCOLeft, updateCORight
+#
+#
+#  27-Apr-2024: 1) Add the optional mode parameter to mps.copy(). If
+#               mode='full-copy', then it will copy also the A[i]
+#               tensors of the MPS. 
+#               2) Added an output of the truncation error to 
+#               the mps.right_canonical() function and via that to
+#               reduceD(). Now both functions return the truncation
+#               error, which is the L_2 norm of the discarded SVD
+#               singular values, normalized by the total L_2 norm of all
+#               the SVD singular values.
+#
+#
+#  3-May-2024: Implemented the reduceDiter mps method, which compresses
+#              the MPS using an iterative series of optimizations sweeps
+#              *without* SVD (only QR). This may be much faster than
+#              the SVD-based reduceD() for large bond dimensions.
+#
+#  4-May-2024: Fixed minor bug in iD1 selection in reduceDiter
+#
+#  22-May-2024: Did a small work-around in mps.reduceD(): when mode='LC', 
+#               forced it to return truncation_error=None --- but this
+#               should be fixed later.
+#
 #----------------------------------------------------------
 #
+
+"""
+
+
+"""
 
 
 import numpy as np
@@ -377,29 +409,45 @@ class mps:
 		return max(D_list)
 		
 
-		
+	#	
 	#--------------------------   copy   ---------------------------
 	#
-	# Returns a copy of the mps class. The copy has a new tensor-list
-	# but it *does not* copy the tensors themselves.
-	#
-	#
-	
-	def copy(self):
+	def copy(self, mode='list'):
+		
+		"""
+		
+		Returns a copy of the mps class. If mode=='list' then only
+		the lists are copied, but the list items are not. 
+		If mode=='full-copy', then also the items in the lists (i.e., 
+		the A tensors) are copied.
+		
+		Input Parameters:
+		------------------
+		mode --- Either 'list' or 'full-copy'
+			
+		Output
+		------
+		An identical mps object.
+		
+		"""
 		
 		new_mps = mps(self.N, self.mtype)
-		
-		new_mps.A = self.A.copy()
-		new_mps.Corder = self.Corder.copy()
-		
-		if self.mtype=='PMPS':
-			new_mps.Ps = self.Ps.copy()
-		
 		new_mps.nr_mantissa = self.nr_mantissa
 		new_mps.nr_exp = self.nr_exp
+		
+		new_mps.Corder = self.Corder.copy()
 
+		if self.mtype=='PMPS':
+			new_mps.Ps = self.Ps.copy()
+
+		if mode=='list':
+			new_mps.A = self.A.copy()
+		else:
+			for i in range(self.N):
+				new_mps.A[i] = self.A[i].copy()
 		
 		return new_mps
+	
 		
 	#--------------------------   reverse   ---------------------------
 	#
@@ -473,7 +521,7 @@ class mps:
 
 			else:
 				order_str ='o '
-				if self.Corder[i]=='L':
+				if self.Corder[i]=='L': 
 					order_str = '< '
 				elif self.Corder[i]=='R':
 					order_str='> '
@@ -629,6 +677,13 @@ class mps:
 	#               modifies, absorbing the overall norm in the
 	#               left-most tensor (i=0).
 	#
+	#
+	#  Output:
+	#  -------
+	#  The normalized truncation order, which is the L_2 norm of the 
+	#  discarded singular values divided by the L_2 of all values.
+	#
+	#
 
 	def right_canonical(self, maxD=None, eps=None, i0=None,i1=None, \
 		nr_bulk = False):
@@ -648,6 +703,8 @@ class mps:
 		# Holds the overall normalization (if normalize_bulk=True)
 		#
 		overall_norm = 1.0
+
+		truncation_error = 0.0
 
 		for i in range(i1,i0-1,-1):
 
@@ -671,7 +728,9 @@ class mps:
 			# otherwise, use RQ trans.
 			#
 
-			if D1>maxD:
+			err = 0.0
+
+			if D1>maxD or eps is not None:
 				
 				#
 				# Use SVD for truncation
@@ -697,10 +756,12 @@ class mps:
 				
 				myD = min(len(S_eff),maxD)
 
-
+				err = sqrt(sum(S[myD:]**2)/sum(S**2))
+				
 				S = S[0:myD]
 				U = U[:,0:myD]
 				V = V[0:myD,:]
+				
 
 				self.set_site(V.reshape(myD, d, D2), i, 'R')
 
@@ -742,17 +803,24 @@ class mps:
 
 				# A[i-1] is updated with an undefined canonical order
 				self.set_site(tensordot(self.A[i-1], R, axes=([2],[0])), i-1)
+				
+			
+			truncation_error += err
+			
 			
 		#
 		# if nr_bulk=True, we absorb the overall norm factor in 
 		# the left-most tensor (i=0)
 		#
 		
+		
 		if nr_bulk:
 			self.set_site(self.A[0]*overall_norm, 0, self.Corder[0])
 			self.update_A0_norm()
 
-		return
+		return truncation_error
+
+
 
 
 	#-------------------------    reduceD   ----------------------------
@@ -843,7 +911,7 @@ class mps:
 			# If there's no site that needs truncation, we quit.
 			#
 			if iD0 is None:
-				return
+				return 0
 
 			for i in range(self.N-2, -1, -1):
 				if self.A[i].shape[2]> min(maxD, \
@@ -886,12 +954,12 @@ class mps:
 			# [iD0+1, i1]. Note that this will also reduce the bond iD0.
 			#
 					
-			self.right_canonical(maxD, eps, i0=iD0+1, i1=i1, \
+			truncation_error = self.right_canonical(maxD, eps, i0=iD0+1, i1=i1, \
 				nr_bulk=nr_bulk)
 		
 		elif mode=='RC':
 			self.left_canonical_QR()
-			self.right_canonical(maxD, eps, nr_bulk=nr_bulk)
+			truncation_error = self.right_canonical(maxD, eps, nr_bulk=nr_bulk)
 			
 		else:
 			if nr_bulk:
@@ -899,12 +967,428 @@ class mps:
 					"mode='LC'")
 				exit(1)
 
+			
 			self.right_canonical()
 			self.left_canonical(maxD, eps)
 			
+			# TODO: add truncation error in the LC case
+			truncation_error = None
+
+		return truncation_error
+
+
+
+
+
+
+
+	#
+	# --------------------------  reduceDiter  ---------------------------
+	#
+	def reduceDiter(self, maxD, nr_bulk=False, max_iter=10, err=1e-6):
+		
+		"""
+
+	Performs a compression of the MPS bond dimension using an iterative
+	optimization that does not invlove SVD. For very large tensors this
+	method can be much faster than the regular SVD method (done reduceD)
+	and use much less memory, but it might be a bit less accurate. 
+	Additionally, at small bond dims, SVD will be much faster.
+	
+	Given a maximal bond dimension maxD, the function first locates a 
+	minimal segment [i0,i1] where truncation should be performed. Then
+	it sweeps left/right on that segement in a DMRG-like manner using
+	only the QR decomposition. The iteration stops once the maximal number
+	of iterations has reached or the accuracy thereshold obtained.
+	
+	The outcome is mixed-canonical MPS with bond dimension <= maxD. 
+	It is left/right canonical up the middle of the truncation range. 
+	More precisely, if i_mid is the middle of the region [i0, i1] then 
+	the output MPS is left-canonical in [0,i_mid-1] and right-canonical in 
+	[i_mid+1, N-1]
+	
+	
+	Input Parameters:
+	-----------------
+	
+	maxD    --- The maximal bond dimension
+	
+	nr_bulk --- Whether or not the normalization of the truncated tensors 
+	            should be absorbed in A[0], and through that into the
+	            mantissa.
+	
+	max_iter --- maximal number of optimization iterations 
+	
+	err      --- Accuracy threshold. This is roughly the average 
+	             variation in the distance between the truncated and 
+	             un-truncated MPSs along a complete optimization sweep.
+	             
+	             
+	Output:
+	-------
+	None.
+	
+	
+
+
+		"""		
+
+		log = False
+		
+		N = self.N
+		
+		#
+		# Step I:
+		# ------------------------------------------------------------------
+		#
+		# Find the range [iD0, iD1] where truncation should be done
+		# and the larger range [i0 [iD0,iD1] i1] such that:
+		#
+		#  (*) i0<=iD0 is the maximal site for which [0,i0] are 
+		#      left-canonical.
+		#  (*) i1>=iD1 is the minimal site for which [i1,N-1] are 
+		#      right-canonical
+		#
+		
+		
+		# Find iD0, i0
+		iD0=None
+		i0Found = False
+		for i in range(N-1):
+			
+			if not i0Found and self.Corder[i] != 'L':
+				i0Found = True
+				i0 = i
+				
+			if self.A[i].shape[2]>min(maxD, self.A[i].shape[0]*self.A[i].shape[1]):
+				iD0 = i
+				break
+				
+		if not i0Found:
+			i0 = iD0
+			
+
+		#
+		# If there's no site that needs truncation, we quit.
+		#
+		if iD0 is None:
+			return
+		
+		# Find iD1, i1
+		iD1 = None
+		i1Found = False
+		for i in range(N-1, iD0, -1):
+			
+			if not i1Found and self.Corder[i] != 'R':
+				i1Found = True
+				i1 = i
+			
+			if self.A[i].shape[0]> min(maxD, self.A[i].shape[2]*self.A[i].shape[1]):
+				iD1 = i
+				break
+		
+		if iD1 is None:
+			iD1 = iD0 + 1
 		
 
+		if not i1Found:
+			i1 = iD1
+
+
+
+		#
+		# Step II:
+		# ------------------------------------------------------------------
+		#
+		# Create This is mpA as an initial guess of the truncated MPS 
+		# tensors in the segmemt [i0,i1]. We do that by simply truncating
+		# the high indices of the original MPS tensors in that segment.
+		#
+
+		NA = i1-i0+1
+
+		mpA = mps(NA)
+		
+		for i in range(NA):
+			B = self.A[i+i0]
+			
+			sh = B.shape
+			DL, d, DR = sh[0], sh[1], sh[2]
+			
+			DL2, d2, DR2 = min(DL,maxD), d, min(DR,maxD)
+			
+			A = B[:DL2,:,:DR2]
+			
+			mpA.set_site(A,i)
+			
+		#
+		# Step II:
+		# --------
+		#
+		# Make mpA right-canonical and update the RBA list, which holds
+		# the right-side envs of the <A|B> inner product.
+		#
+		
+
+		# 
+		# Define two lists that would hold the left/right envs of 
+		# the <mpA|mpB> contraction
+		#
+		LBA = [None]*NA
+		RBA = [None]*NA
+
+		# The initial right-env is the identity because the original 
+		# MPS is right canonical up to i1.
+		DR = mpA.A[NA-1].shape[2]
+		CRBA = eye(DR)
+		
+		for i in range(NA-1,0,-1):
+			
+			#
+			# Make A right-canonical using the RQ decomp'
+			#
+			A = mpA.A[i]
+			sh = A.shape
+			M = A.reshape([sh[0], sh[1]*sh[2]])
+			
+			# Perform RQ by QR + transpose
+			Q,R = qr(M.T)
+			Q,R = Q.T,R.T
+			
+			Chi = Q.shape[0]
+			
+			Q = Q.reshape([Chi, sh[1], sh[2]])
+
+			mpA.set_site(Q, i, Corder='R')
+			mpA.set_site(tensordot(mpA.A[i-1],R, axes=([2],[0])),i-1)
+
+			CRBA = updateCRight(CRBA, self.A[i0+i], mpA.A[i], conjB=True)
+			
+			RBA[i] = CRBA
+			
+
+		#
+		# Step III:     The Left <---> Right optimization sweeps
+		# ------------------------------------------------------------------
+		#
+		
+		S = 0
+		S2 = 0
+		ell = 0
+
+		if log:
+			print(f"\n\n ====== reduceDiter: Entering sweeps in range [{i0}...{i1}] =====\n")
+		
+		exit_loop=False
+		for k in range(max_iter):
+			
+			
+			#
+			# The S, S2 variables hold the sum of the distance and 
+			# distance^2 between |A> and |B> along an optimization sweep.
+			# We use S,S2 to calculate the variation in the distance, 
+			# which is used as a stopping criteria
+			#
+			
+				
+			
+			# =============================================
+			# Left => Right sweep
+			# =============================================
+					
+			calc_dist = True
+			dist = 0
+			
+			DL = mpA.A[0].shape[0]
+			CL = eye(DL)
+			
+			if log:
+				print(f"[*] LEFT=>RIGHT SWEEP (round {k})")
+			
+			for i in range(NA-1):
+				
+				B = self.A[i+i0]
+				
+				CR = RBA[i+1]
+				
+				A = tensordot(B, CR, axes=([2],[0]))
+				A = tensordot(CL, A, axes=([0],[0]))
+				
+				nr2 = norm(A)**2
+				
+				S += nr2
+				S2 += nr2**2
+				ell += 1
+				
+				#
+				# Make A left-canonical
+				#
+				
+				sh = A.shape
+				M = A.reshape([sh[0]*sh[1], sh[2]])
+				Q,R = qr(M)
+				
+				Chi = Q.shape[1]
+				
+				Q = Q.reshape([sh[0], sh[1], Chi])
+				
+
+				mpA.set_site(Q, i, Corder='L')
+				mpA.set_site(tensordot(R,mpA.A[i+1], axes=([1],[0])),i+1)
+				
+				CL = updateCLeft(CL, B, Q, conjB=True)
+				
+				LBA[i] = CL
+
+			# =============================================
+			# Right => Left sweep
+			# =============================================
+
+
+			DR = mpA.A[NA-1].shape[2]
+			CR = eye(DR)
+			
+			if log:
+				print(f"[*] LEFT<=RIGHT SWEEP  (round {k})")
+				
+			for i in range(NA-1, 0, -1):
+				
+				B = self.A[i+i0]
+				
+				CL = LBA[i-1]
+				
+				A = tensordot(B, CR, axes=([2],[0]))
+				A = tensordot(CL, A, axes=([0],[0]))
+				
+				#
+				# Up to an additive constant, ||A^2|| is proportional to the 
+				# distance || |A> - |B> ||^2
+				#
+				nr2 = norm(A)**2
+				
+				
+				S += nr2
+				S2 += nr2**2
+				ell += 1
+											
+				#
+				# Make A right-canonical
+				#
+				
+				sh = A.shape
+				M = A.reshape([sh[0], sh[1]*sh[2]])
+				
+				# perform RQ by QR + transpose
+				Q,R = qr(M.T)
+				Q,R = Q.T,R.T
+				
+				Chi = Q.shape[0]
+				Q = Q.reshape([Chi, sh[1], sh[2]])
+							
+				
+				mpA.set_site(Q, i, Corder='R')
+				mpA.set_site(tensordot(mpA.A[i-1], R, axes=([2],[0])),i-1)
+					
+				
+				CR = updateCRight(CR, B, Q, conjB=True)
+				
+				RBA[i] = CR
+				
+				if i==NA//2 and k>0:
+				
+					if log:
+						print(f"\nGot to mid (i={i}): S2={S2:.6g}  S={S:.6g}")
+					
+					S2 = S2/ell
+					S = S/ell
+			
+					Delta = abs((S2-S**2)/S**2)
+			
+					
+					if log:
+						print(f"Normalized: S2={S2:.6g}  S={S:.6g}  Delta={Delta:.6g}")
+		
+					if Delta<err or k==max_iter-1:
+						if log:
+							print("\n       * * *  BREAKING  * * *\n")
+						exit_loop = True
+						break
+						
+					S2 = 0
+					S = 0
+					ell = 0
+			
+			if exit_loop:
+				break
+					
+					
+				
+
+
+		if log:
+			print(f"=> reduceDiter done with {k+1} rounds. "\
+				f"Delta={Delta:.6g}\n\n")
+
+		#
+		# Step IV:     Merge mpA into mpB and exit
+		# ------------------------------------------------------------------
+		#
+
+
+		#
+		# Now replace the tensors of mpB in the [i0,i1] segment with those
+		# of mpA
+		#
+
+		self.A[i0:(i1+1)] = mpA.A
+		self.Corder[i0:(i1+1)] = mpA.Corder
+			
+		#
+		# If nr_bulk = True, then we move the overall normalization
+		# (which is found in A[i0] since we are right-canonical in the 
+		# [i0,i1] segment) to A[0] and from there to the mantissa
+		# via the update_A0_norm() function.
+		#		
+		if nr_bulk:
+			if i0>0:
+				A0 = self.A[i0]
+				nr = norm(A0)
+				self.set_site(A0/nr, i0)
+				
+				A0 = self.A[0]
+				self.set_site(A0*nr, 0, mpA.Corder[0])
+				
+			self.update_A0_norm()
+		
 		return
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 	#
@@ -1198,10 +1682,8 @@ class peps:
 #                                                                      #
 # N - No. of sites                                                     #
 #                                                                      #
-# Structure of the A's:  [dup,ddown,Dleft,Dright]                      #
+# Structure of the A's:  [D-Left, D-up, D-down, Dright]                #
 #                                                                      #
-#    dup and ddown are the physical entries and must be of the same    #
-#    dimensio. dup is the input index and ddown is the output          #
 #                                                                      #
 ########################################################################
 
@@ -1227,7 +1709,7 @@ class mpo:
 		mpo_shape = ''
 
 		for i in range(self.N):
-			mpo_shape = mpo_shape + ' A_{}({} {}; {} {}) '.\
+			mpo_shape = mpo_shape + ' A_{}({} {} {} {}) '.\
 				format(i,self.A[i].shape[0],self.A[i].shape[1], \
 					self.A[i].shape[2],self.A[i].shape[3])
 
@@ -1238,9 +1720,9 @@ class mpo:
 	#  Sets the tensor of a site in the MPS
 	#
 	#  We expect an array of complex numbers of the form
-	#  M[D1, dup, ddown, D2]
+	#  M[DL, d-up, d-down, DR]
 	#
-	#  The D1 should match the D2 of the previous (i.e., the last)
+	#  The DL should match the DR of the previous (i.e., the last)
 	#  entry in the MPO
 	#
 	#
@@ -1357,66 +1839,77 @@ def untrim_mps(mp):
 
 
 
-# ----------------------------------------------------------------------
-#  applyMPO
 #
-#  Apply the MPO op to the MPS M. If OverWrite=True then result is
-#  written to M itself. Default: OverWrite=False
-#
-#  Parameters:
-#  op       - The MPO
-#  M        - the MPS
-#  i1       - An optional parameter specifying the initial location on M
-#             where op start acting.
-#  cont_leg - which leg of the MPO to contract - could be 'U' (up)
-#             or 'D' (Down).
-#
-#
+# --------------------------   applyMPO   ---------------------------
+#  
 
-def applyMPO(op, M, i1=0, cont_leg='U'):
+def applyMPO(M, op, j0=0, cont_leg='U', overwrite=False):
+	
+	"""
+	
+	Apply an MPO op to an MPS M. If If OverWrite=True then result is
+  written to M itself.
 
+	Input Parameters:
+	------------------
+	
+	M         --- The MPS object
+	op        --- The MPO object
+  j0        --- An optional parameter specifying the initial left-most 
+                site on M where op is to be applied
+                
+  cont_leg  --- which leg of the MPO to contract - could be 'U' (up)
+                 or 'D' (Down).
+             
+  overwrite --- whether or not to write the new MPS into the old MPS
+                object
+                
+  Output:
+  -------
+  The new MPS
 
-	newM = mps(M.N)
+	
+	"""
 
-	for i in range(i1, i1+op.N):
+	if overwrite:
+		newM = M
+	else:
+		newM = M.copy()
 
-		MD1 = M.A[i].shape[0]
-		Md  = M.A[i].shape[1]
-		MD2 = M.A[i].shape[2]
-
-		d_up   = op.A[i-i1].shape[0]
-		d_down = op.A[i-i1].shape[1]
-		opD1   = op.A[i-i1].shape[2]
-		opD2   = op.A[i-i1].shape[3]
+	for j in range(j0, j0+op.N):
 
 		#
-		# Recall that the MPO legs order is [d_up, d_down, D_left, D_right]
+		# Recall that the MPO legs order is  [D_left, d_up, d_down, D_right]
 		# while the MPS element legs are     [D_left, d, Dright]
+		#
 
 		if cont_leg=='U':
-			newA = tensordot(M.A[i], op.A[i-i1], axes=([1],[0]))
-			# newA has the legs [MD1, MD2, d_down, opD1, opD2]
-			#                     0    1     2       3    4
-
-			# transpose it to: [(MD1, opD1), d_down, (MD2, opD2)]
-
-			newA = newA.transpose([0,3,2,1,4])
-			newA = newA.reshape( [MD1*opD1, d_down, MD2*opD2])
+			#
+			# Contract with the upper MPO leg
+			#
+			newA = tensordot(M.A[j], op.A[j-j0], axes=([1],[1]))
 		else:
 			#
-			# So cont_leg = 'D'
+			# Contract with the lower MPO leg
 			#
+			newA = tensordot(M.A[j], op.A[j-j0], axes=([1],[2]))
+			
+		#
+		#                     0    1     2     3    4
+		# newA has the legs [mpDL, mpDR, opDL, d, opDR]
+		#
+		# transpose it to: [(mpDL, opDL), d, (mpDR, opDR)]
+		
+		newA = newA.transpose([0,2,3,1,4])
+		
+		#
+		# Fuse (mpDL, opDL) and (mpDR, opDR)
+		#
+		
+		sh = newA.shape
+		newA = newA.reshape( [ sh[0]*sh[1], sh[2], sh[3]*sh[4] ])
 
-			newA = tensordot(M.A[i], op.A[i-i1], axes=([1],[1]))
-			# newA has the legs [MD1, MD2, d_up, opD1, opD2]
-			#                     0    1     2       3    4
-
-			# transpose it to: [(MD1, opD1), d_up, (MD2, opD2)]
-
-			newA = newA.transpose([0,3,2,1,4])
-			newA = newA.reshape( [MD1*opD1, d_up, MD2*opD2])
-
-		newM.set_site(newA, i)
+		newM.set_site(newA, j)
 
 
 	return newM
@@ -1458,17 +1951,53 @@ def enlargePEPS(p):
 	return newp
 
 
+#
+# ------------------------  updateCOLeft  -----------------------
+#  
 
-# ---------------------------------------------------------
-#  updateCOLeft
-#
-#  Update the contraction of an MPO with 2 MPSs from left to right.
-#
-#  If C is not empty then its a 3 legs tensor:
-#  [Da,Do,Db]
-#
-
-def updateCOLeft(C, A, Op, B):
+def updateCOLeft(C, A, op, B):
+	"""
+	
+	Contract a 3-legs tensor C with an MPO tensor and two MPS tensors
+	(bottom and top)
+	
+	This is used for contracting a "sandwitch" of a PEPS row and 
+	two boundary MPSs from top and bottom, which can be used to calculate
+	local envs.
+	
+	
+                    (B MPS)
+	    +-- C-B     -----+-----         B  = [B-left, B-down, B-right]
+	    |                |
+	    |
+	    |                |
+	C = +-- C-op     ----+---- op (MPO) op = [op-left, op-up, op-down, op-right]
+	    |                |
+	    |
+	    |                |
+	    +-- C-A     -----+------        A  = [A-Left, A-up, A-Right]
+	                   (A MPS)
+	
+	  C = [C-A, C-op, C-B]
+	  
+	  
+	Input Parameters:
+	------------------
+	C  --- The 3 legs operator:   [C-A, C-op, C-B]
+	
+	A  --- The bottom MPS tensor: [A-left, A-up, A-right]
+	
+	op --- The MPO tensor:        [op-left, op-up, op-down, op-right]
+	
+	B  --- The top MPS tensor     [B-left, B-down, B-right]
+	
+	
+	Output:
+	-------
+	
+	The updated C, which is the contraction of (C, A, op, B)
+	
+	"""
 
 
 	if C is None:
@@ -1477,37 +2006,45 @@ def updateCOLeft(C, A, Op, B):
 		# from scratch
 		#
 
-		# A is  [1, dup, D2a]
-		# Op is [up, ddown, 1, D2o]
-		# B is  [1, ddown, D2b]
+		# A is  [1, A-up,   A-right]
+		# Op is [1, op-up,  op-down, op-right]
+		# B is  [1, B-down, B-right]
+		
+		# contract (A, op) along A-up, op-down
+		C1 = tensordot(A[0,:,:], op[0,:,:,:], axes=([0],[1]))
 
-		C1 = tensordot(A[0,:,:], Op[:,:,0,:], axes=([0],[0]))
+		# C legs are: [A-r-ght, op-up, op-right]
 
-		# C legs are: [D2a, ddown, D2o]
-
+		# contract (C1, B) along op-up, B-down
 		C1 = tensordot(C1, B[0,:,:], axes=([1],[0]))
 
-		# result is: [D2a,D2o,D2b]
+		# result is: [A-right, op-right, B-right]
 
 		return C1
 
 
-	# C is given as  [D1a, D1o, D1b]
-	# A is given as  [D1a, dup, D2a]
-	# Op is given as [dup, down, D1o, D2o]
-	# B is given as  [D1b, ddown, D2b]
+	# C is given as  [C-A, C-op, C-B]
+	# A is given as  [A-left, A-up, A-right]
+	# Op is given as [op-left, op-up, op-down, op-right]
+	# B is given as  [B-left, B-down, B-right]
 
-	C1 = tensordot(C,Op, axes=([1],[2]))
-	# C1: [D1a,D1b,dup, ddown, D2o]
-
-	C1 = tensordot(C1, A, axes=([0,2],[0,1]))
-	# C1: [D1b, ddown, D2o, D2a]
-
-	C1 = tensordot(C1, B, axes=([0,1], [0,1]))
-
-	# C1: [D2o, D2a, D2b]
-
-	C1 = C1.transpose([1,0,2])
+	# contract (C,A) along (C-A, A-left)
+	
+	C1 = tensordot(C, A, axes=([0], [0]))
+	
+	# C1 form: [op-right, B-right, A-up, A-right]
+	
+	# contract (C1, op) along (op-right, A-up)--(op-left, op-down)
+	
+	C1 = tensordot(C1, op, axes=([0,2], [0,2]))
+	
+	# C1 form: [B-right, A-right, op-up, op-right]
+	
+	# contract (C1, B) along (B-right, op-up) -- (B-left, B-down)
+	
+	C1 = tensordot(C1, B, axes=([0, 2], [0,1]))
+	
+	# C1 form: [A-right, op-right, B-right]
 
 
 	return C1
@@ -1516,16 +2053,57 @@ def updateCOLeft(C, A, Op, B):
 
 
 
-# ---------------------------------------------------------
-#  updateCORight
 #
-#  Update the contraction of an MPO and two MPSs from right to left
-#
-#  If C is not empty then its a 3 legs tensor:
-#  [Da,Do,Db]
-#
+# ------------------------  updateCORight  -----------------------
+#  
 
-def updateCORight(C, A, Op, B):
+def updateCORight(C, A, op, B):
+	"""
+	
+	Contract a 3-legs tensor C with an MPO tensor and two MPS tensors
+	(bottom and top)
+	
+	This is used for contracting a "sandwitch" of a PEPS row and 
+	two boundary MPSs from top and bottom, which can be used to calculate
+	local envs.
+	
+	
+    (B MPS)
+  ----+----            ---+     
+	    |                   |
+	                        |
+	    |                   |
+	----+---- op         ---+  C
+	    |                   |
+	                        |
+      |                   |
+  ----+-----           ---+ 
+    (A MPS)
+    
+  B  = [B-left, B-down, B-right]
+  op = [op-left, op-up, op-down, op-right]
+  A  = [A-Left, A-up, A-Right]
+	 C = [C-A, C-op, C-B]
+	  
+
+	  
+	Input Parameters:
+	------------------
+	C  --- The 3 legs operator:   [C-A, C-op, C-B]
+	
+	A  --- The bottom MPS tensor: [A-left, A-up, A-right]
+	
+	op --- The MPO tensor:        [op-left, op-up, op-down, op-right]
+	
+	B  --- The top MPS tensor     [B-left, B-down, B-right]
+	
+	
+	Output:
+	-------
+	
+	The updated C, which is the contraction of (C, A, op, B)
+	
+	"""
 
 
 	if C is None:
@@ -1534,40 +2112,50 @@ def updateCORight(C, A, Op, B):
 		# from scratch
 		#
 
-		# A is  [D1a, dup, 1]
-		# Op is [dup, ddown, D1o, 1]
-		# B is  [D1b, ddown, 1]
+		# A is  [A-left, A-up, 1]
+		# Op is [op-left, op-up,  op-down, 1]
+		# B is  [B-left, B-down, 1]
+		
+		# contract (A, op) along A-up, op-down
+		C1 = tensordot(A[:,:,0], op[:,:,:,0], axes=([1],[2]))
 
-		C1 = tensordot(A[:,:,0], Op[:,:,:,0], axes=([1],[0]))
+		# C legs are: [A-left, op-left, op-up]
 
-		# C1 legs are: [D1a, ddown, D1o]
+		# contract (B, C1) along op-up, B-down
+		C1 = tensordot(C1, B[:,:,0], axes=([2],[1]))
 
-		C1 = tensordot(C1, B[:,:,0], axes=([1],[1]))
-
-		# result is: [D1a,D1o,D1b]
+		# C legs are: [A-left, op-left, B-left]
 
 		return C1
 
 
-	# C is given as  [D2a, D2o, D2b]
-	# A is given as  [D1a, dup, D2a]
-	# Op is given as [dup, ddown, D1o, D2o]
-	# B is given as  [D1b, ddown, D2b]
+	# C is given as  [C-A, C-op, C-B]
+	# A is given as  [A-left, A-up, A-right]
+	# Op is given as [op-left, op-up, op-down, op-right]
+	# B is given as  [B-left, B-down, B-right]
 
-	C1 = tensordot(C,Op, axes=([1],[3]))
-	# C1: [D2a,D2b,dup, ddown, D1o]
-
-	C1 = tensordot(C1, A, axes=([0,2],[2,1]))
-	# C1: [D2b, ddown, D1o, D1a]
-
-	C1 = tensordot(C1, B, axes=([0,1], [2,1]))
-
-	# C1: [D1o, D1a, D1b]
-
-	C1 = C1.transpose([1,0,2])
+	# contract (C,A) along (C-A, A-right)
+	
+	C1 = tensordot(C, A, axes=([0], [2]))
+	
+	# C1 form: [C-op, C-B, A-left, A-up]
+	
+	# contract (C1, op) along (C-op, A-up)--(op-right, op-down)
+	
+	C1 = tensordot(C1, op, axes=([0,3], [3,2]))
+	
+	# C1 form: [C-B,A-left,op-left,op-up]
+	
+	# contract (C1, B) along (C-B, op-up)--(B-right,B-down)
+	
+	C1 = tensordot(C1, B, axes=([0, 3], [2,1]))
+	
+	# C1 form: [A-left, op-left, B-left]
 
 
 	return C1
+
+
 
 
 

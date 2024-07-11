@@ -27,6 +27,7 @@ from typing import Tuple, Generator
 # For TN methods and types:
 from tensor_networks.operations import fuse_tensor_to_itself
 from lattices.directions import LatticeDirection, BlockSide, Direction, check
+from lattices._common import Node as LatticeNode
 from enums import NodeFunctionality, UnitCellFlavor
 
 # For smart iterations:
@@ -41,10 +42,31 @@ class TensorNode():
     is_ket : bool
     pos : Tuple[PosScalarType, ...]
     edges : list[EdgeIndicatorType]
-    directions : list[LatticeDirection] 
+    directions : list[Direction]   # preferably: LatticeDirection:s are used
     functionality : NodeFunctionality = field(default=NodeFunctionality.Undefined) 
-    cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneLattice) 
+    cell_flavor : UnitCellFlavor = field(default=UnitCellFlavor.NoneUnitCell) 
     boundaries : set[BlockSide] = field(default_factory=set) 
+
+    @staticmethod
+    def from_lattice_node(
+        lattice_node:LatticeNode, tensor:np.ndarray, name:str="", 
+        functionality:NodeFunctionality=NodeFunctionality.Undefined, cell_flavor:UnitCellFlavor=UnitCellFlavor.NoneUnitCell
+    ) -> "TensorNode":
+        return TensorNode(
+            # Directly from lattice-node:
+            index = lattice_node.index,
+            pos = lattice_node.pos,
+            edges = lattice_node.edges,
+            directions = lattice_node.directions,
+            boundaries = lattice_node.boundaries,
+            # Decide by derivation:
+            is_ket = _decide_if_tensor_is_ket_of_node(lattice_node, tensor),
+            # From other inputs:
+            tensor = tensor,
+            name = name,
+            functionality = functionality,
+            cell_flavor = cell_flavor
+        )
 
     def __hash__(self)->int:
         return hash((self.name, self.pos, self.functionality, self.cell_flavor))
@@ -223,7 +245,19 @@ class TensorNode():
         positions = lists.convert_whole_numbers_to_int(list(self.pos))
         return f"Node '{self.name}' at index [{self.index}] on site {tuple(positions)} in address {id(self)}"
 
-    
+
+def _decide_if_tensor_is_ket_of_node(lattice_node:LatticeNode, tensor:np.ndarray) -> bool:
+    lattice_num_legs = len(lattice_node.edges)
+    tensor_num_legs = len(tensor.shape)
+    if tensor_num_legs == lattice_num_legs:
+        return False
+    elif tensor_num_legs == lattice_num_legs + 1:
+        return True
+    else:
+        raise ValueError(f"Impossible! Tensor has {tensor_num_legs} legs while its lattice-node has {lattice_num_legs} lags.")
+
+
+
 def validated_int_square_root(a:int)->int:
     return assertions.integer(np.sqrt(a))
 
