@@ -38,7 +38,7 @@ def _get_energy_per_site(shifted_tn:KagomeTNArbitrary, messages, h, D, bp_config
 
 def main(
     parallel_msgs : bool = False,
-    filename : str = "save-BPSU-Kagome-PEPS-n4-D3.pkl"  # /Kagome-PEPS.pkl / Kagome-PEPS-n2-D3.pkl / save-BPSU-Kagome-PEPS-n4-D3
+    filename : str = "Kagome-PEPS-n2-D3.pkl"  # /Kagome-PEPS.pkl / Kagome-PEPS-n2-D3.pkl / save-BPSU-Kagome-PEPS-n4-D3
 ) -> dict:
     
     ## Create tensor network:
@@ -56,7 +56,8 @@ def main(
     mode = UpdateMode.A
 
     
-    directions = [None]+list(LatticeDirection.all_in_counter_clockwise_order())
+    # directions = [None]+list(LatticeDirection.all_in_counter_clockwise_order())
+    directions = list(LatticeDirection.all_in_counter_clockwise_order())
 
     # For the crnt network: Get energy:
     energies = []

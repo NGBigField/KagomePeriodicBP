@@ -35,7 +35,7 @@ from containers.sizes_and_dimensions import TNDimensions
 from utils import lists, tuples, numerics, indices, strings, arguments
 
 import numpy as np
-from typing import NamedTuple, TypeVar
+from typing import NamedTuple, TypeVar, Generator
 from copy import deepcopy
 
 # For efficient functions:
@@ -444,12 +444,20 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
                     case 'left':  tensor_node.cell_flavor = UnitCellFlavor.B
                     case 'right': tensor_node.cell_flavor = UnitCellFlavor.C
 
-    def shift_periodically_in_direction(self, direction:LatticeDirection, _plot:bool=True) -> "KagomeTNArbitrary":
+    def all_lattice_shifting_options(self) -> Generator["KagomeTNArbitrary", None, None]:
+        for triangles_permutation_list in triangle_lattice.all_periodic_lattice_shifting_permutation(self.lattice.N):
+            if DEBUG_MODE:
+                assert indices.valid_permutation_list(triangles_permutation_list)
+            yield self._shift_kagome_according_to_triangular_permutation(triangles_permutation_list)
+
+    def shift_periodically_in_direction(self, direction:LatticeDirection, _plot:bool=False) -> "KagomeTNArbitrary":
         ## First get the permutation for triangular lattice, which defined shifting of upper-triangles
         triangles_permutation_list = triangle_lattice.shift_periodically_in_direction(self.lattice.N, direction)
         if DEBUG_MODE:
             assert indices.valid_permutation_list(triangles_permutation_list)
+        return self._shift_kagome_according_to_triangular_permutation(triangles_permutation_list, _plot=_plot)
 
+    def _shift_kagome_according_to_triangular_permutation(self, triangles_permutation_list:list[int], _plot:bool=False) -> "KagomeTNArbitrary":
         ## Collect permutation list for nodes, bunched in upper-triangles:        
         permutation_list : list[_PermuteTuple] = []
         for prev_triangle_i, next_triangle_i in enumerate(triangles_permutation_list):

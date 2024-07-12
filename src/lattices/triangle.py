@@ -1,7 +1,7 @@
 # Import types used in the code:
 from lattices._common import Node, sorted_boundary_nodes, plot_lattice
 from lattices.directions import LatticeDirection, BlockSide, Direction, DirectionError
-from lattices.edges import edges_dict_from_edges_list
+from lattices.edges import edges_dict_from_edges_list, EdgesDictType
 from _error_types import LatticeError, OutsideLatticeError
 
 # For type hinting:
@@ -25,7 +25,7 @@ CACHED_ORDERED_BOUNDARY_EDGES_PER_LATTICE_SIZE : Final[dict[int, list[str]]] = {
 
 
 @functools.cache
-def total_vertices(N):
+def total_vertices(N:int) -> int:
 	"""
 	Returns the total number of vertices in the *bulk* of a hex 
 	TN with linear parameter N
@@ -146,6 +146,11 @@ def get_neighbor_coordinates_in_direction(i:int, j:int, direction:LatticeDirecti
 	return i2, j2
 
 
+def get_neighbor_by_index_and_direction(ind:int, direction:LatticeDirection, N:int) -> int:
+	i, j = get_vertex_coordinates(int, N)
+	return get_neighbor(i, j, direction, N)
+
+
 def get_neighbor(i:int, j:int, direction:LatticeDirection, N:int)->int:	
 	i2, j2 = get_neighbor_coordinates_in_direction(i, j, direction, N)
 	return get_vertex_index(i2, j2, N)
@@ -196,11 +201,17 @@ def get_vertex_index(i:int, j:int, N:int) -> int:
 		
 	return Aw + j
 
+
+@functools.cache
+def get_center_vetex_coordinates(N:int) -> tuple[int, int]:
+	i = num_rows(N)//2
+	j = row_width(i, N)//2
+	return i, j
+
 		
 @functools.cache
 def get_center_vertex_index(N):
-	i = num_rows(N)//2
-	j = row_width(i, N)//2
+	i, j = get_center_vetex_coordinates(N)
 	return get_vertex_index(i, j, N)
 
 
@@ -965,26 +976,11 @@ def change_boundary_conditions_to_periodic(lattice:list[Node]) -> list[Node]:
 	return lattice
 
 
-def shift_periodically_in_direction(N:int, direction:LatticeDirection) -> list[int]:
-	"""Return the permutation list of of a triangular lattice when shifting periodically in a direction.
-
-	Args:
-		N (int): Size of lattice
-		direction (LatticeDirection): Direction in which to move the lattice.
-
-	Returns:
-		list[int]: Permutation list
-	"""
-
-	## Create periodic triangular lattice:
-	open_lattice = create_triangle_lattice(N)
-	periodic_lattice = change_boundary_conditions_to_periodic(open_lattice)
-	# plot_lattice(periodic_lattice, periodic=True)
-
-	## Collect a comfortable dict of all edges:
-	edges = edges_dict_from_edges_list([node.edges for node in periodic_lattice])
-
-	## Help functions:
+def _shift_periodically_in_direction_given_periodic_lattice(
+	periodic_lattice:list[Node], edges:EdgesDictType, direction:LatticeDirection
+) -> list[int]:
+	
+	## Help function:
 	def _get_new_index(node:Node) -> int:
 		edge = node.get_edge_in_direction(direction)
 		_indices = edges[edge]
@@ -996,3 +992,72 @@ def shift_periodically_in_direction(N:int, direction:LatticeDirection) -> list[i
 	## Produce output:
 	permutation_list = [_get_new_index(node) for node in periodic_lattice]
 	return permutation_list
+
+
+def _common_periodic_shifting_inputs(N:int) -> tuple[list[Node], EdgesDictType]:
+	## Create periodic triangular lattice:
+	open_lattice = create_triangle_lattice(N)
+	periodic_lattice = change_boundary_conditions_to_periodic(open_lattice)
+	# plot_lattice(periodic_lattice, periodic=True)
+
+	## Collect a comfortable dict of all edges:
+	edges = edges_dict_from_edges_list([node.edges for node in periodic_lattice])
+
+	return periodic_lattice, edges
+
+
+def shift_periodically_in_direction(N:int, direction:LatticeDirection) -> list[int]:
+	"""Return the permutation list of of a triangular lattice when shifting periodically in a direction.
+
+	Args:
+		N (int): Size of lattice
+		direction (LatticeDirection): Direction in which to move the lattice.
+
+	Returns:
+		list[int]: Permutation list
+	"""
+
+	periodic_lattice, edges = _common_periodic_shifting_inputs(N)
+	return _shift_periodically_in_direction_given_periodic_lattice(periodic_lattice, edges, direction)
+
+
+def all_periodic_lattice_shifting_permutation(N:int, _movie:bool=True) -> Generator[list[int], None, None]:
+	"""Get all permutation of the triangular lattice that shift nodes altogether in a periodic manner
+
+	Args:
+		N (int): Linear size of lattice
+
+	This is achieved with a breadth-first graph walk of the entire lattice.
+	To track that we really explored the entire graph, we imagine that the center node is where we start,
+	and each neighboring node that we arrived to, we shift the graph periodically in its direction.
+	We keep a set with all the nodes that we visited, to make sure nothing is visited twice.
+	"""	
+	## Visuals:
+	from utils.visuals import VideoRecorder
+	if _movie:
+		movie = VideoRecorder()
+
+	## Helper functions and types:
+	visited_nodes : set[int] = set()
+	next_nodes : list[int] = []
+	periodic_lattice, edges = _common_periodic_shifting_inputs(N)
+	num_nodes = total_vertices(N)
+
+	## Start with the current position (The NULL permutation)
+	the_null_permutation = list(range(num_nodes))
+	crnt = get_center_vertex_index(N)
+	yield the_null_permutation
+	visited_nodes.add(crnt)
+	next_nodes.append(crnt)
+
+	## For each direction, yield permutation
+	for crnt in next_nodes:
+		## Cut places where we've been
+		
+		for direction in LatticeDirection.all_in_counter_clockwise_order():
+			next = get_neighbor_by_index_and_direction(crnt, direction, N)
+			permutation = _shift_periodically_in_direction_given_periodic_lattice(periodic_lattice, edges, direction)
+
+
+	if _movie:
+		movie.write_video(f"Lattice-Walk N={N}")
