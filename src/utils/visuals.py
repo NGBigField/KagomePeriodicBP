@@ -31,7 +31,7 @@ if ALLOW_VISUALS:
     # For videos:
     try:
         from moviepy.editor import ImageClip, concatenate_videoclips
-    except ImportError:
+    except ImportError as e:
         ImageClip, concatenate_videoclips = None, None
 else:
     Figure, Axes = Any, Any

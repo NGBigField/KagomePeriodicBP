@@ -17,6 +17,9 @@ import functools
 # for math:
 import numpy as np
 
+# For datastructures required in some algorithms:
+from queue import Queue
+
 
 class TriangularLatticeError(LatticeError): ...
 
@@ -977,24 +980,28 @@ def change_boundary_conditions_to_periodic(lattice:list[Node]) -> list[Node]:
 
 
 def _shift_periodically_in_direction_given_periodic_lattice(
-	periodic_lattice:list[Node], edges:EdgesDictType, direction:LatticeDirection
+	periodic_lattice:list[Node], edges:EdgesDictType, given_permutation_list:list[int], direction:LatticeDirection
 ) -> list[int]:
-	
-	## Help function:
-	def _get_new_index(node:Node) -> int:
+
+	## Help functions:
+	def get_new_node_in_direction(node:Node) -> int:
 		edge = node.get_edge_in_direction(direction)
 		_indices = edges[edge]
 		if   _indices[0] == node.index:	return _indices[1]
 		elif _indices[1] == node.index:	return _indices[0]
 		else:
 			raise LatticeError("Impossible situation")
-			
+		
+	def _get_new_index(crnt_index:int) -> int:
+		node = periodic_lattice[crnt_index]
+		return get_new_node_in_direction(node)
+
 	## Produce output:
-	permutation_list = [_get_new_index(node) for node in periodic_lattice]
+	permutation_list = [_get_new_index(index) for index in given_permutation_list]
 	return permutation_list
 
 
-def _common_periodic_shifting_inputs(N:int) -> tuple[list[Node], EdgesDictType]:
+def _common_periodic_shifting_inputs(N:int) -> tuple[list[Node], EdgesDictType, list[int]]:
 	## Create periodic triangular lattice:
 	open_lattice = create_triangle_lattice(N)
 	periodic_lattice = change_boundary_conditions_to_periodic(open_lattice)
@@ -1003,7 +1010,11 @@ def _common_periodic_shifting_inputs(N:int) -> tuple[list[Node], EdgesDictType]:
 	## Collect a comfortable dict of all edges:
 	edges = edges_dict_from_edges_list([node.edges for node in periodic_lattice])
 
-	return periodic_lattice, edges
+	## The starting permutation is each node pointing to itself
+	num_nodes = total_vertices(N)
+	null_permutation = list(range(num_nodes))  # Permutation from node to itself
+
+	return periodic_lattice, edges, null_permutation
 
 
 def shift_periodically_in_direction(N:int, direction:LatticeDirection) -> list[int]:
@@ -1016,9 +1027,9 @@ def shift_periodically_in_direction(N:int, direction:LatticeDirection) -> list[i
 	Returns:
 		list[int]: Permutation list
 	"""
-
-	periodic_lattice, edges = _common_periodic_shifting_inputs(N)
-	return _shift_periodically_in_direction_given_periodic_lattice(periodic_lattice, edges, direction)
+	return _shift_periodically_in_direction_given_periodic_lattice(
+		*_common_periodic_shifting_inputs(N), direction
+	)
 
 
 def all_periodic_lattice_shifting_permutation(N:int, _movie:bool=True) -> Generator[list[int], None, None]:
@@ -1039,25 +1050,29 @@ def all_periodic_lattice_shifting_permutation(N:int, _movie:bool=True) -> Genera
 
 	## Helper functions and types:
 	visited_nodes : set[int] = set()
-	next_nodes : list[int] = []
-	periodic_lattice, edges = _common_periodic_shifting_inputs(N)
-	num_nodes = total_vertices(N)
+	next_nodes : Queue[int] = Queue()
+	periodic_lattice, edges, null_permutation = _common_periodic_shifting_inputs(N)
 
 	## Start with the current position (The NULL permutation)
-	the_null_permutation = list(range(num_nodes))
 	crnt = get_center_vertex_index(N)
-	yield the_null_permutation
-	visited_nodes.add(crnt)
-	next_nodes.append(crnt)
+	next_nodes.put(crnt)
 
-	## For each direction, yield permutation
+	## For each node in waiting list
 	for crnt in next_nodes:
-		## Cut places where we've been
+		## For each direction, yield permutation
+
+		_visit_node_and_create_permutation_list
+		yield null_permutation
 		
 		for direction in LatticeDirection.all_in_counter_clockwise_order():
 			next = get_neighbor_by_index_and_direction(crnt, direction, N)
 			permutation = _shift_periodically_in_direction_given_periodic_lattice(periodic_lattice, edges, direction)
 
 
+	
 	if _movie:
 		movie.write_video(f"Lattice-Walk N={N}")
+
+
+def _produce_lattice_shifting_permutation_based_on_previous_permutation() -> None:
+	pass

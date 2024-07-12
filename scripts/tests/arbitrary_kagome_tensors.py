@@ -38,7 +38,7 @@ def _get_energy_per_site(shifted_tn:KagomeTNArbitrary, messages, h, D, bp_config
 
 def main(
     parallel_msgs : bool = False,
-    filename : str = "Kagome-PEPS-n2-D3.pkl"  # /Kagome-PEPS.pkl / Kagome-PEPS-n2-D3.pkl / save-BPSU-Kagome-PEPS-n4-D3
+    filename : str = "save-BPSU-Kagome-PEPS-n4-D3.pkl"  # /Kagome-PEPS.pkl / Kagome-PEPS-n2-D3.pkl / save-BPSU-Kagome-PEPS-n4-D3
 ) -> dict:
     
     ## Create tensor network:
@@ -49,29 +49,22 @@ def main(
     D = tn.dimensions.virtual_dim
     bp_config = Config.BPConfig(
         damping=0.1,
-        max_swallowing_dim=D**2,
-        parallel_msgs=parallel_msgs
+        max_swallowing_dim=2,
+        parallel_msgs=parallel_msgs,
+        max_iterations=1
     )
     h = hamiltonians.heisenberg_afm()
     mode = UpdateMode.A
 
     
-    # directions = [None]+list(LatticeDirection.all_in_counter_clockwise_order())
-    directions = list(LatticeDirection.all_in_counter_clockwise_order())
-
-    # For the crnt network: Get energy:
     energies = []
     messages = None
-    ## For each shift in some direction:
-    for direction in directions:
-        print(f"direction = {direction.__str__()}")
-        if direction is None:
-            shifted_tn = tn
-        else:
-            shifted_tn = tn.shift_periodically_in_direction(direction)
+    ## For each shift in some direction along the lattice:
+    for shifted_tn in tn.all_lattice_shifting_options():
         # for the shifted network: Get energy:
-        energy, messages = _get_energy_per_site(shifted_tn, messages, h, D, bp_config, mode)
-        energies.append(energy)
+        belief_propagation(shifted_tn, config=bp_config)
+        # energy, messages = _get_energy_per_site(shifted_tn, messages, h, D, bp_config, mode)
+        # energies.append(energy)
     
     print(energies)
     mean_energy = lists.average(energies)
