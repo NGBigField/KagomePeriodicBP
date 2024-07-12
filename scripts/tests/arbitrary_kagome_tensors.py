@@ -13,6 +13,10 @@ from algo.measurements import measure_energies_and_observables_together
 # help types:
 from enums import UpdateMode
 
+## Where to load from
+from unit_cell.get_from._simple_update import DATA_SUBFOLDER as SIMPLE_UPDATE_DATA_SUBFOLDER
+
+
 
 def _print_success(stats:BPStats) -> None:
     if stats.success:
@@ -34,11 +38,11 @@ def _get_energy_per_site(shifted_tn:KagomeTNArbitrary, messages, h, D, bp_config
 
 def main(
     parallel_msgs : bool = False,
-    filename : str = "Kagome-PEPS.pkl"  # /Kagome-PEPS.pkl / Kagome-PEPS-n2-D3.pkl
+    filename : str = "save-BPSU-Kagome-PEPS-n4-D3.pkl"  # /Kagome-PEPS.pkl / Kagome-PEPS-n2-D3.pkl / save-BPSU-Kagome-PEPS-n4-D3
 ) -> dict:
     
     ## Create tensor network:
-    tensors = saveload.load(filename)
+    tensors = saveload.load(filename, sub_folder=SIMPLE_UPDATE_DATA_SUBFOLDER)
     tn = KagomeTNArbitrary(tensors=tensors)
 
     ## Config:

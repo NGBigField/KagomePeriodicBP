@@ -2,7 +2,7 @@ import _import_src  ## Needed to import src folders when scripts are called from
 
 # Types in the code:
 from containers import Config
-from unit_cell import UnitCell, given_by
+from unit_cell import UnitCell, get_from
 
 from utils import strings, csvs, prints
 from utils.visuals import AppendablePlot, save_figure
@@ -56,7 +56,7 @@ def _per_size_get_measurements(D:int, size:int, periodic:bool, config:Config):
 
     ## Get tnsu results:
     t1 = time.perf_counter()
-    unit_cell, tnsu_energy = given_by.tnsu(D=D, size=size, periodic=periodic)
+    unit_cell, tnsu_energy = get_from.simple_update(D=D, size=size, periodic=periodic)
     t2 = time.perf_counter()
     run_time = t2 - t1
 

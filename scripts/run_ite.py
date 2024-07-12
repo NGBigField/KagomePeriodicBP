@@ -2,7 +2,7 @@ import _import_src  ## Needed to import src folders when scripts are called from
 
 # Types in the code:
 from containers import Config
-from unit_cell import UnitCell, given_by
+from unit_cell import UnitCell, get_from
 
 from utils import strings, lists
 from typing import Iterable, TypeAlias
@@ -84,7 +84,7 @@ def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
         case "tnsu":
             print("Get unit_cell by simple-update:")
             is_random = True
-            unit_cell, energy = given_by.tnsu(D=D)
+            unit_cell, energy = get_from.simple_update(D=D)
 
         case _:
             unit_cell = UnitCell.load(get_from)

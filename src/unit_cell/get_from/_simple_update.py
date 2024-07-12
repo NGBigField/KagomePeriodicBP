@@ -23,7 +23,7 @@ import libs.tnsu.structure_matrix_constructor as smg
 
 
 TnsuReturnType : TypeAlias = TensorNetwork
-DATA_SUBFOLDER = "tnsu_results"
+DATA_SUBFOLDER = "simple_update_results"
 
 
 # Pauli matrices

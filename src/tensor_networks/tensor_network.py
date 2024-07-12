@@ -469,7 +469,7 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
         # Sort according to new order:
         permutation_list.sort(key=lambda perm: perm.next)
         # New tensors are in the "new" order, by indexing the old list with its "old" indices:
-        new_tensors = [self.tensors[perm.prev] for perm in permutation_list]
+        new_tensors = [self.tensors[perm.prev].copy() for perm in permutation_list]
 
         new_tn = KagomeTNArbitrary(tensors=new_tensors)
         return new_tn
