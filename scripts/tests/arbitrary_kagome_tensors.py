@@ -57,12 +57,15 @@ def main(
     mode = UpdateMode.A
 
     
+    from time import sleep
+
     energies = []
     messages = None
     ## For each shift in some direction along the lattice:
     for shifted_tn in tn.all_lattice_shifting_options():
         # for the shifted network: Get energy:
-        belief_propagation(shifted_tn, config=bp_config)
+        # belief_propagation(shifted_tn, config=bp_config)
+        sleep(1)
         # energy, messages = _get_energy_per_site(shifted_tn, messages, h, D, bp_config, mode)
         # energies.append(energy)
     
