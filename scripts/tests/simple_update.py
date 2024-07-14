@@ -77,11 +77,11 @@ def main(
 )->None:
 
     ## Config:
-    config = Config.derive_from_physical_dim(D=D)
+    config = Config.derive_from_dimensions(D=D)
     config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None, None)
     config.bp.damping = 0.1
     config.bp.msg_diff_terminate = 1e-15
-    config.bp.max_swallowing_dim = 2*D**2 + 10
+    config.bp.trunc_dim = 2*D**2 + 10
     config.dims.big_lattice_size = 3
 
     ## Prepare plots:

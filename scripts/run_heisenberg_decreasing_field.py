@@ -73,13 +73,13 @@ def main(
     unit_cell._file_name = strings.time_stamp()
 
     ## Config:
-    config = Config.derive_from_physical_dim(D)
+    config = Config.derive_from_dimensions(D)
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
     config.bp.damping = damping
     config.bp.parallel_msgs = parallel
     config.trunc_dim = int(4*D**2+20 * chi_factor)
-    config.bp.max_swallowing_dim = int(4*D**2 * chi_factor)
+    config.bp.trunc_dim = int(4*D**2 * chi_factor)
     config.bp.msg_diff_terminate = 1e-12
     config.bp.msg_diff_good_enough = 1e-5
     config.bp.times_to_deem_failure_when_diff_increases = 4

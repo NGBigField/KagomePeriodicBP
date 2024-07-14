@@ -51,13 +51,14 @@ def _method2(rho_pt: DensityMatrix) -> float:
     return sum
 
 def negativity(
-    rho: DensityMatrix, 
+    rho: DensityMatrix|np.ndarray, 
     num_qubits_on_first_part:typ.Optional[int]=None, 
     part_to_transpose:typ.Literal['first', 'second']='first',
     validate:bool=True
 ) -> float:
     if isinstance(rho, np.ndarray):
         rho = DensityMatrix(rho)
+    assert isinstance(rho, DensityMatrix)
     
     rho_pt = rho.partial_transpose(num_qubits_on_first_part, part_to_transpose, validate) # default to half of qubits are transposed
     res2 = _method2(rho_pt)    
@@ -68,11 +69,11 @@ def negativity(
     return result
 
 @typ.overload
-def log_negativity(rho: DensityMatrix) -> float: ...
+def log_negativity(val: DensityMatrix) -> float: ...
 @typ.overload
-def log_negativity(negativity: float) -> float: ...
+def log_negativity(val: float) -> float: ...
 
-def log_negativity(val: typ.Literal['DensityMatrix', 'float']  ) -> float:
+def log_negativity(val) -> float:
     if isinstance(val, DensityMatrix):
         neg = negativity(val)
     elif isinstance(val, float):

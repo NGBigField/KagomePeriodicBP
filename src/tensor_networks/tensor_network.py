@@ -35,7 +35,7 @@ from containers.sizes_and_dimensions import TNDimensions
 from utils import lists, tuples, numerics, indices, strings, arguments
 
 import numpy as np
-from typing import NamedTuple, TypeVar, Generator
+from typing import NamedTuple, TypeVar, Generator, TypeAlias
 from copy import deepcopy
 
 # For efficient functions:
@@ -314,6 +314,7 @@ class KagomeTensorNetwork(TensorNetwork, ABC):
 
 
 class KagomeTNRepeatedUnitCell(KagomeTensorNetwork):
+    _KagomeLattice : TypeAlias = KagomeLattice
 
     # ================================================= #
     #|                Basic Attributes                 |#

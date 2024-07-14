@@ -13,6 +13,8 @@ from typing import (
     List,
 	Generator,
     Literal,
+    TypeAlias,
+    Type
 )
 
 from abc import ABC, abstractmethod
@@ -26,6 +28,7 @@ import project_paths
 # Operating System and files:
 from pathlib import Path
 import os
+FileDescriptor : TypeAlias = int
 
 # For saving stuff:
 if SAVE_FILES_WITH == "pickle":
@@ -53,7 +56,9 @@ class _Mode():
     @abstractmethod
     def str(cls) -> str: ...
 
-class Modes():     
+class Modes():  
+    _ModeType : TypeAlias = _Mode   
+
     class Read(_Mode):
         @classmethod
         def str(cls) -> str:
@@ -101,7 +106,7 @@ def _common_name(name:str, typ:Literal['data', 'log']='data') -> str:
         return name+"."+target_extension
 
 
-def _default_load_catch_other_load(file:str) -> Any:
+def _default_load_catch_other_load(file) -> Any:
     try:
         data = pickle.load(file)
     except Exception as e:
@@ -143,7 +148,7 @@ def all_saved_data() -> Generator[Tuple[str, Any], None, None]:
             yield name, data
 
 
-def save_or_load_with_fullpath(fullpath:str, mode:_Mode, var:Any|None=None) -> Any:
+def save_or_load_with_fullpath(fullpath:str, mode:Type[_Mode], var:Any|None=None) -> Any:
     file = _open(fullpath=fullpath, mode=mode.str())    
     match mode:
         case Modes.Write:
@@ -154,11 +159,11 @@ def save_or_load_with_fullpath(fullpath:str, mode:_Mode, var:Any|None=None) -> A
             raise ValueError("Not matching an existing case")
 
 
-def save(var:Any, name:Optional[str]=None, sub_folder:Optional[str]=None, if_not_exist:bool=False, print_:bool=False) -> str:
-    if if_not_exist and exist(name=name, sub_folder=sub_folder):
-        return None
+def save(var:Any, name:Optional[str]=None, sub_folder:Optional[str]=None, if_not_exist:bool=False, print_:bool=False) -> str|None:
     # Complete missing inputs:
     name = arguments.default_value(name, strings.time_stamp())
+    if if_not_exist and exist(name=name, sub_folder=sub_folder):
+        return None
     # fullpath:
     fullpath = _fullpath(name, sub_folder)
     # Common save or load:
@@ -190,15 +195,15 @@ def delete(name:str, sub_folder:Optional[str]=None, if_exist:bool=False)->None:
 
 def get_size(name:str, sub_folder:Optional[str]=None, if_exist:bool=False) -> int:
     if if_exist and not exist(name=name, sub_folder=sub_folder):
-        return None
+        return None  #type: ignore
     # fullpath:
     fullpath = _fullpath(name, sub_folder)
     # get size
     return os.path.getsize(fullpath)
 
 def force_subfolder_exists(folder_name:str) -> None:
-    folderpath = DATA_FOLDER + PATH_SEP + folder_name
-    force_folder_exists(folderpath)
+    folder_path = DATA_FOLDER + PATH_SEP + folder_name
+    force_folder_exists(folder_path)
 
 
 def force_folder_exists(folderpath:str) -> None:

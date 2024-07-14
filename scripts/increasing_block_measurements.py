@@ -37,12 +37,12 @@ def main(
     # unit_cell = UnitCell.random_product_state(d, D)
 
     ## Config:
-    config = Config.derive_from_physical_dim(D)
+    config = Config.derive_from_dimensions(D)
     config.bp.damping = damping
-    config.bp.max_swallowing_dim = 4*D**2
+    config.bp.trunc_dim = 4*D**2
     config.bp.parallel_msgs = parallel
     config.trunc_dim *= chi_factor
-    config.bp.max_swallowing_dim *= chi_factor
+    config.bp.trunc_dim *= chi_factor
 
     # Interaction:
     match hamiltonian: 

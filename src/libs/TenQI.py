@@ -52,7 +52,7 @@ ketbra01 = array([[0,1],[0,0]])
 #
 #
 
-def op_to_mat(op):
+def op_to_mat(op) -> np.matrix:
 	
 	"""
 		maps an n-qubits operator in the tensor representation

@@ -146,6 +146,11 @@ class UnitCell:
             return self._file_name
 
         return strings.time_stamp()
+    
+    def derive_dimensions(self) -> tuple[int, int]:
+        d = self.A.shape[0]
+        D = self.A.shape[-1]
+        return d, D
 
     
 def _zero_state_tensor(D:int)->np.ndarray:

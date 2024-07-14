@@ -138,7 +138,7 @@ def contract_to_edge_test(
     if with_bp:
         messages = saveload.load("last_messages", none_if_not_exist=True)
         from algo.belief_propagation import belief_propagation, BPConfig
-        bp_config=BPConfig(max_swallowing_dim=chi//2, msg_diff_terminate=1e-6)
+        bp_config=BPConfig(trunc_dim=chi//2, msg_diff_terminate=1e-6)
         _, messages, _ = belief_propagation(full_tn, messages, bp_config=bp_config)
         saveload.save(messages, "last_messages")
     else:        
@@ -189,7 +189,7 @@ def test_all_edges_contraction(
     full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     if with_bp:
         from algo.belief_propagation import belief_propagation, BPConfig
-        bp_config=BPConfig(max_swallowing_dim=chi, msg_diff_terminate=1e-7)
+        bp_config=BPConfig(trunc_dim=chi, msg_diff_terminate=1e-7)
         belief_propagation(full_tn, bp_config=bp_config)
     else:        
         full_tn.connect_random_messages()

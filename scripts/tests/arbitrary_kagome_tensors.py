@@ -31,7 +31,7 @@ def _get_energy_per_site_per_mode(shifted_tn:KagomeTNArbitrary, h, D, bp_config)
     energy_per_site_per_mode = {}    
     for mode in UpdateMode.all_options():
         print(f"Mode = {mode}")
-        energies, expectations, entanglement = measure_energies_and_observables_together(shifted_tn, h, trunc_dim=2*D**2, mode=mode)
+        energies, expectations, entanglement = measure_energies_and_observables_together(shifted_tn, h, trunc_dim=2*D**2+10, mode=mode)
         print(energies)
         energy_per_site = sum(energies.values())/3
         print(energy_per_site)
@@ -53,7 +53,7 @@ def main(
     D = tn.dimensions.virtual_dim
     bp_config = Config.BPConfig(
         damping=0.1,
-        max_swallowing_dim=D**2,
+        trunc_dim=D**2+10,
         parallel_msgs=parallel_msgs,
         max_iterations=50
     )
@@ -69,14 +69,13 @@ def main(
         # Get energy:
         energies_per_mode = _get_energy_per_site_per_mode(shifted_tn, h, D, bp_config)
         all_energies.append(energies_per_mode)
-        break
     
     print("\n"*3)
     for mode in UpdateMode.all_options():
         print(f"Mode = {mode}")
         per_mode_energies = [energies_per_mode[mode] for energies_per_mode in all_energies]
         print(per_mode_energies)
-        mean_energy = lists.average(all_energies)
+        mean_energy = lists.average(per_mode_energies)
         print(f"mean_energy={mean_energy}")
         print(f"\n")
 

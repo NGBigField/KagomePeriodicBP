@@ -31,10 +31,10 @@ class Config(_StoreConfigClasses, _ConfigClass):
     trunc_dim : int
 
     @staticmethod
-    def derive_from_physical_dim(D:int)->"Config":
+    def derive_from_dimensions(D:int)->"Config":
 
         config = Config(
-            bp=BPConfig(max_swallowing_dim=2*D**2),
+            bp=BPConfig(trunc_dim=2*D**2),
             ite=ITEConfig(),
             iterative_process=IterativeProcessConfig(),
             dims=TNDimensions(virtual_dim=D),
@@ -43,7 +43,7 @@ class Config(_StoreConfigClasses, _ConfigClass):
         )
 
         if D>3:
-            config.bp.max_swallowing_dim = D**2
+            config.bp.trunc_dim = D**2
             config.trunc_dim = 2*D**2
 
         return config
@@ -56,12 +56,12 @@ class Config(_StoreConfigClasses, _ConfigClass):
         self.ite.__post_init__()
         self.bp.__post_init__()
         # specials:
-        trunc_d_bp = self.bp.max_swallowing_dim
+        trunc_d_bp = self.bp.trunc_dim
         trunc_d_all_other = self.trunc_dim
         if trunc_d_bp > trunc_d_all_other:
             prints.print_warning(f" truncation dim of BP is greater than that of the other bubblcon usages.")
         if self.trunc_dim == -1:
-            self.trunc_dim = self.bp.max_swallowing_dim*2
+            self.trunc_dim = self.bp.trunc_dim*2
         if not ALLOW_VISUALS:
             self.visuals.live_plots = False
 

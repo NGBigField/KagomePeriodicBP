@@ -122,7 +122,7 @@ def _out_going_messages(
     allow_prog_bar:bool=True
 )->MessageDictType:
     ## prepare inputs:
-    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=config.max_swallowing_dim)
+    fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=config.trunc_dim)
     multi_processing = config.parallel_msgs 
 
     ## Different behavior between parallel or concurrent comp:
@@ -173,7 +173,7 @@ def _belief_propagation_step(
     if config.damping is None or config.damping==0:
         next_messages = out_messages
     else:
-        next_messages = _message_damping(prev_messages, out_messages, config.damping, config.max_swallowing_dim)
+        next_messages = _message_damping(prev_messages, out_messages, config.damping, config.trunc_dim)
 
     return out_messages, next_messages, next_error
 
@@ -320,7 +320,7 @@ def robust_belief_propagation(
             min_messages = deepcopy(messages)
 
         # Try again with better config:
-        config.max_swallowing_dim = int(1.5*config.max_swallowing_dim)
+        config.trunc_dim = int(1.5*config.trunc_dim)
         if isinstance(config.max_iterations, int):
             config.max_iterations += 11
         messages_in = None

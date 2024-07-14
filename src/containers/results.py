@@ -1,30 +1,32 @@
 from dataclasses import dataclass, fields
+from _types import UnitCellExpectationValuesDict, UnitCellValuePerEdgeDict, ExpectationsPerDirection
+from typing import TypeAlias
+from utils import lists, strings
 
+Expectations : TypeAlias = ExpectationsPerDirection
 
-@dataclass
-class Expectations():
-    x : float
-    y : float
-    z : float
-
-    def __repr__(self) -> str:        
-        s = f"{self.__class__.__name__}:"
-        for f in fields(self):
-            s += "\n"
-            value = getattr(self, f.name)
-            s += f"  {f.name}: {value}"
-        return s
-    
 
 @dataclass
 class Measurements():
-    expectations : Expectations
-    energy : float
+    energies:       UnitCellValuePerEdgeDict  # energies
+    expectations:   UnitCellExpectationValuesDict  # expectations
+    entanglement:   UnitCellValuePerEdgeDict  # entanglement
+
+    @property
+    def mean_energy(self)->float:
+        return sum(self.energies.values())/3
+
+    @property
+    def mean_expectation_values(self)->Expectations:
+        output = {}
+        for xyz in ['x', 'y', 'z']:
+            results = [self.expectations[abc][xyz] for abc in ['A', 'B', 'C']]
+            output[xyz] = lists.average(results)
+        return output
+
 
     def __repr__(self) -> str:        
-        s = f"{self.__class__.__name__}:"
-        for f in fields(self):
-            s += "\n"
-            value = getattr(self, f.name)
-            s += f"{f.name}: {value}"
-        return s
+        xyz = self.mean_expectation_values
+        x, y, z = xyz['x'], xyz['y'], xyz['z'] 
+        _formatted = lambda v: strings.formatted(v, width=10, precision=6, signed=True)
+        return f"mean-energy={_formatted(self.mean_energy)} ; xyz=[{_formatted(x), _formatted(y), _formatted(z)}]"

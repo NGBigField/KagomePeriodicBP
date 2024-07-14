@@ -110,7 +110,7 @@ def _initial_inputs(
 )->tuple[Config, UnitCell, logs.Logger, None, ITESegmentStats, ITEProgressTracker, ITEPlots]:
     # Config:
     if config is None:
-        config = Config.derive_from_physical_dim(DEFAULT_PHYSICAL_DIM)
+        config = Config.derive_from_dimensions(DEFAULT_PHYSICAL_DIM)
     config.post_creation_fix()
     
     # Unit-Cell:
@@ -162,10 +162,10 @@ def _initialize_visuals_and_trackers(
 
 def _harden_bp_config_if_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger) -> Config:
     if not bp_stats.success: 
-        config.bp.max_swallowing_dim = bp_stats.final_config.max_swallowing_dim
-        logger.debug(f"        config.bp.max_swallowing_dim updated to {config.bp.max_swallowing_dim}")
-        if bp_stats.final_config.max_swallowing_dim>=config.trunc_dim:
-            config.trunc_dim = int(bp_stats.final_config.max_swallowing_dim*1.33)
+        config.bp.trunc_dim = bp_stats.final_config.trunc_dim
+        logger.debug(f"        config.bp.max_swallowing_dim updated to {config.bp.trunc_dim}")
+        if bp_stats.final_config.trunc_dim>=config.trunc_dim:
+            config.trunc_dim = int(bp_stats.final_config.trunc_dim*1.33)
             logger.debug(f"        config.bubblecon_trunc_dim updated to {config.trunc_dim}")
     return config
 

@@ -12,8 +12,16 @@ from dataclasses import dataclass
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 
-from unit_cell import BestUnitCellData
+from unit_cell import BestUnitCellData, UnitCell
+from containers.results import Measurements
+from containers.configs import Config
 
+from tensor_networks import KagomeTNRepeatedUnitCell
+
+# For measurements of Kagome Lattice State:
+from algo import measurements
+
+d = 2
 
 @dataclass
 class RefResult:
@@ -46,14 +54,33 @@ def _collect_references():
     return Ds, SUs, VUs
 
 
+def _robust_energy_measurement(unit_cell:UnitCell) -> Measurements:
+    ## define configs:
+    d, D = unit_cell.derive_dimensions()
+    config = Config.derive_from_dimensions(D)
+    config.bp.msg_diff_terminate = 1e-12
+    config.bp.trunc_dim = 2*D**2 + 10
+    config.trunc_dim    = 2*D**2 + 20
+
+    ## Run:
+    return measurements.run_converged_measurement_test(unit_cell, config=config)
+    
+
 def _collect_best_results():
     Ds = []
     energies = []
     for fullpath in files.get_all_files_fullpath_in_folder(BestUnitCellData._folder_fullpath()):
         data : BestUnitCellData = saveload.save_or_load_with_fullpath(fullpath, saveload.Modes.Read)
-        energy = data.mean_energy
+        energy_at_run = data.mean_energy
         D = data.D
+        unit_cell = data.unit_cell
+
+        ## Verify energy:
+        measurements = _robust_energy_measurement(unit_cell)
+        energy = measurements.mean_energy
         
+        
+        ## Keep data:
         Ds.append(D)
         energies.append(energy)
 

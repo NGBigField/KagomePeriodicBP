@@ -14,7 +14,7 @@ from lattices.directions import BlockSide
 class BPConfig(_ConfigClass): 
     init_msg: MessageModel = MessageModel.RANDOM_QUANTUM
     max_iterations : int|None = 40   # None is used for unlimited number of iterations
-    max_swallowing_dim : int = 9
+    trunc_dim : int = 9
     msg_diff_terminate : float = 1e-10
     msg_diff_good_enough : float = 1e-4
     msg_diff_squared : bool = True  # True is easier to get to 
