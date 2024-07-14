@@ -1046,17 +1046,66 @@ class _PermutationLatticeWalkItem(NamedTuple):
 		return f"{self.node_index}"
 
 
-def _queue_contians_item(queue:Queue[_PermutationLatticeWalkItem], node_index:int) -> bool:
-	existing_items = set((_item.node_index for _item in queue.queue))
-	return set([node_index]).issubset(existing_items)
+class _PermutationsQueue():
+	__slots__ = "_queue", "_indices"
 
+	def __init__(self) -> None:
+		self._queue : Queue[_PermutationLatticeWalkItem] = Queue()
+		self._indices : set[int] = set()
 
-def _lattice_walk_add_movie_frame(movie, lattice:list[Node], visited_nodes:set[int], lattice_walk_queue:Queue[_PermutationLatticeWalkItem]) -> None:
+	def get(self) -> _PermutationLatticeWalkItem:
+		item = self._queue.get()
+		self._indices.remove(item.node_index)
+		return item
+	
+	def put(self, item:_PermutationLatticeWalkItem) -> None:
+		if item in self:
+			assert ValueError("Item already in queue")
+		self._indices.add(item.node_index)
+		return self._queue.put(item)
+	
+	@property
+	def indices(self)->Iterable[int]:
+		return self._indices
+	
+	@property
+	def empty(self) -> bool:
+		if len(self._indices)==0:
+			assert len(self._queue.queue)==0
+			return True
+		else:
+			assert len(self._queue.queue)!=0
+			return False
+	
+	def __contains__(self, item:int|_PermutationLatticeWalkItem) -> bool:
+		if isinstance(item,_PermutationLatticeWalkItem):
+			index = item.node_index
+		elif isinstance(item, int):
+			index = item
+		else:
+			raise TypeError("Not a supported type")
+		return index in self._indices
+	
+	def _ordered_indices(self) -> list[int]:
+		return [item.node_index for item in self._queue.queue]
+	
+	def __repr__(self) -> str:
+		return f"{self._ordered_indices()}"
+		
+	def __str__(self) -> str:
+		return f"_PermutationQueue with {self._queue.qsize()} item: "+self.__repr__()
+	
+
+def _lattice_walk_add_movie_frame(ax, lattice:list[Node], visited_nodes:set[int], lattice_walk_queue:_PermutationsQueue) -> tuple:
 	from matplotlib import pyplot as plt	
 	from utils import visuals
 
-	ax = plt.subplot(1,1,1)
+	if ax is None:
+		ax = plt.subplot(1,1,1)
+	elif isinstance(ax, plt.Axes):
+		ax.cla()
 	fig = ax.figure
+
 
 	## Basic data:
 	N = linear_size_from_total_vertices(len(lattice))
@@ -1075,9 +1124,8 @@ def _lattice_walk_add_movie_frame(movie, lattice:list[Node], visited_nodes:set[i
 		x, y = get_node_position(i, j, N)
 		plt.scatter(x, y, s=300, c=color, zorder=2)
 
-	## Add forntier:
-	for item in lattice_walk_queue.queue:
-		i = item.node_index
+	## Add frontier:
+	for i in lattice_walk_queue.indices:
 		_plot_node(i, "blue")
 
 	## Add visited nodes:
@@ -1087,7 +1135,7 @@ def _lattice_walk_add_movie_frame(movie, lattice:list[Node], visited_nodes:set[i
 	return fig, ax
 
 
-def all_periodic_lattice_shifting_permutation(N:int, _movie:bool=True) -> Generator[list[int], None, None]:
+def all_periodic_lattice_shifting_permutation(N:int, _movie:bool=False, _print:bool=False) -> Generator[list[int], None, None]:
 	"""Get all permutation of the triangular lattice that shift nodes altogether in a periodic manner
 
 	Args:
@@ -1103,10 +1151,12 @@ def all_periodic_lattice_shifting_permutation(N:int, _movie:bool=True) -> Genera
 		from utils.visuals import VideoRecorder, draw_now
 		from matplotlib import pyplot as plt 
 		movie = VideoRecorder()
+		ax = plt.subplot(1,1,1)
+		draw_now()
 
 	## Helper functions and types:
 	visited_nodes : set[int] = set()
-	lattice_walk_queue : Queue[_PermutationLatticeWalkItem] = Queue()
+	lattice_walk_queue  = _PermutationsQueue()
 	periodic_lattice, edges, null_permutation = _common_periodic_shifting_inputs(N)
 
 	## Start with the current position (The NULL permutation)
@@ -1114,8 +1164,9 @@ def all_periodic_lattice_shifting_permutation(N:int, _movie:bool=True) -> Genera
 	lattice_walk_queue.put(crnt)
 
 	## For each node in waiting list
-	while lattice_walk_queue.not_empty:
-		print(lattice_walk_queue.queue)
+	while not lattice_walk_queue.empty:
+		if _print:
+			print(lattice_walk_queue)
 		## Get item and continue if already visited here
 		crnt = lattice_walk_queue.get()
 		if crnt.node_index in visited_nodes:
@@ -1138,9 +1189,8 @@ def all_periodic_lattice_shifting_permutation(N:int, _movie:bool=True) -> Genera
 				continue
 
 			## Avoid from computing shifts for places we've already visited or are queued:
-			if _queue_contians_item(lattice_walk_queue, next_index) or next_index in visited_nodes:
+			if next_index in lattice_walk_queue or next_index in visited_nodes:
 				continue
-
 
 			## get permutation based on the permutation that brough us here:
 			next_permutation = _shift_periodically_in_direction_given_periodic_lattice(
@@ -1151,11 +1201,11 @@ def all_periodic_lattice_shifting_permutation(N:int, _movie:bool=True) -> Genera
 
 		## frame for movie:
 		if _movie:
-			fig, ax = _lattice_walk_add_movie_frame(movie, periodic_lattice, visited_nodes, lattice_walk_queue)
+			fig, ax = _lattice_walk_add_movie_frame(ax, periodic_lattice, visited_nodes, lattice_walk_queue)
 			movie.capture(fig)
-			# draw_now()
-			# plt.close(fig)
-	
+			draw_now()
+
+	## Write Movie
 	if _movie:
 		movie.write_video(f"Lattice-Walk N={N}")
 
