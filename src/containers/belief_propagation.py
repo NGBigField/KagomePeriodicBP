@@ -4,6 +4,7 @@ from utils.arguments import Stats
 from containers._meta import _ConfigClass
 from containers.contractions import MPSOrientation
 from typing import NamedTuple, TypeAlias
+import numpy as np
 from lattices.directions import LatticeDirection
 from libs.bmpslib import mps as MPS
 from lattices.directions import BlockSide
@@ -58,5 +59,5 @@ class Message(NamedTuple):
     
 
 class MessageDictType(dict[BlockSide, Message]):
-    def mpss(self)->list[MPS]:
-        return [msg.mps.A for side, msg in self.items()]
+    def mpss(self)->list[list[np.ndarray]]:
+        return [msg.mps.A for side, msg in self.items()]  #type: ignore

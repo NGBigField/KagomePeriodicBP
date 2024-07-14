@@ -248,7 +248,7 @@ class KagomeTensorNetwork(TensorNetwork, ABC):
     def __init__(self, lattice:KagomeLattice, dimensions:TNDimensions) -> None:
         # Save data:
         self.lattice : KagomeLattice = lattice  # Must keep a Kagome lattice
-        self.messages : MessageDictType = {}  # Must have a dictionary of messages for each block side
+        self.messages : MessageDictType = MessageDictType({})  # Must have a dictionary of messages for each block side
         self.dimensions : TNDimensions = dimensions  # Must keep its dimensions in a simple dictionary
     # ================================================= #
     #|                    messages                     |#
