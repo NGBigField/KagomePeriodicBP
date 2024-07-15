@@ -1,28 +1,60 @@
 import numpy as np
+import pickle
 import os
+import copy as cp
 
-from utils.saveload import pickle
+from typing import TypedDict
+import pathlib
+
+DEFAULT_NETWORKS_FOLDER = str(pathlib.Path(__file__).parent/"networks")
+
+class _EdgesDict(TypedDict):
+    edges : np.ndarray
+    dims : np.ndarray
 
 class TensorNetwork:
     """A Tensor-Network object. Used in the field of Quantum Information and Quantum Computation"""
+
     def __init__(self, structure_matrix: np.array = None, tensors: list = None, weights: list = None,
-                 spin_dim: int = 2, virtual_dim: int = 3, dir_path='./networks',
-                 network_name='tensor_network', complex_random_tensors:bool = True):
+                 spin_dim: int = 2, virtual_dim: int = 3, dir_path:str|None=None,
+                 network_name='tensor_network', random_init_real_loc: float = 1.,
+                 random_init_real_scale: float = 1., random_init_imag_loc: float = None,
+                 random_init_imag_scale: float = None):
         """
         :param structure_matrix: A 2D numpy array of integers > 0, corresponds to the interconnections between tensors
          and weights in the Tensor Network.
         :param tensors: A list of numpy arrays of dimension k + 1. The last k dimensions (which potentially can be
         different for any tensor in the list) corresponds to the virtual dimension of the Tensor Network, while the
         first dimension corresponds to the physical dimension of the Tensor Network (Spin dimension). Each array
-        corresponds to a Tensor in the the Tensor Network
+        corresponds to a Tensor in the Tensor Network
         :param weights: A list of 1D numpy arrays corresponds to the simple update weights between the tensors of the
         Tensor Network.
         :param spin_dim: Relevant only in tensors==None. Then spin_dim is the size of the 0 dimension of all generated
         random tensors.
         :param virtual_dim: The virtual_dim is the size of all the generated weight vectors.
         :param dir_path: directory path for loading and saving networks.
-        :param network_name: name of the network. Also needed when loading a network.
+        :param network_name: Name of the network. Also needed when loading a network.
+        :param random_init_real_loc: Loc value for tensors' real random part values initialization, Gaussian(loc, scale).
+        :param random_init_real_scale: Scale value for tensors' real part random values initialization, Gaussian(loc, scale).
+        :param random_init_imag_loc: Loc value for tensors' imaginary random values initialization, 1j * Gaussian(loc, scale).
+        :param random_init_imag_scale: Loc value for tensors' imaginary random values initialization, 1j * Gaussian(loc, scale).
         """
+
+        # Handle tensors random initialization parameters
+        assert (((random_init_real_loc is not None) and (random_init_real_scale is not None)) or
+                ((random_init_imag_loc is not None) and (random_init_imag_scale is not None))) == True, \
+            f"'real' or 'imag' loc and scale values for tensors' random initialization must be float values, " \
+            f"instead got: {random_init_real_loc=}, {random_init_real_scale=}, {random_init_imag_loc=}, " \
+            f"{random_init_imag_scale=}."
+
+        real_init = random_init_real_loc is not None
+        imag_init = random_init_imag_loc is not None
+        if real_init:
+            assert random_init_real_scale > 0, f"random_init_real_scale should be positive, " \
+                                               f"instead got {random_init_real_scale=}"
+        if imag_init:
+            assert random_init_imag_scale > 0, f"random_init_imag_scale should be positive, " \
+                                               f"instead got {random_init_imag_scale=}"
 
         if structure_matrix is not None:
             assert structure_matrix is not None, 'a structure matrix is required as an argument input.'
@@ -56,7 +88,7 @@ class TensorNetwork:
                         weight_dim = tensors[i].shape[structure_matrix[i, j]]
                         weights[j] = np.ones(weight_dim, dtype=np.float) / weight_dim
 
-            # generate a random (gaussian(1, 1)) tensors list in case didn't get one
+            # generate a random gaussian tensors list in case didn't get one as input
             else:
                 tensors = [0] * n
                 for i in range(n):
@@ -71,7 +103,22 @@ class TensorNetwork:
                                 tensor_shape[structure_matrix[i, j]] = len(weights[j])
                             else:
                                 tensor_shape[structure_matrix[i, j]] = virtual_dim
-                    tensors[i] = _random_initial_tensor(tensor_shape, complex_random_tensors)
+                    if real_init and not imag_init:
+                        tensors[i] = np.random.normal(
+                            loc=random_init_real_loc * np.ones(tensor_shape),
+                            scale=random_init_real_scale)
+                    elif imag_init and not real_init:
+                        tensors[i] = 1j * np.random.normal(
+                            loc=random_init_imag_loc * np.ones(tensor_shape),
+                            scale=random_init_imag_scale)
+                    elif real_init and imag_init:
+                        tensors[i] = np.random.normal(
+                            loc=random_init_real_loc * np.ones(tensor_shape),
+                            scale=random_init_real_scale) + 1j * np.random.normal(
+                            loc=random_init_imag_loc * np.ones(tensor_shape),
+                            scale=random_init_imag_scale)
+                    else:
+                        raise TypeError
 
                 # generate a weights list in case didn't get one
                 if weights is None:
@@ -111,7 +158,7 @@ class TensorNetwork:
         self.tensors = tensors
         self.weights = weights
         self.structure_matrix = structure_matrix
-        self.dir_path = dir_path
+        self.dir_path = dir_path if dir_path is not None else DEFAULT_NETWORKS_FOLDER
         self.network_name = network_name
         self.su_logger = None
         self.state_dict = None
@@ -167,12 +214,109 @@ class TensorNetwork:
         except Exception as error:
             print(f'There was an error in loading the tensor network from path:\n {path_to_network}\n'
                   f'with the next exception:\n {error}.')
+            
+    def get_edges(self, tensor_idx:int) -> _EdgesDict:
+        """
+        Gets all edges and dimension of a tensor
+        :param tensor_idx: the tensor index
+        :return: dictionary of edges and dimensions
+        """
+        tensor_edges = np.nonzero(self.structure_matrix[tensor_idx, :])[0]
+        tensor_dims = self.structure_matrix[tensor_idx, tensor_edges]
+        return {'edges': tensor_edges, 'dims': tensor_dims}
+    
+    def absorb_weights(self, tensor:np.ndarray, edges_dims:dict) -> np.ndarray:
+        """
+        Absorb all local weights into a tensor
+        :param tensor: the tensor
+        :param edges_dims: an edge-dimension dict
+        :return: the new tensor
+        """
+        edges = edges_dims['edges']
+        dims = edges_dims['dims']
+        for i, edge in enumerate(edges):
+            tensor = np.einsum(tensor, np.arange(len(tensor.shape)), self.weights[edge], [dims[i]],
+                               np.arange(len(tensor.shape)))
+        return tensor
 
+    def absorb_inverse_weights(self, tensor:np.ndarray, edges_dims:dict) -> np.ndarray:
+        """
+        Absorb all local inverse weights (weight^-1) into a tensor
+        :param tensor: the tensor
+        :param edges_dims: an edge-dimension dict
+        :return: the new tensor
+        """
+        edges = edges_dims['edges']
+        dims = edges_dims['dims']
+        for i, edge in enumerate(edges):
+            tensor = np.einsum(tensor, np.arange(len(tensor.shape)),
+                               np.power(self.weights[edge], -1), [dims[i]], np.arange(len(tensor.shape)))
+        return tensor
 
+    def absorb_sqrt_weights(self, tensor, edges_dims):
+        """
+        Absorb all local sqrt(weights) into a tensor
+        :param tensor: the tensor
+        :param edges_dims: an edge-dimension dict
+        :return: the new tensor
+        """
+        edges = edges_dims['edges']
+        dims = edges_dims['dims']
+        for i, edge in enumerate(edges):
+            tensor = np.einsum(tensor, np.arange(len(tensor.shape)), np.sqrt(self.weights[edge]), [dims[i]],
+                               np.arange(len(tensor.shape)))
+        return tensor
 
-def _random_initial_tensor(tensor_shape:tuple[int, ...], complex_random_tensors:bool) -> np.ndarray:
-    _rand_real = lambda: np.random.normal(loc=np.ones(tensor_shape), scale=1.0)
-    if complex_random_tensors:
-        return _rand_real() + 1j*_rand_real()
-    else:
-        return _rand_real()
+    def absorb_sqrt_inverse_weights(self, tensor, edges_dims):
+        """
+        Absorb all local sqrt(weights)^(-1) into a tensor
+        :param tensor: the tensor
+        :param edges_dims: an edge-dimension dict
+        :return: the new tensor
+        """
+        edges = edges_dims['edges']
+        dims = edges_dims['dims']
+        for i, edge in enumerate(edges):
+            tensor = np.einsum(tensor, np.arange(len(tensor.shape)), np.power(np.sqrt(self.weights[edge]), -1),
+                               [dims[i]], np.arange(len(tensor.shape)))
+        return tensor
+
+    def absorb_all_weights(self):
+        """
+        Absorbs all the sqrt(weights) into their neighboring tensors.
+        :return: None
+        """
+        n, m = self.structure_matrix.shape
+        for tensor_idx in range(n):
+            tensor = self.tensors[tensor_idx]
+            edges_dims = self.get_edges(tensor_idx=tensor_idx)
+            tensor = self.absorb_sqrt_weights(tensor=tensor, edges_dims=edges_dims)
+            self.tensors[tensor_idx] = tensor
+
+    def absorb_all_inverse_weights(self):
+        """
+        Absorbs all the sqrt(weights)^(-1) into their neighboring tensors.
+        :return: None
+        """
+        n, m = self.structure_matrix.shape
+        for tensor_idx in range(n):
+            tensor = self.tensors[tensor_idx]
+            edges_dims = self.get_edges(tensor_idx=tensor_idx)
+            tensor = self.absorb_sqrt_inverse_weights(tensor=tensor, edges_dims=edges_dims)
+            self.tensors[tensor_idx] = tensor
+
+    def copy(self) -> "TensorNetwork":
+        """
+        Returns a deep copy of this TensorNetwork.
+        """
+        return cp.deepcopy(self)
+
+    def get_tensor_network_state(self) -> list[np.ndarray]:
+        """
+        Returns a copy of the tensor network with all sqrt(weights) absobed into their 
+        negihboring tensors. This tensor-network is a PEPS represnting the state of the system.
+        :returns: list[np.ndarray]: A list of tensors. The order 
+        """
+        tn = self.copy()
+        tn.absorb_all_weights()
+        return tn

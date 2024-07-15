@@ -42,7 +42,7 @@ def _get_energy_per_site_per_mode(shifted_tn:KagomeTNArbitrary, h, D, bp_config)
 
 def main(
     parallel_msgs : bool = False,
-    filename : str = "save-BPSU-Kagome-PEPS-n4-D3.pkl"  # /Kagome-PEPS.pkl / Kagome-PEPS-n2-D3.pkl / save-BPSU-Kagome-PEPS-n4-D3
+    filename : str = "Kagome-PEPS.pkl"  # /Kagome-PEPS.pkl / Kagome-PEPS-n2-D3.pkl / save-BPSU-Kagome-PEPS-n4-D3
 ) -> dict:
     
     ## Create tensor network:

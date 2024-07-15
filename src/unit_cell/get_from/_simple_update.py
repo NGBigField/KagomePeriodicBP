@@ -376,10 +376,9 @@ def _kagome_afh_peps_ground_state_search(
     energy = afh_tn_su.energy_per_site()
 
     # Swallow matrices into tensors:
-    afh_tn_su.absorb_all_weights()
-
     print(f'| D max: {D} | Energy: {energy}\n')
-    afh_tn = afh_tn_su.tensor_network
+    
+    afh_tn = afh_tn_su.tensor_network.get_tensor_network_state()
     # Save energy. We might use it later
     afh_tn.__setattr__("final_energy", energy)
 

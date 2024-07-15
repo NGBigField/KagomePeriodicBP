@@ -286,8 +286,7 @@ def run_converged_measurement_test(
     results : list[tuple[int, Measurements]] = []
 
     if progress_bar:
-        _print_prefix = "Performing BlockBP..."
-        _print_prefix = "Measuring Results...."  
+        _print_prefix = "Measuring growing block"  
         try:
             n = len(sizes)  #type: ignore
         except:

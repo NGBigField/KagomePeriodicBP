@@ -1,10 +1,20 @@
-from libs.tnsu.tensor_network import TensorNetwork
+from libs.tnsu.tensor_network import TensorNetwork, _EdgesDict
 from scipy import linalg
 from libs.tnsu._utils import l2
 import libs.tnsu.ncon as ncon
 import numpy as np
 import copy as cp
 import time
+import itertools
+from typing import TypedDict
+
+
+# For easier annotation and code-hints:
+class _TensorDict(TypedDict):
+    tensor : np.ndarray
+    index : int
+    dim : int 
+
 
 
 class SimpleUpdate:
@@ -45,10 +55,7 @@ class SimpleUpdate:
         """
 
         # Unpacking the tensor network
-        self.tensors = tensor_network.tensors
-        self.weights = tensor_network.weights
-        self.structure_matrix = tensor_network.structure_matrix
-        self.tensor_network = tensor_network
+        self.tensor_network : TensorNetwork = tensor_network
 
         # Simple Update variables
         self.j_ij = j_ij
@@ -77,6 +84,19 @@ class SimpleUpdate:
         self.log_energy = log_energy
         self.print_process = print_process
         self.converged = False
+
+    @property
+    def tensors(self) -> list[np.ndarray]:
+        return self.tensor_network.tensors
+
+    @property
+    def weights(self) -> list[np.ndarray]:
+        return self.tensor_network.weights
+    
+    @property
+    def structure_matrix(self) -> list[np.ndarray]:
+        return self.tensor_network.structure_matrix
+
 
     def run(self):
         """
@@ -191,8 +211,8 @@ class SimpleUpdate:
             pj = self.rank_n_rank_3(tj['tensor'])
 
             # perform RQ decomposition of pi, pj to obtain ri, qi and rj, qj sub-tensors respectively.
-            ri, qi = linalg.rq(np.reshape(pi, [pi.shape[0] * pi.shape[1], pi.shape[2]]))
-            rj, qj = linalg.rq(np.reshape(pj, [pj.shape[0] * pj.shape[1], pj.shape[2]]))
+            ri, qi = linalg.rq(np.reshape(pi, [pi.shape[0] * pi.shape[1], pi.shape[2]]), mode="economic")
+            rj, qj = linalg.rq(np.reshape(pj, [pj.shape[0] * pj.shape[1], pj.shape[2]]), mode="economic")
 
             # reshape ri and rj into rank 3 tensors with shape (spin_dim, ek_dim, q_(right/left).shape[0]).
             i_physical_dim = ti['tensor'].shape[0]
@@ -240,7 +260,7 @@ class SimpleUpdate:
             tensors[tj['index']] = tj['tensor'] / self.tensor_norm(tj['tensor'])
             weights[ek] = lambda_k_tilde / np.sum(lambda_k_tilde)
 
-    def get_tensors(self, edge):
+    def get_tensors(self, edge) -> tuple[_TensorDict, _TensorDict]:
         """
         Get tensors along an edge
         :param edge: A tensor network edge index
@@ -268,71 +288,13 @@ class SimpleUpdate:
         tensor_dims = self.structure_matrix[tensor_idx, tensor_edges]
         return {'edges': tensor_edges, 'dims': tensor_dims}
 
-    def get_edges(self, tensor_idx):
+    def get_edges(self, tensor_idx:int) -> _EdgesDict:
         """
         Gets all edges and dimension of a tensor
         :param tensor_idx: the tensor index
         :return: dictionary of edges and dimensions
         """
-        tensor_edges = np.nonzero(self.structure_matrix[tensor_idx, :])[0]
-        tensor_dims = self.structure_matrix[tensor_idx, tensor_edges]
-        return {'edges': tensor_edges, 'dims': tensor_dims}
-
-    def absorb_weights(self, tensor, edges_dims):
-        """
-        Absorb all local weights into a tensor
-        :param tensor: the tensor
-        :param edges_dims: an edge-dimension dict
-        :return: the new tensor
-        """
-        edges = edges_dims['edges']
-        dims = edges_dims['dims']
-        for i, edge in enumerate(edges):
-            tensor = np.einsum(tensor, np.arange(len(tensor.shape)), self.weights[edge], [dims[i]],
-                               np.arange(len(tensor.shape)))
-        return tensor
-
-    def absorb_sqrt_weights(self, tensor, edges_dims):
-        """
-        Absorb all local sqrt(weights) into a tensor
-        :param tensor: the tensor
-        :param edges_dims: an edge-dimension dict
-        :return: the new tensor
-        """
-        edges = edges_dims['edges']
-        dims = edges_dims['dims']
-        for i, edge in enumerate(edges):
-            tensor = np.einsum(tensor, np.arange(len(tensor.shape)), np.sqrt(self.weights[edge]), [dims[i]],
-                               np.arange(len(tensor.shape)))
-        return tensor
-
-    def absorb_sqrt_inverse_weights(self, tensor, edges_dims):
-        """
-        Absorb all local sqrt(weights)^(-1) into a tensor
-        :param tensor: the tensor
-        :param edges_dims: an edge-dimension dict
-        :return: the new tensor
-        """
-        edges = edges_dims['edges']
-        dims = edges_dims['dims']
-        for i, edge in enumerate(edges):
-            tensor = np.einsum(tensor, np.arange(len(tensor.shape)), np.power(np.sqrt(self.weights[edge]), -1),
-                               [dims[i]], np.arange(len(tensor.shape)))
-        return tensor
-
-    def absorb_inverse_weights(self, tensor, edges_dims):
-        """
-        Absorb all local inverse weights (weight^-1) into a tensor
-        :param tensor: the tensor
-        :param edges_dims: an edge-dimension dict
-        :return: the new tensor
-        """
-        edges = edges_dims['edges']
-        dims = edges_dims['dims']
-        for i, edge in enumerate(edges):
-            tensor = np.einsum(tensor, np.arange(len(tensor.shape)),
-                               np.power(self.weights[edge], -1), [dims[i]], np.arange(len(tensor.shape)))
-        return tensor
+        return self.tensor_network.get_edges(tensor_idx=tensor_idx)
 
     @staticmethod
     def tensor_dim_permute(tensor):
@@ -552,7 +514,13 @@ class SimpleUpdate:
         tensors_list = [ti['tensor'], np.conj(np.copy(ti['tensor'])), tj['tensor'], np.conj(
             np.copy(tj['tensor'])), np.diag(common_weight), np.diag(common_weight)]
         indices_list = [ti_idx, ti_conj_idx, tj_idx, tj_conj_idx, common_edge_idx, common_edge_conj_idx]
-        rdm = ncon.ncon(tensors_list, indices_list)  # (i, j, i', j')
+
+        # creating a contraction order
+        contraction_order = [item for item in itertools.chain.from_iterable([ti_idx, tj_idx]) if 0 < item < t] \
+                            + common_edge_idx + common_edge_conj_idx
+        contraction_forder = [ti_idx[0], tj_idx[0], ti_conj_idx[0], tj_conj_idx[0]]
+
+        rdm = ncon.ncon(tensors_list, indices_list, order=contraction_order, forder=contraction_forder) # (i, j, i', j')
 
         # reshape and normalize
         rdm /= np.trace(np.reshape(rdm, (rdm.shape[0] * rdm.shape[1], rdm.shape[2] * rdm.shape[3])))
@@ -625,27 +593,9 @@ class SimpleUpdate:
         for tensor_idx, _ in enumerate(self.tensors):
             expectation += self.tensor_expectation(tensor_idx, operator)
         return np.real(expectation) / len(self.tensors)
+    
+    def absorb_weights(self, tensor:np.ndarray, edges_dims:dict) -> np.ndarray:
+        return self.tensor_network.absorb_weights(tensor=tensor, edges_dims=edges_dims)
 
-    def absorb_all_weights(self):
-        """
-        Absorbs all the sqrt(weights) into their neighboring tensors.
-        :return: None
-        """
-        n, m = self.structure_matrix.shape
-        for tensor_idx in range(n):
-            tensor = self.tensors[tensor_idx]
-            edges_dims = self.get_edges(tensor_idx=tensor_idx)
-            tensor = self.absorb_sqrt_weights(tensor=tensor, edges_dims=edges_dims)
-            self.tensors[tensor_idx] = tensor
-
-    def absorb_all_inverse_weights(self):
-        """
-        Absorbs all the sqrt(weights)^(-1) into their neighboring tensors.
-        :return: None
-        """
-        n, m = self.structure_matrix.shape
-        for tensor_idx in range(n):
-            tensor = self.tensors[tensor_idx]
-            edges_dims = self.get_edges(tensor_idx=tensor_idx)
-            tensor = self.absorb_sqrt_inverse_weights(tensor=tensor, edges_dims=edges_dims)
-            self.tensors[tensor_idx] = tensor
+    def absorb_inverse_weights(self, tensor:np.ndarray, edges_dims:dict) -> np.ndarray:
+        return self.tensor_network.absorb_inverse_weights(tensor=tensor, edges_dims=edges_dims)
