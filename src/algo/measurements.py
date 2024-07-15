@@ -16,7 +16,6 @@ from _config_reader import DEBUG_MODE
 # Everyone needs numpy:
 import numpy as np
 
-
 # Other of our modules we need here:
 from libs.ITE import rho_ij
 
@@ -35,7 +34,7 @@ from unit_cell import UnitCell
 
 ## Algos we need:
 from algo.tn_reduction import reduce_full_kagome_to_core, reduce_tn
-from algo.belief_propagation import belief_propagation
+from algo.belief_propagation import belief_propagation, BPStats
 from algo.contract_tensor_network import contract_tensor_network
 
 # For energy estimation:
@@ -50,7 +49,7 @@ from utils import assertions, logs, errors, lists, parallels, prints, strings
 
 # A bit of OOP:
 from copy import deepcopy
-from typing import TypeVar, TypeAlias, Iterable
+from typing import TypeVar, TypeAlias, Iterable, NamedTuple
 from dataclasses import dataclass
 
 _T = TypeVar('_T')
@@ -238,6 +237,82 @@ def measure_energies_and_observables_together(
             expectations_out[abc][xyz] = sum_/count_  
     
     return Measurements(energies=energies, expectations=expectations_out, entanglement=entanglement)
+
+
+
+class _EnergyAndMeasurements(NamedTuple):
+    energy : float
+    measurements : Measurements
+
+def calc_measurement_non_unit_cell_kagome_tn(
+    tn:KagomeTNArbitrary|list[np.ndarray],
+    config:Config|None=None,
+    hamiltonian:HamiltonianFuncAndInputs|np.ndarray=hamiltonians.heisenberg_afm(), 
+    mode:UpdateMode=UpdateMode.random(),
+    print_:bool=True
+) -> float:
+    
+    if isinstance(tn, KagomeTNArbitrary):
+        pass
+    elif isinstance(tn, list) and lists.all_isinstance(tn, np.ndarray):
+        tn = KagomeTNArbitrary(tn)
+    else:
+        raise TypeError(f"Not supporting input `tn` of type {type(tn)!r}")
+    
+    def _cond_print(*args, **kwargs) -> None:
+        if print_:
+            print(*args, **kwargs)
+
+    def _print_success(stats:BPStats) -> None:
+        if not print_:
+            return
+        if stats.success:
+            s = f"Succeeded to converge on an error below {stats.final_config.msg_diff_good_enough!r}"
+        else:
+            s = f"Failed to converge!"
+        s += f" error is now {stats.final_error!r}"
+        print(s)
+
+    def _get_energy_per_site_per_mode(shifted_tn:KagomeTNArbitrary) -> dict[UpdateMode, float]:
+        energy_per_site_per_mode : dict[UpdateMode, _EnergyAndMeasurements] = {}    
+        for mode in UpdateMode.all_options():
+            _cond_print(f"Mode = {mode}")
+            measurements = measure_energies_and_observables_together(shifted_tn, hamiltonian, trunc_dim=config.trunc_dim, mode=mode)
+            energies = measurements.energies
+            _cond_print(energies)
+            energy_per_site = measurements.mean_energy
+            _cond_print(energy_per_site)
+            energy_per_site_per_mode[mode] = _EnergyAndMeasurements(energy_per_site, measurements)
+
+        return energy_per_site_per_mode
+
+    all_energies : list[dict[UpdateMode, _EnergyAndMeasurements]] = []
+    messages = None
+    ## For each shift in some direction along the lattice:
+    for shifted_tn in tn.all_lattice_shifting_options():
+        _cond_print("\n")
+        # for the shifted network: Block BP once:
+        messages, stats = belief_propagation(shifted_tn, messages, config=config.bp)
+        _print_success(stats)
+        # Get energy:
+        energies_per_mode = _get_energy_per_site_per_mode(shifted_tn)
+        all_energies.append(energies_per_mode)
+    
+    mean_energies_per_mode = []
+    _cond_print("\n"*3)
+    for mode in UpdateMode.all_options():
+        _cond_print(f"Mode = {mode}")
+        per_mode_pairs : list[_EnergyAndMeasurements] = [energies_per_mode[mode] for energies_per_mode in all_energies]
+        per_mode_energies = [measurement.energy for measurement in per_mode_pairs]
+        _cond_print(per_mode_energies)
+        mean_energy = lists.average(per_mode_energies)
+        _cond_print(f"mean_energy={mean_energy}")
+        _cond_print(f"\n")
+        mean_energies_per_mode.append(mean_energy)
+
+    ## What mode is best?
+    _cond_print("Done.")
+    return min(mean_energies_per_mode)
 
 
 

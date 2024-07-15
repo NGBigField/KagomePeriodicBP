@@ -3234,7 +3234,8 @@ def main_get_contraction_orders(
 def main(
     n:int=2, 
     _print:bool=True,
-    periodic:bool=False
+    periodic:bool=False,
+    save_at:str=""
 ) -> dict:
     
     
@@ -3301,7 +3302,7 @@ def main(
     edges_colors_dict['magneta']= magneta_edges
     edges_colors_dict['green']  = green_edges
 
-    foutname = f"Kagome-Lattice-n{n}.pkl"
+    foutname = save_at+f"Kagome-Lattice-n{n}.pkl"
     fout = open(foutname, 'wb')
     saved_data = (edges_list, edges_colors_dict)
     pickle.dump( saved_data, fout)
@@ -3328,7 +3329,7 @@ def main(
     _conditioned_print(closed_pos_list)
     _conditioned_print("")
 
-    foutname = f"Kagome-Lattice-n{n}-with-messages.pkl"
+    foutname = save_at+f"Kagome-Lattice-n{n}-with-messages.pkl"
     fout = open(foutname, 'wb')
     saved_data = (closed_edges_list, per_direction_dict)
     pickle.dump( saved_data, fout)

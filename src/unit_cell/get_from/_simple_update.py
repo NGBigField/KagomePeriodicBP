@@ -203,7 +203,7 @@ def _common_filename(D:int, size:int, periodic:bool)->str:
 
 
 def load_or_compute_tnsu_unit_cell(D:int=2, size:int=1, periodic:bool=True) -> tuple[UnitCell, float]:
-    tnsu_network = _load_or_compute_tnsu_network(D=D, size=size, periodic=periodic)
+    tnsu_network = load_or_compute_tnsu_network(D=D, size=size, periodic=periodic)
     unit_cell = _parse_tnsu_network_to_unit_cell(D=D, size=size, periodic=periodic, tnsu_network=tnsu_network)
     try:
         tnsu_energy = tnsu_network.final_energy
@@ -212,7 +212,7 @@ def load_or_compute_tnsu_unit_cell(D:int=2, size:int=1, periodic:bool=True) -> t
     return unit_cell, tnsu_energy 
 
 
-def _load_or_compute_tnsu_network(D:int=2, size:int=1, periodic:bool=True)->TnsuReturnType:
+def load_or_compute_tnsu_network(D:int=2, size:int=1, periodic:bool=True)->TnsuReturnType:
     filename = _common_filename(D=D, size=size, periodic=periodic)
     if saveload.exist(filename, sub_folder=DATA_SUBFOLDER):
         tnsu_network = saveload.load(filename, sub_folder=DATA_SUBFOLDER)

@@ -541,7 +541,8 @@ def main(
 	d:int=2,
 	D:int=3,
 	N_Kagome:int=2,  # Kagome size parameter
-	lattice_fname:str|None=None
+	lattice_fname:str|None=None,
+	save_at:str=""
 ):
 
 	np.random.seed(5)
@@ -585,7 +586,7 @@ def main(
 	#
 
 	dt_list = [0.1]*50 + [5e-2]*100 + [2e-2]*100 + [1e-2]*200 \
-		+ [5e-3]*400 + [1e-3]*600
+		+ [5e-3]*400 + [1e-3]*400 + [5e-4]*400
 #	dt_list = [1e-2]*100 + [5e-3]*100 + [1e-3]*300  + [5e-4]*300 
 
 
@@ -609,7 +610,7 @@ def main(
 	#
 	# File name to save results (after each energy measurement)
 	#
-	fname = f"BPSU-Kagome-PEPS-n{N_Kagome}-D{D}.pkl"
+	fname = save_at+f"BPSU-Kagome-PEPS-n{N_Kagome}-D{D}.pkl"
 
 
 	#
