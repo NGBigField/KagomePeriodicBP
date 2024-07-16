@@ -1,7 +1,7 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 
 # Types in the code:
-from containers import Config
+from containers import Config, HamiltonianFuncAndInputs
 from unit_cell import UnitCell, get_from
 
 from utils import strings, lists
@@ -23,7 +23,7 @@ def decreasing_global_field_func(delta_t:float|None)->float:
     if delta_t is None:
         return 0
     if delta_t>1e-5:
-        r = 0.96
+        r = 0.93
     else:
         r = 0.90
     crnt_force_value *= r
@@ -38,9 +38,11 @@ def constant_global_field(delta_t:float|None)->float:
 
 
 def _config_at_measurement(config:Config)->Config:
-    config.dims.big_lattice_size += 0
-    config.bp.msg_diff_terminate /= 1
-    config.bp.allowed_retries    += 0
+    config.dims.big_lattice_size += 1
+    config.bp.msg_diff_terminate /= 2
+    config.bp.allowed_retries    += 1
+    config.bp.trunc_dim *= 2
+    config.trunc_dim *= 2
     return config
 
 
@@ -50,22 +52,24 @@ def _get_time_steps(e_start:int, e_end:int, n_per_dt:int)->list[float]:
     return time_steps
 
 
-def _get_hamiltonian(hamiltonian:str) -> tuple:
+def _get_hamiltonian(hamiltonian:str) -> HamiltonianFuncAndInputs:
     match hamiltonian: 
-        case "FM":        return (hamiltonians.heisenberg_fm, None, None)
-        case "FM-T":      return (hamiltonians.heisenberg_fm_with_field, "delta_t", constant_global_field)
-        case "AFM":       return (hamiltonians.heisenberg_afm, None, None)
-        case "AFM-T":     return (hamiltonians.heisenberg_afm_with_field, "delta_t", decreasing_global_field_func)
-        case "Field":     return (hamiltonians.field, None, None)
-        case "Ising-AFM": return (hamiltonians.ising_with_transverse_field, "delta_t", constant_global_field)
+        case "FM":        out = (hamiltonians.heisenberg_fm, None, None)
+        case "FM-T":      out = (hamiltonians.heisenberg_fm_with_field, "delta_t", constant_global_field)
+        case "AFM":       out = (hamiltonians.heisenberg_afm, None, None)
+        case "AFM-T":     out = (hamiltonians.heisenberg_afm_with_field, "delta_t", decreasing_global_field_func)
+        case "Field":     out = (hamiltonians.field, None, None)
+        case "Ising-AFM": out = (hamiltonians.ising_with_transverse_field, "delta_t", constant_global_field)
         case _:
             raise ValueError("Not matching any option.")
         
+    return out  #type: ignore
+        
 
-def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
+def _get_unit_cell(D:int, source:str) -> tuple[UnitCell, bool]:
     is_random = False
 
-    match get_from:
+    match source:
         case "random":
             unit_cell = UnitCell.random(d=d, D=D)
             is_random = True
@@ -78,7 +82,7 @@ def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
         case "best":
             unit_cell = UnitCell.load_best(D=D)
             if unit_cell is None:
-                return _get_unit_cell(D=D, get_from="tnsu")
+                return _get_unit_cell(D=D, source="tnsu")
             print("Got unit_cell as the previous best.")
 
         case "tnsu":
@@ -87,7 +91,8 @@ def _get_unit_cell(D:int, get_from:str) -> tuple[UnitCell, bool]:
             unit_cell, energy = get_from.simple_update(D=D)
 
         case _:
-            unit_cell = UnitCell.load(get_from)
+            assert isinstance(source, str)
+            unit_cell = UnitCell.load(source)
 
 
     return unit_cell, is_random
@@ -134,13 +139,13 @@ def _plot_field_over_time() -> None:
 
 
 def main(
-    D = 3,
-    N = 2,
+    D = 2,
+    N = 3,
     chi_factor : int|float = 1,
     live_plots:_Bool|Iterable[_Bool] = [0, 0, 0],   #type: ignore
     progress_bar:bool=True,
     results_filename:str|None = None,
-    parallel:_Bool = 0,
+    parallel:bool = True,
     hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
     unit_cell_from:str = "best"
@@ -153,7 +158,7 @@ def main(
     if results_filename is None:
         results_filename = strings.time_stamp()+"_"+strings.random(4)+f"_D={D}_N={N}"
 
-    unit_cell, _radom_unit_cell = _get_unit_cell(D=D, get_from=unit_cell_from)
+    unit_cell, _radom_unit_cell = _get_unit_cell(D=D, source=unit_cell_from)
     unit_cell.set_filename(results_filename) 
 
     ## Config:
@@ -187,9 +192,9 @@ def main(
 
     ## time steps:
     if D<4:
-        n_per_dt = 300
-        e_start = 4
-        e_end   = 8
+        n_per_dt = 200
+        e_start = 3
+        e_end   = 7
     else:
         n_per_dt = 150
         e_start = 3

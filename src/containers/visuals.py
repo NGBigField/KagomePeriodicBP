@@ -1,10 +1,11 @@
 from dataclasses import dataclass, field
 from containers._meta import _ConfigClass
-from typing import Iterable
+from typing import Iterable, TypeAlias
 from utils import assertions
 
 
 
+_Logical : TypeAlias = int|bool
 _DEFAULT_PLOTS_TO_SHOW = (True, True, False)
 
 
@@ -25,7 +26,7 @@ class VisualsConfig(_ConfigClass):
         return True if any(self._plots_to_show) else False
     
     @live_plots.setter
-    def live_plots(self, value:bool|Iterable[bool]) -> None:
+    def live_plots(self, value:_Logical|Iterable[_Logical]) -> None:
         self._plots_to_show_setter(value)
 
     def _plots_to_show_setter(self, value) -> None:

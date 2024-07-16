@@ -8,7 +8,6 @@ from copy import deepcopy
 
 # For type hinting:
 from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Iterable, Any, TypeAlias, Union
-_T = TypeVar("_T")
 
 # Other containers and enums:
 from containers._meta import _ConfigClass
@@ -22,6 +21,8 @@ from _error_types import ITEError
 
 # For smart iterations:
 import itertools
+
+_T = TypeVar("_T")
 
 
 DEFAULT_ITE_TRACKER_MEMORY_LENGTH : int = 10
@@ -84,9 +85,9 @@ def _optional_arguments_for_hamiltonian_function(args:_HamilInputType, rule:_Ham
 
 
 class HamiltonianFuncAndInputs(NamedTuple):
-    func: Callable[[_HamilInputType], np.ndarray] 
+    func: Callable[[_HamilInputType|None], np.ndarray] 
     args: _HamilInputType
-    args_rule: _HamilInputRuleType
+    args_rule: _HamilInputRuleType     
 
     def __repr__(self) -> str:
         return f"Hamiltonian function {self.func.__name__!r} with arguments: {self.args}"
@@ -200,7 +201,7 @@ class IterativeProcessConfig(_ConfigClass):
     # Measure expectation and energies:
     num_mode_repetitions_per_segment : int = 1  # number of modes between each measurement of energy
     num_edge_repetitions_per_mode : int = 6  # number of edges before new segment
-    change_config_for_measurements_func : Callable[[_T], _T] = _Identity_function
+    change_config_for_measurements_func : Callable = _Identity_function
 
     def __repr__(self) -> str:
         return super().__repr__()

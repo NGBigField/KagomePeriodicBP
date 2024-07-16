@@ -2,7 +2,6 @@ import numpy as np
 from numpy import tensordot, zeros
 from physics.pauli import x, y, z, id
 from physics.spin_operators import Sx, Sy, Sz
-from functools import cache
 
 # For type hinting:
 from typing import Literal

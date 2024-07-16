@@ -3,7 +3,7 @@ from typing import Generator, Final
 from numpy import ndarray as np_ndarray
 from enums import UnitCellFlavor
 import numpy as np
-from metrics.distance import tensor_distance
+from physics.metrics.distance import tensor_distance
 
 from utils import saveload, strings, iterations, files, assertions
 

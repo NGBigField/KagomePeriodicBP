@@ -43,7 +43,7 @@ from libs.ITE import rho_ij
 from libs.TenQI import op_to_mat
 
 # Quantum Information metrics:
-from metrics import negativity
+from physics.metrics import negativity
 
 # Utils:
 from utils import assertions, logs, errors, lists, parallels, prints, strings
