@@ -196,7 +196,8 @@ def _calculate_crnt_observables(
         full_tn.connect_uniform_messages()
 
     ## Calculate observables:
-    energies, expectations, entanglement = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
+    measurements = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
+    
 
     return energies, expectations, entanglement, messages
 
