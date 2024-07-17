@@ -13,7 +13,7 @@ from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 
 from unit_cell import BestUnitCellData, UnitCell
-from containers.results import Measurements
+from containers.results import MeasurementsOnUnitCell
 from containers.configs import Config
 
 from tensor_networks import KagomeTNRepeatedUnitCell
@@ -54,7 +54,7 @@ def _collect_references():
     return Ds, SUs, VUs
 
 
-def _robust_energy_measurement(unit_cell:UnitCell) -> Measurements:
+def _robust_energy_measurement(unit_cell:UnitCell) -> MeasurementsOnUnitCell:
     ## define configs:
     d, D = unit_cell.derive_dimensions()
     config = Config.derive_from_dimensions(D)

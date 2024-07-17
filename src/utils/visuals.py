@@ -349,21 +349,32 @@ class AppendablePlot():
     # def scatter(self, x, y, draw_now_:bool=True, plt_kwargs:dict=dict())->None:
     #     pass
 
-    def append(self, draw_now_:bool=True, plt_kwargs:dict=dict(), **kwargs:tuple[float,float]|float|None)->None:
+    def append(
+        self, 
+        draw_now_:bool=True, 
+        plt_kwargs:dict|None=None, 
+        values:dict[str, float]|dict[str, tuple[float,float]]|None=None, 
+        **kwargs:tuple[float,float]|float
+    )->None:
+        
+        ## Default values:
+        if values is None: values = dict()
+        if plt_kwargs is None: plt_kwargs = dict()
         ## append to values
-        for name, val in kwargs.items():
-            if isinstance(val, tuple):
-                x = val[0]
-                y = val[1]
-            elif isinstance(val, float|int):
-                x = None
-                y = val
-            elif val is None:
-                x = None
-                y = None
-            else:
-                raise TypeError(f"val of type {type(val)!r} does not match possible cases.")
-            self._add_xy(name, x, y, plt_kwargs=plt_kwargs)
+        for dict_ in [values, kwargs]:
+            for name, val in dict_.items():
+                if isinstance(val, tuple):
+                    x = val[0]
+                    y = val[1]
+                elif isinstance(val, float|int):
+                    x = None
+                    y = val
+                elif val is None:
+                    x = None
+                    y = None
+                else:
+                    raise TypeError(f"val of type {type(val)!r} does not match possible cases.")
+                self._add_xy(name, x, y, plt_kwargs=plt_kwargs)
 
         ## Update plot:
         self._update(draw_now_=draw_now_)

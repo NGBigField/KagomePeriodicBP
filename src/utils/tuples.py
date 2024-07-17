@@ -13,6 +13,7 @@ from copy import deepcopy
 
 _T1 = TypeVar("_T1")
 _NumericType = TypeVar("_NumericType", float, complex, int)
+_InputNamedTupleType = TypeVar("_InputNamedTupleType", bound=NamedTuple)
 
 
 def angle(t1:Tuple[_NumericType,...], t2:Tuple[_NumericType,...])->float:
@@ -59,12 +60,12 @@ def copy_with_replaced_val_at_index(t:tuple, i:int, val:Any) -> tuple:
     return tuple(temp)
 
 
-def copy_with_replaced_val_at_key(t:NamedTuple, key:str, val:Any) -> NamedTuple:
+def copy_with_replaced_val_at_key(t:_InputNamedTupleType, key:str, val:Any) -> _InputNamedTupleType:
     i = get_index_of_named_tuple_key(t=t, key=key)
     # create native tuple:
     t2 = copy_with_replaced_val_at_index(t, i, val)    
     # use constructor to create instance of the same NamedTuple as t:
-    return t.__class__(*t2)  
+    return t.__class__(*t2)  # type: ignore
 
 def get_index_of_named_tuple_key(t:NamedTuple, key:str)->int:
     for i, field in enumerate(t._fields):

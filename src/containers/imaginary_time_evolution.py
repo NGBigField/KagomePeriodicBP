@@ -7,14 +7,15 @@ from utils.arguments import Stats
 from copy import deepcopy
 
 # For type hinting:
-from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Iterable, Any, TypeAlias, Union
+from typing import Generator, NamedTuple, Callable, TypeVar, Generic, Iterable, Any, TypeAlias, Union, List, Final
 
 # Other containers and enums:
 from containers._meta import _ConfigClass
+from containers.density_matrices import MatrixMetrics 
+from containers.results import MeasurementsOnUnitCell
 from enums.imaginary_time_evolution import UpdateMode
 from enums.tensor_networks import UnitCellFlavor
 from containers.belief_propagation import BPStats
-from containers.density_matrices import MatrixMetrics 
 from tensor_networks import UnitCell
 from _error_types import ITEError
 
@@ -26,8 +27,8 @@ _T = TypeVar("_T")
 
 
 DEFAULT_ITE_TRACKER_MEMORY_LENGTH : int = 10
-_HamilInputType : TypeAlias = _T|tuple[_T]|None|str
-_HamilInputRuleType : TypeAlias = Callable[[Any], _HamilInputType]|None
+_HamilInputType = TypeVar("_HamilInputType")
+_HamilInputRuleType : TypeAlias = Callable[[Any], _HamilInputType]
 NUM_EDGES_PER_MODE : int = 6
 
 def _Identity_function(x):
@@ -42,7 +43,7 @@ _NEXT_IN_ABC_ORDER = {
 
 
 
-class _LimitedLengthList(Generic[_T]):
+class _LimitedLengthList(List[_T]):
     __slots__ = ("length_limit", "_list")
 
     def __init__(self, length:int) -> None:
@@ -63,20 +64,20 @@ class _LimitedLengthList(Generic[_T]):
         if len(self._list)>self.length_limit:
             self.pop_oldest()
 
-    def __setitem__(self, key, value)->None:
+    def __setitem__(self, key, value) -> None:
         return self._list.__setitem__(key, value)
     
-    def __getitem__(self, key)->_T:
+    def __getitem__(self, key) -> _T:
         return self._list.__getitem__(key)
     
-    def __delitem__(self, key)->_T:
+    def __delitem__(self, key) -> None:
         return self._list.__delitem__(key)
 
     def __len__(self)->int:
         return len(self._list)
 
 
-def _optional_arguments_for_hamiltonian_function(args:_HamilInputType, rule:_HamilInputRuleType, **kwargs)->_HamilInputType:
+def _optional_arguments_for_hamiltonian_function(args:_HamilInputType, rule:_HamilInputRuleType, **kwargs)->_HamilInputType|None:
     if isinstance(args, str) and args=="delta_t" and "delta_t" in kwargs:
         args = kwargs["delta_t"]
     if rule is not None:
@@ -84,8 +85,9 @@ def _optional_arguments_for_hamiltonian_function(args:_HamilInputType, rule:_Ham
     return args
 
 
-class HamiltonianFuncAndInputs(NamedTuple):
-    func: Callable[[_HamilInputType|None], np.ndarray] 
+@dataclass
+class HamiltonianFuncAndInputs(Generic[_HamilInputType]):
+    func: Callable[[_HamilInputType], np.ndarray] 
     args: _HamilInputType
     args_rule: _HamilInputRuleType     
 
@@ -94,23 +96,24 @@ class HamiltonianFuncAndInputs(NamedTuple):
 
     @staticmethod
     def default()->"HamiltonianFuncAndInputs":
-        return HamiltonianFuncAndInputs(func=zero, args=None, args_rule=None)
+        return HamiltonianFuncAndInputs(func=zero, args=None, args_rule=None)  # type:ignore
 
     @staticmethod
     def standard(self_or_tuple)->"HamiltonianFuncAndInputs":
-        assert len(self_or_tuple)==3
-        assert callable(self_or_tuple[0])
         if isinstance(self_or_tuple, HamiltonianFuncAndInputs):
-            assert callable(self_or_tuple.func)
-            return self_or_tuple
+            pass
+        elif isinstance(self_or_tuple, tuple):
+            assert len(self_or_tuple)==3
+            self_or_tuple = HamiltonianFuncAndInputs(func=self_or_tuple[0], args=self_or_tuple[1], args_rule=self_or_tuple[2])
+        else:
+            raise TypeError("Not a supported type")
         
-        if isinstance(self_or_tuple, tuple):
-            return HamiltonianFuncAndInputs(func=self_or_tuple[0], args=self_or_tuple[1], args_rule=self_or_tuple[2])
-
-        raise ValueError(f"Not a valid input for class {HamiltonianFuncAndInputs.__name__!r}") 
+        assert callable(self_or_tuple.func)
+        return self_or_tuple
+    
 
     def call(self, **kwargs)->np.ndarray:
-        assert len(self)==3
+        ## Unpack:
         func = self.func
         args = self.args
         rule = self.args_rule
@@ -120,7 +123,7 @@ class HamiltonianFuncAndInputs(NamedTuple):
 
         # call:
         if args is None:
-            return func()
+            return func()  # type:ignore
         elif isinstance(args, Iterable):
             return func(*args)
         else:
@@ -141,9 +144,8 @@ class UpdateEdge(NamedTuple):
     def __repr__(self) -> str:
         return UpdateEdge.to_str(self)
     
-    @property
-    def as_strings(self)->tuple[str, str]:
-        return (self.first.name, self.second.name)
+    def __str__(self) -> str:
+        return self.__repr__()
 
     @staticmethod
     def all_options()->Generator["UpdateEdge", None, None]:
@@ -157,18 +159,20 @@ class UpdateEdge(NamedTuple):
         if num_edges != NUM_EDGES_PER_MODE:
             random_order = lists.repeat_list(random_order, num_items=num_edges)
         return (mode for mode in random_order)
-    
+
     @staticmethod
-    def to_str(edge_tuple: Union["UpdateEdge",tuple])->str:
+    def to_str(edge_tuple: Union["UpdateEdge", tuple[str, str], str])->str:
         if isinstance(edge_tuple, UpdateEdge):
             return f"({edge_tuple.first}, {edge_tuple.second})"
         elif isinstance(edge_tuple, tuple):
             return f"({edge_tuple[0]}, {edge_tuple[1]})"
+        elif isinstance(edge_tuple, str):
+            return edge_tuple
         else:
             raise TypeError("Not an expected type")
 
 
-SUB_FOLDER = "ite_trackers"
+SUB_FOLDER : Final[str] = "ite_trackers"
 DEFAULT_TIME_STEPS = lambda: [0.02]*5 + [0.01]*5 + [0.001]*100 + [1e-4]*100 + [1e-5]*100 + [1e-6]*100 + [1e-7]*100 + \
     [1e-8]*100 + [1e-9]*100 + [1e-10]*100 + [1e-11]*100 + [1e-12]*100 + [1e-13]*100 + [1e-15]*200
 
@@ -221,7 +225,7 @@ class ITEConfig(_ConfigClass):
     # After update flags:
     normalize_tensors_after_update : bool = True
     force_hermitian_tensors_after_update : bool = True
-    # Optimizaion params:
+    # Optimization params:
     add_gaussian_noise_fraction : float|None = None
     # Hamiltonian commutation constraints:
     symmetric_product_formula : bool = True
@@ -259,16 +263,14 @@ class ITEConfig(_ConfigClass):
         return self._interaction_hamiltonian
     @interaction_hamiltonian.setter
     def interaction_hamiltonian(self, value:HamiltonianFuncAndInputs)->None:
-        self._interaction_hamiltonian = value
-        self.__post_init__()
+        self._interaction_hamiltonian = HamiltonianFuncAndInputs.standard(value)
 
     @property
     def time_steps(self)->list[float]:
         return self._time_steps
     @time_steps.setter
     def time_steps(self, value:list[float]|list[list[float]])->None:
-        self._time_steps = value
-        self.__post_init__()
+        self._time_steps = _fix_and_rearrange_time_steps(value)
     
     
 
@@ -285,7 +287,7 @@ class ITESegmentStats(Stats):
     ite_per_mode_stats : list[ITEPerModeStats] = None # type: ignore
     modes_order : list[UpdateMode] = None  # type: ignore
     delta_t : float = None  # type: ignore
-    mean_energy : float = None
+    mean_energy : float = None  # type: ignore
     had_to_revert : bool = False
 
     def __post_init__(self):
@@ -294,7 +296,7 @@ class ITESegmentStats(Stats):
 
 
                         
-_TrackerStepOutputs = tuple[
+_TrackerStepOutputs : TypeAlias = tuple[
     float,              # delta_t
     complex|None,       # energy    
     ITESegmentStats,    # env_hermicity      
@@ -306,7 +308,7 @@ _TrackerStepOutputs = tuple[
 
 class ITEProgressTracker():
 
-    def __init__(self, unit_cell:UnitCell, messages:dict|None, config:Any, mem_length:int=DEFAULT_ITE_TRACKER_MEMORY_LENGTH, filename:str=None):
+    def __init__(self, unit_cell:UnitCell, messages:dict|None, config:Any, mem_length:int=DEFAULT_ITE_TRACKER_MEMORY_LENGTH, filename:str|None=None):
         # From input:
         self.last_unit_cell : UnitCell = unit_cell.copy()
         self.last_messages : dict = deepcopy(messages)  #type: ignore
@@ -317,7 +319,7 @@ class ITEProgressTracker():
         self.file_name : str = filename if filename is not None else "ite-tracker_"+strings.time_stamp()+" "+strings.random(5)
         # Lists memory:
         self.delta_ts           : _LimitedLengthList[float]             = _LimitedLengthList[float](mem_length) 
-        self.energies           : _LimitedLengthList[complex|None]      = _LimitedLengthList[complex|None](mem_length)     
+        self.energies           : _LimitedLengthList[float]             = _LimitedLengthList[float](mem_length)     
         self.expectation_values : _LimitedLengthList[dict]              = _LimitedLengthList[dict](mem_length) 
         self.unit_cells         : _LimitedLengthList[UnitCell]          = _LimitedLengthList[UnitCell](mem_length) 
         self.messages           : _LimitedLengthList[dict]              = _LimitedLengthList[dict](mem_length) 
@@ -331,14 +333,14 @@ class ITEProgressTracker():
     def full_path(self) -> str:
         return saveload._fullpath(name=self.file_name, sub_folder=SUB_FOLDER)
 
-    def log_segment(self, delta_t:float, unit_cell:UnitCell, messages:dict, expectation_values:dict, energy:complex, stats:ITESegmentStats )->None:
+    def log_segment(self, delta_t:float, unit_cell:UnitCell, messages:dict|None, measurements:MeasurementsOnUnitCell, stats:ITESegmentStats )->None:
         # Get a solid copy
         _unit_cell = unit_cell.copy()
         messages = deepcopy(messages)
-        expectation_values = deepcopy(expectation_values)
+        expectation_values = deepcopy(measurements.expectations)
         ## Lists:
         self.delta_ts.append(delta_t)
-        self.energies.append(energy)
+        self.energies.append(measurements.mean_energy)
         self.unit_cells.append(_unit_cell)
         self.messages.append(messages)
         self.expectation_values.append(expectation_values)
@@ -401,14 +403,15 @@ class ITEProgressTracker():
         ite_tracker = saveload.load(file_name, sub_folder=SUB_FOLDER, none_if_not_exist=True)        
         return ite_tracker
 
-    def save(self)->None:
-        # avoid saving local variable:
+    def save(self)->str:
         # Save:
-        return saveload.save(self, self.file_name, sub_folder=SUB_FOLDER)        
+        filename : str = self.file_name
+        sub_folder : str = SUB_FOLDER
+        return saveload.save(self, name=filename, sub_folder=sub_folder)        
 
     def plot(self, live_plot:bool=False)->None:
         # Specific plotting imports:
-        from algo.imaginary_time_evolution._visualization import ITEPlots
+        from visualizations.ite import ITEPlots
         from utils import visuals
         from containers import Config
 
@@ -419,6 +422,7 @@ class ITEProgressTracker():
         for delta_t, energy, unit_cell, msg, expectations, stats \
             in zip(self.delta_ts, self.energies, self.unit_cells, self.messages, self.expectation_values, self.stats ):
 
+            raise NotImplementedError("Need to fix this call") #TODO fic
             plots.update(energies=energy, segment_stats=stats, delta_t=delta_t, expectations=expectations, unit_cell=unit_cell, _draw_now=live_plot)            
         
         visuals.draw_now()
@@ -449,6 +453,6 @@ def _time_steps_str(time_steps:list[float])->str:
 
 def _fix_and_rearrange_time_steps(times:list[float]|list[list[float]])->list[float]:
     if isinstance(times, list):
-        return lists.join_sub_lists(times)
+        return lists.join_sub_lists(times)  # type: ignore
     else:
         raise TypeError(f"Not an expected type of argument `times`. It has type {type(times)}")

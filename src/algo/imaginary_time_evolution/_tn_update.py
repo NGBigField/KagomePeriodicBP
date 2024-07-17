@@ -27,7 +27,10 @@ import functools  #TODO  use cache
 import numpy as np
 
 
-def get_imaginary_time_evolution_operator(hamiltonian_func:HamiltonianFuncAndInputs, delta_t:float|None) -> tuple[np.ndarray, np.ndarray]: 
+def get_imaginary_time_evolution_operator(
+    hamiltonian_func:HamiltonianFuncAndInputs, delta_t:float|None
+) -> tuple[np.ndarray, np.ndarray|None]: 
+    
     hamiltonian_func = HamiltonianFuncAndInputs.standard(hamiltonian_func)
     if delta_t is None:
         h = hamiltonian_func.call(delta_t=0.0)
@@ -110,7 +113,7 @@ def _calc_environment_equivalent_matrix(environment_tensors:list[np.ndarray]) ->
     return m
 
 
-def _measures_on_edge(t1_new, t2_new, mps_env, h:np.ndarray=None, eigen_values=None) -> tuple[complex, MatrixMetrics]:
+def _measures_on_edge(t1_new, t2_new, mps_env, h:np.ndarray|None=None, eigen_values=None) -> tuple[float|None, MatrixMetrics]:
     rdm = rho_ij(t1_new, t2_new, mps_env=mps_env)
 
     if h is None:
@@ -187,6 +190,7 @@ def ite_update_unit_cell(
 
     # Calc energy and calc env metrics:
     energy_after, metrics = _measures_on_edge(t1_new, t2_new, mps_env, h=h, eigen_values=origin_eigen_vals)
+    assert energy_after is not None
 
     ## normalize
     if ite_config.normalize_tensors_after_update:

@@ -16,7 +16,7 @@ class VisualsConfig(_ConfigClass):
     verbose : bool = False  # Print any tiny detail through the code execution 
     energies_print_decimal_point_length : int = 8
     
-    _plots_to_show : tuple[bool] = _DEFAULT_PLOTS_TO_SHOW
+    _plots_to_show : tuple[bool, bool, bool] = _DEFAULT_PLOTS_TO_SHOW
 
     def __repr__(self) -> str:
         return super().__repr__()
