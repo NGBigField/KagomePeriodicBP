@@ -454,6 +454,7 @@ class ITEPlots():
         mean_expectation_values = measurements_at_end.mean_expectation_values
         energies_at_end = measurements_at_end.energies
         entanglement = measurements_at_end.entanglement
+        mean_energy = measurements_at_end.mean_energy
 
         ## Main:
         if self.show.main:
@@ -472,11 +473,6 @@ class ITEPlots():
 
             if isinstance(energies_at_end, dict):
                 _scatter_plot_at_main_per_edge(results_dict=energies_at_end, iteration=i, base_style=energies_after_segment_style, axis_name="energies")
-                mean_energy = lists.average(list(energies_at_end.values()))
-            elif isinstance(energies_at_end, (complex, float, int)):
-                mean_energy = energies_at_end
-            else:
-                raise TypeError(f"Not an expected type {type(energies_at_end)}")
             
             ## Energies after each update:
             if not _initial:
