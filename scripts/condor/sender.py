@@ -20,15 +20,15 @@ import time
 
 from src import project_paths
 
-
-results_dir = project_paths.data/"condor"
-results_dir = results_dir.__str__()
-if not os.path.exists(results_dir):
-    os.makedirs(results_dir)
+sep = os.sep
+_results_dir = project_paths.data/"condor"
+results_dir_str : str = _results_dir.__str__()
+if not os.path.exists(results_dir_str):
+    os.makedirs(results_dir_str)
 
 
 RAM_MEMORY_IN_2_EXPONENTS = False
-LOCAL_TEST = False
+LOCAL_TEST = True
 
 RESULT_KEYS_DICT = dict(
     bp = ["with_bp", 'D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'],
@@ -39,20 +39,20 @@ RESULT_KEYS_DICT = dict(
 
 ## all values:
 DEFAULT_VALS = {}
-DEFAULT_VALS['D'] = [3]
-DEFAULT_VALS['N'] = list(range(2, 20))
-DEFAULT_VALS['chi'] = [1]
-DEFAULT_VALS['method'] = [0]
+DEFAULT_VALS['D'] = list(range(2, 5))
+DEFAULT_VALS['N'] = list(range(2, 5))
+DEFAULT_VALS['chi'] = [1, 2, 3]
+DEFAULT_VALS['method'] = [1]
 DEFAULT_VALS['seed'] = [1]
-DEFAULT_VALS['parallel'] = [0, 1]
+DEFAULT_VALS['parallel'] = [0]
 
 Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(parallel) $(result_keys)'
 
 
 def main(
-    job_type="parallel_timings",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
+    job_type="ite_afm",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
     request_cpus:int=8,
-    request_memory_gb:int=8,
+    request_memory_gb:int=16,
     vals:dict=DEFAULT_VALS,
     result_file_name:str|None=None
 ):
@@ -69,11 +69,10 @@ def main(
     result_keys = RESULT_KEYS_DICT[job_type]
 
     ## Define paths and names:
-    sep = os.sep
     this_folder_path = pathlib.Path(__file__).parent.__str__()
     #
     worker_script_fullpath = this_folder_path+sep+"worker.py"
-    results_fullpath       = results_dir+sep+result_file_name+".csv"
+    results_fullpath       = results_dir_str+sep+result_file_name+".csv"
     output_files_prefix    = "kagome-bp-"+job_type+"-"+_time_stamp()
     #
     print(f"script_fullpath={worker_script_fullpath!r}")

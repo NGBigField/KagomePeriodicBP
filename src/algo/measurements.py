@@ -23,7 +23,7 @@ from libs.ITE import rho_ij
 # Common types in the code:
 from containers import Config, BubbleConConfig, UpdateEdge
 from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
-from containers.results import Measurements
+from containers.results import MeasurementsOnUnitCell
 from tensor_networks import KagomeTNRepeatedUnitCell, KagomeTNArbitrary, ModeTN, EdgeTN, TensorNode, MPS
 from tensor_networks.abstract_classes import TensorNetwork
 from lattices.directions import BlockSide
@@ -43,7 +43,7 @@ from libs.ITE import rho_ij
 from libs.TenQI import op_to_mat
 
 # Quantum Information metrics:
-from metrics import negativity
+from physics.metrics import negativity
 
 # Utils:
 from utils import assertions, logs, errors, lists, parallels, prints, strings
@@ -168,7 +168,7 @@ def measure_energies_and_observables_together(
     trunc_dim:int,
     mode:UpdateMode|None=None,
     force_real:bool=True
-)->Measurements:
+)->MeasurementsOnUnitCell:
     """Based on a stable TensorNetwork, get measurements using the reduced-density-matrix per edge.
     """
 
@@ -209,7 +209,7 @@ def measure_energies_and_observables_together(
 
         # keep energies:
         if return_by_flavor:
-            key = edge_tuple.as_strings
+            key = str(edge_tuple)
         else:
             key = edge_tn.edge_name 
         energies[key] = edge_energy
@@ -237,7 +237,7 @@ def measure_energies_and_observables_together(
             # override value, count tuple with mean:
             expectations_out[abc][xyz] = sum_/count_  
     
-    return Measurements(energies=energies, expectations=expectations_out, entanglement=entanglement)
+    return MeasurementsOnUnitCell(energies=energies, expectations=expectations_out, entanglement=entanglement)
 
 
 
@@ -246,7 +246,7 @@ def calc_measurements(
     config:Config,
     hamiltonian:HamiltonianFuncAndInputs|np.ndarray=hamiltonians.heisenberg_afm(), 
     mode:UpdateMode=UpdateMode.random()
-) -> Measurements:
+) -> MeasurementsOnUnitCell:
     ## Unpack data to get TN:
     # Get TN:
     N = config.dims.big_lattice_size
@@ -271,7 +271,7 @@ def run_converged_measurement_test(
     config:Config|None=None,
     progress_bar:bool=True,
     plot:bool=True
-)->Measurements:
+)->MeasurementsOnUnitCell:
     ## Basic Data:
     d, D = unit_cell.derive_dimensions()
     if config is None:
@@ -283,7 +283,7 @@ def run_converged_measurement_test(
     crnt_config = deepcopy(config)
     
     ## Prepare results:
-    results : list[tuple[int, Measurements]] = []
+    results : list[tuple[int, MeasurementsOnUnitCell]] = []
 
     if progress_bar:
         _print_prefix = "Performing BlockBP..."

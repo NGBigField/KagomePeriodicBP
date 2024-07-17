@@ -39,6 +39,13 @@ def main(
         case _:
             raise ValueError("Not a valid option")
 
+    # Parallel:
+    if parallel==0:     parallel=False
+    elif parallel==1:   parallel=True
+    else:
+        raise ValueError(f"Invalid parallel value {parallel!r}")
+
+
     ## Run:
     energy, unit_cell_file_path = run_ite(
         N=N, D=D, chi_factor=chi_factor, 

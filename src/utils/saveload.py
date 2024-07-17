@@ -6,16 +6,7 @@
 from _config_reader import SAVE_FILES_WITH
 
 # Typing hints:
-from typing import (
-    Tuple,
-    Optional,
-    Any,
-    List,
-	Generator,
-    Literal,
-    TypeAlias,
-    Type
-)
+from typing import Tuple, Optional, Any, List, Generator, Literal, TypeAlias, Type, overload
 
 from abc import ABC, abstractmethod
 
@@ -158,12 +149,11 @@ def save_or_load_with_fullpath(fullpath:str, mode:Type[_Mode], var:Any|None=None
         case _:
             raise ValueError("Not matching an existing case")
 
-
-def save(var:Any, name:Optional[str]=None, sub_folder:Optional[str]=None, if_not_exist:bool=False, print_:bool=False) -> str|None:
+def save(var:Any, name:Optional[str]=None, sub_folder:Optional[str]=None, if_not_exist:bool=False, print_:bool=False) -> str:
     # Complete missing inputs:
     name = arguments.default_value(name, strings.time_stamp())
     if if_not_exist and exist(name=name, sub_folder=sub_folder):
-        return None
+        return ""
     # fullpath:
     fullpath = _fullpath(name, sub_folder)
     # Common save or load:

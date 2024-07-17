@@ -4,9 +4,9 @@ _T = TypeVar('_T')
 
 @dataclass
 class Stats():
-    execution_time : float = None  # type: ignore
-    size_of_inputs : int = None
-    size_of_outputs : int = None
+    execution_time  : float = None  # type: ignore
+    size_of_inputs  : int|None = None
+    size_of_outputs : int|None = None
 
     def __post_init__(self):
         pass

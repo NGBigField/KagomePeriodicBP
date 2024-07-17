@@ -12,10 +12,10 @@ from utils import visuals, strings, logs, prints, tuples, lists, saveload, dicts
 import project_paths
 
 from tensor_networks import UnitCell
-from containers import Config, ITESegmentStats, UpdateEdge
+from containers import Config, ITESegmentStats, UpdateEdge, MeasurementsOnUnitCell
 import numpy as np
 from dataclasses import dataclass, fields
-from typing import TypeVar, Generic, Generator, Optional, Callable
+from typing import TypeVar, Generic, Generator, Optional, Callable, Protocol
 _T = TypeVar('_T')
 
 from _types import UnitCellExpectationValuesDict
@@ -127,7 +127,7 @@ class BlockSpherePlot():
             self._under_text.remove()
         self._under_text = self.axis.text(0,0,-1.3, s)
 
-    def append(self, vector:list[float, float, float])->None:
+    def append(self, vector:list[float])->None:
         assert len(vector)==3
         # Add track to memory (only if different the last point in track)
         refresh_track = self._add_to_track(vector)
@@ -199,7 +199,6 @@ class BlockSpherePlot():
             self.axis.quiver(0, 0, 0, x, y, z, **XYZ_ARROW_KWARGS)
             self.axis.text(x,y,z,text)
 
-    
 
 
 class ITEPlots():
@@ -419,23 +418,22 @@ class ITEPlots():
         
 
     def update(self, 
-        energies_at_end : dict[str, float], 
-        energies_at_updates : list[dict[str, float]] ,
+        measurements_at_end : MeasurementsOnUnitCell,
+        energies_at_updates : list[dict[str, float]]|None,
         segment_stats : ITESegmentStats, 
         delta_t : float, 
-        expectations : UnitCellExpectationValuesDict, 
         unit_cell : UnitCell, 
-        entanglement : list[dict[str, float]],
         _initial:bool=False,
         _draw_now:bool=True
     ):
         if not self.active:
             return
         
-        if not _initial:
+        if _initial:
+            assert energies_at_updates is None
+        else:
+            assert isinstance(energies_at_updates, list) and isinstance(energies_at_updates[0], dict)
             self._iteration += 1  # index beginning at 1 (not 0)
-
-        mean_expec_vals = _mean_expectation_values(expectations)
 
         def _small_scatter(plot:visuals.AppendablePlot, x:float, y:float, style:visual_constants.ScatterStyle=default_marker_style)->None:
             plot.axis.scatter(x=x, y=y, c=style.color, s=style.size, alpha=style.alpha, marker=style.marker)
@@ -451,14 +449,27 @@ class ITEPlots():
                     style = tuples.copy_with_replaced_val_at_key(style, "alpha", alpha)
                 _small_scatter(plot, iteration, value, style=style)
 
+        def _energies_adjust(energies:dict[str, float]) -> dict[str, float]:
+            res = {}
+            for key, energy in energies.items():
+                if isinstance(energy, complex):
+                    energy = energy.real
+                res[key] = energy*2
+            return res
 
+        ## Collect data:
         had_to_revert = segment_stats.had_to_revert
+        mean_expectation_values = measurements_at_end.mean_expectation_values
+        energies_at_end = _energies_adjust(measurements_at_end.energies)
+        entanglement = measurements_at_end.entanglement
+        mean_energy = measurements_at_end.mean_energy
 
         ## Main:
         if self.show.main:
             if not _initial:
                 self.plots.main["delta_t"].append(delta_t=delta_t, draw_now_=False)
-            self.plots.main["expectations"].append(**mean_expec_vals, draw_now_=False)
+
+            self.plots.main["expectations"].append(values=mean_expectation_values, draw_now_=False)
 
             # Time and space complexity
             self.plots.main["exec_t"].append(time=segment_stats.execution_time, plt_kwargs={'c':COLORS.time_complexity}, draw_now_=False)
@@ -466,30 +477,29 @@ class ITEPlots():
 
             ## Energies per edge:
             i = self._iteration
-            plot = self.plots.main["energies"]
+            _plot = self.plots.main["energies"]
 
             if isinstance(energies_at_end, dict):
                 _scatter_plot_at_main_per_edge(results_dict=energies_at_end, iteration=i, base_style=energies_after_segment_style, axis_name="energies")
-                mean_energy = lists.average(list(energies_at_end.values()))
-            elif isinstance(energies_at_end, (complex, float, int)):
-                mean_energy = energies_at_end
-            else:
-                raise TypeError(f"Not an expected type {type(energies_at_end)}")
             
             ## Energies after each update:
-            num_fractions = len(energies_at_updates)
-            frac = 1/num_fractions if num_fractions>0 else None
-            j = self._iteration-1
-            for energies in energies_at_updates:
-                j += frac
-                _scatter_plot_at_main_per_edge(results_dict=energies, iteration=j, base_style=energies_at_update_style, axis_name="energies")
+            if not _initial:
+                assert energies_at_updates is not None
+                num_fractions = len(energies_at_updates)
+                frac = 1/num_fractions if num_fractions>0 else None
+                j = self._iteration-1
+                for energies in energies_at_updates:
+                    energies = _energies_adjust(energies)
+                    assert frac is not None
+                    j += frac
+                    _scatter_plot_at_main_per_edge(results_dict=energies, iteration=j, base_style=energies_at_update_style, axis_name="energies")
                 
             # Mean:
-            plot.append(mean=(i, mean_energy), draw_now_=False)
+            _plot.append(mean=(i, mean_energy), draw_now_=False)
 
             # Ground-truth
             if self.config.ite.reference_ground_energy is not None:
-                plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
+                _plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
 
             ## Entanglement
             _scatter_plot_at_main_per_edge(results_dict=entanglement, iteration=i, base_style=energies_after_segment_style, axis_name="entanglement", alpha=1.0)
@@ -523,9 +533,9 @@ class ITEPlots():
 
         ## Core
         if self.show.cores:
-            for abc, xyz_dict in expectations.items():
-                vector = [0, 0, 0]
-                plot : BlockSpherePlot = self.plots.cores[abc]
+            for abc, xyz_dict in measurements_at_end.expectations.items():
+                vector : list[float] = [.0, .0, .0]
+                plot : BlockSpherePlot = self.plots.cores[abc]  #type: ignore
                 for xyz, value in xyz_dict.items():
                     match xyz:
                         case 'x': vector[0]=value
@@ -534,7 +544,7 @@ class ITEPlots():
                 plot.append(vector)
             
             for abc, tensor in unit_cell.items():
-                plot : BlockSpherePlot = self.plots.cores[abc.name]
+                plot : BlockSpherePlot = self.plots.cores[abc.name]  #type: ignore
                 norm = np.linalg.norm(tensor)
                 # plot.under_text(f"Norm={norm}")
         

@@ -39,12 +39,12 @@ def add_stats(
     memory_usage:bool=False
 ) -> Callable[[Callable[_In, _Out]], Callable[_In, _Out]]:  # A function that return a decorator which depends on inputs
 
-    def _add_stats_to_object(stats:Stats, t1:float, t2:float, size_of_inputs:int, size_of_outputs:int)->None:        
+    def _add_stats_to_object(stats:Stats, t1:float, t2:float, size_of_inputs:int|None, size_of_outputs:int|None)->None:        
         stats.execution_time = t2-t1
         stats.size_of_inputs = size_of_inputs
         stats.size_of_outputs = size_of_outputs
 
-    def _update_stats_object_in_outputs(inputs:tuple[list, dict], outputs:_Out, t1:float, t2:float)->_Out:
+    def _update_stats_object_in_outputs(inputs:tuple, outputs:_Out, t1:float, t2:float)->_Out:
         if memory_usage:
             size_of_inputs  = sizes.get_object_size(inputs)
             size_of_outputs = sizes.get_object_size(outputs)

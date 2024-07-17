@@ -1,23 +1,21 @@
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field
 from _types import UnitCellExpectationValuesDict, UnitCellValuePerEdgeDict, ExpectationsPerDirection
 from typing import TypeAlias
 from utils import lists, strings
 
-Expectations : TypeAlias = ExpectationsPerDirection
-
 
 @dataclass
-class Measurements():
-    energies:       UnitCellValuePerEdgeDict  # energies
-    expectations:   UnitCellExpectationValuesDict  # expectations
-    entanglement:   UnitCellValuePerEdgeDict  # entanglement
+class MeasurementsOnUnitCell():
+    energies:     UnitCellValuePerEdgeDict  # energies
+    expectations: UnitCellExpectationValuesDict  # expectations
+    entanglement: UnitCellValuePerEdgeDict  # entanglement
 
     @property
     def mean_energy(self)->float:
         return sum(self.energies.values())/3
 
     @property
-    def mean_expectation_values(self)->Expectations:
+    def mean_expectation_values(self)->ExpectationsPerDirection:
         output = {}
         for xyz in ['x', 'y', 'z']:
             results = [self.expectations[abc][xyz] for abc in ['A', 'B', 'C']]

@@ -12,7 +12,7 @@ class BubbleConConfig(_ConfigClass):
     separate_exp=True
     iterative_compression_max_ier : int =  200
     iterative_compression_error : float = 1e-8
-    d_threshold_for_compression : int = 3
+    d_threshold_for_compression : int = 10
 
     def bubblecon_compression(self, D:int) -> dict:
         if D <= self.d_threshold_for_compression:

@@ -8,7 +8,7 @@ import inspect
 from utils import assertions, prints
 from copy import deepcopy
 from dataclasses import dataclass, field
-from metrics.src.numbers_and_indices import dec2binary, binary2dec, BitsType, BitType
+from physics.metrics.src.numbers_and_indices import dec2binary, binary2dec, BitsType, BitType
 
 from _config_reader import DEBUG_MODE
 

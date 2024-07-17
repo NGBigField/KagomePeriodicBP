@@ -4,7 +4,7 @@ from itertools import combinations
 from scipy.linalg import sqrtm
 import matplotlib.pyplot as plt
 # My modules:
-from metrics.src.densitymats import DensityMatrix, CommonDensityMatrices
+from physics.metrics.src.densitymats import DensityMatrix, CommonDensityMatrices
 from utils import assertions
 
 # Global Constants:
