@@ -94,7 +94,7 @@ def main():
 
     ## Force usage of requested Giga-bytes:
     stop_event = threading.Event()
-    thread = threading.Thread(target=_auto_timed_compute_with_random_mat_by_ram, args=(req_mem_gb, stop_event))
+    thread = threading.Thread(target=_auto_timed_compute_with_random_mat_by_ram, args=(req_mem_gb, stop_event), daemon=True)
     thread.start()
 
     ## Run:
