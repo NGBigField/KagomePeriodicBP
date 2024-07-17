@@ -449,10 +449,18 @@ class ITEPlots():
                     style = tuples.copy_with_replaced_val_at_key(style, "alpha", alpha)
                 _small_scatter(plot, iteration, value, style=style)
 
+        def _energies_adjust(energies:dict[str, float]) -> dict[str, float]:
+            res = {}
+            for key, energy in energies.items():
+                if isinstance(energy, complex):
+                    energy = energy.real
+                res[key] = energy*2
+            return res
+
         ## Collect data:
         had_to_revert = segment_stats.had_to_revert
         mean_expectation_values = measurements_at_end.mean_expectation_values
-        energies_at_end = measurements_at_end.energies
+        energies_at_end = _energies_adjust(measurements_at_end.energies)
         entanglement = measurements_at_end.entanglement
         mean_energy = measurements_at_end.mean_energy
 
@@ -481,6 +489,7 @@ class ITEPlots():
                 frac = 1/num_fractions if num_fractions>0 else None
                 j = self._iteration-1
                 for energies in energies_at_updates:
+                    energies = _energies_adjust(energies)
                     assert frac is not None
                     j += frac
                     _scatter_plot_at_main_per_edge(results_dict=energies, iteration=j, base_style=energies_at_update_style, axis_name="energies")
