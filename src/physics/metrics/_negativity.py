@@ -65,7 +65,12 @@ def negativity(
     if IS_VALIDATE_CORRECT_METHOD:        
         res1 = _method1(rho_pt)
         _assert_same_results([res1, res2])
-    result = assertions.real(res2)
+
+    if validate:
+        result = assertions.real(res2)
+    else:
+        result = float(res2)
+
     return result
 
 @typ.overload

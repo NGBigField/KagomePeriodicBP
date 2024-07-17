@@ -8,7 +8,7 @@ from tensor_networks import KagomeTNRepeatedUnitCell, KagomeTNArbitrary, Lattice
 from containers import Config
 from physics import hamiltonians
 # Import our algorithms:
-from algo.belief_propagation import belief_propagation, BPStats, MessageDictType
+from algo.belief_propagation import robust_belief_propagation, BPStats, MessageDictType
 from algo.measurements import measure_energies_and_observables_together
 # help types:
 from enums import UpdateMode
@@ -64,7 +64,7 @@ def main(
     ## For each shift in some direction along the lattice:
     for shifted_tn in tn.all_lattice_shifting_options():
         # for the shifted network: Block BP once:
-        messages, stats = belief_propagation(shifted_tn, messages, config=bp_config)
+        messages, stats = robust_belief_propagation(shifted_tn, messages, config=bp_config)
         _print_success(stats)
         # Get energy:
         energies_per_mode = _get_energy_per_site_per_mode(shifted_tn, h, D, bp_config)

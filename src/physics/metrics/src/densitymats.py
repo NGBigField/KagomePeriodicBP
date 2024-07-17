@@ -61,23 +61,17 @@ def _is_square(m: np.matrix) -> bool :
         return False
     return True
 
-def _is_positive_semidefinite(m, EPSILON) -> bool:
+def _is_positive_semidefinite(m, tolerance=1e-6) -> bool:
     eigen_vals = np.linalg.eigvals(m)
-    if np.any(np.imag(eigen_vals)>EPSILON):  # Must be real
+    if np.any(np.imag(eigen_vals)>tolerance):  # Must be real
         return False
-    if np.any(np.real(eigen_vals)<-EPSILON):  # Must be positive
+    if np.any(np.real(eigen_vals)<-tolerance):  # Must be positive
         return False
     return True
 
-def _is_hermitian(m: np.matrix, tolerance=0.1) -> bool:
-    diff = m.H-m
-    shape = m.shape
-    for i in range(shape[0]):
-        for j in range(shape[1]):
-            if abs(diff[i,j])>tolerance:
-                return False
-    return True    
-
+def _is_hermitian(m: np.matrix, tolerance=1e-6) -> bool:
+    diff = abs(m.H-m)
+    return diff.max() < tolerance
 
 def _matrix_dimension_from_optional_num_qubits(num_qubits:typ.Optional[int] = None, mat_dim:typ.Optional[int] = None) -> int:
     if num_qubits is None and mat_dim is None:
@@ -222,8 +216,8 @@ class DensityMatrix(SquareMatrix):
         assert _is_square(self), "Density Matrix must be a square matrix"  
         assertions.integer(np.log2(self.shape[0]), reason="Must have indices of 2 to the power of the qubits") 
         assert abs(self.trace()-1)<EPSILON, "Density Matrix must have trace==1"
-        _assert_or_warning(_is_hermitian(self, EPSILON), msg="Density Matrix must be hermitian")
-        _assert_or_warning(_is_positive_semidefinite(self, EPSILON), msg="Density Matrix must be positive semi-definite")
+        _assert_or_warning(_is_hermitian(self), msg="Density Matrix must be hermitian")
+        _assert_or_warning(_is_positive_semidefinite(self), msg="Density Matrix must be positive semi-definite")
 
     def trace(self) -> complex:
         return np.trace(self)

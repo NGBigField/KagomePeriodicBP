@@ -69,21 +69,23 @@ def _derive_n_d_from_filename(filename:str, who:str) -> tuple[int, int]:
     return n, D
 
 
-def _find_saved_tensor_network(D:int, N:int, who:str) -> list[np.ndarray]:
+def _find_saved_tensor_network(D:int, N:int, who:str) -> list[np.ndarray]|None:
     for fullpath, filename in _all_saved_results_common(who=who):
         crnt_N, crnt_D = _derive_n_d_from_filename(filename, who=who)
         if crnt_D==D and crnt_N==N:
             return _load(fullpath)
     else:
-        return None
+        return None 
 
-def get_itai_tn(D:int, N:int):
+
+def get_itai_tn(D:int, N:int) -> list[np.ndarray]:
     tensor_network = _find_saved_tensor_network(D, N, who="itai")
     if tensor_network is None:
         kagome_block_data = itai_create_kagome_lattice(n=N, _print=False, periodic=True, save_at=simple_update_data_folder)
         output_dict = itai_find_ground_state(d=d, D=D, N_Kagome=N, lattice_fname=kagome_block_data['lattice']['path'], save_at=simple_update_data_folder)
         tensor_network = output_dict['data']
-    return tensor_network
+    return tensor_network  
+
 
 def get_roy_tn(D:int, N:int):
     tensor_network = roy_get_network(D=D, size=N, periodic=True)
@@ -107,14 +109,14 @@ def measure_energy(
     D = tn.dimensions.virtual_dim
     bp_config = Config.BPConfig(
         damping = 0.1,
-        trunc_dim = D**2 + 10,
+        trunc_dim = 2*D**2 + 10,
         parallel_msgs=parallel_msgs,
         max_iterations=50,
         msg_diff_terminate=1e-12
     )
     config = Config.derive_from_dimensions(D)
     config.bp = bp_config
-    config.trunc_dim = 2*D**2 + 10
+    config.trunc_dim = 2*D**2 + 20
 
     ## Run:
     energy = calc_measurement_non_unit_cell_kagome_tn(

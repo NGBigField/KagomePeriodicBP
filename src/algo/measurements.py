@@ -35,7 +35,7 @@ from unit_cell import UnitCell
 
 ## Algos we need:
 from algo.tn_reduction import reduce_full_kagome_to_core, reduce_tn
-from algo.belief_propagation import belief_propagation, BPStats
+from algo.belief_propagation import robust_belief_propagation, BPStats
 from algo.contract_tensor_network import contract_tensor_network
 
 # For energy estimation:
@@ -85,14 +85,11 @@ def _find_not_none_item_in_double_dict( d :dict[str, dict[str, _T]], keys1, keys
             item = d[k1][k2]
             if item is not None:
                 return item
+    raise ValueError("Not found")
 
 def compute_negativity_of_rdm(rdm:np.ndarray)->float:
     matrix : np.matrix = op_to_mat(rdm)
-    try:
-        value = negativity(matrix)
-    except Exception as e:
-        print(e)
-        value = negativity(matrix)
+    value = negativity(matrix)
     return value
 
 def print_results_table(results:dict[str, dict[str, float]])->None:
@@ -299,7 +296,7 @@ def calc_measurement_non_unit_cell_kagome_tn(
     for shifted_tn in tn.all_lattice_shifting_options():
         _cond_print("\n")
         # for the shifted network: Block BP once:
-        messages, stats = belief_propagation(shifted_tn, messages, config=config.bp)
+        messages, stats = robust_belief_propagation(shifted_tn, messages, config=config.bp)
         _print_success(stats)
         # Get energy:
         energies_per_mode = _get_energy_per_site_per_mode(shifted_tn)
@@ -339,7 +336,7 @@ def calc_measurements(
     trunc_dim = config.trunc_dim
 
     ## BP to get stable environment:
-    belief_propagation(tn, None, config.bp)
+    robust_belief_propagation(tn, None, config.bp)
 
     ## Measure:
     return measure_energies_and_observables_together(tn, hamiltonian=hamiltonian, trunc_dim=trunc_dim, mode=mode)
@@ -570,9 +567,9 @@ def calc_unit_cell_expectation_values_from_tn(
     assert not isinstance(denominator, MPS), "Full contraction should result in a number, not an MPS"
     center_nodes = tn.get_center_core_nodes()
     unit_cell_indices = UnitCell(
-        A = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.A),
-        B = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.B),
-        C = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.C)
+        A = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.A),  #type: ignore
+        B = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.B),  #type: ignore
+        C = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.C)   #type: ignore
     )
 
     ## Prepare progress-bar:

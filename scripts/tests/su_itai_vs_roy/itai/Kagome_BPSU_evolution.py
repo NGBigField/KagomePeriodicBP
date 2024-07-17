@@ -59,7 +59,11 @@ from BPSU import  BP_gauging,  merge_SU_weights, \
 
 from ITE import rho_ij
 
+from typing import TypedDict
 
+class _OutputDictType(TypedDict):
+	path : str
+	data : list[np.ndarray]
 
 #
 # -------------------   is_external_e   -----------------------------
@@ -543,7 +547,7 @@ def main(
 	N_Kagome:int=2,  # Kagome size parameter
 	lattice_fname:str|None=None,
 	save_at:str=""
-):
+) -> _OutputDictType:
 
 	np.random.seed(5)
 
