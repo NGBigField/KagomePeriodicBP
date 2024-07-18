@@ -221,11 +221,11 @@ class BestUnitCellData:
 
 
 
-
 def _random_quantum_state_tensor(d:int, D:int, num_virtual_legs) -> np.ndarray:
     ## define needed params and functions:
     dims = [d] + [D]*num_virtual_legs
-    _rand_real_mat = lambda: np.random.rand(*dims)
+    def _rand_real_mat() -> np.ndarray:
+        return np.random.rand(*dims)  #type: ignore
 
     ## create a legit tensor by a random tensor and its conjugate:
     t = _rand_real_mat() + 1j*_rand_real_mat()

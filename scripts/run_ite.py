@@ -142,13 +142,13 @@ def main(
     D = 2,
     N = 3,
     chi_factor : int|float = 1.5,
-    live_plots:_Bool|Iterable[_Bool] = [1,1,1],   #type: ignore
+    live_plots:_Bool|Iterable[_Bool] = [0,0,0],   #type: ignore
     progress_bar:bool=True,
     results_filename:str|None = None,
     parallel:bool = False,
     hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
-    unit_cell_from:str = "best"
+    unit_cell_from:str = "last"
 )->tuple[float, str]:
 
     assert N>=2
@@ -185,7 +185,7 @@ def main(
     config.ite.random_edge_order = False
     config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
-    config.ite.add_gaussian_noise_fraction = 1e-4
+    config.ite.add_gaussian_noise_fraction = 1e-3
     config.iterative_process.bp_every_edge = True
     config.iterative_process.num_mode_repetitions_per_segment = 3
 

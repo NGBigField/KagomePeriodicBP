@@ -267,9 +267,9 @@ def calc_measurement_non_unit_cell_kagome_tn(
             print(*args, **kwargs)
 
     def _print_success(stats:BPStats) -> None:
-        if not print_:
-            return
         if stats.success:
+            if not print_:
+                return
             s = f"Succeeded to converge on an error below {stats.final_config.msg_diff_good_enough!r}"
         else:
             s = f"Failed to converge!"

@@ -280,7 +280,6 @@ def _pre_segment_init_params(
     else:
         prog_bar = prints.ProgressBar.inactive()
 
-
     ## Add gaussian noise?
     if config.ite.add_gaussian_noise_fraction is not None:
         # the smallest delta_t, the smallest the noise:  #TODO check if still applicable 

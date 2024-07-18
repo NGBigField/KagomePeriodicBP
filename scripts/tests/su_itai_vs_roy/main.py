@@ -109,14 +109,14 @@ def measure_energy(
     D = tn.dimensions.virtual_dim
     bp_config = Config.BPConfig(
         damping = 0.1,
-        trunc_dim = 2*D**2 + 10,
+        trunc_dim = 3*D**2 + 20,
         parallel_msgs=parallel_msgs,
         max_iterations=50,
         msg_diff_terminate=1e-12
     )
     config = Config.derive_from_dimensions(D)
     config.bp = bp_config
-    config.trunc_dim = 2*D**2 + 20
+    config.trunc_dim = 3*D**2 + 30
 
     ## Run:
     energy = calc_measurement_non_unit_cell_kagome_tn(
