@@ -830,5 +830,5 @@ if __name__ == "__main__":
     add_src()
     add_base()
     add_scripts()
-    from scripts import replay_log
-    replay_log.main()
+    from scripts.plot import log
+    log.main()
