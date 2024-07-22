@@ -62,10 +62,7 @@ class SegmentResults(NamedTuple):
         return self.energy < other.energy 
 
 
-def _edge_order_per_mode(
-    config:Config,
-    mode:UpdateMode
-)->list[UpdateEdge]:
+def _edge_order(config:Config)->list[UpdateEdge]:
     
     ## for each edge in the mode, once
     num_edges = config.iterative_process.num_edge_repetitions_per_mode
@@ -252,7 +249,8 @@ def _pre_segment_init_params(
     EnergiesOfEdgesDuringUpdateType,  # energies_at_updates
     prints.ProgressBar,  # prog_bar, 
     list[UpdateMode],  # modes_order, 
-    Callable[[str], None]  # log_method,
+    Callable[[str], None],  # log_method,
+    list[UpdateEdge]
 ]:
     ## Copy and parse config:
     config = config_in.copy()
@@ -265,6 +263,9 @@ def _pre_segment_init_params(
 
     ## Generate a random mode order without repeating the same mode previous twice in a row
     modes_order = _mode_order_without_repetitions(prev_stats.modes_order, config.ite, num_modes)
+
+    ## Decide the order of the edges:
+    edge_order = _edge_order(config)
 
     ## Keep track of stats:
     stats = ITESegmentStats()
@@ -293,7 +294,7 @@ def _pre_segment_init_params(
         unit_cell = unit_cell.rotate("random")
     
 
-    return unit_cell, messages, stats, config, energies_at_updates, prog_bar, modes_order, log_method
+    return unit_cell, messages, stats, config, energies_at_updates, prog_bar, modes_order, log_method, edge_order
 
 
 def _log_plot_and_print_segment_results(
@@ -526,24 +527,21 @@ def ite_per_mode(
     delta_t:float,
     logger:logs.Logger,
     config:Config,
-    mode:UpdateMode
+    mode:UpdateMode,
+    edge_order:list[UpdateEdge]
 )->tuple[
     UnitCell,               # unit_cell
     MessageDictType|None,   # messages
     dict[str, float],       # edge_energies
     ITEPerModeStats         # Stats
 ]:
-
-    ## Decide the order of the edges:
-    edge_tuples = _edge_order_per_mode(config, mode)
-
     ## prepare statistics and results:
     stats = ITEPerModeStats()
     edge_energies = dict()
     mode_tn : ModeTN
 
-    prog_bar = get_progress_bar(config, len(edge_tuples), "Executing ITE per-mode:")
-    for is_first, is_last, edge_tuple in lists.iterate_with_edge_indicators(list(edge_tuples)):
+    prog_bar = get_progress_bar(config, len(edge_order), "Executing ITE per-mode:")
+    for is_first, is_last, edge_tuple in lists.iterate_with_edge_indicators(list(edge_order)):
         prog_bar.next(extra_str=f"{edge_tuple}")
 
         if config.visuals.live_plots:
@@ -562,7 +560,7 @@ def ite_per_mode(
         # Perform ITE update:
         old_cell = unit_cell.copy()
         unit_cell, energy, env_metrics = ite_update_unit_cell(edge_tn, unit_cell, permutation_orders, config.ite, delta_t, logger)
-        env_metrics.other["update_distance"] = unit_cell.distance(old_cell)
+        env_metrics.other["update_distance"] = unit_cell.distance_from(old_cell)
 
         # keep stats:
         edge_energies[str(edge_tuple)] = energy
@@ -590,7 +588,8 @@ def ite_per_segment(
     ITESegmentStats  # stats
 ]:
 
-    unit_cell, messages, stats, config, energies_at_updates, prog_bar, modes_order, log_method = _pre_segment_init_params(
+    unit_cell, messages, stats, config, energies_at_updates, \
+        prog_bar, modes_order, log_method, edge_order = _pre_segment_init_params(
         unit_cell, messages, prev_stats, config_in, logger, delta_t
     )
 
@@ -602,7 +601,7 @@ def ite_per_segment(
         ## Run:
         try:
             unit_cell, messages, energies_at_update_per_mode, ite_per_mode_stats = ite_per_mode(
-                unit_cell, messages, delta_t, logger, config, update_mode
+                unit_cell, messages, delta_t, logger, config, update_mode, edge_order
             )
         except BPNotConvergedError as e:
             prog_bar.clear()

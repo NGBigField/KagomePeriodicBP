@@ -67,16 +67,6 @@ class UnitCell:
         return ["A", "B", "C"]
     
     @staticmethod
-    def are_equal(uc1:"UnitCell", uc2:"UnitCell") -> bool:
-        assert isinstance(uc1, UnitCell)
-        assert isinstance(uc2, UnitCell)
-        if not np.all(uc1.A==uc2.A) : return False
-        if not np.all(uc1.B==uc2.B) : return False
-        if not np.all(uc1.C==uc2.C) : return False
-        if not np.all(uc1._rotated==uc2._rotated==0)  : return False
-        return True
-    
-    @staticmethod
     def size()->int:
         return 3
 
@@ -133,6 +123,23 @@ class UnitCell:
             return None
         assert data.D == D
         return data.unit_cell        
+    
+    @staticmethod
+    def are_equal(uc1:"UnitCell", uc2:"UnitCell") -> bool:
+        assert isinstance(uc1, UnitCell)
+        assert isinstance(uc2, UnitCell)
+        if not np.all(uc1.A==uc2.A) : return False
+        if not np.all(uc1.B==uc2.B) : return False
+        if not np.all(uc1.C==uc2.C) : return False
+        if not np.all(uc1._rotated==uc2._rotated==0)  : return False
+        return True
+    
+    @staticmethod
+    def distance(uc1:"UnitCell", uc2:"UnitCell") -> float:
+        assert isinstance(uc1, UnitCell)
+        assert isinstance(uc2, UnitCell)
+        distances = [tensor_distance(t1, t2) for (_, t1), (_,t2) in zip(uc1.items(), uc2.items(), strict=True) ]
+        return sum(distances)
 
     def set_filename(self, filename:str)->None:
         self._file_name = filename
@@ -158,10 +165,8 @@ class UnitCell:
         self.B = _add_noise(self.B)
         self.C = _add_noise(self.C)
 
-    def distance(self, other:"UnitCell") -> float:
-        distances = [tensor_distance(t1, t2) for (_, t1), (_,t2) in zip(self.items(), other.items(), strict=True) ]
-        return sum(distances)
-
+    def distance_from(self, other:"UnitCell") -> float:
+        return UnitCell.distance(self, other)
 
     def _derive_file_name(self, given_name:str|None)->str:
         if given_name is not None:
@@ -279,11 +284,11 @@ class BestUnitCellData:
         for file_name in BestUnitCellData._all_files_with_D(D=D):
             return saveload.load(file_name, sub_folder=BEST_UNIT_CELL_DATA_FOLDER_NAME)
         if none_if_not_exist:
-            return None
+            return None  #type: ignore
         else:
             raise FileExistsError(f"No saved file for best unit_cell with D={D}")
         
-    def save(self) -> None:
+    def save(self) -> str:
         BestUnitCellData.force_folder_exist()
         BestUnitCellData._remove_all_with_D(D=self.D)
         file_name = self._canonical_file_name()
