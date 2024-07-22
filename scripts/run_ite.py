@@ -140,13 +140,13 @@ def _plot_field_over_time() -> None:
 
 def main(
     D = 2,
-    N = 3,
+    N = 2,
     chi_factor : int|float = 1.5,
     live_plots:_Bool|Iterable[_Bool] = [0,0,0],   #type: ignore
     progress_bar:bool=True,
     results_filename:str|None = None,
     parallel:bool = False,
-    hamiltonian:str = "AFM-T",  # Anti-Ferro-Magnetic or Ferro-Magnetic
+    hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
     unit_cell_from:str = "last"
 )->tuple[float, str]:
@@ -175,7 +175,7 @@ def main(
     config.bp.trunc_dim = int(config.bp.trunc_dim*chi_factor)
 
     config.bp.msg_diff_good_enough = 1e-4
-    config.bp.msg_diff_terminate = 1e-12
+    config.bp.msg_diff_terminate = 1e-6
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 50
     config.bp.allowed_retries = 2
@@ -183,11 +183,11 @@ def main(
     config.iterative_process.start_segment_with_new_bp_message = True
     config.iterative_process.use_bp = True
     config.ite.random_edge_order = False
-    config.ite.symmetric_product_formula = True
     config.ite.always_use_lowest_energy_state = False
-    config.ite.add_gaussian_noise_fraction = 1e-3
+    config.ite.symmetric_product_formula = False
+    config.ite.add_gaussian_noise_fraction = 1e-4
     config.iterative_process.bp_every_edge = True
-    config.iterative_process.num_mode_repetitions_per_segment = 3
+    config.iterative_process.num_mode_repetitions_per_segment = 1
 
     ## time steps:
     if D<4:

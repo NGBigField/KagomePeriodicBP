@@ -185,6 +185,8 @@ def _calculate_unit_cell_measurements(
     live_plots = config.visuals.live_plots
     allow_prog_bar = config.visuals.progress_bars
 
+    ## if unit_cell is rotated, rotate it back:
+    unit_cell.force_zero_rotation()
 
     ## Sometimes we would like to change the configurations for measurements:
     config, messages = _change_config_for_measurements_if_applicable(config, messages)
@@ -286,6 +288,11 @@ def _pre_segment_init_params(
         noise_fraction = config.ite.add_gaussian_noise_fraction * delta_t  
         unit_cell.add_noise(noise_fraction)
 
+    ## Randomly rotate Unit-Cell?
+    if config.iterative_process.randomly_rotate_unit_cell_between_segments:
+        unit_cell = unit_cell.rotate("random")
+    
+
     return unit_cell, messages, stats, config, energies_at_updates, prog_bar, modes_order, log_method
 
 
@@ -343,6 +350,10 @@ def _post_segment_measurements_checks_and_visuals(
     SegmentResults  # best results
 ]:
     should_break = False
+
+    ## Keep unit-cell in its canonical rotation
+    # if unit_cell is rotated, rotate it back:
+    unit_cell.force_zero_rotation()
 
     ## Calculate observables:
     measurements_after_segment, messages = _calculate_unit_cell_measurements(unit_cell, config, messages)
@@ -607,7 +618,6 @@ def ite_per_segment(
     return unit_cell, messages, energies_at_updates, stats
 
 
-# @decorators.multiple_tries(3)
 def ite_per_delta_t(
     unit_cell:UnitCell, messages:MessageDictType|None, delta_t:float, num_repeats:int, config_in:Config, 
     plots:ITEPlots, logger:logs.Logger, tracker:ITEProgressTracker, segment_stats:ITESegmentStats

@@ -202,6 +202,7 @@ class IterativeProcessConfig(_ConfigClass):
     num_errors_per_delta_t_threshold : int = 5    
     segment_error_cause_state_revert : bool = False    
     keep_harder_bp_config_between_segments : bool = False
+    randomly_rotate_unit_cell_between_segments : bool = True
     # Measure expectation and energies:
     num_mode_repetitions_per_segment : int = 1  # number of modes between each measurement of energy
     num_edge_repetitions_per_mode : int = 6  # number of edges before new segment
