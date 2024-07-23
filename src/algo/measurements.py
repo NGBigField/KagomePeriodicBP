@@ -320,7 +320,7 @@ def calc_measurement_non_unit_cell_kagome_tn(
     return min(mean_energies_per_mode)
 
 
-def calc_measurements(
+def calc_measurements_on_unit_cell(
     unit_cell:UnitCell, 
     config:Config,
     hamiltonian:HamiltonianFuncAndInputs|np.ndarray=hamiltonians.heisenberg_afm(), 
@@ -380,7 +380,7 @@ def run_converged_measurement_test(
         assert N>=2
         try:
             crnt_config.dims.big_lattice_size = N
-            measurements = calc_measurements(unit_cell, config=crnt_config)
+            measurements = calc_measurements_on_unit_cell(unit_cell, config=crnt_config)
         except Exception as e:
             errors.print_traceback(e)
             continue

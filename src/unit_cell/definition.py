@@ -236,13 +236,17 @@ class UnitCell:
         assert self._rotated==0
 
     def _rotate_once_clockwise(self) -> None:
-        new = UnitCell(
-            A = _permute_physical_tensor(self.B, [2, 3, 4, 1]),
-            B = _permute_physical_tensor(self.C, [3, 4, 1, 2]),
-            C = _permute_physical_tensor(self.A, [2, 3, 4, 1])
-        )
-        new._rotated = (self._rotated + 1) % 3
-        self.copy_from(new, fields_to_copy={"A", "B", "C", "_rotated"})
+        ## Get new attributes:
+        A = _permute_physical_tensor(self.B, [2, 3, 4, 1])
+        B = _permute_physical_tensor(self.C, [3, 4, 1, 2])
+        C = _permute_physical_tensor(self.A, [2, 3, 4, 1])
+        _rotated = (self._rotated + 1) % 3
+
+        ## Apply to self:
+        self.A = A
+        self.B = B
+        self.C = C
+        self._rotated = _rotated
     
     def copy_from(self, other:"UnitCell", fields_to_copy:list[str]|set[str]|None=None) -> None:
         assert isinstance(other, UnitCell)

@@ -140,8 +140,8 @@ def _plot_field_over_time() -> None:
 
 def main(
     D = 2,
-    N = 3,
-    chi_factor : int|float = 2,
+    N = 2,
+    chi_factor : int|float = 1,
     live_plots:_Bool|Iterable[_Bool] = [0,0,0],   #type: ignore
     progress_bar:bool=True,
     results_filename:str|None = None,
@@ -175,7 +175,7 @@ def main(
     config.bp.trunc_dim = int(config.bp.trunc_dim*chi_factor)
 
     config.bp.msg_diff_good_enough = 1e-4
-    config.bp.msg_diff_terminate = 1e-12
+    config.bp.msg_diff_terminate = 1e-6
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 50
     config.bp.allowed_retries = 2
@@ -204,7 +204,7 @@ def main(
     config.ite.time_steps = _get_time_steps(e_start, e_end, n_per_dt)
 
     ## Run:
-    energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config)
+    energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config, common_results_name=results_filename)
     fullpath = unit_cell_out.save(results_filename+"_final")
     print("Done")
 

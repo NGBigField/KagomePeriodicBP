@@ -193,14 +193,14 @@ DEFAULT_TIME_STEPS = lambda: [0.02]*5 + [0.01]*5 + [0.001]*100 + [1e-4]*100 + [1
 @dataclass
 class IterativeProcessConfig(_ConfigClass):
     # Belief-Propagation flags:
+    use_bp : bool = True  # Controls if we use block-belief-propagation or not
     start_segment_with_new_bp_message : bool = True
     bp_not_converged_raises_error : bool = False
     bp_every_edge : bool = True
     # Control numbers:
-    use_bp : bool = True  # Controls if we use block-belief-propagation or not
-    num_total_errors_threshold : int = 20    
-    num_errors_per_delta_t_threshold : int = 5    
-    segment_error_cause_state_revert : bool = False   #TODO check when `True`
+    num_total_errors_threshold : int = 10    
+    num_errors_per_delta_t_threshold : int = 2    
+    segment_error_cause_state_revert : bool = False   #TODO Implement when `True`
     keep_harder_bp_config_between_segments : bool = False
     randomly_rotate_unit_cell_between_segments : bool = True
     # Measure expectation and energies:
@@ -309,7 +309,9 @@ _TrackerStepOutputs : TypeAlias = tuple[
 
 class ITEProgressTracker():
 
-    def __init__(self, unit_cell:UnitCell, messages:dict|None, config:Any, mem_length:int=DEFAULT_ITE_TRACKER_MEMORY_LENGTH, filename:str|None=None):
+    def __init__(self, unit_cell:UnitCell, messages:dict|None, config:Any, filename:str|None=None):
+        # Derive:
+        mem_length=config.iterative_process.num_total_errors_threshold
         # From input:
         self.last_unit_cell : UnitCell = unit_cell.copy()
         self.last_messages : dict = deepcopy(messages)  #type: ignore

@@ -136,30 +136,12 @@ def _initial_inputs(
     messages = None
     step_stats = ITESegmentStats()  # initial step stats for the first iteration. used for randomized mode order
 
-    # Prepare tracking lists and plots:
-    ite_tracker, plots = _initialize_visuals_and_trackers(config, unit_cell, logger, messages, common_results_name)
+    ## Init tracking lists and plots:
+    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config,filename=common_results_name)
+    plots = ITEPlots(active=config.visuals.live_plots, config=config)
 
     return config, unit_cell, logger, messages, step_stats, ite_tracker, plots
 
-
-## Prepare tracking lists and plots:
-def _initialize_visuals_and_trackers(
-    config:Config, 
-    unit_cell:UnitCell, 
-    logger:logs.Logger, 
-    messages:MessageDictType|None,
-    common_results_name:str
-)->tuple[
-    ITEProgressTracker, # ite_tracker, 
-    ITEPlots # plots
-]:
-    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, 
-                                     config=config, mem_length=config.iterative_process.num_total_errors_threshold,
-                                     filename=common_results_name)
-    _log_and_print_starting_message(logger, config, ite_tracker, unit_cell)  # Print and log valuable information: 
-    plots = ITEPlots(active=config.visuals.live_plots, config=config)
-
-    return ite_tracker, plots
 
 
 def _harden_bp_config_if_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger) -> Config:
@@ -401,7 +383,7 @@ def _deal_with_segment_error(
     logger.warn(str(error)+"\n"*3)
     total_num_errors = tracker.log_error(error)
     if total_num_errors >= config.iterative_process.num_total_errors_threshold:
-        raise ITEError(f"ITE Algo experienced {total_num_errors}, and will terminate therefor.")
+        raise ITEError(f"ITE Algo experienced {total_num_errors}, and will terminate.")
     
     elif errors_count >= config.iterative_process.num_errors_per_delta_t_threshold:
         logger.warn(f"ITE Algo experienced {errors_count} errors for delta_t={delta_t}, and will continue with the next delta_t.")
@@ -695,6 +677,7 @@ def full_ite(
     config, unit_cell, logger, messages, step_stats, ite_tracker, plots = _initial_inputs(
         config, unit_cell, logger, common_results_name
     )
+    _log_and_print_starting_message(logger, config, ite_tracker, unit_cell)  # Print and log valuable information: 
 
     ## Calculate observables of starting core:
     if config.visuals.live_plots: 
@@ -713,7 +696,7 @@ def full_ite(
             _log_and_print_finish_message(logger, config, ite_tracker, plots)  # Print and log valuable information: 
             raise e
     
-    ## Log finish:
+    ## finish:
     prog_bar.clear()
     _log_and_print_finish_message(logger, config, ite_tracker, plots)  # Print and log valuable information: 
 
