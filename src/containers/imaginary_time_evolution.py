@@ -26,7 +26,6 @@ import itertools
 _T = TypeVar("_T")
 
 
-DEFAULT_ITE_TRACKER_MEMORY_LENGTH : int = 10
 _HamilInputType = TypeVar("_HamilInputType")
 _HamilInputRuleType : TypeAlias = Callable[[Any], _HamilInputType]
 NUM_EDGES_PER_MODE : int = 6
@@ -308,13 +307,12 @@ _TrackerStepOutputs : TypeAlias = tuple[
 
 
 class ITEProgressTracker():
+    __slots__ = "config", "last_iter", "file_name", "delta_ts", "energies", "expectation_values", "unit_cells", "messages", "stats", "error_counters"
 
     def __init__(self, unit_cell:UnitCell, messages:dict|None, config:Any, filename:str|None=None):
         # Derive:
         mem_length=config.iterative_process.num_total_errors_threshold
         # From input:
-        self.last_unit_cell : UnitCell = unit_cell.copy()
-        self.last_messages : dict = deepcopy(messages)  #type: ignore
         self.config = config
         # Fresh variables:
         self.last_iter : int = 0
@@ -328,6 +326,14 @@ class ITEProgressTracker():
         self.messages           : _LimitedLengthList[dict]              = _LimitedLengthList[dict](mem_length) 
         self.stats              : _LimitedLengthList[ITESegmentStats]   = _LimitedLengthList[ITESegmentStats](mem_length)            
 
+        ## First lists values:
+        self.delta_ts.append(None)              #type: ignore
+        self.energies.append(None)              #type: ignore
+        self.expectation_values.append(None)    #type: ignore
+        self.unit_cells.append(unit_cell)       #type: ignore
+        self.messages.append(messages)          #type: ignore
+        self.stats.append(None)                 #type: ignore
+
     @property
     def memory_usage(self)->int:
         return saveload.get_size(self.file_name, sub_folder=SUB_FOLDER)        
@@ -335,6 +341,15 @@ class ITEProgressTracker():
     @property
     def full_path(self) -> str:
         return saveload._fullpath(name=self.file_name, sub_folder=SUB_FOLDER)
+
+    @property
+    def last_unit_cell(self) ->UnitCell:
+        return self.unit_cells[-1]
+    
+    @property
+    def last_messages(self) -> dict:
+        return self.messages[-1]
+
 
     def log_segment(self, delta_t:float, unit_cell:UnitCell, messages:dict|None, measurements:MeasurementsOnUnitCell, stats:ITESegmentStats )->None:
         # Get a solid copy
@@ -345,12 +360,9 @@ class ITEProgressTracker():
         self.delta_ts.append(delta_t)
         self.energies.append(measurements.mean_energy)
         self.unit_cells.append(_unit_cell)
-        self.messages.append(messages)
+        self.messages.append(messages)  #type: ignore
         self.expectation_values.append(expectation_values)
         self.stats.append(stats)
-        ## Up_to_date memory:
-        self.last_unit_cell = _unit_cell
-        self.last_messages = messages
         self.last_iter += 1
         ## Save to file
         self.save()
