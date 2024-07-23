@@ -248,7 +248,7 @@ class KagomeTensorNetwork(TensorNetwork, ABC):
     def __init__(self, lattice:KagomeLattice, dimensions:TNDimensions) -> None:
         # Save data:
         self.lattice : KagomeLattice = lattice  # Must keep a Kagome lattice
-        self.messages : MessageDictType = MessageDictType({})  # Must have a dictionary of messages for each block side
+        self.messages : MessageDictType = dict() # Must have a dictionary of messages for each block side
         self.dimensions : TNDimensions = dimensions  # Must keep its dimensions in a simple dictionary
     # ================================================= #
     #|                    messages                     |#
@@ -772,7 +772,7 @@ def _derive_message_node_position(nodes_on_boundary:list[Node], edge:EdgeIndicat
 
 
 def _message_nodes(
-    tn : KagomeTNRepeatedUnitCell,
+    tn : KagomeTensorNetwork,
     message : Message,
     boundary_side : BlockSide,
     first_node_index : int
@@ -850,7 +850,7 @@ def _message_nodes(
 
 
 
-def _common_kagome_get_message_nodes(tn:KagomeTensorNetwork) -> list[Node]:
+def _common_kagome_get_message_nodes(tn:KagomeTensorNetwork) -> list[TensorNode]:
     nodes = []
     if len(tn.messages)>0:
         crnt_node_index = tn.lattice.size
@@ -898,7 +898,8 @@ def  _derive_nodes_kagome_tn_repeated_unit_cell(tn:KagomeTNRepeatedUnitCell)->li
     # Nearest-neighbors of the center triangles are part of the outer-core:
     for node in center_nodes:
         for edge in node.edges:
-            neighbor_index = tn.lattice.get_neighbor(node, edge).index
+            _lattice_node = node.to_lattice_node()
+            neighbor_index = tn.lattice.get_neighbor(_lattice_node, edge).index
             neighbor = nodes[neighbor_index]
             if neighbor in center_nodes:
                 continue

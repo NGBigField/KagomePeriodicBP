@@ -2,6 +2,8 @@ from _types import EdgeIndicatorType, PosScalarType
 from lattices.directions import Direction, BlockSide, DirectionError
 from utils import tuples
 from dataclasses import dataclass, field
+from typing import Protocol
+
 
 
 @dataclass

@@ -33,7 +33,7 @@ from typing import Generator
 
 
 def _hermitize_messages(messages:MessageDictType) -> MessageDictType:
-    hermitized_dict = MessageDictType({})
+    hermitized_dict = dict()
     for side, message in messages.items():
         mps = ite.hermitize_a_message(message.mps)
         hermitized_dict[side] = Message(mps=mps, orientation=message.orientation)
@@ -81,7 +81,7 @@ def _message_damping(prev_messages:MessageDictType, out_messages:MessageDictType
         next_mps = _single_mps_damping(old_message.mps, new_message.mps, damping, trunc_dim)  # Apply damping per message
         next_messages[side] = Message(next_mps, new_message.orientation)
 
-    return MessageDictType(next_messages)
+    return next_messages
 
 
 def _single_outgoing_message(
@@ -141,7 +141,7 @@ def _out_going_messages(
     ) 
 
     ## Next incoming messages are the outgoing messages after applying periodic boundaries:
-    out_messages = MessageDictType({side.opposite() : message for side, message in out_messages.items()})
+    out_messages = {side.opposite() : message for side, message in out_messages.items()}
 
     ## Apply message corrections:
     if config.fix_msg_each_step:
@@ -331,7 +331,7 @@ def robust_belief_propagation(
 
     ## Did we succeed?
     success = error_out < good_enough_error
-    assert isinstance(messages_out, MessageDictType)
+    assert isinstance(messages_out, dict)
     tn.connect_messages(messages_out)
 
     ## Return stats

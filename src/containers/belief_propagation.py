@@ -3,7 +3,7 @@ from enums import MessageModel
 from utils.arguments import Stats
 from containers._meta import _ConfigClass
 from containers.contractions import MPSOrientation
-from typing import NamedTuple, TypeAlias
+from typing import NamedTuple, TypeAlias, Dict
 import numpy as np
 from lattices.directions import LatticeDirection
 from libs.bmpslib import mps as MPS
@@ -58,4 +58,4 @@ class Message(NamedTuple):
         )
     
 
-MessageDictType : TypeAlias = dict[BlockSide, Message]
+MessageDictType : TypeAlias = Dict[BlockSide, Message]

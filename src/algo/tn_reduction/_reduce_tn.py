@@ -14,6 +14,7 @@ from tensor_networks.abstract_classes import TensorNetwork, KagomeTensorNetwork
 
 # For type hinting:
 from typing import TypeVar, Type, Callable, Any
+TensorNetworkType = TypeVar("TensorNetworkType", bound=KagomeTensorNetwork)
 TensorNetworkOutput = TypeVar("TensorNetworkOutput", CoreTN, ModeTN, EdgeTN)
 
 # For function required kwargs:
@@ -36,7 +37,7 @@ def _remove_unneeded_kwargs(func:Callable, kwargs:dict[str, object])->TensorNetw
     return kwargs
 
 
-def _next_reduction_function(tn:TensorNetwork)->Callable[[TensorNetwork, Any], TensorNetwork]:
+def _next_reduction_function(tn:TensorNetworkType)->Callable[[TensorNetworkType, Any], TensorNetworkType]:
     if isinstance(tn, KagomeTensorNetwork):
         return reduce_full_kagome_to_core
     if isinstance(tn, CoreTN):
