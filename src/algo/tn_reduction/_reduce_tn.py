@@ -11,10 +11,12 @@ from algo.tn_reduction.mode_to_edge import reduce_mode_to_edge
 # Types in the code:
 from tensor_networks import CoreTN, ModeTN, EdgeTN
 from tensor_networks.abstract_classes import TensorNetwork, KagomeTensorNetwork
+from containers.configs import ContractionConfig
 
 # For type hinting:
-from typing import TypeVar, Type, Callable, Any
-TensorNetworkType = TypeVar("TensorNetworkType", bound=KagomeTensorNetwork)
+from typing import TypeVar, Type, Callable, Any, TypeAlias
+
+TensorNetworkType : TypeAlias = CoreTN|ModeTN|EdgeTN|KagomeTensorNetwork
 TensorNetworkOutput = TypeVar("TensorNetworkOutput", CoreTN, ModeTN, EdgeTN)
 
 # For function required kwargs:
@@ -36,7 +38,6 @@ def _remove_unneeded_kwargs(func:Callable, kwargs:dict[str, object])->TensorNetw
         kwargs.pop(key)
     return kwargs
 
-
 def _next_reduction_function(tn:TensorNetworkType)->Callable[[TensorNetworkType, Any], TensorNetworkType]:
     if isinstance(tn, KagomeTensorNetwork):
         return reduce_full_kagome_to_core
@@ -47,14 +48,14 @@ def _next_reduction_function(tn:TensorNetworkType)->Callable[[TensorNetworkType,
     raise TypeError(f"Input TN of type {type(tn)!r} didn't match one of the possible reduction functions")
 
 
-def _reduce_tn_one_step(tn:TensorNetwork, trunc_dim:int, copy:bool, **kwargs_in)->TensorNetwork:
+def _reduce_tn_one_step(tn:TensorNetworkType, contract_config:ContractionConfig, copy:bool, **kwargs_in)->TensorNetworkType:
 
     ## Choose correct function:
     func = _next_reduction_function(tn)
 
     ## Keep only needed kwargs for the specific function:
     kwargs_to_use = deepcopy(kwargs_in)
-    kwargs_to_use["trunc_dim"]=trunc_dim
+    kwargs_to_use["contract_config"]=contract_config
     kwargs_to_use["copy"]=copy
     kwargs_to_use = _remove_unneeded_kwargs(func, kwargs_to_use)
 
@@ -63,7 +64,7 @@ def _reduce_tn_one_step(tn:TensorNetwork, trunc_dim:int, copy:bool, **kwargs_in)
     return res
 
 
-def reduce_tn(tn:TensorNetwork, target_type:Type[TensorNetworkOutput], trunc_dim:int, copy:bool=True, **kwargs)->TensorNetworkOutput:
+def reduce_tn(tn:TensorNetwork, target_type:Type[TensorNetworkOutput], contract_config:ContractionConfig, copy:bool=True, **kwargs)->TensorNetworkOutput:
     """A general "fits-all" function that reduces the given TN into a chosen TN.
 
     # Args:
@@ -79,7 +80,7 @@ def reduce_tn(tn:TensorNetwork, target_type:Type[TensorNetworkOutput], trunc_dim
         >>> core_tn = reduce_tn(full_tn, CoreTN, 16)
     """
     while type(tn) is not target_type:
-        tn = _reduce_tn_one_step(tn, trunc_dim=trunc_dim, copy=copy, **kwargs)
+        tn = _reduce_tn_one_step(tn, contract_config=contract_config, copy=copy, **kwargs)
     return tn
 
 

@@ -21,7 +21,8 @@ import numpy as np
 from libs.ITE import rho_ij
 
 # Common types in the code:
-from containers import Config, BubbleConConfig, UpdateEdge
+from containers import BubbleConConfig, UpdateEdge
+from containers.configs import Config, ContractionConfig
 from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
 from containers.results import MeasurementsOnUnitCell
 from tensor_networks import KagomeTNRepeatedUnitCell, KagomeTNArbitrary, ModeTN, EdgeTN, TensorNode, MPS
@@ -162,7 +163,7 @@ def mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[str
 def measure_energies_and_observables_together(
     tn:TensorNetwork, 
     hamiltonian:HamiltonianFuncAndInputs|np.ndarray, 
-    trunc_dim:int,
+    contract_config:ContractionConfig,
     mode:UpdateMode|None=None,
     force_real:bool=True
 )->MeasurementsOnUnitCell:
@@ -193,13 +194,13 @@ def measure_energies_and_observables_together(
     }
     
     ## Contract to mode:
-    mode_tn = reduce_tn(tn, ModeTN, trunc_dim, copy=True, mode=mode)
+    mode_tn = reduce_tn(tn, ModeTN, contract_config=contract_config, copy=True, mode=mode)
 
     ## For each edge, reduce a bit more and calc energy:
     for edge_tuple in UpdateEdge.all_options():
     
         # do the final needed contraction for this specific edge:
-        edge_tn = reduce_tn(mode_tn, target_type=EdgeTN, trunc_dim=trunc_dim, copy=True, edge_tuple=edge_tuple)
+        edge_tn = reduce_tn(mode_tn, target_type=EdgeTN, contract_config=contract_config, copy=True, edge_tuple=edge_tuple)
         edge_tn.rearrange_tensors_and_legs_into_canonical_order()
         rdm, edge_energy = _get_edge_rdm_and_energy(edge_tn, h, force_real)
         edge_negativity = compute_negativity_of_rdm(rdm)
@@ -280,7 +281,7 @@ def calc_measurement_non_unit_cell_kagome_tn(
         energy_per_site_per_mode : dict[UpdateMode, _EnergyAndMeasurements] = {}    
         for mode in UpdateMode.all_options():
             _cond_print(f"Mode = {mode}")
-            measurements = measure_energies_and_observables_together(shifted_tn, hamiltonian, trunc_dim=config.trunc_dim, mode=mode)
+            measurements = measure_energies_and_observables_together(shifted_tn, hamiltonian, contract_config=config.contraction, mode=mode)
             energies = measurements.energies
             _cond_print(energies)
             energy_per_site = measurements.mean_energy
@@ -333,13 +334,13 @@ def calc_measurements_on_unit_cell(
     lattice = KagomeTNRepeatedUnitCell._KagomeLattice(N=N)
     tn = KagomeTNRepeatedUnitCell(lattice, unit_cell, d, D)
     # General Config:
-    trunc_dim = config.trunc_dim
+    contract_config = config.contraction
 
     ## BP to get stable environment:
     robust_belief_propagation(tn, None, config.bp)
 
     ## Measure:
-    return measure_energies_and_observables_together(tn, hamiltonian=hamiltonian, trunc_dim=trunc_dim, mode=mode)
+    return measure_energies_and_observables_together(tn, hamiltonian=hamiltonian, contract_config=contract_config, mode=mode)
 
 
 def run_converged_measurement_test(

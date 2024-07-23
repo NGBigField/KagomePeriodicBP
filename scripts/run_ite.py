@@ -41,8 +41,8 @@ def _config_at_measurement(config:Config)->Config:
     config.dims.big_lattice_size += 1
     config.bp.msg_diff_terminate /= 2
     config.bp.allowed_retries    += 1
-    config.bp.trunc_dim *= 2
-    config.trunc_dim *= 2
+    config.chi_bp *= 2
+    config.chi *= 2
     return config
 
 
@@ -171,8 +171,8 @@ def main(
     config.ite.interaction_hamiltonian = _get_hamiltonian(hamiltonian)
 
     # Chi factor:
-    config.trunc_dim = int(config.trunc_dim*chi_factor)
-    config.bp.trunc_dim = int(config.bp.trunc_dim*chi_factor)
+    config.chi = int(config.chi*chi_factor)
+    config.chi_bp = int(config.chi_bp*chi_factor)
 
     config.bp.msg_diff_good_enough = 1e-4
     config.bp.msg_diff_terminate = 1e-5
@@ -192,11 +192,11 @@ def main(
     ## time steps:
     if D<4:
         n_per_dt = 200
-        e_start = 3
+        e_start = 4
         e_end   = 7
     else:
-        n_per_dt = 150
-        e_start = 3
+        n_per_dt = 200
+        e_start = 4
         e_end   = 7
     # 
     if _radom_unit_cell:

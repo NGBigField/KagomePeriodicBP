@@ -31,6 +31,7 @@ from tensor_networks.node import TensorNode, two_nodes_ordered_by_relative_direc
 from lattices.directions import Direction, LatticeDirection, BlockSide, check
 from enums import ContractionDepth, NodeFunctionality, UpdateMode
 from containers import MPSOrientation, UpdateEdge
+from containers.configs import ContractionConfig
 
 # Our utilities:
 from utils import parallels, tuples, lists, assertions, prints
@@ -119,19 +120,19 @@ def _contract_half(
 def _contract_tn_from_sides_and_create_mpss(
     tn:KagomeTensorNetwork,
     directions:_PerSide[BlockSide],
-    bubblecon_trunc_dim:int,
-    parallel:bool
+    contract_config:ContractionConfig
 )->tuple[
     _PerSide[MPS],
     _PerSide[list[int]],
     _PerSide[MPSOrientation]
 ]:
-    
+
     ## Run in parallel or sequential:
+    parallel = contract_config.parallel
     fixed_arguments = dict(
         tn = tn,
         directions = directions,
-        bubblecon_trunc_dim = bubblecon_trunc_dim,
+        bubblecon_trunc_dim = contract_config.trunc_dim,
         print_progress = not parallel
     )
     values = list(_PerSide.side_names())
@@ -149,7 +150,7 @@ def _contract_tn_from_sides_and_create_mpss(
     return mpss, con_orders, orientations
 
 def _basic_data(
-    tn:KagomeTensorNetwork, parallel:bool, direction:BlockSide|None
+    tn:KagomeTensorNetwork, direction:BlockSide|None
 )->tuple[
     list[TensorNode],
     _PerSide[int],
@@ -315,18 +316,18 @@ def _add_env_tensors_to_open_core(small_tn:ArbitraryTN, env_tensors:list[TensorN
 
 
 
-def reduce_full_kagome_to_core(tn:KagomeTensorNetwork, trunc_dim:int, parallel:bool=False, direction:BlockSide|None=None) -> CoreTN:
+def reduce_full_kagome_to_core(tn:KagomeTensorNetwork, contract_config:ContractionConfig, direction:BlockSide|None=None) -> CoreTN:
     ## 0: Check inputs:
     if DEBUG_MODE:
         tn.validate()
     assert tn.has_messages, "To reduce to core, KagomeTN must have mps messages."
 
     ## I. Parse and derive data
-    core_nodes, num_core_connections, num_side_overlap_connections, directions = _basic_data(tn, parallel, direction)
+    core_nodes, num_core_connections, num_side_overlap_connections, directions = _basic_data(tn, direction)
 
     ## II. Prepare two MPSs, contract until core:
 	#      One MPS is "from the bottom-up" and the other is "from the top-down"
-    mpss, con_orders, orientations = _contract_tn_from_sides_and_create_mpss(tn, directions, trunc_dim, parallel)
+    mpss, con_orders, orientations = _contract_tn_from_sides_and_create_mpss(tn, directions, contract_config)
     
     ## Some verifications:
     if DEBUG_MODE:
