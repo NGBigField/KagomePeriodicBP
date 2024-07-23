@@ -42,9 +42,9 @@ class Config(_StoreConfigClasses, _ConfigClass):
             trunc_dim=2*D**2+10
         )
 
-        if D>3:
-            config.bp.trunc_dim = D**2
-            config.trunc_dim = 2*D**2
+        # if D>3:
+        #     config.bp.trunc_dim = D**2
+        #     config.trunc_dim = 2*D**2
 
         return config
 

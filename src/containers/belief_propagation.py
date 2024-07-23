@@ -16,7 +16,7 @@ class BPConfig(_ConfigClass):
     max_iterations : int|None = 40   # None is used for unlimited number of iterations
     trunc_dim : int = 9
     msg_diff_terminate : float = 1e-10
-    msg_diff_good_enough : float = 1e-4
+    msg_diff_good_enough : float = 1e-5
     msg_diff_squared : bool = True  # True is easier to get to 
     allowed_retries : int = 2
     times_to_deem_failure_when_diff_increases  : int = 3

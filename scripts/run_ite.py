@@ -145,7 +145,7 @@ def main(
     live_plots:_Bool|Iterable[_Bool] = [0,0,0],   #type: ignore
     progress_bar:bool=True,
     results_filename:str|None = None,
-    parallel:bool = False,
+    parallel:bool = True,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
     unit_cell_from:str = "last"
@@ -175,7 +175,7 @@ def main(
     config.bp.trunc_dim = int(config.bp.trunc_dim*chi_factor)
 
     config.bp.msg_diff_good_enough = 1e-4
-    config.bp.msg_diff_terminate = 1e-6
+    config.bp.msg_diff_terminate = 1e-12
     config.bp.times_to_deem_failure_when_diff_increases = 4
     config.bp.max_iterations = 50
     config.bp.allowed_retries = 2

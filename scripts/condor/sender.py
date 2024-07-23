@@ -26,9 +26,9 @@ results_dir_str : str = _results_dir.__str__()
 if not os.path.exists(results_dir_str):
     os.makedirs(results_dir_str)
 
-
 RAM_MEMORY_IN_2_EXPONENTS = False
-LOCAL_TEST = True
+LOCAL_TEST = False
+
 
 RESULT_KEYS_DICT = dict(
     bp = ["with_bp", 'D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'],
@@ -42,16 +42,16 @@ DEFAULT_VALS = {}
 DEFAULT_VALS['D'] = list(range(2, 5))
 DEFAULT_VALS['N'] = list(range(2, 5))
 DEFAULT_VALS['chi'] = [1, 2, 3]
-DEFAULT_VALS['method'] = [1]
+DEFAULT_VALS['method'] = [1, 3]
 DEFAULT_VALS['seed'] = [1]
-DEFAULT_VALS['parallel'] = [0]
+DEFAULT_VALS['parallel'] = [0, 1]
 
 Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(parallel) $(result_keys)'
 
 
 def main(
     job_type="ite_afm",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
-    request_cpus:int=8,
+    request_cpus:int=4,
     request_memory_gb:int=16,
     vals:dict=DEFAULT_VALS,
     result_file_name:str|None=None
@@ -63,7 +63,10 @@ def main(
         result_file_name="results_"+job_type
     # Memory:
     request_memory_gb = _legit_memory_sizes(request_memory_gb)
-    # request_memory_bytes = 1073741824 * request_memory_gb
+    # CPUs:
+    if "parallel" in vals and (1 in vals["parallel"] or True in vals["parallel"]):
+        request_cpus = max(request_cpus, 8)
+
 
     ## Get from job type:
     result_keys = RESULT_KEYS_DICT[job_type]
