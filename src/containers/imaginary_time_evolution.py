@@ -471,3 +471,6 @@ def _fix_and_rearrange_time_steps(times:list[float]|list[list[float]])->list[flo
         return lists.join_sub_lists(times)  # type: ignore
     else:
         raise TypeError(f"Not an expected type of argument `times`. It has type {type(times)}")
+    
+
+UpdateEdgesOrder : TypeAlias = list[tuple[UpdateEdge, float]]  # contains update-edge and delta_t per edge

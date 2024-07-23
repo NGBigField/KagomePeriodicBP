@@ -1,6 +1,6 @@
 from .contractions import BubbleConConfig, MPSOrientation
 from .belief_propagation import BPConfig, BPStats, Message, MessageDictType
-from .imaginary_time_evolution import ITEConfig, ITEPerModeStats, ITESegmentStats, ITEProgressTracker, UpdateEdge, HamiltonianFuncAndInputs
+from .imaginary_time_evolution import ITEConfig, ITEPerModeStats, ITESegmentStats, ITEProgressTracker, UpdateEdge, HamiltonianFuncAndInputs, UpdateEdgesOrder
 from .sizes_and_dimensions import TNDimensions
 from .global_config import Config
 from .results import MeasurementsOnUnitCell

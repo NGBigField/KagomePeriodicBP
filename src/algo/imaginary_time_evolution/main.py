@@ -22,7 +22,7 @@ from containers import Config
 
 # Import other needed types:
 from enums import UpdateMode
-from containers import MessageDictType, UpdateEdge, BestUnitCellData
+from containers import MessageDictType, UpdateEdge, BestUnitCellData, UpdateEdgesOrder
 from tensor_networks import KagomeTNRepeatedUnitCell, CoreTN, ModeTN, EdgeTN, UnitCell
 from tensor_networks.construction import kagome_tn_from_unit_cell
 from _error_types import BPNotConvergedError, ITEError
@@ -62,7 +62,7 @@ class SegmentResults(NamedTuple):
         return self.energy < other.energy 
 
 
-def _edge_order(config:Config)->list[UpdateEdge]:
+def _deal_edge_order(config:Config, delta_t:float)->UpdateEdgesOrder:
     
     ## for each edge in the mode, once
     num_edges = config.iterative_process.num_edge_repetitions_per_mode
@@ -74,11 +74,25 @@ def _edge_order(config:Config)->list[UpdateEdge]:
         assert num_edges==6
         edge_tuples = list(UpdateEdge.all_options())
 
-    ## Symmetric?
+    ## Define delta_t iterator. 
+    # Symmetric? if yes, we got a special case:
     if config.ite.symmetric_second_order_trotterization:
+        # Add the revered order for symmetry:
         edge_tuples += lists.reversed(edge_tuples)
+
+        ## the middle edge should appear once with double delta_t:
+        middle_index = len(edge_tuples)//2-1
+        assert edge_tuples[middle_index]==edge_tuples[middle_index+1], f"Bug. The center edges should have been the same"
+        edge_tuples.pop(middle_index+1)
+        delta_ts = (delta_t*2 if i==middle_index else delta_t for i in range(len(edge_tuples)))
+
+    else:
+        delta_ts = (delta_t for _ in range(len(edge_tuples)))
+                
+    ## combine 
+    edge_order = list(zip(edge_tuples, delta_ts, strict=True))
         
-    return edge_tuples
+    return edge_order
 
 
 def _change_config_for_measurements_if_applicable(
@@ -147,10 +161,10 @@ def _initial_inputs(
 def _harden_bp_config_if_struggled(config:Config, bp_stats:BPStats, logger:logs.Logger) -> Config:
     if not bp_stats.success: 
         config.bp.trunc_dim = bp_stats.final_config.trunc_dim
-        logger.debug(f"        config.bp.max_swallowing_dim updated to {config.bp.trunc_dim}")
-        if bp_stats.final_config.trunc_dim>=config.trunc_dim:
-            config.trunc_dim = int(bp_stats.final_config.trunc_dim*1.33)
-            logger.debug(f"        config.bubblecon_trunc_dim updated to {config.trunc_dim}")
+        logger.debug(f"        config.bp.trunc_dim updated to {config.bp.trunc_dim}")
+        if bp_stats.final_config.trunc_dim>=config.chi:
+            config.chi = int(bp_stats.final_config.trunc_dim*1.33)
+            logger.debug(f"        config.chi updated to {config.chi}")
     return config
 
 
@@ -180,7 +194,7 @@ def _calculate_unit_cell_measurements(
         full_tn.connect_uniform_messages()
 
     ## Calculate observables:
-    measurements = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.trunc_dim)
+    measurements = measure_energies_and_observables_together(full_tn, config.ite.interaction_hamiltonian, config.contraction)
     
     return measurements, messages
 
@@ -232,7 +246,7 @@ def _pre_segment_init_params(
     prints.ProgressBar,  # prog_bar, 
     list[UpdateMode],  # modes_order, 
     Callable[[str], None],  # log_method,
-    list[UpdateEdge]
+    UpdateEdgesOrder  # edge_order
 ]:
     ## Copy and parse config:
     config = config_in.copy()
@@ -247,7 +261,7 @@ def _pre_segment_init_params(
     modes_order = _mode_order_without_repetitions(prev_stats.modes_order, config.ite, num_modes)
 
     ## Decide the order of the edges:
-    edge_order = _edge_order(config)
+    edge_order = _deal_edge_order(config, delta_t)
 
     ## Keep track of stats:
     stats = ITESegmentStats()
@@ -308,9 +322,9 @@ def _log_plot_and_print_segment_results(
     energies_str     = strings.float_list_to_str(list(energies_at_end.values()), num_decimals=num_decimals)
     entanglement_str = strings.float_list_to_str(list(entanglement.values())   , num_decimals=num_decimals)
     xyz_str          = strings.float_dict_to_str(xyz_means                     , num_decimals=num_decimals)
-    logger_method(f"        Edge-Energies after segment =   "+energies_str)
-    logger_method(f"        Edge-Negativities           =   "+entanglement_str)
-    logger_method(f"        Expectation-Values          =   "+xyz_str)
+    logger_method(f"    Edge-Energies after segment =   "+energies_str)
+    logger_method(f"    Edge-Negativities           =   "+entanglement_str)
+    logger_method(f"    Expectation-Values          =   "+xyz_str)
     logger_method(f"Mean energy after segment = {mean_energy}")
 
 
@@ -506,11 +520,10 @@ def _from_unit_cell_to_stable_mode(
 def ite_per_mode(
     unit_cell:UnitCell,
     messages:MessageDictType|None,
-    delta_t:float,
     logger:logs.Logger,
     config:Config,
     mode:UpdateMode,
-    edge_order:list[UpdateEdge]
+    edge_order:UpdateEdgesOrder
 )->tuple[
     UnitCell,               # unit_cell
     MessageDictType|None,   # messages
@@ -523,7 +536,7 @@ def ite_per_mode(
     mode_tn : ModeTN
 
     prog_bar = get_progress_bar(config, len(edge_order), "Executing ITE per-mode:")
-    for is_first, is_last, edge_tuple in lists.iterate_with_edge_indicators(list(edge_order)):
+    for is_first, is_last, (edge_tuple, delta_t) in lists.iterate_with_edge_indicators(list(edge_order)):
         prog_bar.next(extra_str=f"{edge_tuple}")
 
         if config.visuals.live_plots:
@@ -583,7 +596,7 @@ def ite_per_segment(
         ## Run:
         try:
             unit_cell, messages, energies_at_update_per_mode, ite_per_mode_stats = ite_per_mode(
-                unit_cell, messages, delta_t, logger, config, update_mode, edge_order
+                unit_cell, messages, logger, config, update_mode, edge_order
             )
         except BPNotConvergedError as e:
             prog_bar.clear()

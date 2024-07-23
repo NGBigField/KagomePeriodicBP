@@ -163,11 +163,11 @@ def main(
 
     ## Config:
     config = Config.derive_from_dimensions(D)
+    config.set_parallel(parallel) 
     config.dims.big_lattice_size = N
     config.visuals.live_plots = live_plots
     config.visuals.progress_bars = progress_bar
     config.bp.damping = damping
-    config.bp.parallel_msgs = parallel
     config.ite.interaction_hamiltonian = _get_hamiltonian(hamiltonian)
 
     # Chi factor:
@@ -175,7 +175,7 @@ def main(
     config.chi_bp = int(config.chi_bp*chi_factor)
 
     config.bp.msg_diff_good_enough = 1e-4
-    config.bp.msg_diff_terminate = 1e-5
+    config.bp.msg_diff_terminate = 1e-12
     # config.bp.times_to_deem_failure_when_diff_increases = 3
     # config.bp.max_iterations = 50
     # config.bp.allowed_retries = 2
@@ -187,7 +187,7 @@ def main(
     # config.ite.symmetric_second_order_trotterization = True
     config.ite.add_gaussian_noise_fraction = 1e-6
     # config.iterative_process.bp_every_edge = True
-    config.iterative_process.num_mode_repetitions_per_segment = 1
+    config.iterative_process.num_mode_repetitions_per_segment = 5
 
     ## time steps:
     if D<4:

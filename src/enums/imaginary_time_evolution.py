@@ -1,6 +1,6 @@
 from enum import Enum, auto, unique
 from enums.tensor_networks import UnitCellFlavor
-from typing import Generator
+from typing import Generator, TypeAlias
 from lattices.directions import BlockSide
 from utils import lists
 
@@ -49,6 +49,3 @@ MODES_SIDES : dict[UpdateMode, BlockSide] = {
     UpdateMode.B : BlockSide.DL,
     UpdateMode.C : BlockSide.DR,
 }
-
-    
-

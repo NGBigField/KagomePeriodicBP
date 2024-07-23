@@ -8,7 +8,7 @@ from typing import Callable
 @dataclass
 class ContractionConfig(_ConfigClass):
     trunc_dim : int = 20
-    parallel : bool = True
+    parallel : bool = False
 
 @dataclass
 class BubbleConConfig(_ConfigClass): 

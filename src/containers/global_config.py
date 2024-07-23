@@ -63,6 +63,11 @@ class Config(_StoreConfigClasses, _ConfigClass):
     def chi_bp(self, value) -> None:
         self.bp.trunc_dim = value
 
+    def set_parallel(self, value:bool) -> None:
+        assert isinstance(self, bool) or value in [0, 1]
+        self.bp.parallel_msgs = value
+        self.contraction.parallel = value
+
     def post_creation_fix(self):
         self.__post_init__()
         
