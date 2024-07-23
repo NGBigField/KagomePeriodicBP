@@ -23,14 +23,6 @@ def main(
     parallel : int = 0
 ) -> dict:
     
-
-    # name:
-    results_filename = f"AFM_D={D}_N={N}"
-    if seed == -1:
-        results_filename += "_"+strings.time_stamp()+"_"+strings.random(3)
-    else:
-        results_filename += f"_{seed}"
-
     # method
     match method:
         case 1: unit_cell_from = "best"
@@ -52,7 +44,6 @@ def main(
         live_plots=False, 
         parallel=parallel, 
         progress_bar=False,
-        results_filename=results_filename,
         unit_cell_from=unit_cell_from
     )
     

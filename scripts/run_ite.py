@@ -148,7 +148,7 @@ def main(
     parallel:bool = True,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
-    unit_cell_from:str = "last"
+    unit_cell_from:str = "best"
 )->tuple[float, str]:
 
     assert N>=2
@@ -156,7 +156,7 @@ def main(
     assert chi_factor>0
 
     if results_filename is None:
-        results_filename = strings.time_stamp()+"_"+strings.random(4)+f"_D={D}_N={N}"
+        results_filename = strings.time_stamp()+"_"+strings.random(4)+f"_AFM_D={D}_N={N}"
 
     unit_cell, _radom_unit_cell = _get_unit_cell(D=D, source=unit_cell_from)
     unit_cell.set_filename(results_filename) 
