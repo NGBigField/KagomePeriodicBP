@@ -140,8 +140,8 @@ def _plot_field_over_time() -> None:
 
 def main(
     D = 2,
-    N = 2,
-    chi_factor : int|float = 1.5,
+    N = 3,
+    chi_factor : int|float = 2,
     live_plots:_Bool|Iterable[_Bool] = [0,0,0],   #type: ignore
     progress_bar:bool=True,
     results_filename:str|None = None,
@@ -191,11 +191,11 @@ def main(
 
     ## time steps:
     if D<4:
-        n_per_dt = 200
+        n_per_dt = 400
         e_start = 3
         e_end   = 7
     else:
-        n_per_dt = 150
+        n_per_dt = 300
         e_start = 3
         e_end   = 7
     # 

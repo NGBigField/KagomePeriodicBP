@@ -242,12 +242,17 @@ class UnitCell:
             C = _permute_physical_tensor(self.A, [2, 3, 4, 1])
         )
         new._rotated = (self._rotated + 1) % 3
-        self.copy_from(new)
+        self.copy_from(new, fields_to_copy={"A", "B", "C", "_rotated"})
     
-    def copy_from(self, other:"UnitCell") -> None:
+    def copy_from(self, other:"UnitCell", fields_to_copy:list[str]|set[str]|None=None) -> None:
         assert isinstance(other, UnitCell)
-
+        
+        if fields_to_copy is None:
+            fields_to_copy = {f.name for f in fields(self)}
+        
         for f in fields(self):
+            if f.name not in fields_to_copy:
+                continue
             value = getattr(other, f.name)
             setattr(self, f.name, value)
         
