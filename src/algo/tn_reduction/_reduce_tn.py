@@ -13,7 +13,7 @@ from tensor_networks import CoreTN, ModeTN, EdgeTN
 from tensor_networks.abstract_classes import TensorNetwork, KagomeTensorNetwork
 
 # For type hinting:
-from typing import TypeVar, Type, Callable
+from typing import TypeVar, Type, Callable, Any
 TensorNetworkOutput = TypeVar("TensorNetworkOutput", CoreTN, ModeTN, EdgeTN)
 
 # For function required kwargs:
@@ -21,7 +21,7 @@ from copy import deepcopy
 from inspect import getfullargspec
 
 
-def _remove_unneeded_kwargs(func:callable, kwargs:dict[str, object])->TensorNetwork:
+def _remove_unneeded_kwargs(func:Callable, kwargs:dict[str, object])->TensorNetwork:
     # Find what is needed by func:
     spec = getfullargspec(func)
     needed_keys = set(spec.args)
@@ -36,7 +36,7 @@ def _remove_unneeded_kwargs(func:callable, kwargs:dict[str, object])->TensorNetw
     return kwargs
 
 
-def _next_reduction_function(tn:TensorNetwork)->Callable[[TensorNetwork, dict], TensorNetwork]:
+def _next_reduction_function(tn:TensorNetwork)->Callable[[TensorNetwork, Any], TensorNetwork]:
     if isinstance(tn, KagomeTensorNetwork):
         return reduce_full_kagome_to_core
     if isinstance(tn, CoreTN):

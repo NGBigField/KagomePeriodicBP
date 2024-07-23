@@ -228,7 +228,7 @@ class ITEConfig(_ConfigClass):
     # Optimization params:
     add_gaussian_noise_fraction : float|None = None
     # Hamiltonian commutation constraints:
-    symmetric_product_formula : bool = True
+    symmetric_second_order_trotterization : bool = True
 
     @property
     def reference_ground_energy(self)->float|None:  

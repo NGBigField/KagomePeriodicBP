@@ -35,7 +35,7 @@ from containers.sizes_and_dimensions import TNDimensions
 from utils import lists, tuples, numerics, indices, strings, arguments
 
 import numpy as np
-from typing import NamedTuple, TypeVar, Generator, TypeAlias
+from typing import NamedTuple, TypeVar, Generator, TypeAlias, Type
 from copy import deepcopy
 
 # For efficient functions:
@@ -52,7 +52,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Final
 
 _T = TypeVar("_T")
-
+_FrozenSpecificNetworkType = TypeVar("_FrozenSpecificNetworkType", bound="_FrozenSpecificNetwork")
 
 class TensorDims(NamedTuple):
     virtual  : int
@@ -66,7 +66,7 @@ class TensorNetwork(ABC):
     # ================================================= #
     #|   Implementation Specific Methods\Properties    |#
     # ================================================= #
-    nodes : list[TensorNode] = None
+    nodes : list[TensorNode] 
 
     @abstractmethod
     def copy(self)->"TensorNetwork": ...
@@ -75,7 +75,7 @@ class TensorNetwork(ABC):
     #|              Basic Derived Properties           |#
     # ================================================= #
     @property
-    def size(self)->list[np.ndarray]:
+    def size(self)->int:
         return len(self.nodes)
     
     @property
@@ -295,7 +295,7 @@ class KagomeTensorNetwork(TensorNetwork, ABC):
     def num_boundary_nodes(self, boundary:BlockSide)->int:
         return self.lattice.num_boundary_nodes(boundary)
     
-    def positions_min_max(self)->tuple[int, ...]:
+    def positions_min_max(self)->tuple[float, ...]:
         min_x, max_x = lists.min_max([node.pos[0] for node in self.nodes])
         min_y, max_y = lists.min_max([node.pos[1] for node in self.nodes])
         return min_x, max_x, min_y, max_y
@@ -564,7 +564,7 @@ class _FrozenSpecificNetwork(TensorNetwork):
         self._nodes = nodes
 
     @classmethod
-    def from_arbitrary_tn(cls, tn:ArbitraryTN, **kwargs) -> "_FrozenSpecificNetwork":
+    def from_arbitrary_tn(cls:Type[_FrozenSpecificNetworkType], tn:ArbitraryTN, **kwargs) -> _FrozenSpecificNetworkType:
         new = cls(tn.nodes, copy=False, **kwargs)
         return new
     
@@ -574,8 +574,9 @@ class _FrozenSpecificNetwork(TensorNetwork):
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
     # ================================================= #
-    def copy(self, **kwargs)->"_FrozenSpecificNetwork":
-        return type(self)(nodes=self.nodes, copy=True, **kwargs)
+    def copy(self:_FrozenSpecificNetworkType, **kwargs)->_FrozenSpecificNetworkType:
+        cls = type(self)
+        return cls(nodes=self.nodes, copy=True, **kwargs)
     
     # ================================================= #
     #|        Protecting nodes from change             |#

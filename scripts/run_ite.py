@@ -175,27 +175,27 @@ def main(
     config.bp.trunc_dim = int(config.bp.trunc_dim*chi_factor)
 
     config.bp.msg_diff_good_enough = 1e-4
-    config.bp.msg_diff_terminate = 1e-12
-    config.bp.times_to_deem_failure_when_diff_increases = 4
-    config.bp.max_iterations = 50
-    config.bp.allowed_retries = 2
+    config.bp.msg_diff_terminate = 1e-5
+    # config.bp.times_to_deem_failure_when_diff_increases = 3
+    # config.bp.max_iterations = 50
+    # config.bp.allowed_retries = 2
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
-    config.iterative_process.start_segment_with_new_bp_message = True
-    config.iterative_process.use_bp = True
-    config.ite.random_edge_order = True
-    config.ite.always_use_lowest_energy_state = False
-    config.ite.symmetric_product_formula = True
-    config.ite.add_gaussian_noise_fraction = 1e-4
-    config.iterative_process.bp_every_edge = True
-    config.iterative_process.num_mode_repetitions_per_segment = 3
+    # config.iterative_process.start_segment_with_new_bp_message = True
+    # config.iterative_process.use_bp = True
+    # config.ite.random_edge_order = True
+    config.ite.always_use_lowest_energy_state = True
+    # config.ite.symmetric_second_order_trotterization = True
+    config.ite.add_gaussian_noise_fraction = 1e-6
+    # config.iterative_process.bp_every_edge = True
+    config.iterative_process.num_mode_repetitions_per_segment = 1
 
     ## time steps:
     if D<4:
-        n_per_dt = 400
+        n_per_dt = 200
         e_start = 3
         e_end   = 7
     else:
-        n_per_dt = 300
+        n_per_dt = 150
         e_start = 3
         e_end   = 7
     # 

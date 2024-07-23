@@ -13,7 +13,7 @@ from lattices.directions import BlockSide
 @dataclass
 class BPConfig(_ConfigClass): 
     init_msg: MessageModel = MessageModel.RANDOM_QUANTUM
-    max_iterations : int|None = 40   # None is used for unlimited number of iterations
+    max_iterations : int|None = 50   # None is used for unlimited number of iterations
     trunc_dim : int = 9
     msg_diff_terminate : float = 1e-10
     msg_diff_good_enough : float = 1e-5
@@ -58,6 +58,4 @@ class Message(NamedTuple):
         )
     
 
-class MessageDictType(dict[BlockSide, Message]):
-    def mpss(self)->list[list[np.ndarray]]:
-        return [msg.mps.A for side, msg in self.items()]  #type: ignore
+MessageDictType : TypeAlias = dict[BlockSide, Message]

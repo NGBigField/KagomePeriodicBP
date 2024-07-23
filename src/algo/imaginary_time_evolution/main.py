@@ -75,7 +75,7 @@ def _edge_order(config:Config)->list[UpdateEdge]:
         edge_tuples = list(UpdateEdge.all_options())
 
     ## Symmetric?
-    if config.ite.symmetric_product_formula:
+    if config.ite.symmetric_second_order_trotterization:
         edge_tuples += lists.reversed(edge_tuples)
         
     return edge_tuples
