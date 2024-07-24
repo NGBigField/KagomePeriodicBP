@@ -140,15 +140,15 @@ def _plot_field_over_time() -> None:
 
 def main(
     D = 2,
-    N = 2,
+    N = 3,
     chi_factor : int|float = 1,
     live_plots:_Bool|Iterable[_Bool] = [0,0,0],   #type: ignore
     progress_bar:bool=True,
     results_filename:str|None = None,
-    parallel:bool = True,
+    parallel:bool = False,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
-    unit_cell_from:str = "best"
+    unit_cell_from:str = "random"
 )->tuple[float, str]:
 
     assert N>=2

@@ -10,6 +10,9 @@ class ContractionConfig(_ConfigClass):
     trunc_dim : int = 20
     parallel : bool = False
 
+    def __repr__(self) -> str:
+        return super().__repr__()
+
 @dataclass
 class BubbleConConfig(_ConfigClass): 
     # trunc_dim_2=None
