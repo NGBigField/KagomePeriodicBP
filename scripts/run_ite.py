@@ -141,14 +141,14 @@ def _plot_field_over_time() -> None:
 def main(
     D = 2,
     N = 3,
-    chi_factor : int|float = 1,
+    chi_factor : int|float = 2,
     live_plots:_Bool|Iterable[_Bool] = [0,0,0],   #type: ignore
     progress_bar:bool=True,
     results_filename:str|None = None,
     parallel:bool = False,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0.1,
-    unit_cell_from:str = "random"
+    damping:float|None = 0.0,
+    unit_cell_from:str = "2024.07.18_10.01.15_HXYB_D=2_N=3"
 )->tuple[float, str]:
 
     assert N>=2
@@ -174,8 +174,8 @@ def main(
     config.chi = int(config.chi*chi_factor)
     config.chi_bp = int(config.chi_bp*chi_factor)
 
-    config.bp.msg_diff_good_enough = 1e-4
-    config.bp.msg_diff_terminate = 1e-12
+    config.bp.msg_diff_good_enough = 1e-7
+    config.bp.msg_diff_terminate = 1e-14
     # config.bp.times_to_deem_failure_when_diff_increases = 3
     # config.bp.max_iterations = 50
     # config.bp.allowed_retries = 2
@@ -185,7 +185,7 @@ def main(
     # config.ite.random_edge_order = True
     config.ite.always_use_lowest_energy_state = True
     # config.ite.symmetric_second_order_trotterization = True
-    config.ite.add_gaussian_noise_fraction = 1e-6
+    config.ite.add_gaussian_noise_fraction = 1e-2
     # config.iterative_process.bp_every_edge = True
     config.iterative_process.num_mode_repetitions_per_segment = 5
 

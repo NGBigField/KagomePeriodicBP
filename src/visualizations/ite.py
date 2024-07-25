@@ -592,6 +592,16 @@ def _scatter_values(
         is_first = False
 
 
+def _remove_x_axis_labels(ax:Axes) -> None:
+    x_axis = ax.get_xaxis()
+    old_ticks = x_axis.get_ticklabels()
+    new_ticks = []
+    for old_text in old_ticks:
+        new_text = old_text
+        new_text.set_text("")
+        new_ticks.append(new_text)
+    x_axis.set_ticklabels(new_ticks)
+
 def _plot_per_segment_health_common(ax:Axes, strs:list[str], style:visual_constants.ScatterStyle=default_marker_style) -> None:
 
     for i, line in enumerate(strs):
@@ -762,6 +772,12 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
 
 
     ## Finally:
+    # Remove x-ticks from all axes but last:
+    for _, last, _, ax in dicts.iterate_with_edge_indicators(axes):
+        if last:
+            continue
+        _remove_x_axis_labels(ax)        
+
     # link x axes:
     first_ax = None
     for first, _, _, ax in dicts.iterate_with_edge_indicators(axes):
@@ -769,6 +785,8 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
             first_ax = ax
             continue
         ax.sharex(first_ax)
+
+            
 
 
 def _get_log_fullpath(log_name:str) -> str:
@@ -795,19 +813,31 @@ def _mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[st
     return mean_per_direction
 
 
+def _capture_network_movie(log_name:str, ite_fig:Figure) -> None:
+    pass
+
 def plot_from_log(
-    log_name:str = "2024.04.10_10.24.40 VJDEMA - long",
+    # log_name:str = "log - from zero to hero",
+    log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3",
     save:bool = True,
-    show_health_figure:bool = False
+    plot_health_figure:bool = False,
+    capture_lattice_movie:bool = True,
 ):
     
     _print_log_header(log_name)
+    figs : dict[str,Figure] = dict()
+
 
     for _plot_func, name in [
         (_plot_main_figure_from_log, "main"),
-        (_plot_health_figure_from_log, "health")
+        (_plot_health_figure_from_log, "health"),
+        (_capture_network_movie, "network_movie"),
     ]:
-        if name=="health" and not show_health_figure:
+        if name=="health" and not plot_health_figure:
+            continue
+
+        if name=="network_movie" and capture_lattice_movie:
+            movie = _plot_func(log_name, figs["main"])
             continue
 
         # Plot
@@ -816,6 +846,9 @@ def plot_from_log(
         # save:
         if save:
             visuals.save_figure(fig=fig  , file_name=log_name+" - "+name) 
+
+        # Keep:
+        figs[name] = fig
 
     # Show:
     plt.show()
@@ -829,6 +862,4 @@ if __name__ == "__main__":
     from project_paths import add_src, add_base, add_scripts
     add_src()
     add_base()
-    add_scripts()
-    from scripts.plot import log
-    log.main()
+    plot_from_log()

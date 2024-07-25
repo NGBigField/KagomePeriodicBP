@@ -59,8 +59,8 @@ def _robust_energy_measurement(unit_cell:UnitCell) -> MeasurementsOnUnitCell:
     d, D = unit_cell.derive_dimensions()
     config = Config.derive_from_dimensions(D)
     config.bp.msg_diff_terminate = 1e-12
-    config.bp.trunc_dim = 2*D**2 + 10
-    config.trunc_dim    = 2*D**2 + 20
+    config.chi_bp = 2*D**2 + 10
+    config.chi    = 2*D**2 + 20
 
     ## Run:
     return measurements.run_converged_measurement_test(unit_cell, config=config)

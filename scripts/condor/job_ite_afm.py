@@ -15,12 +15,15 @@ from scripts.run_ite import main as run_ite
 
 
 def main(
+    # Values from sender:
     D : int = 2,
     N : int = 2,
     chi_factor : int = 1,
     seed : int = -1,
     method : int = 1,
-    parallel : int = 0
+    parallel : int = 0,
+    # Default values:
+    progress_bar : bool = True
 ) -> dict:
     
     # method
@@ -43,7 +46,7 @@ def main(
         N=N, D=D, chi_factor=chi_factor, 
         live_plots=False, 
         parallel=parallel, 
-        progress_bar=False,
+        progress_bar=progress_bar,
         unit_cell_from=unit_cell_from
     )
     
@@ -61,6 +64,6 @@ def main(
     return results
 
 
-if __name__ == "__main__":    
+if __name__ == "__main__":     
     main()
 
