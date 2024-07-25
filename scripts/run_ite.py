@@ -47,7 +47,7 @@ def _config_at_measurement(config:Config)->Config:
 
 
 def _get_time_steps(e_start:int, e_end:int, n_per_dt:int)->list[float]:
-    time_steps = [[np.power(10, -float(exp))]*n_per_dt for exp in np.arange(e_start, e_end, 1)]
+    time_steps = [[np.power(10, -float(exp))]*n_per_dt for exp in np.arange(e_start, e_end+1, 1)]
     time_steps = lists.join_sub_lists(time_steps)
     return time_steps
 
@@ -148,7 +148,7 @@ def main(
     parallel:bool = False,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.0,
-    unit_cell_from:str = "2024.07.18_10.01.15_HXYB_D=2_N=3"
+    unit_cell_from:str = "random"
 )->tuple[float, str]:
 
     assert N>=2
@@ -191,17 +191,27 @@ def main(
 
     ## time steps:
     if D<4:
-        n_per_dt = 200
+        n_per_dt = 300
         e_start = 4
         e_end   = 7
     else:
-        n_per_dt = 200
+        n_per_dt = 300
         e_start = 4
         e_end   = 7
     # 
-    if _radom_unit_cell:
-        e_start = 2
     config.ite.time_steps = _get_time_steps(e_start, e_end, n_per_dt)
+
+    if _radom_unit_cell:
+        append_to_head = []
+        n_per_dt = 100
+        e_start = 2
+        e_end   = 2
+        append_to_head += _get_time_steps(e_start, e_end, n_per_dt) 
+        n_per_dt = 400
+        e_start = 3
+        e_end   = 3
+        append_to_head += _get_time_steps(e_start, e_end, n_per_dt)
+        config.ite.time_steps = append_to_head + config.ite.time_steps
 
     ## Run:
     energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config, common_results_name=results_filename)
