@@ -23,7 +23,7 @@ from algo.tn_reduction import reduce_tn
 from physics import hamiltonians
 
 # Performance:
-from time import perf_counter
+from time import perf_counter, sleep
 
 # Numpy for math stuff:
 import numpy as np
@@ -412,9 +412,12 @@ def _get_expectation_values(edge_tn:EdgeTN) -> float:
 
 
 def per_D_N_single_convergence_run(
-    D:int, N:int, method:str, config:Config,
+    D:int, N:int, method:str, config:Config, parallel:bool,
     **kwargs
 ) -> float:
+    
+    config = config.copy()
+
     ## Create kagome TN:
     unit_cell = UnitCell.load_best(D)
     tn = create_repeated_kagome_tn(d, D, N, unit_cell)
@@ -424,11 +427,14 @@ def per_D_N_single_convergence_run(
         case "random"|"exact":
             tn.connect_uniform_messages()
         case "bp":
-            belief_propagation(tn, None, config.bp)
+            belief_propagation(tn, None, config.bp, update_plots_between_steps=False)
             
-    ## Define contraction precision:
-    if method=="exact":
-        config.chi = 1e3
+    ## Define contraction precision and other config andjustments:
+    match method:
+        case "exact":
+            config.chi = 200
+        case "bp":
+            config.set_parallel(parallel)
 
     ## Contract to edge:
     edge_tn = reduce_tn(tn, EdgeTN, config.contraction, **kwargs)
@@ -438,7 +444,10 @@ def per_D_N_single_convergence_run(
     return z
 
 
-def _get_full_converges_run_plots(combined_figure:bool) -> tuple[visuals.AppendablePlot, visuals.AppendablePlot]:
+def _get_full_converges_run_plots(
+    combined_figure:bool, 
+    live_plots:bool=True
+) -> tuple[visuals.AppendablePlot, visuals.AppendablePlot]:
     plot_values = visuals.AppendablePlot()
     plt.xlabel("linear system size", fontsize=12)
     plt.ylabel("$<Z>$", fontsize=12)
@@ -457,26 +466,36 @@ def _get_full_converges_run_plots(combined_figure:bool) -> tuple[visuals.Appenda
     #     plot.fig.set_size_inches((4.5, 8))
     #     plot.axis.set_position(box)
 
-    visuals.draw_now()
+    if live_plots:
+        visuals.draw_now()
     return plot_values, plot_times
 
 
 def test_bp_convergence_all_runs(
-    parallel:bool = False,
     D:int = 3,
-    Ns:list[int] = [2, 3],
-    methods:list[str] = ["random", "exact","bp"],
-    combined_figure:bool = True
+    combined_figure:bool = False,
+    live_plots:bool = False,
+    parallel:bool = True,
 ) -> None:
+    
+    ## 
+    ["random", "exact", "bp"],
+    methods_and_Ns:dict[str: list[int]] = dict(
+        # exact  = [2, 3, 4],
+        random = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+        bp     = [2, 3, 4]
+    ) 
+
     ## config:
     mode = UpdateMode.A
     update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
     config = Config.derive_from_dimensions(D)
-    config.chi    = D**2 
-    config.chi_bp = D**2 + 2
+    config.chi    = 2*D**2 
+    config.chi_bp = 2*D**2 + 10
 
-    ## Prepare plots:
-    plot_values, plot_times = _get_full_converges_run_plots(combined_figure)
+    ## Prepare plots and csv:
+    plot_values, plot_times = _get_full_converges_run_plots(combined_figure, live_plots)
+    csv = csvs.CSVManager(["D", "N", "method", "z", "t"])
 
     line_styles =   {'bp': "-", 'random': '--', 'exact':":"}
     marker_styles = {'bp': "X", 'random': 'o' , 'exact':"^"}
@@ -487,16 +506,20 @@ def test_bp_convergence_all_runs(
         )
 
 
-    for method in methods: 
+    for method, Ns in methods_and_Ns.items(): 
         print(f"method={method}")
         
         for N in Ns:
             print(f"  N={N}")
+            sleep(0.1)
 
             ## Get results:
             _t1 = perf_counter()
             try:
-                z = per_D_N_single_convergence_run(D, N, method, config, mode=mode, edge_tuple=update_edge)
+                z = per_D_N_single_convergence_run(
+                    D, N, method, config, parallel, 
+                    mode=mode, edge_tuple=update_edge
+                )
             except Exception:
                 break
             _t2 = perf_counter()
@@ -504,11 +527,14 @@ def test_bp_convergence_all_runs(
 
             ## plot:
             plt_kwargs = _get_plt_kwargs(method)
-            plot_values.append(plot_kwargs=plt_kwargs ,**{ method : (N, z)})
-            plot_times.append( plot_kwargs=plt_kwargs ,**{ method : (N, t)})
+            plot_values.append(plot_kwargs=plt_kwargs ,**{ method : (N, z)}, draw_now_=live_plots)
+            plot_times.append( plot_kwargs=plt_kwargs ,**{ method : (N, t)}, draw_now_=live_plots)
 
             plot_values._update()
             plot_times._update()
+
+            # csv:
+            csv.append([D, N, method, z, t])
 
     # plot_values.axis.set_ylim(bottom=1e-8*2)
     
