@@ -4,7 +4,7 @@ import _import_src  ## Needed to import src folders when scripts are called from
 import project_paths
 
 # Tensor-Networks creation:
-from tensor_networks.construction import create_kagome_tn, UnitCell
+from tensor_networks.construction import create_repeated_kagome_tn, UnitCell
 
 # BP:
 from algo.belief_propagation import belief_propagation, robust_belief_propagation
@@ -12,6 +12,7 @@ from algo.belief_propagation import belief_propagation, robust_belief_propagatio
 # Config and containers:
 from containers import BPConfig
 from tensor_networks import KagomeTNRepeatedUnitCell, CoreTN, ModeTN, EdgeTN
+from tensor_networks import 
 
 # update config
 from enums import UpdateMode, UnitCellFlavor
@@ -72,7 +73,7 @@ def bp_single_call(
 
     ## Tensor-Network
     unit_cell= UnitCell.load(f"random_D={D}")
-    tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
+    tn = create_repeated_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     tn.validate()
 
     ## Find or guess messages:
@@ -117,7 +118,7 @@ def growing_tn_bp_test2(
     for N in range(min_N, max_N+1, 1):
         print(" ")
         print(f"N={N:2}: ")
-        tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
+        tn = create_repeated_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
         tn.validate()
 
         ## Find or guess messages:
@@ -157,7 +158,7 @@ def growing_tn_bp_test(
     unit_cell = UnitCell.random(d=d, D=D)
 
     ## small network:
-    small_tn = create_kagome_tn(d=d, D=D, N=bp_N, unit_cell=unit_cell)
+    small_tn = create_repeated_kagome_tn(d=d, D=D, N=bp_N, unit_cell=unit_cell)
     small_tn, messages, stats = belief_propagation(small_tn, messages=None, bp_config=bp_config)
     small_res = derive_xyz_expectation_values_with_tn(small_tn, reduce=False)
     print(" ")
@@ -168,7 +169,7 @@ def growing_tn_bp_test(
     distances = []
     Ns = []
     for N in range(min_N, max_N+1):
-        big_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
+        big_tn = create_repeated_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
         big_tn.connect_random_messages()
         big_res = derive_xyz_expectation_values_with_tn(big_tn, reduce=False)
         print(" ")
@@ -236,7 +237,7 @@ def test_single_bp_vs_growing_TN(
             msg_diff_terminate=1e-7
         )
 
-        tn = create_kagome_tn(d, D, bp_N, unit_cell)
+        tn = create_repeated_kagome_tn(d, D, bp_N, unit_cell)
         bp_num_tensors = tn.size
 
         _, _ = robust_belief_propagation(tn, None, bp_config)
@@ -313,7 +314,7 @@ def test_bp_convergence_steps(
 
 
         for N in N_vals:
-            tn = create_kagome_tn(d, D, N, unit_cell)
+            tn = create_repeated_kagome_tn(d, D, N, unit_cell)
             messages, stats = belief_propagation(tn, None, bp_config)
 
             x = N
@@ -354,13 +355,13 @@ def test_bp_convergence_steps_single_run(
         if saveload.exist(fname):
             ref_rdm = saveload.load(fname)
         else:
-            tn_inf = create_kagome_tn(d, D, N_inf, unit_cell)
+            tn_inf = create_repeated_kagome_tn(d, D, N_inf, unit_cell)
             tn_inf.connect_random_messages()
             ref_rdm = _get_rho_i(tn_inf)
             saveload.save(ref_rdm, fname)
 
 
-    tn = create_kagome_tn(d, D, N, unit_cell)
+    tn = create_repeated_kagome_tn(d, D, N, unit_cell)
     tn.connect_random_messages()
 
     t1 = perf_counter()
@@ -402,11 +403,21 @@ def test_bp_convergence_steps_single_run(
     return iterations, chi, time_none, time_bp, z_random, z_bp, diff_random, diff_bp
 
 
+
+def per_D_N_single_convergence_run(D:int, N:int, method:str) -> tuple[float, float]:
+    unit_cell = UnitCell.load_best(D)
+    tn = 
+
+    return exec_time, z
+
+
 def test_bp_convergence_all_runs(
-    parallel_bp=False
+    parallel:bool = False,
+    Ds:list[int] = [3],
+    Ns:list[int] = [2, 3],
+    methods:list[str] = ["random", "exact","bp"]
 ):
 
-    N_inf = 14
     update_mode = UpdateMode.A
     update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 
@@ -433,8 +444,6 @@ def test_bp_convergence_all_runs(
     line_styles = {'bp': "-", 'random': '--'}
     marker_styles = {'bp': "X", 'random': 'o'}
 
-    Ds = [3, 4]
-
     def _legend_key(D:int, data:str)->str:
         ## diff bp:
         if len(Ds)==1:
@@ -450,47 +459,32 @@ def test_bp_convergence_all_runs(
 
 
     for D in Ds:
+        for N in Ns:
+            for method in methods: 
 
-        chi = 2*D**2 + 10
+                time, z = per_D_N_single_convergence_run()
 
-        chi_inf = 2*D**2 + 40 
-        unit_cell = UnitCell.load(f"best_heisenberg_AFM_D{D}")
-        tn = create_kagome_tn(d, D, N_inf, unit_cell)
-        tn.connect_random_messages()
+                dict_ = { _legend_key(D, 'bp')  : (N, diff_bp) }
+                plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'], marker=marker_styles['bp'])
+                plot_values.append(plt_kwargs=plt_kwargs ,**dict_)
 
-        fname = f"ref_rdm_D{D}_N{N_inf}"
-        if saveload.exist(fname):
-            ref_rdm = saveload.load(fname)
-        else:
-            ref_rdm = _get_rho_i(tn, chi_inf)
-            saveload.save(ref_rdm, fname)
+                ## diff random:
+                dict_ = { _legend_key(D, 'none') : (N, diff_none) }
+                plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'], marker=marker_styles['random'])
+                plot_values.append(plt_kwargs=plt_kwargs ,**dict_)
 
+                ## Time bp:
+                dict_ = { _legend_key(D, 'bp')  : (N, time_bp) }
+                plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'], marker=marker_styles['bp'])
+                plot_times.append(plt_kwargs=plt_kwargs ,**dict_)
 
-        for N in range(2, 9):
-            iterations, chi, time_none, time_bp, z_none, z_bp, diff_none, diff_bp = test_bp_convergence_steps_single_run(D=D, N=N, parallel_bp=parallel_bp, ref_rdm=ref_rdm)
+                ## Time random:
+                dict_ = { _legend_key(D, 'none') : (N, time_none) }
+                plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'], marker=marker_styles['random'])
+                plot_times.append(plt_kwargs=plt_kwargs ,**dict_)
 
-
-            dict_ = { _legend_key(D, 'bp')  : (N, diff_bp) }
-            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'], marker=marker_styles['bp'])
-            plot_values.append(plt_kwargs=plt_kwargs ,**dict_)
-
-            ## diff random:
-            dict_ = { _legend_key(D, 'none') : (N, diff_none) }
-            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'], marker=marker_styles['random'])
-            plot_values.append(plt_kwargs=plt_kwargs ,**dict_)
-
-            ## Time bp:
-            dict_ = { _legend_key(D, 'bp')  : (N, time_bp) }
-            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'], marker=marker_styles['bp'])
-            plot_times.append(plt_kwargs=plt_kwargs ,**dict_)
-
-            ## Time random:
-            dict_ = { _legend_key(D, 'none') : (N, time_none) }
-            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'], marker=marker_styles['random'])
-            plot_times.append(plt_kwargs=plt_kwargs ,**dict_)
-
-            plot_values._update()
-            plot_times._update()
+                plot_values._update()
+                plot_times._update()
 
     visuals.draw_now()
 

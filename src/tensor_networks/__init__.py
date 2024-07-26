@@ -8,6 +8,6 @@ from tensor_networks.tensor_network import (
     CoreTN, ModeTN, EdgeTN,  # stages of the Kagome TN during its contraction 
     get_common_edge, get_common_edge_legs  # Functions on TNs
 )
-from tensor_networks.construction import create_kagome_tn
+from tensor_networks.construction import create_repeated_kagome_tn
 # Directions:
 from tensor_networks.tensor_network import LatticeDirection, BlockSide, Direction

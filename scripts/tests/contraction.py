@@ -1,7 +1,7 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 
 # Tensor-Networks creation:
-from tensor_networks.construction import create_kagome_tn
+from tensor_networks.construction import create_repeated_kagome_tn
 
 # Types in the code:
 from enums import UpdateMode, UnitCellFlavor
@@ -65,7 +65,7 @@ def contract_to_core_test(
     for N in range(2, max_N+1):
         times, results = dict(), dict()
         ## contract network:
-        tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
+        tn = create_repeated_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
         # tn, messages, stats = belief_propagation(tn, None, bp_config)
         tn.connect_random_messages()
         for reduce in [False, True]:
@@ -100,7 +100,7 @@ def contract_to_mode_test(
         unit_cell.save(f"random_D={D}")
     
     # Full tn:
-    full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
+    full_tn = create_repeated_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     full_tn.connect_random_messages()
     res = derive_xyz_expectation_values_with_tn(full_tn, reduce=False)
     print(res['x'])
@@ -134,7 +134,7 @@ def contract_to_edge_test(
     edge = UpdateEdge(C, B)
     
     ##Contraction Sequence:
-    full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
+    full_tn = create_repeated_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     if with_bp:
         messages = saveload.load("last_messages", none_if_not_exist=True)
         from algo.belief_propagation import belief_propagation, BPConfig
@@ -186,7 +186,7 @@ def test_all_edges_contraction(
     unit_cell = load_or_randomize_unit_cell(d, D)
 
     ## Full tn with messages:
-    full_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
+    full_tn = create_repeated_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
     if with_bp:
         from algo.belief_propagation import belief_propagation, BPConfig
         bp_config=BPConfig(trunc_dim=chi, msg_diff_terminate=1e-7)

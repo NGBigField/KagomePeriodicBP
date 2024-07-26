@@ -3,7 +3,7 @@ from _config_reader import DEBUG_MODE
 
 from containers import TNDimensions, ITEConfig, Config, MatrixMetrics
 from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
-from tensor_networks import TensorNode, KagomeTNRepeatedUnitCell, EdgeTN, UnitCell, create_kagome_tn
+from tensor_networks import TensorNode, KagomeTNRepeatedUnitCell, EdgeTN, UnitCell, create_repeated_kagome_tn
 from tensor_networks.abstract_classes import TensorNetwork
 from utils import lists, logs, assertions, prints
 from enums import UnitCellFlavor
