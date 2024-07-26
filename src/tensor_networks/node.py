@@ -68,6 +68,15 @@ class TensorNode():
             cell_flavor = cell_flavor
         )
 
+    def to_lattice_node(self) -> LatticeNode:
+        return LatticeNode(
+            index = self.index,
+            pos = self.pos,
+            edges = self.edges,
+            directions = self.directions,
+            boundaries = self.boundaries
+        )
+
     def __hash__(self)->int:
         return hash((self.name, self.pos, self.functionality, self.cell_flavor))
 
@@ -89,7 +98,7 @@ class TensorNode():
         return [direction.angle for direction in self.directions ]
 
     @property
-    def dims(self) -> Tuple[int]:
+    def dims(self) -> Tuple[int, ...]:
         if not self.is_ket:
             return self.tensor.shape
         connectable_dims = self.tensor.shape[1:]        
@@ -99,7 +108,7 @@ class TensorNode():
     def norm(self) -> np.float64:
         return np.linalg.norm(self.tensor)
     
-    def legs(self) -> Generator[tuple[LatticeDirection, EdgeIndicatorType, int], None, None]:
+    def legs(self) -> Generator[tuple[Direction, EdgeIndicatorType, int], None, None]:
         for direction, edge, dim in zip(self.directions, self.edges, self.dims, strict=True):
             yield direction, edge, dim
 

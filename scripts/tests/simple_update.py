@@ -2,7 +2,7 @@ import _import_src  ## Needed to import src folders when scripts are called from
 
 # Types in the code:
 from containers import Config
-from unit_cell import UnitCell, given_by
+from unit_cell import UnitCell, get_from
 
 from utils import strings, csvs, prints
 from utils.visuals import AppendablePlot, save_figure
@@ -56,7 +56,7 @@ def _per_size_get_measurements(D:int, size:int, periodic:bool, config:Config):
 
     ## Get tnsu results:
     t1 = time.perf_counter()
-    unit_cell, tnsu_energy = given_by.tnsu(D=D, size=size, periodic=periodic)
+    unit_cell, tnsu_energy = get_from.simple_update(D=D, size=size, periodic=periodic)
     t2 = time.perf_counter()
     run_time = t2 - t1
 
@@ -77,11 +77,11 @@ def main(
 )->None:
 
     ## Config:
-    config = Config.derive_from_physical_dim(D=D)
+    config = Config.derive_from_dimensions(D=D)
     config.ite.interaction_hamiltonian = (hamiltonians.heisenberg_afm, None, None)
     config.bp.damping = 0.1
     config.bp.msg_diff_terminate = 1e-15
-    config.bp.max_swallowing_dim = 2*D**2 + 10
+    config.bp.trunc_dim = 2*D**2 + 10
     config.dims.big_lattice_size = 3
 
     ## Prepare plots:

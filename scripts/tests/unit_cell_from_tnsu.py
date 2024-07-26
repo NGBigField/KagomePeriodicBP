@@ -1,6 +1,6 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 
-from unit_cell.given_by._tnsu import load_or_compute_tnsu_unit_cell
+from unit_cell.get_from._simple_update import load_or_compute_tnsu_unit_cell
 
 
 

@@ -1,11 +1,11 @@
 # Import types used in the code:
 from lattices._common import Node, sorted_boundary_nodes, plot_lattice
 from lattices.directions import LatticeDirection, BlockSide, Direction, DirectionError
-from lattices.edges import edges_dict_from_edges_list
+from lattices.edges import edges_dict_from_edges_list, EdgesDictType
 from _error_types import LatticeError, OutsideLatticeError
 
 # For type hinting:
-from typing import Generator, Final, Iterable, TypeGuard
+from typing import Generator, Final, Iterable, TypeGuard, TypeAlias, NamedTuple
 from dataclasses import dataclass
 
 # some of our utils:
@@ -17,6 +17,9 @@ import functools
 # for math:
 import numpy as np
 
+# For datastructures required in some algorithms:
+from queue import Queue
+
 
 class TriangularLatticeError(LatticeError): ...
 
@@ -25,7 +28,7 @@ CACHED_ORDERED_BOUNDARY_EDGES_PER_LATTICE_SIZE : Final[dict[int, list[str]]] = {
 
 
 @functools.cache
-def total_vertices(N):
+def total_vertices(N:int) -> int:
 	"""
 	Returns the total number of vertices in the *bulk* of a hex 
 	TN with linear parameter N
@@ -146,6 +149,11 @@ def get_neighbor_coordinates_in_direction(i:int, j:int, direction:LatticeDirecti
 	return i2, j2
 
 
+def get_neighbor_by_index_and_direction(ind:int, direction:LatticeDirection, N:int) -> int:
+	i, j = get_vertex_coordinates(ind, N)
+	return get_neighbor(i, j, direction, N)
+
+
 def get_neighbor(i:int, j:int, direction:LatticeDirection, N:int)->int:	
 	i2, j2 = get_neighbor_coordinates_in_direction(i, j, direction, N)
 	return get_vertex_index(i2, j2, N)
@@ -196,11 +204,17 @@ def get_vertex_index(i:int, j:int, N:int) -> int:
 		
 	return Aw + j
 
+
+@functools.cache
+def get_center_vetex_coordinates(N:int) -> tuple[int, int]:
+	i = num_rows(N)//2
+	j = row_width(i, N)//2
+	return i, j
+
 		
 @functools.cache
 def get_center_vertex_index(N):
-	i = num_rows(N)//2
-	j = row_width(i, N)//2
+	i, j = get_center_vetex_coordinates(N)
 	return get_vertex_index(i, j, N)
 
 
@@ -965,6 +979,44 @@ def change_boundary_conditions_to_periodic(lattice:list[Node]) -> list[Node]:
 	return lattice
 
 
+def _shift_periodically_in_direction_given_periodic_lattice(
+	periodic_lattice:list[Node], edges:EdgesDictType, given_permutation_list:list[int], direction:LatticeDirection
+) -> list[int]:
+
+	## Help functions:
+	def get_new_node_in_direction(node:Node) -> int:
+		edge = node.get_edge_in_direction(direction)
+		_indices = edges[edge]
+		if   _indices[0] == node.index:	return _indices[1]
+		elif _indices[1] == node.index:	return _indices[0]
+		else:
+			raise LatticeError("Impossible situation")
+		
+	def _get_new_index(crnt_index:int) -> int:
+		node = periodic_lattice[crnt_index]
+		return get_new_node_in_direction(node)
+
+	## Produce output:
+	permutation_list = [_get_new_index(index) for index in given_permutation_list]
+	return permutation_list
+
+
+def _common_periodic_shifting_inputs(N:int) -> tuple[list[Node], EdgesDictType, list[int]]:
+	## Create periodic triangular lattice:
+	open_lattice = create_triangle_lattice(N)
+	periodic_lattice = change_boundary_conditions_to_periodic(open_lattice)
+	# plot_lattice(periodic_lattice, periodic=True)
+
+	## Collect a comfortable dict of all edges:
+	edges = edges_dict_from_edges_list([node.edges for node in periodic_lattice])
+
+	## The starting permutation is each node pointing to itself
+	num_nodes = total_vertices(N)
+	null_permutation = list(range(num_nodes))  # Permutation from node to itself
+
+	return periodic_lattice, edges, null_permutation
+
+
 def shift_periodically_in_direction(N:int, direction:LatticeDirection) -> list[int]:
 	"""Return the permutation list of of a triangular lattice when shifting periodically in a direction.
 
@@ -975,24 +1027,212 @@ def shift_periodically_in_direction(N:int, direction:LatticeDirection) -> list[i
 	Returns:
 		list[int]: Permutation list
 	"""
+	return _shift_periodically_in_direction_given_periodic_lattice(
+		*_common_periodic_shifting_inputs(N), direction
+	)
 
-	## Create periodic triangular lattice:
-	open_lattice = create_triangle_lattice(N)
-	periodic_lattice = change_boundary_conditions_to_periodic(open_lattice)
-	# plot_lattice(periodic_lattice, periodic=True)
 
-	## Collect a comfortable dict of all edges:
-	edges = edges_dict_from_edges_list([node.edges for node in periodic_lattice])
+	
 
-	## Help functions:
-	def _get_new_index(node:Node) -> int:
-		edge = node.get_edge_in_direction(direction)
-		_indices = edges[edge]
-		if   _indices[0] == node.index:	return _indices[1]
-		elif _indices[1] == node.index:	return _indices[0]
+
+class _PermutationLatticeWalkItem(NamedTuple):
+	"""Each item keeps the index of the current node position, Together with the
+	permutation the brought us from the cetner vertex to this node position. 
+	"""
+	node_index : int
+	permutation : list[int]
+
+	def __repr__(self) -> str:
+		return f"{self.node_index}"
+
+
+class _PermutationsQueue():
+	__slots__ = "_queue", "_indices"
+
+	def __init__(self) -> None:
+		self._queue : Queue[_PermutationLatticeWalkItem] = Queue()
+		self._indices : set[int] = set()
+
+	def get(self) -> _PermutationLatticeWalkItem:
+		item = self._queue.get()
+		self._indices.remove(item.node_index)
+		return item
+	
+	def put(self, item:_PermutationLatticeWalkItem) -> None:
+		if item in self:
+			assert ValueError("Item already in queue")
+		self._indices.add(item.node_index)
+		return self._queue.put(item)
+	
+	@property
+	def indices(self)->Iterable[int]:
+		return self._indices
+	
+	@property
+	def empty(self) -> bool:
+		if len(self._indices)==0:
+			assert len(self._queue.queue)==0
+			return True
 		else:
-			raise LatticeError("Impossible situation")
-			
-	## Produce output:
-	permutation_list = [_get_new_index(node) for node in periodic_lattice]
-	return permutation_list
+			assert len(self._queue.queue)!=0
+			return False
+	
+	def __contains__(self, item:int|_PermutationLatticeWalkItem) -> bool:
+		if isinstance(item,_PermutationLatticeWalkItem):
+			index = item.node_index
+		elif isinstance(item, int):
+			index = item
+		else:
+			raise TypeError("Not a supported type")
+		return index in self._indices
+	
+	def _ordered_indices(self) -> list[int]:
+		return [item.node_index for item in self._queue.queue]
+	
+	def __repr__(self) -> str:
+		return f"{self._ordered_indices()}"
+		
+	def __str__(self) -> str:
+		return f"_PermutationQueue with {self._queue.qsize()} item: "+self.__repr__()
+	
+
+def _lattice_walk_add_movie_frame(ax, lattice:list[Node], visited_nodes:set[int], lattice_walk_queue:_PermutationsQueue) -> tuple:
+	from matplotlib import pyplot as plt	
+	from utils import visuals
+
+	if ax is None:
+		ax = plt.subplot(1,1,1)
+	elif isinstance(ax, plt.Axes):
+		ax.cla()
+	fig = ax.figure
+
+
+	## Basic data:
+	N = linear_size_from_total_vertices(len(lattice))
+
+	## Plot lattice:
+	plot_lattice(
+		lattice, periodic=True,
+		node_color="black",
+		node_size=20,
+		edge_style="y-",
+		with_edge_names=False 
+	)
+
+	def _plot_node(ind:int, color:str) -> None:
+		i, j = get_vertex_coordinates(ind, N)
+		x, y = get_node_position(i, j, N)
+		plt.scatter(x, y, s=300, c=color, zorder=2)
+
+	## Add frontier:
+	for i in lattice_walk_queue.indices:
+		_plot_node(i, "blue")
+
+	## Add visited nodes:
+	for i in visited_nodes:
+		_plot_node(i, "red")
+
+	return fig, ax
+
+
+def all_periodic_lattice_shifting_permutation(N:int, _movie:bool=False, _print:bool=False) -> Generator[list[int], None, None]:
+	"""Get all permutation of the triangular lattice that shift nodes altogether in a periodic manner
+
+	Args:
+		N (int): Linear size of lattice
+
+	This is achieved with a breadth-first graph walk of the entire lattice.
+	To track that we really explored the entire graph, we imagine that the center node is where we start,
+	and each neighboring node that we arrived to, we shift the graph periodically in its direction.
+	We keep a set with all the nodes that we visited, to make sure nothing is visited twice.
+	"""	
+	## Visuals:
+	if _movie:
+		from utils.visuals import VideoRecorder, draw_now
+		from matplotlib import pyplot as plt 
+		movie = VideoRecorder()
+		ax = plt.subplot(1,1,1)
+		draw_now()
+
+	## Helper functions and types:
+	visited_nodes : set[int] = set()
+	lattice_walk_queue  = _PermutationsQueue()
+	periodic_lattice, edges, null_permutation = _common_periodic_shifting_inputs(N)
+
+	## Start with the current position (The NULL permutation)
+	crnt = _PermutationLatticeWalkItem(node_index=get_center_vertex_index(N), permutation=null_permutation) 
+	lattice_walk_queue.put(crnt)
+
+	## For each node in waiting list
+	while not lattice_walk_queue.empty:
+		if _print:
+			print(lattice_walk_queue)
+		## Get item and continue if already visited here
+		crnt = lattice_walk_queue.get()
+		if crnt.node_index in visited_nodes:
+			continue
+
+		## Mark node as visited and send permutation:
+		visited_nodes.add(crnt.node_index)
+		yield crnt.permutation
+
+		# plt.subplot(1,1,1)
+		# _plot_shifting_lattice(periodic_lattice, crnt.permutation)
+
+		## For each direction, yield the new permutation:
+		for direction in LatticeDirection.all_in_counter_clockwise_order():
+			## look for next node:
+			try:
+				next_index = get_neighbor_by_index_and_direction(crnt.node_index, direction, N)
+			except LatticeError:
+				# No need to explore beyond the block:
+				continue
+
+			## Avoid from computing shifts for places we've already visited or are queued:
+			if next_index in lattice_walk_queue or next_index in visited_nodes:
+				continue
+
+			## get permutation based on the permutation that brough us here:
+			next_permutation = _shift_periodically_in_direction_given_periodic_lattice(
+				periodic_lattice, edges, crnt.permutation, direction
+			)
+			next = _PermutationLatticeWalkItem(node_index=next_index, permutation=next_permutation)
+			lattice_walk_queue.put(next)
+
+		## frame for movie:
+		if _movie:
+			fig, ax = _lattice_walk_add_movie_frame(ax, periodic_lattice, visited_nodes, lattice_walk_queue)
+			movie.capture(fig)
+			draw_now()
+
+	## Write Movie
+	if _movie:
+		movie.write_video(f"Lattice-Walk N={N}")
+
+
+def _plot_shifting_lattice(lattice:list[Node], permutation_list:list[int]) -> None:
+	from utils import visuals        
+	from matplotlib import pyplot as plt
+	not_all_the_way = 0.9
+	positions = [node.pos for node in lattice]
+
+	plot_lattice(
+		lattice, periodic=True,
+		node_color="black",
+		node_size=20,
+		edge_style="k--",
+		with_edge_names=False 
+	)
+
+	colors = visuals.color_gradient(len(permutation_list))
+	for (prev_i, next_i), color in zip(enumerate(permutation_list), colors, strict=True):
+		x1, y1 = positions[prev_i]
+		x2, y2 = positions[next_i]
+		plt.text(x1, y1, f"{prev_i}")
+		plt.arrow(
+			x1, y1, (x2-x1)*not_all_the_way, (y2-y1)*not_all_the_way, 
+			width=0.05,
+			color=color,
+			zorder=0
+		)
+	print("Done plotting shifting")

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, fields
+from containers.contractions import BubbleConConfig, ContractionConfig
 from containers.belief_propagation import BPConfig
 from containers.sizes_and_dimensions import TNDimensions
 from containers.imaginary_time_evolution import ITEConfig, IterativeProcessConfig
@@ -18,6 +19,7 @@ class _StoreConfigClasses:
     ITEConfig     = ITEConfig
     IterativeProcessConfig = IterativeProcessConfig
     VisualsConfig = VisualsConfig
+    ContractionConfig = ContractionConfig
 
 
 @dataclass
@@ -28,25 +30,43 @@ class Config(_StoreConfigClasses, _ConfigClass):
     iterative_process : IterativeProcessConfig
     dims : TNDimensions
     visuals : VisualsConfig
-    trunc_dim : int
+    contraction : ContractionConfig   # non-BP contraction config
 
     @staticmethod
-    def derive_from_physical_dim(D:int)->"Config":
+    def derive_from_dimensions(D:int)->"Config":
 
         config = Config(
-            bp=BPConfig(max_swallowing_dim=2*D**2),
+            bp=BPConfig(trunc_dim=2*D**2),
             ite=ITEConfig(),
             iterative_process=IterativeProcessConfig(),
             dims=TNDimensions(virtual_dim=D),
             visuals=VisualsConfig(),
-            trunc_dim=2*D**2+10
+            contraction=ContractionConfig(trunc_dim=2*D**2+10)
         )
 
-        if D>3:
-            config.bp.max_swallowing_dim = D**2
-            config.trunc_dim = 2*D**2
+        # if D>3:
+        #     config.bp.trunc_dim = D**2
+        #     config.trunc_dim = 2*D**2
 
         return config
+
+    @property
+    def chi(self) -> int:
+        return self.contraction.trunc_dim
+    @chi.setter
+    def chi(self, value) -> None:
+        self.contraction.trunc_dim = value
+    @property
+    def chi_bp(self) -> int:
+        return self.bp.trunc_dim
+    @chi_bp.setter
+    def chi_bp(self, value) -> None:
+        self.bp.trunc_dim = value
+
+    def set_parallel(self, value:bool) -> None:
+        assert isinstance(self, bool) or value in [0, 1]
+        self.bp.parallel_msgs = value
+        self.contraction.parallel = value
 
     def post_creation_fix(self):
         self.__post_init__()
@@ -56,12 +76,9 @@ class Config(_StoreConfigClasses, _ConfigClass):
         self.ite.__post_init__()
         self.bp.__post_init__()
         # specials:
-        trunc_d_bp = self.bp.max_swallowing_dim
-        trunc_d_all_other = self.trunc_dim
-        if trunc_d_bp > trunc_d_all_other:
+        
+        if self.chi_bp > self.chi:
             prints.print_warning(f" truncation dim of BP is greater than that of the other bubblcon usages.")
-        if self.trunc_dim == -1:
-            self.trunc_dim = self.bp.max_swallowing_dim*2
         if not ALLOW_VISUALS:
             self.visuals.live_plots = False
 
@@ -71,7 +88,7 @@ class Config(_StoreConfigClasses, _ConfigClass):
             self.bp.max_iterations *= 2
         # self.bp.max_swallowing_dim *= 2
         # self.bp.allowed_retries += 1
-        self.trunc_dim *= 4
+        self.chi *= 4
         if _harder_target:
             self.bp.msg_diff_terminate /= 10
 

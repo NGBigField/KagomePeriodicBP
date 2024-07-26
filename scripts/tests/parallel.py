@@ -62,7 +62,7 @@ def _single_test_parallel_execution_time_single_bp_step(
         
     ## Prepare config:
     bp_config = BPConfig(
-        max_iterations=10, max_swallowing_dim=D**2, msg_diff_terminate=1e-8, parallel_msgs=parallel
+        max_iterations=10, trunc_dim=D**2, msg_diff_terminate=1e-8, parallel_msgs=parallel
     )
     steps_iterator = prints.ProgressBar.inactive()
 

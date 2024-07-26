@@ -21,21 +21,22 @@ import numpy as np
 from libs.ITE import rho_ij
 
 # Common types in the code:
-from containers import Config, BubbleConConfig, UpdateEdge
+from containers import BubbleConConfig, UpdateEdge
+from containers.configs import Config, ContractionConfig
 from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
+from containers.results import MeasurementsOnUnitCell
 from tensor_networks import KagomeTNRepeatedUnitCell, KagomeTNArbitrary, ModeTN, EdgeTN, TensorNode, MPS
 from tensor_networks.abstract_classes import TensorNetwork
 from lattices.directions import BlockSide
 from _error_types import TensorNetworkError, BPNotConvergedError
 from _types import UnitCellExpectationValuesDict
 from enums import ContractionDepth, NodeFunctionality, UnitCellFlavor, UpdateMode
-from physics import pauli
+from physics import pauli, hamiltonians
 from unit_cell import UnitCell
-from containers.results import Measurements, Expectations
 
 ## Algos we need:
 from algo.tn_reduction import reduce_full_kagome_to_core, reduce_tn
-from algo.belief_propagation import belief_propagation
+from algo.belief_propagation import robust_belief_propagation, BPStats
 from algo.contract_tensor_network import contract_tensor_network
 
 # For energy estimation:
@@ -43,14 +44,14 @@ from libs.ITE import rho_ij
 from libs.TenQI import op_to_mat
 
 # Quantum Information metrics:
-from metrics import negativity
+from physics.metrics import negativity
 
 # Utils:
 from utils import assertions, logs, errors, lists, parallels, prints, strings
 
 # A bit of OOP:
 from copy import deepcopy
-from typing import TypeVar, TypeAlias
+from typing import TypeVar, TypeAlias, Iterable, NamedTuple
 from dataclasses import dataclass
 
 _T = TypeVar('_T')
@@ -75,7 +76,7 @@ TensorNetworkType = TypeVar("TensorNetworkType", bound=TensorNetwork)
 
 @dataclass
 class _ValueAndCount():
-    value : float = 0.0
+    value : complex|float = 0.0
     count : int   = 0
 
 
@@ -85,14 +86,11 @@ def _find_not_none_item_in_double_dict( d :dict[str, dict[str, _T]], keys1, keys
             item = d[k1][k2]
             if item is not None:
                 return item
+    raise ValueError("Not found")
 
 def compute_negativity_of_rdm(rdm:np.ndarray)->float:
-    matrix = op_to_mat(rdm)
-    try:
-        value = negativity(matrix)
-    except Exception as e:
-        value = negativity(matrix)
-        value = None
+    matrix : np.matrix = op_to_mat(rdm)
+    value = negativity(matrix)
     return value
 
 def print_results_table(results:dict[str, dict[str, float]])->None:
@@ -127,7 +125,7 @@ def print_results_table(results:dict[str, dict[str, float]])->None:
         print(row_str)
 
 
-def _get_edge_rdm_and_energy(edge_tn:EdgeTN, h:np.ndarray, force_real:bool)->float:
+def _get_edge_rdm_and_energy(edge_tn:EdgeTN, h:np.ndarray, force_real:bool)->tuple[np.ndarray, float]:
 
     # Compute Reduce-Density-Matrix (RDM)
     rdm = edge_tn.rdm
@@ -142,13 +140,13 @@ def _get_edge_rdm_and_energy(edge_tn:EdgeTN, h:np.ndarray, force_real:bool)->flo
 
     return rdm, energy
 
-def _get_hamiltonian_tensor(hamiltonian)->np.ndarray:
+def _get_hamiltonian_tensor(hamiltonian:np.ndarray|HamiltonianFuncAndInputs)->np.ndarray:
     if isinstance(hamiltonian, np.ndarray):
         h = hamiltonian
     elif callable(hamiltonian):
         h = hamiltonian()
-    elif isinstance(hamiltonian, tuple|HamiltonianFuncAndInputs):
-        h, _ = _get_imaginary_time_evolution_operator(hamiltonian, None)
+    elif isinstance(hamiltonian, HamiltonianFuncAndInputs):
+        h, _ = _get_hamiltonian_operator(hamiltonian, None)
     else:
         raise TypeError(f"Not a valid type for input 'hamiltonian' of type {hamiltonian!r}")    
     return h
@@ -165,14 +163,13 @@ def mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[str
 def measure_energies_and_observables_together(
     tn:TensorNetwork, 
     hamiltonian:HamiltonianFuncAndInputs|np.ndarray, 
-    trunc_dim:int,
+    contract_config:ContractionConfig,
     mode:UpdateMode|None=None,
     force_real:bool=True
-)->tuple[
-    dict[tuple[str, str], float],  # energies
-    UnitCellExpectationValuesDict,  # expectations
-    dict[tuple[str, str], float]  # entanglement
-]:
+)->MeasurementsOnUnitCell:
+    """Based on a stable TensorNetwork, get measurements using the reduced-density-matrix per edge.
+    """
+
     ## Prepare outputs and check inputs:
     # inputs:
     if DEBUG_MODE: tn.validate()
@@ -197,20 +194,20 @@ def measure_energies_and_observables_together(
     }
     
     ## Contract to mode:
-    mode_tn = reduce_tn(tn, ModeTN, trunc_dim, copy=True, mode=mode)
+    mode_tn = reduce_tn(tn, ModeTN, contract_config=contract_config, copy=True, mode=mode)
 
     ## For each edge, reduce a bit more and calc energy:
     for edge_tuple in UpdateEdge.all_options():
     
         # do the final needed contraction for this specific edge:
-        edge_tn = reduce_tn(mode_tn, target_type=EdgeTN, trunc_dim=trunc_dim, copy=True, edge_tuple=edge_tuple)
+        edge_tn = reduce_tn(mode_tn, target_type=EdgeTN, contract_config=contract_config, copy=True, edge_tuple=edge_tuple)
         edge_tn.rearrange_tensors_and_legs_into_canonical_order()
         rdm, edge_energy = _get_edge_rdm_and_energy(edge_tn, h, force_real)
         edge_negativity = compute_negativity_of_rdm(rdm)
 
         # keep energies:
         if return_by_flavor:
-            key = edge_tuple.as_strings
+            key = str(edge_tuple)
         else:
             key = edge_tn.edge_name 
         energies[key] = edge_energy
@@ -228,95 +225,186 @@ def measure_energies_and_observables_together(
                 expectations[abc][xyz].count += 1     # count appearances
 
     # mean expectation values from all appearances :
+    expectations_out = {}
     for abc in ['A', 'B', 'C']:
+        expectations_out[abc] = {}
+
         for xyz in ['x', 'y', 'z']:
             sum_   = expectations[abc][xyz].value
             count_ = expectations[abc][xyz].count
             # override value, count tuple with mean:
-            expectations[abc][xyz] = sum_/count_  
+            expectations_out[abc][xyz] = sum_/count_  
     
-    return energies, expectations, entanglement
+    return MeasurementsOnUnitCell(energies=energies, expectations=expectations_out, entanglement=entanglement)
 
 
-def _measurements_everything_on_duplicated_core_specific_size(
-    core:KagomeTNRepeatedUnitCell, 
-    repeats:int,
-    config:Config,
-    logger:logs.Logger,
-    reduce_for_xyz:bool=True,
-    use_rdms_for_xyz:bool=True
-)->Measurements:
-    ## Parse commonly used inputs:
-    chi = config.trunc_dim
+class _EnergyAndMeasurements(NamedTuple):
+    energy : float
+    measurements : MeasurementsOnUnitCell
 
-    ## Get small stable network:
-    tn_open = repeat_core(core, repeats)
-    # Belief Propagation:
-    tn_stable, _, bp_stats = belief_propagation(tn_open, messages=None, bp_config=config.bp)
-    if bp_stats.final_error>config.bp.msg_diff_terminate:
-        raise BPNotConvergedError("")
-    tn_stable_around_core = reduce_full_kagome_to_core(tn_stable, chi, method=config.reduce2core_method)
-
-    ## Calc 
-    # Energies:
-    energies_per_site, rdms = measure_energies_and_observables_together(tn_stable_around_core, config.ite.interaction_hamiltonian, chi)    
-    # XYZ
-    if use_rdms_for_xyz:
-        expectation_values = measure_xyz_expectation_values_with_rdms(rdms)
+def calc_measurement_non_unit_cell_kagome_tn(
+    tn:KagomeTNArbitrary|list[np.ndarray],
+    config:Config|None=None,
+    hamiltonian:HamiltonianFuncAndInputs|np.ndarray=hamiltonians.heisenberg_afm(), 
+    mode:UpdateMode=UpdateMode.random(),
+    print_:bool=True
+) -> float:
+    
+    ## Check and complete inputs:
+    # TN:
+    if isinstance(tn, KagomeTNArbitrary):
+        pass
+    elif isinstance(tn, list) and lists.all_isinstance(tn, np.ndarray):
+        tn = KagomeTNArbitrary(tn)
     else:
-        if reduce_for_xyz:
-            expectation_values = derive_xyz_expectation_values_with_tn(tn_stable_around_core, reduce=False)
+        raise TypeError(f"Not supporting input `tn` of type {type(tn)!r}")
+    # Config:
+    if config is None:
+        config = Config.derive_from_dimensions(tn.dimensions.virtual_dim)
+    
+    ## Helper functions:
+    def _cond_print(*args, **kwargs) -> None:
+        if print_:
+            print(*args, **kwargs)
+
+    def _print_success(stats:BPStats) -> None:
+        if stats.success:
+            if not print_:
+                return
+            s = f"Succeeded to converge on an error below {stats.final_config.msg_diff_good_enough!r}"
         else:
-            expectation_values = derive_xyz_expectation_values_with_tn(tn_stable, reduce=False)
+            s = f"Failed to converge!"
+        s += f" error is now {stats.final_error!r}"
+        print(s)
 
-    ## Pack results:
-    measurements = Measurements(
-        expectations=Expectations(
-            x=np.abs(np.real(expectation_values['x'])),
-            y=np.abs(np.real(expectation_values['y'])),
-            z=np.abs(np.real(expectation_values['z']))
-        ),
-        energy=sum([np.real(e) for e in energies_per_site])/len(energies_per_site)
-    )
+    def _get_energy_per_site_per_mode(shifted_tn:KagomeTNArbitrary) -> dict[UpdateMode, _EnergyAndMeasurements]:
+        energy_per_site_per_mode : dict[UpdateMode, _EnergyAndMeasurements] = {}    
+        for mode in UpdateMode.all_options():
+            _cond_print(f"Mode = {mode}")
+            measurements = measure_energies_and_observables_together(shifted_tn, hamiltonian, contract_config=config.contraction, mode=mode)
+            energies = measurements.energies
+            _cond_print(energies)
+            energy_per_site = measurements.mean_energy
+            _cond_print(energy_per_site)
+            energy_per_site_per_mode[mode] = _EnergyAndMeasurements(energy_per_site, measurements)
 
-    logger.info("")
-    logger.info(f"Measurements on TN of edge size {tn_open.original_lattice_dims[0]}")
-    logger.info(f"{measurements}")
+        return energy_per_site_per_mode
 
-    return measurements
+    ## Measure energy and expectations on TN:
+    all_energies : list[dict[UpdateMode, _EnergyAndMeasurements]] = []
+    messages = None
+    ## For each shift in some direction along the lattice:
+    for shifted_tn in tn.all_lattice_shifting_options():
+        _cond_print("\n")
+        # for the shifted network: Block BP once:
+        messages, stats = robust_belief_propagation(shifted_tn, messages, config=config.bp)
+        _print_success(stats)
+        # Get energy:
+        energies_per_mode = _get_energy_per_site_per_mode(shifted_tn)
+        all_energies.append(energies_per_mode)
+    
+    ## Derive Energy per mode:
+    mean_energies_per_mode = []
+    _cond_print("\n"*3)
+    for mode in UpdateMode.all_options():
+        _cond_print(f"Mode = {mode}")
+        per_mode_pairs : list[_EnergyAndMeasurements] = [energies_per_mode[mode] for energies_per_mode in all_energies]
+        per_mode_energies = [measurement.energy for measurement in per_mode_pairs]
+        _cond_print(per_mode_energies)
+        mean_energy = lists.average(per_mode_energies)
+        _cond_print(f"mean_energy={mean_energy}")
+        _cond_print(f"\n")
+        mean_energies_per_mode.append(mean_energy)
+
+    ## What mode is best?
+    _cond_print("Done.")
+    return min(mean_energies_per_mode)
 
 
-def measurements_everything_on_duplicated_core(
-    core:KagomeTNRepeatedUnitCell, 
-    repeats:int,
+def calc_measurements_on_unit_cell(
+    unit_cell:UnitCell, 
     config:Config,
-    logger:logs.Logger|None = None
-)->Measurements:
+    hamiltonian:HamiltonianFuncAndInputs|np.ndarray=hamiltonians.heisenberg_afm(), 
+    mode:UpdateMode=UpdateMode.random()
+) -> MeasurementsOnUnitCell:
+    ## Unpack data to get TN:
+    # Get TN:
+    N = config.dims.big_lattice_size
+    d, D = unit_cell.derive_dimensions()
+    lattice = KagomeTNRepeatedUnitCell._KagomeLattice(N=N)
+    tn = KagomeTNRepeatedUnitCell(lattice, unit_cell, d, D)
+    # General Config:
+    contract_config = config.contraction
+
+    ## BP to get stable environment:
+    robust_belief_propagation(tn, None, config.bp)
+
+    ## Measure:
+    return measure_energies_and_observables_together(tn, hamiltonian=hamiltonian, contract_config=contract_config, mode=mode)
+
+
+def run_converged_measurement_test(
+    unit_cell:UnitCell, 
+    sizes:Iterable[int]=range(2,10),
+    config:Config|None=None,
+    progress_bar:bool=True,
+    plot:bool=True
+)->MeasurementsOnUnitCell:
+    ## Basic Data:
+    d, D = unit_cell.derive_dimensions()
+    if config is None:
+        config = Config.derive_from_dimensions(D)
+
     ## Check:
-    repeats = assertions.odd(repeats, reason="Must be an odd number >= 3")
-    assert repeats>=3, "Must be an odd number >= 3"
-    if logger is None:
-        logger = logs.get_logger()
 
     ## Some changes to config:
     crnt_config = deepcopy(config)
-    crnt_config.bp.allowed_retries = 1 # Force Only a single bp attempt per tn size
-    crnt_repeats = repeats
+    
+    ## Prepare results:
+    results : list[tuple[int, MeasurementsOnUnitCell]] = []
 
-    ## Multiple tries
-    measurements = None
-    while crnt_repeats >= 3:
+    if progress_bar:
+        _print_prefix = "Measuring Results...."  
         try:
-            measurements = _measurements_everything_on_duplicated_core_specific_size(core, crnt_repeats, crnt_config, logger)
-        except Exception as e:
-            logger.warn(errors.get_traceback(e))
-            crnt_repeats -= 2
-            continue
+            n = len(sizes)  #type: ignore
+        except:
+            prog_bar = prints.ProgressBar.unlimited(print_prefix=_print_prefix)
         else:
-            break
+            prog_bar = prints.ProgressBar(n, print_prefix=_print_prefix)
+    else:
+        prog_bar = prints.ProgressBar.inactive()
+            
+    ## Multiple tries
+    for N in sizes:
+        prog_bar.next(extra_str=f" N={N}")
+
+        assert N>=2
+        try:
+            crnt_config.dims.big_lattice_size = N
+            measurements = calc_measurements_on_unit_cell(unit_cell, config=crnt_config)
+        except Exception as e:
+            errors.print_traceback(e)
+            continue
+        results.append((N, measurements))
+
+    prog_bar.clear()
+
+    ## sort
+    results.sort(key=lambda tuple_: tuple_[0])
+    Ns = [meas[0] for meas in results]
+    energies = [meas[1].mean_energy for meas in results]
+
+    ## Get the converged measurement:
+    print(energies)
+    if plot:
+        from matplotlib import pyplot as plt
+        from utils import visuals
+        plt.subplot(1,1,1)
+        plt.plot(Ns, energies)
+        visuals.draw_now()
+    measurements = results[-1][1]
+
     ## Return
-    assert measurements is not None, f"Not even a single attempt succeeded"
-    assert isinstance(measurements, Measurements) , f"Not even a single attempt succeeded"
     return measurements
 
 
@@ -480,9 +568,9 @@ def calc_unit_cell_expectation_values_from_tn(
     assert not isinstance(denominator, MPS), "Full contraction should result in a number, not an MPS"
     center_nodes = tn.get_center_core_nodes()
     unit_cell_indices = UnitCell(
-        A = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.A),
-        B = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.B),
-        C = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.C)
+        A = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.A),  #type: ignore
+        B = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.B),  #type: ignore
+        C = next(n.index for n in center_nodes if n.cell_flavor is UnitCellFlavor.C)   #type: ignore
     )
 
     ## Prepare progress-bar:
@@ -562,12 +650,11 @@ def _get_z_projection(rho:np.ndarray)->complex:
     return rho[0,0] - rho[1,1] 
 
 
-def _get_imaginary_time_evolution_operator(hamiltonian_func:HamiltonianFuncAndInputs, delta_t:float|None) -> tuple[np.ndarray, np.ndarray]: 
+def _get_hamiltonian_operator(hamiltonian_func:HamiltonianFuncAndInputs, delta_t:float|None) -> tuple[np.ndarray, np.ndarray]: 
     hamiltonian_func = HamiltonianFuncAndInputs.standard(hamiltonian_func)
     h = hamiltonian_func.call(delta_t=0.0)
-    g = None
+    g = -1
     return h, g
-
 
 def _rotate_rdm(rho:np.matrix, pauli_name:str)->np.matrix:
     match pauli_name:       

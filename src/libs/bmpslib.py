@@ -220,7 +220,7 @@ class mps:
 
 		self.N = N
 		
-		self.A = [None]*N
+		self.A : list[np.ndarray] = [None]*N    #type: ignore
 		self.Corder = [None]*N  # Canonical order of each element
 		self.Ps = [1]*N
 		

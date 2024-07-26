@@ -13,6 +13,7 @@
         "expec",
         "Ferro",
         "foldersep",
+        "Hamil",
         "hamiltonians",
         "Hasik",
         "hermicity",
@@ -24,6 +25,7 @@
         "kagome",
         "ketbra",
         "kets",
+        "labelcolor",
         "mpss",
         "Negativities",
         "numpys",
@@ -31,12 +33,16 @@
         "paulis",
         "PESS",
         "rdms",
+        "semidefinite",
         "stds",
         "suptitle",
         "tnsu",
+        "trotterization",
         "twinx"
     ],
     "cSpell.ignoreWords": [
-        "arange"
+        "Eisert's",
+        "arange",
+        "vari"
     ]
 }

@@ -14,8 +14,6 @@ from typing import Generic, TypeVar, Generator
 from dataclasses import dataclass, field
 _T = TypeVar("_T")
 
-# Common types in the code:
-from tensor_networks import KagomeTNRepeatedUnitCell, ArbitraryTN, ModeTN, TensorNode, MPS, CoreTN, get_common_edge
 
 # Everyone needs numpy:
 import numpy as np
@@ -27,11 +25,13 @@ from libs import bmpslib
 from algo.contract_tensor_network import contract_tensor_network
 
 # Types we need in our module:
-from tensor_networks import KagomeTNRepeatedUnitCell, ArbitraryTN, TensorNode, MPS
+from tensor_networks import ArbitraryTN, TensorNode, MPS, CoreTN
+from tensor_networks.abstract_classes import KagomeTensorNetwork
 from tensor_networks.node import TensorNode, two_nodes_ordered_by_relative_direction
 from lattices.directions import Direction, LatticeDirection, BlockSide, check
 from enums import ContractionDepth, NodeFunctionality, UpdateMode
 from containers import MPSOrientation, UpdateEdge
+from containers.configs import ContractionConfig
 
 # Our utilities:
 from utils import parallels, tuples, lists, assertions, prints
@@ -76,8 +76,8 @@ class _PerSide(Generic[_T]):
     Used for repeating structure where one part comes from the top of the hexagonal block down, meeting first the top of the center triangle,
     and the other part comes from the bottom of the hexagonal block going up, meeting first the base of the center triangle.
     """
-    top_down  : _T = field(default=None) 
-    bottom_up : _T = field(default=None)
+    top_down  : _T = field(default=None)  #type: ignore 
+    bottom_up : _T = field(default=None)  #type: ignore
 
     def items(self)->Generator[tuple[str, _T], None, None]:
         yield "top_down" , self.top_down 
@@ -103,7 +103,7 @@ class _PerSide(Generic[_T]):
 
 def _contract_half(
     side_key:str, 
-    tn:KagomeTNRepeatedUnitCell,
+    tn:KagomeTensorNetwork,
     directions:_PerSide[BlockSide],
     bubblecon_trunc_dim:int,
     print_progress:bool
@@ -118,21 +118,21 @@ def _contract_half(
 
 
 def _contract_tn_from_sides_and_create_mpss(
-    tn:KagomeTNRepeatedUnitCell,
+    tn:KagomeTensorNetwork,
     directions:_PerSide[BlockSide],
-    bubblecon_trunc_dim:int,
-    parallel:bool
+    contract_config:ContractionConfig
 )->tuple[
     _PerSide[MPS],
     _PerSide[list[int]],
     _PerSide[MPSOrientation]
 ]:
-    
+
     ## Run in parallel or sequential:
+    parallel = contract_config.parallel
     fixed_arguments = dict(
         tn = tn,
         directions = directions,
-        bubblecon_trunc_dim = bubblecon_trunc_dim,
+        bubblecon_trunc_dim = contract_config.trunc_dim,
         print_progress = not parallel
     )
     values = list(_PerSide.side_names())
@@ -150,7 +150,7 @@ def _contract_tn_from_sides_and_create_mpss(
     return mpss, con_orders, orientations
 
 def _basic_data(
-    tn:KagomeTNRepeatedUnitCell, parallel:bool, direction:BlockSide|None
+    tn:KagomeTensorNetwork, direction:BlockSide|None
 )->tuple[
     list[TensorNode],
     _PerSide[int],
@@ -316,18 +316,18 @@ def _add_env_tensors_to_open_core(small_tn:ArbitraryTN, env_tensors:list[TensorN
 
 
 
-def reduce_full_kagome_to_core(tn:KagomeTNRepeatedUnitCell, trunc_dim:int, parallel:bool=False, direction:BlockSide|None=None) -> CoreTN:
+def reduce_full_kagome_to_core(tn:KagomeTensorNetwork, contract_config:ContractionConfig, direction:BlockSide|None=None) -> CoreTN:
     ## 0: Check inputs:
     if DEBUG_MODE:
         tn.validate()
     assert tn.has_messages, "To reduce to core, KagomeTN must have mps messages."
 
     ## I. Parse and derive data
-    core_nodes, num_core_connections, num_side_overlap_connections, directions = _basic_data(tn, parallel, direction)
+    core_nodes, num_core_connections, num_side_overlap_connections, directions = _basic_data(tn, direction)
 
     ## II. Prepare two MPSs, contract until core:
 	#      One MPS is "from the bottom-up" and the other is "from the top-down"
-    mpss, con_orders, orientations = _contract_tn_from_sides_and_create_mpss(tn, directions, trunc_dim, parallel)
+    mpss, con_orders, orientations = _contract_tn_from_sides_and_create_mpss(tn, directions, contract_config)
     
     ## Some verifications:
     if DEBUG_MODE:

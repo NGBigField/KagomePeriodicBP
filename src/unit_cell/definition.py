@@ -1,9 +1,9 @@
-from dataclasses import dataclass, field
-from typing import Generator, Final
+from dataclasses import dataclass, field, fields
+from typing import Generator, Literal
 from numpy import ndarray as np_ndarray
 from enums import UnitCellFlavor
 import numpy as np
-from metrics.distance import tensor_distance
+from physics.metrics.distance import tensor_distance
 
 from utils import saveload, strings, iterations, files, assertions
 
@@ -13,10 +13,27 @@ BEST_UNIT_CELL_FOLDER_FULLPATH = UNIT_CELL_FOLDER_FULLPATH + saveload.PATH_SEP +
 
 @dataclass
 class UnitCell: 
+    """A 3-sites UnitCell for the Kagome lattice
+    >>>        \\  /
+    >>>         \\/
+    >>>          A
+    >>>         / \\ 
+    >>>        /   \\
+    >>> ------B-----C------
+    >>>      /       \\
+    >>>     /         \\
+        
+    3 Tensors are located in 3 sites in an upper-triangle:
+        A: Top of the triangle.      Legs are ordered us: [physical-leg, UL, DL, DR, UR]
+        B: Left corner of triangle.  Legs are ordered us: [physical-leg, L,  DL, R,  UR]
+        C: Right corner of triangle. Legs are ordered us: [physical-leg, UL, L,  DR, R ]
+    """
+
     A : np_ndarray
     B : np_ndarray
     C : np_ndarray
     _file_name : str|None = None
+    _rotated : int = 0
 
     def __getitem__(self, key:str)->np_ndarray:
         match key:
@@ -49,7 +66,6 @@ class UnitCell:
     def all_keys()->list[str]:
         return ["A", "B", "C"]
     
-    
     @staticmethod
     def size()->int:
         return 3
@@ -59,7 +75,8 @@ class UnitCell:
             A=self.A.copy(),
             B=self.B.copy(),
             C=self.C.copy(),
-            _file_name=self._file_name
+            _file_name=self._file_name,
+            _rotated=self._rotated
         )
     
     @staticmethod
@@ -106,6 +123,23 @@ class UnitCell:
             return None
         assert data.D == D
         return data.unit_cell        
+    
+    @staticmethod
+    def are_equal(uc1:"UnitCell", uc2:"UnitCell") -> bool:
+        assert isinstance(uc1, UnitCell)
+        assert isinstance(uc2, UnitCell)
+        if not np.all(uc1.A==uc2.A) : return False
+        if not np.all(uc1.B==uc2.B) : return False
+        if not np.all(uc1.C==uc2.C) : return False
+        if not np.all(uc1._rotated==uc2._rotated==0)  : return False
+        return True
+    
+    @staticmethod
+    def distance(uc1:"UnitCell", uc2:"UnitCell") -> float:
+        assert isinstance(uc1, UnitCell)
+        assert isinstance(uc2, UnitCell)
+        distances = [tensor_distance(t1, t2) for (_, t1), (_,t2) in zip(uc1.items(), uc2.items(), strict=True) ]
+        return sum(distances)
 
     def set_filename(self, filename:str)->None:
         self._file_name = filename
@@ -131,10 +165,8 @@ class UnitCell:
         self.B = _add_noise(self.B)
         self.C = _add_noise(self.C)
 
-    def distance(self, other:"UnitCell") -> float:
-        distances = [tensor_distance(t1, t2) for (_, t1), (_,t2) in zip(self.items(), other.items(), strict=True) ]
-        return sum(distances)
-
+    def distance_from(self, other:"UnitCell") -> float:
+        return UnitCell.distance(self, other)
 
     def _derive_file_name(self, given_name:str|None)->str:
         if given_name is not None:
@@ -146,6 +178,88 @@ class UnitCell:
             return self._file_name
 
         return strings.time_stamp()
+    
+    def derive_dimensions(self) -> tuple[int, int]:
+        d = self.A.shape[0]
+        D = self.A.shape[-1]
+        return d, D
+    
+    def rotate(self, num_rotations:int|Literal["random"], on_copy:bool=False) -> "UnitCell":
+        """Rotate the unit-cell while keeping correct relative leg order.
+
+        Args:
+            `num_rotations`: int in [-2, -1, 0, 1, 2] or str=="random".
+            
+                when positive, rotating clockwise `num_rotations` times.                
+
+                when negative, rotating counter-clockwise `num_rotations` times.
+            
+                when 0, not rotating (useful when "not-rotating" is part of the random orientations).
+            
+                when "random", randomizing value.
+
+        Returns:
+            copy of UnitCell
+            number of rotations (useful when `num_rotations=="random"`)
+        """
+        if isinstance(num_rotations, int):
+            ## Check rotations:
+            assert num_rotations in [-2, -1, 0, 1, 2]
+            if num_rotations < 0:
+                num_rotations += 3                
+
+            # Copy?
+            if on_copy:
+                res = self.copy()
+            else:
+                res = self
+
+            # Rotate by small steps:
+            for _ in range(num_rotations):
+                res._rotate_once_clockwise()
+                
+        elif isinstance(num_rotations, str):
+            assert num_rotations=="random"
+            num_rotations = np.random.randint(0, 3)  # rand [0, 1 or 2]
+            res = self.rotate(num_rotations, on_copy)
+
+        else:
+            raise TypeError("Not an expected type")
+        
+        return res
+
+    def force_zero_rotation(self) -> None:
+        """ Keep unit-cell in its canonical rotation. if the unit_cell is rotated, rotate it back to zero rotation.
+        """
+        num_rotations = -self._rotated
+        self.rotate(num_rotations=num_rotations, on_copy=False)
+        assert self._rotated==0
+
+    def _rotate_once_clockwise(self) -> None:
+        ## Get new attributes:
+        A = _permute_physical_tensor(self.B, [2, 3, 4, 1])
+        B = _permute_physical_tensor(self.C, [3, 4, 1, 2])
+        C = _permute_physical_tensor(self.A, [2, 3, 4, 1])
+        _rotated = (self._rotated + 1) % 3
+
+        ## Apply to self:
+        self.A = A
+        self.B = B
+        self.C = C
+        self._rotated = _rotated
+    
+    def copy_from(self, other:"UnitCell", fields_to_copy:list[str]|set[str]|None=None) -> None:
+        assert isinstance(other, UnitCell)
+        
+        if fields_to_copy is None:
+            fields_to_copy = {f.name for f in fields(self)}
+        
+        for f in fields(self):
+            if f.name not in fields_to_copy:
+                continue
+            value = getattr(other, f.name)
+            setattr(self, f.name, value)
+        
 
     
 def _zero_state_tensor(D:int)->np.ndarray:
@@ -179,11 +293,11 @@ class BestUnitCellData:
         for file_name in BestUnitCellData._all_files_with_D(D=D):
             return saveload.load(file_name, sub_folder=BEST_UNIT_CELL_DATA_FOLDER_NAME)
         if none_if_not_exist:
-            return None
+            return None  #type: ignore
         else:
             raise FileExistsError(f"No saved file for best unit_cell with D={D}")
         
-    def save(self) -> None:
+    def save(self) -> str:
         BestUnitCellData.force_folder_exist()
         BestUnitCellData._remove_all_with_D(D=self.D)
         file_name = self._canonical_file_name()
@@ -215,12 +329,15 @@ class BestUnitCellData:
         saveload.force_folder_exists(BEST_UNIT_CELL_FOLDER_FULLPATH)
 
 
-
+def _permute_physical_tensor(t:np.ndarray, permutation:list[int]) -> np.ndarray:
+    permutation = [0]+permutation  # include physical leg
+    return t.copy().transpose(permutation)
 
 def _random_quantum_state_tensor(d:int, D:int, num_virtual_legs) -> np.ndarray:
     ## define needed params and functions:
     dims = [d] + [D]*num_virtual_legs
-    _rand_real_mat = lambda: np.random.rand(*dims)
+    def _rand_real_mat() -> np.ndarray:
+        return np.random.rand(*dims)  #type: ignore
 
     ## create a legit tensor by a random tensor and its conjugate:
     t = _rand_real_mat() + 1j*_rand_real_mat()

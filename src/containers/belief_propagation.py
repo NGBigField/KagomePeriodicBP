@@ -3,7 +3,8 @@ from enums import MessageModel
 from utils.arguments import Stats
 from containers._meta import _ConfigClass
 from containers.contractions import MPSOrientation
-from typing import NamedTuple, TypeAlias
+from typing import NamedTuple, TypeAlias, Dict
+import numpy as np
 from lattices.directions import LatticeDirection
 from libs.bmpslib import mps as MPS
 from lattices.directions import BlockSide
@@ -12,10 +13,10 @@ from lattices.directions import BlockSide
 @dataclass
 class BPConfig(_ConfigClass): 
     init_msg: MessageModel = MessageModel.RANDOM_QUANTUM
-    max_iterations : int|None = 40   # None is used for unlimited number of iterations
-    max_swallowing_dim : int = 9
+    max_iterations : int|None = 50   # None is used for unlimited number of iterations
+    trunc_dim : int = 9
     msg_diff_terminate : float = 1e-10
-    msg_diff_good_enough : float = 1e-4
+    msg_diff_good_enough : float = 1e-5
     msg_diff_squared : bool = True  # True is easier to get to 
     allowed_retries : int = 2
     times_to_deem_failure_when_diff_increases  : int = 3
@@ -57,6 +58,4 @@ class Message(NamedTuple):
         )
     
 
-class MessageDictType(dict[BlockSide, Message]):
-    def mpss(self)->list[MPS]:
-        return [msg.mps.A for side, msg in self.items()]
+MessageDictType : TypeAlias = Dict[BlockSide, Message]

@@ -35,7 +35,7 @@ from containers.sizes_and_dimensions import TNDimensions
 from utils import lists, tuples, numerics, indices, strings, arguments
 
 import numpy as np
-from typing import NamedTuple, TypeVar
+from typing import NamedTuple, TypeVar, Generator, TypeAlias, Type
 from copy import deepcopy
 
 # For efficient functions:
@@ -52,7 +52,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Final
 
 _T = TypeVar("_T")
-
+_FrozenSpecificNetworkType = TypeVar("_FrozenSpecificNetworkType", bound="_FrozenSpecificNetwork")
 
 class TensorDims(NamedTuple):
     virtual  : int
@@ -66,7 +66,7 @@ class TensorNetwork(ABC):
     # ================================================= #
     #|   Implementation Specific Methods\Properties    |#
     # ================================================= #
-    nodes : list[TensorNode] = None
+    nodes : list[TensorNode] 
 
     @abstractmethod
     def copy(self)->"TensorNetwork": ...
@@ -75,7 +75,7 @@ class TensorNetwork(ABC):
     #|              Basic Derived Properties           |#
     # ================================================= #
     @property
-    def size(self)->list[np.ndarray]:
+    def size(self)->int:
         return len(self.nodes)
     
     @property
@@ -248,7 +248,7 @@ class KagomeTensorNetwork(TensorNetwork, ABC):
     def __init__(self, lattice:KagomeLattice, dimensions:TNDimensions) -> None:
         # Save data:
         self.lattice : KagomeLattice = lattice  # Must keep a Kagome lattice
-        self.messages : MessageDictType = {}  # Must have a dictionary of messages for each block side
+        self.messages : MessageDictType = dict() # Must have a dictionary of messages for each block side
         self.dimensions : TNDimensions = dimensions  # Must keep its dimensions in a simple dictionary
     # ================================================= #
     #|                    messages                     |#
@@ -295,7 +295,7 @@ class KagomeTensorNetwork(TensorNetwork, ABC):
     def num_boundary_nodes(self, boundary:BlockSide)->int:
         return self.lattice.num_boundary_nodes(boundary)
     
-    def positions_min_max(self)->tuple[int, ...]:
+    def positions_min_max(self)->tuple[float, ...]:
         min_x, max_x = lists.min_max([node.pos[0] for node in self.nodes])
         min_y, max_y = lists.min_max([node.pos[1] for node in self.nodes])
         return min_x, max_x, min_y, max_y
@@ -314,6 +314,7 @@ class KagomeTensorNetwork(TensorNetwork, ABC):
 
 
 class KagomeTNRepeatedUnitCell(KagomeTensorNetwork):
+    _KagomeLattice : TypeAlias = KagomeLattice
 
     # ================================================= #
     #|                Basic Attributes                 |#
@@ -444,12 +445,20 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
                     case 'left':  tensor_node.cell_flavor = UnitCellFlavor.B
                     case 'right': tensor_node.cell_flavor = UnitCellFlavor.C
 
-    def shift_periodically_in_direction(self, direction:LatticeDirection, _plot:bool=True) -> "KagomeTNArbitrary":
+    def all_lattice_shifting_options(self) -> Generator["KagomeTNArbitrary", None, None]:
+        for triangles_permutation_list in triangle_lattice.all_periodic_lattice_shifting_permutation(self.lattice.N):
+            if DEBUG_MODE:
+                assert indices.valid_permutation_list(triangles_permutation_list)
+            yield self._shift_kagome_according_to_triangular_permutation(triangles_permutation_list)
+
+    def shift_periodically_in_direction(self, direction:LatticeDirection, _plot:bool=False) -> "KagomeTNArbitrary":
         ## First get the permutation for triangular lattice, which defined shifting of upper-triangles
         triangles_permutation_list = triangle_lattice.shift_periodically_in_direction(self.lattice.N, direction)
         if DEBUG_MODE:
             assert indices.valid_permutation_list(triangles_permutation_list)
+        return self._shift_kagome_according_to_triangular_permutation(triangles_permutation_list, _plot=_plot)
 
+    def _shift_kagome_according_to_triangular_permutation(self, triangles_permutation_list:list[int], _plot:bool=False) -> "KagomeTNArbitrary":
         ## Collect permutation list for nodes, bunched in upper-triangles:        
         permutation_list : list[_PermuteTuple] = []
         for prev_triangle_i, next_triangle_i in enumerate(triangles_permutation_list):
@@ -469,7 +478,7 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
         # Sort according to new order:
         permutation_list.sort(key=lambda perm: perm.next)
         # New tensors are in the "new" order, by indexing the old list with its "old" indices:
-        new_tensors = [self.tensors[perm.prev] for perm in permutation_list]
+        new_tensors = [self.tensors[perm.prev].copy() for perm in permutation_list]
 
         new_tn = KagomeTNArbitrary(tensors=new_tensors)
         return new_tn
@@ -555,7 +564,7 @@ class _FrozenSpecificNetwork(TensorNetwork):
         self._nodes = nodes
 
     @classmethod
-    def from_arbitrary_tn(cls, tn:ArbitraryTN, **kwargs) -> "_FrozenSpecificNetwork":
+    def from_arbitrary_tn(cls:Type[_FrozenSpecificNetworkType], tn:ArbitraryTN, **kwargs) -> _FrozenSpecificNetworkType:
         new = cls(tn.nodes, copy=False, **kwargs)
         return new
     
@@ -565,8 +574,9 @@ class _FrozenSpecificNetwork(TensorNetwork):
     # ================================================= #
     #|       Mandatory Implementations of ABC          |#
     # ================================================= #
-    def copy(self, **kwargs)->"_FrozenSpecificNetwork":
-        return type(self)(nodes=self.nodes, copy=True, **kwargs)
+    def copy(self:_FrozenSpecificNetworkType, **kwargs)->_FrozenSpecificNetworkType:
+        cls = type(self)
+        return cls(nodes=self.nodes, copy=True, **kwargs)
     
     # ================================================= #
     #|        Protecting nodes from change             |#
@@ -762,7 +772,7 @@ def _derive_message_node_position(nodes_on_boundary:list[Node], edge:EdgeIndicat
 
 
 def _message_nodes(
-    tn : KagomeTNRepeatedUnitCell,
+    tn : KagomeTensorNetwork,
     message : Message,
     boundary_side : BlockSide,
     first_node_index : int
@@ -840,7 +850,7 @@ def _message_nodes(
 
 
 
-def _common_kagome_get_message_nodes(tn:KagomeTensorNetwork) -> list[Node]:
+def _common_kagome_get_message_nodes(tn:KagomeTensorNetwork) -> list[TensorNode]:
     nodes = []
     if len(tn.messages)>0:
         crnt_node_index = tn.lattice.size
@@ -888,7 +898,8 @@ def  _derive_nodes_kagome_tn_repeated_unit_cell(tn:KagomeTNRepeatedUnitCell)->li
     # Nearest-neighbors of the center triangles are part of the outer-core:
     for node in center_nodes:
         for edge in node.edges:
-            neighbor_index = tn.lattice.get_neighbor(node, edge).index
+            _lattice_node = node.to_lattice_node()
+            neighbor_index = tn.lattice.get_neighbor(_lattice_node, edge).index
             neighbor = nodes[neighbor_index]
             if neighbor in center_nodes:
                 continue

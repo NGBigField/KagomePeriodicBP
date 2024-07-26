@@ -20,6 +20,7 @@ from tensor_networks.node import TensorNode, two_nodes_ordered_by_relative_direc
 from tensor_networks.mps import mps_index_of_open_leg, MPS
 from enums import ContractionDepth, NodeFunctionality
 from containers import UpdateEdge, MPSOrientation
+from containers.configs import ContractionConfig
 from _types import EdgeIndicatorType
 from _error_types import TensorNetworkError
 
@@ -249,17 +250,18 @@ def _derive_commons_neighbors_connections_if_it_was_a_matrix(
 def reduce_mode_to_edge(
     mode_tn:ModeTN, 
     edge_tuple:UpdateEdge,
-    trunc_dim:int,
+    contract_config:ContractionConfig,
     copy:bool=True
 )->EdgeTN:
     
     ## Get basic data:
+    trunc_dim = contract_config.trunc_dim
     edge, i1, i2, is_center_included = _derive_edge_and_nodes(mode_tn, edge_tuple)
 
     ## Contract everything except the mode and its neighbors:
     if is_center_included:
         tn = mode_tn.to_arbitrary_tn(copy=copy)
-        #TODO: Add trunctation dimension using SVD 
+        #TODO: Add truncation dimension using SVD 
         tn, common_neighbor = _contract_all_nodes_individually_except_neighbors(tn, i1, i2)
 
         # Decide which of the common_neighbor's legs fit at which side:

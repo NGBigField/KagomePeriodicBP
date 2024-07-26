@@ -2,6 +2,8 @@ from _types import EdgeIndicatorType, PosScalarType
 from lattices.directions import Direction, BlockSide, DirectionError
 from utils import tuples
 from dataclasses import dataclass, field
+from typing import Protocol
+
 
 
 @dataclass
@@ -27,7 +29,8 @@ class Node():
 
 def plot_lattice(
     lattice:list[Node], edges_dict:dict[str, tuple[int, int]]|None=None, 
-    node_color:str="red", node_size=40, edge_style:str="b-", periodic:bool=False
+    node_color:str="red", node_size=40, edge_style:str="b-", 
+    periodic:bool=False, with_edge_names:bool=True
 )->None:
     from matplotlib import pyplot as plt
 
@@ -35,7 +38,7 @@ def plot_lattice(
     for node in lattice:
         x, y = node.pos
         plt.scatter(x, y, c=node_color, s=node_size)
-        plt.text(x,y, s=node.index)
+        plt.text(x,y, s=node.index, zorder=3)
 
     ## Plot edges:
     edges_list = [node.edges for node in lattice]
@@ -58,7 +61,8 @@ def plot_lattice(
                     x_text = x2
                     y_text = y2
                     plt.plot([x1, x2], [y1, y2], edge_style)
-                    plt.text(x_text, y_text, edge, color="green")
+                    if with_edge_names:
+                        plt.text(x_text, y_text, edge, color="green")
                 continue
 
             elif len(nodes)==2:
@@ -80,7 +84,8 @@ def plot_lattice(
                 y_text = y2
 
             plt.plot([x1, x2], [y1, y2], edge_style)
-            plt.text(x_text, y_text, edge, color="green")
+            if with_edge_names:
+                plt.text(x_text, y_text, edge, color="green")
             
 
 

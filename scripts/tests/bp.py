@@ -65,7 +65,7 @@ def bp_single_call(
     ## Config:
     bubblecon_trunc_dim = 4*D**2
     bp_config = BPConfig(
-        max_swallowing_dim=D**2,
+        trunc_dim=D**2,
         max_iterations=50,
         msg_diff_terminate=1e-5
     )
@@ -94,7 +94,7 @@ def growing_tn_bp_test2(
     ## Config:
     bubblecon_trunc_dim = 2*D**2
     bp_config = BPConfig(
-        max_swallowing_dim=D**2,
+        trunc_dim=D**2,
         max_iterations=50,
         msg_diff_terminate=1e-5
     )
@@ -151,7 +151,7 @@ def growing_tn_bp_test(
 ):
     ## Config:
     bp_config = BPConfig(
-        max_swallowing_dim=8,
+        trunc_dim=8,
         msg_diff_terminate=1e-7
     )
     unit_cell = UnitCell.random(d=d, D=D)
@@ -232,7 +232,7 @@ def test_single_bp_vs_growing_TN(
 
         bp_config = BPConfig(
             max_iterations=60,
-            max_swallowing_dim=bp_chi,
+            trunc_dim=bp_chi,
             msg_diff_terminate=1e-7
         )
 
@@ -307,7 +307,7 @@ def test_bp_convergence_steps(
 
         ## Config:
         bp_config = BPConfig(
-            max_swallowing_dim=chi,
+            trunc_dim=chi,
             msg_diff_terminate=1e-5
         )
 
@@ -376,7 +376,7 @@ def test_bp_convergence_steps_single_run(
 
     if N>4:
         t1 = perf_counter()
-        bp_config = BPConfig(max_iterations=50, max_swallowing_dim=bp_chi, msg_diff_terminate=1e-7, parallel_msgs=parallel_bp)
+        bp_config = BPConfig(max_iterations=50, trunc_dim=bp_chi, msg_diff_terminate=1e-7, parallel_msgs=parallel_bp)
         _, stats = belief_propagation(tn, None, config=bp_config)
         t2 = perf_counter()
         time_bp = t2-t1

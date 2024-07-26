@@ -8,7 +8,7 @@ import traceback
 # for type hints:
 from typing import List, TypeVar, ClassVar
 
-from utils import strings
+from utils import strings, prints
 
 # ============================================================================ #
 #|                               Helper Types                                 |#
@@ -23,7 +23,7 @@ Self = TypeVar('Self')
 
 def print_traceback(e: Exception) -> None:
     s = get_traceback(e)
-    s = strings.add_color(s, strings.PrintColors.RED)
+    s = prints.add_color(s, prints.PrintColors.RED)
     print(s)
 
 
