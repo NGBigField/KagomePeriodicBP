@@ -14,7 +14,7 @@ from matplotlib.pyplot import Axes
 import numpy as np
 
 # for type hints:
-from typing import Optional, Literal, Any, List, Tuple, Iterator, Callable, TypeVar, ClassVar, Generator, TypeAlias, ParamSpec
+from typing import Optional, Literal, Any, List, Tuple, Iterator, Callable, TypeVar, ClassVar, Generator, TypeAlias, ParamSpec, NamedTuple
 
 from _config_reader import ALLOW_VISUALS
 
@@ -42,12 +42,13 @@ else:
 # For OOP:
 from enum import Enum
 from functools import wraps
+from dataclasses import dataclass
 
 # for copy:
 from copy import deepcopy
 
 # Use our other utils 
-from utils import strings, assertions, arguments, saveload, types
+from utils import strings, assertions, arguments, saveload, types, prints
 
 # For saving plots:
 from pathlib import Path
@@ -255,6 +256,31 @@ class VideoRecorder():
         return frames_dir
 
 
+class _ValuesTupleType(NamedTuple):
+    x: list[float]
+    y: list[float] 
+    kwargs: dict
+
+@dataclass
+class _TwinPlotData:
+    has_twin : bool = False
+    twin_ref : "AppendablePlot" = None 
+    _twin_ordering : int = 0
+
+    def is_first_twin(self) -> bool:
+        return self.has_twin and self._twin_ordering==1
+    
+    def is_second_twin(self) -> bool:
+        return self.has_twin and self._twin_ordering==2
+    
+    def default_color(self) -> str:
+        if self.is_first_twin():
+            return "tab:blue"
+        elif self.is_second_twin():
+            return "tab:red"
+        else:
+            raise ValueError("Unexpected")
+    
 class AppendablePlot():
     def __init__(self, size_factor:float=1.0, axis:Optional[Axes]=None, legend_on:bool=True) -> None:
         #
@@ -266,18 +292,40 @@ class AppendablePlot():
         else:
             assert isinstance(axis, plt.Axes)           
             fig = axis.figure
-        # save data:
+        
+        # Publoc data:
         self.fig  = fig
         self.axis : plt.Axes = axis
-        self.values : dict[str, tuple[list[float], list[float], dict] ] = dict()
+        self.values : dict[str, _ValuesTupleType ] = dict()
         self.axis.get_yaxis().get_major_formatter().set_useOffset(False)  # Stop the weird pyplot tendency to give a "string" offset to graphs
         self.legend_on : bool = legend_on
+        
+        # Private data:
+        self._twin_plot_data : _TwinPlotData = _TwinPlotData() 
+
+        # Update:
         self._update()        
 
 
     @classmethod
     def inactive(cls)->"InactiveAppendablePlot":
         return InactiveAppendablePlot()
+
+    def get_twin_plot(self) -> "AppendablePlot":  
+        ## Prepare twin:
+        twin = AppendablePlot(axis=self.axis.twinx())
+        for ap, color in zip([self, twin], ["tab:blue", "tab:red"], strict=True):
+            ap.axis.set_ylabel(ap.axis.get_ylabel(), color=color)
+            ap.axis.tick_params(axis='y',       labelcolor=color)
+        ## Update twin data:
+        self._twin_plot_data.has_twin = True
+        self._twin_plot_data.twin_ref = twin
+        self._twin_plot_data._twin_ordering = 1
+        twin._twin_plot_data.has_twin = True 
+        twin._twin_plot_data.twin_ref = self
+        twin._twin_plot_data._twin_ordering = 2
+        ## Return
+        return twin
 
     def _next_x(self, name:str) -> float|int:
         x_vals = self.values[name][0]
@@ -287,10 +335,10 @@ class AppendablePlot():
             return x_vals[-1]+1
 
     def _get_xy(self, name:str)->tuple[list[float], list[float]]:
-        x, y = self.values[name]
+        x, y, _ = self.values[name]
         return x, y
 
-    def _add_xy(self, name:str, x:float|None ,y:float|None, plt_kwargs:dict=dict())->None:
+    def _add_xy(self, name:str, x:float|None ,y:float|None, plot_kwargs:dict=dict())->None:
         # If new argument name:
         if name not in self.values:
             self.values[name] = ([], [], {})
@@ -300,7 +348,7 @@ class AppendablePlot():
         # Append:     
         self.values[name][0].append(x) 
         self.values[name][1].append(y) 
-        for key, value in plt_kwargs.items():
+        for key, value in plot_kwargs.items():
             self.values[name][2][key] = value
 
     def _clear_plots(self)->list[str]:
@@ -323,9 +371,7 @@ class AppendablePlot():
         # Add values:
         for name, values in self.values.items():    
             # Get plot info:
-            x = values[0]
-            y = values[1]
-            kwargs = values[2]
+            x, y, kwargs = values
             # choose marker:
             if "marker" not in kwargs:
                 kwargs = deepcopy( values[2] )
@@ -346,35 +392,49 @@ class AppendablePlot():
         if draw_now_:
             draw_now()
 
-    # def scatter(self, x, y, draw_now_:bool=True, plt_kwargs:dict=dict())->None:
-    #     pass
+    def _derive_x_y(self, val:tuple|float|int|None) -> tuple[float, float]:
+        if isinstance(val, tuple):
+            x = val[0]
+            y = val[1]
+        elif isinstance(val, float|int):
+            x = None
+            y = val
+        elif val is None:
+            x = None
+            y = None
+        else:
+            raise TypeError(f"val of type {type(val)!r} does not match possible cases.")
+        return x, y
+
+    def _fix_plot_kwargs(self, **plot_kwargs) -> dict:
+        if self._twin_plot_data.has_twin:
+            color = self._twin_plot_data.default_color()
+            if 'color' in plot_kwargs:
+                prints.print_warning("given color as input to twin plot")
+            plot_kwargs['color'] = color
+
+        return plot_kwargs 
 
     def append(
         self, 
         draw_now_:bool=True, 
-        plt_kwargs:dict|None=None, 
+        plot_kwargs:dict|None=None, 
         values:dict[str, float]|dict[str, tuple[float,float]]|None=None, 
         **kwargs:tuple[float,float]|float
     )->None:
         
         ## Default values:
         if values is None: values = dict()
-        if plt_kwargs is None: plt_kwargs = dict()
+        if plot_kwargs is None: plot_kwargs = dict()
         ## append to values
         for dict_ in [values, kwargs]:
             for name, val in dict_.items():
-                if isinstance(val, tuple):
-                    x = val[0]
-                    y = val[1]
-                elif isinstance(val, float|int):
-                    x = None
-                    y = val
-                elif val is None:
-                    x = None
-                    y = None
-                else:
-                    raise TypeError(f"val of type {type(val)!r} does not match possible cases.")
-                self._add_xy(name, x, y, plt_kwargs=plt_kwargs)
+                ## Derive x, y from tuple:
+                x, y = self._derive_x_y(val)
+                ## Deal with kwargs:
+                plot_kwargs = self._fix_plot_kwargs(**plot_kwargs)
+                ## Keep:
+                self._add_xy(name, x, y, plot_kwargs=plot_kwargs)
 
         ## Update plot:
         self._update(draw_now_=draw_now_)

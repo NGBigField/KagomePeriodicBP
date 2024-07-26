@@ -251,7 +251,8 @@ def reduce_mode_to_edge(
     mode_tn:ModeTN, 
     edge_tuple:UpdateEdge,
     contract_config:ContractionConfig,
-    copy:bool=True
+    copy:bool=True,
+    arange_legs:bool=True
 )->EdgeTN:
     
     ## Get basic data:
@@ -285,6 +286,11 @@ def reduce_mode_to_edge(
     if DEBUG_MODE:
         edge_tn.validate()
         assert tuples.equal(edge_tn.unit_cell_flavors, edge_tuple, allow_permutation=True)
+
+    ## arange legs into canonical order:
+    # This is usually not done now, if user wants to keep permutation lists
+    if arange_legs:
+        edge_tn.rearrange_tensors_and_legs_into_canonical_order()
 
     return edge_tn
 

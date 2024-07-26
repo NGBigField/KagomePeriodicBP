@@ -12,17 +12,17 @@ from algo.belief_propagation import belief_propagation, robust_belief_propagatio
 # Config and containers:
 from containers import BPConfig
 from tensor_networks import KagomeTNRepeatedUnitCell, CoreTN, ModeTN, EdgeTN
-from tensor_networks import 
 
-# update config
+# config:
 from enums import UpdateMode, UnitCellFlavor
-from containers import UpdateEdge
+from containers import UpdateEdge, Config
 
 # Measure core data
 from algo.measurements import derive_xyz_expectation_values_with_tn, calc_unit_cell_expectation_values_from_tn, pauli, measure_energies_and_observables_together
 from algo.tn_reduction import reduce_tn
 from physics import hamiltonians
 
+# Performance:
 from time import perf_counter
 
 # Numpy for math stuff:
@@ -403,101 +403,116 @@ def test_bp_convergence_steps_single_run(
     return iterations, chi, time_none, time_bp, z_random, z_bp, diff_random, diff_bp
 
 
+def _get_expectation_values(edge_tn:EdgeTN) -> float:
+    rho = edge_tn.rdm
+    rho_i = np.trace(rho, axis1=2, axis2=3)
+    z = np.trace(rho_i @ pauli.z,)
+    z = float(z)
+    return z
 
-def per_D_N_single_convergence_run(D:int, N:int, method:str) -> tuple[float, float]:
+
+def per_D_N_single_convergence_run(
+    D:int, N:int, method:str, config:Config,
+    **kwargs
+) -> float:
+    ## Create kagome TN:
     unit_cell = UnitCell.load_best(D)
-    tn = 
+    tn = create_repeated_kagome_tn(d, D, N, unit_cell)
 
-    return exec_time, z
+    ## Get environment:
+    match method:   #["random", "exact","bp"]
+        case "random"|"exact":
+            tn.connect_uniform_messages()
+        case "bp":
+            belief_propagation(tn, None, config.bp)
+            
+    ## Define contraction precision:
+    if method=="exact":
+        config.chi = 1e3
+
+    ## Contract to edge:
+    edge_tn = reduce_tn(tn, EdgeTN, config.contraction, **kwargs)
+    ## Get results:
+    z = _get_expectation_values(edge_tn)
+
+    return z
+
+
+def _get_full_converges_run_plots(combined_figure:bool) -> tuple[visuals.AppendablePlot, visuals.AppendablePlot]:
+    plot_values = visuals.AppendablePlot()
+    plt.xlabel("linear system size", fontsize=12)
+    plt.ylabel("$<Z>$", fontsize=12)
+    plot_values.axis.set_yscale('log')
+
+    if combined_figure:
+        plot_times  = plot_values.get_twin_plot()
+    else:
+        plot_times  = visuals.AppendablePlot()
+        plt.xlabel("linear system size", fontsize=12)
+    plt.ylabel("Computation time [sec]", fontsize=12)
+
+    # for plot in [plot_values, plot_times]:
+    #     points = [[0.17, 0.06], [0.90, 0.98]]
+    #     box = mtransforms.Bbox(points)
+    #     plot.fig.set_size_inches((4.5, 8))
+    #     plot.axis.set_position(box)
+
+    visuals.draw_now()
+    return plot_values, plot_times
 
 
 def test_bp_convergence_all_runs(
     parallel:bool = False,
-    Ds:list[int] = [3],
+    D:int = 3,
     Ns:list[int] = [2, 3],
-    methods:list[str] = ["random", "exact","bp"]
-):
-
-    update_mode = UpdateMode.A
+    methods:list[str] = ["random", "exact","bp"],
+    combined_figure:bool = True
+) -> None:
+    ## config:
+    mode = UpdateMode.A
     update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
+    config = Config.derive_from_dimensions(D)
+    config.chi    = D**2 
+    config.chi_bp = D**2 + 2
 
-    def _get_rho_i(tn:KagomeTNRepeatedUnitCell, chi:int)->np.ndarray:
-        edge_tn = reduce_tn(tn , EdgeTN, trunc_dim=chi, mode=update_mode, edge_tuple=update_edge)
-        rdm = edge_tn.rdm
-        return np.trace(rdm, axis1=2, axis2=3)
+    ## Prepare plots:
+    plot_values, plot_times = _get_full_converges_run_plots(combined_figure)
 
-
-    plot_values = visuals.AppendablePlot()
-    plt.xlabel("linear system size", fontsize=12)
-    plt.ylabel("Trace distance between $\\rho_{A}$ and $\\rho_{A\infty}$", fontsize=12)
-    plot_values.axis.set_yscale('log')
-
-
-    plot_times  = visuals.AppendablePlot()
-    plt.xlabel("linear system size", fontsize=12)
-    plt.ylabel("Computation time [sec]", fontsize=12)
-
-    visuals.draw_now()
+    line_styles =   {'bp': "-", 'random': '--', 'exact':":"}
+    marker_styles = {'bp': "X", 'random': 'o' , 'exact':"^"}
+    def _get_plt_kwargs(method:str)->str:
+        return dict(
+            linestyle=line_styles[method], 
+            marker=marker_styles[ method]
+        )
 
 
-    colors_D = {2: 'blue', 3: 'red', 4: 'green'}
-    line_styles = {'bp': "-", 'random': '--'}
-    marker_styles = {'bp': "X", 'random': 'o'}
-
-    def _legend_key(D:int, data:str)->str:
-        ## diff bp:
-        if len(Ds)==1:
-            legend_key = ""
-        else:
-            legend_key = f"D={D} " 
-
-        if data=="bp":
-            legend_key += "BlockBP"
-        elif data=="none":
-            legend_key += "random env"
-        return legend_key
-
-
-    for D in Ds:
+    for method in methods: 
+        print(f"method={method}")
+        
         for N in Ns:
-            for method in methods: 
+            print(f"  N={N}")
 
-                time, z = per_D_N_single_convergence_run()
+            ## Get results:
+            _t1 = perf_counter()
+            try:
+                z = per_D_N_single_convergence_run(D, N, method, config, mode=mode, edge_tuple=update_edge)
+            except Exception:
+                break
+            _t2 = perf_counter()
+            t = _t2 - _t1
 
-                dict_ = { _legend_key(D, 'bp')  : (N, diff_bp) }
-                plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'], marker=marker_styles['bp'])
-                plot_values.append(plt_kwargs=plt_kwargs ,**dict_)
+            ## plot:
+            plt_kwargs = _get_plt_kwargs(method)
+            plot_values.append(plot_kwargs=plt_kwargs ,**{ method : (N, z)})
+            plot_times.append( plot_kwargs=plt_kwargs ,**{ method : (N, t)})
 
-                ## diff random:
-                dict_ = { _legend_key(D, 'none') : (N, diff_none) }
-                plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'], marker=marker_styles['random'])
-                plot_values.append(plt_kwargs=plt_kwargs ,**dict_)
+            plot_values._update()
+            plot_times._update()
 
-                ## Time bp:
-                dict_ = { _legend_key(D, 'bp')  : (N, time_bp) }
-                plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'], marker=marker_styles['bp'])
-                plot_times.append(plt_kwargs=plt_kwargs ,**dict_)
-
-                ## Time random:
-                dict_ = { _legend_key(D, 'none') : (N, time_none) }
-                plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'], marker=marker_styles['random'])
-                plot_times.append(plt_kwargs=plt_kwargs ,**dict_)
-
-                plot_values._update()
-                plot_times._update()
-
-    visuals.draw_now()
-
-    for plot in [plot_values, plot_times]:
-        points = [[0.17, 0.06], [0.90, 0.98]]
-        box = mtransforms.Bbox(points)
-        plot.fig.set_size_inches((4.5, 8))
-        plot.axis.set_position(box)
-
-
-
-    plot_values.axis.set_ylim(bottom=1e-8*2)
+    # plot_values.axis.set_ylim(bottom=1e-8*2)
     
+    visuals.save_figure(plot_values.fig)
     print("Done")    
 
     

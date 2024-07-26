@@ -686,6 +686,10 @@ class EdgeTN(_FrozenSpecificNetwork):
     num_core_tensors : Final[int] = 2
     num_env_tensors  : Final[int] = 6
 
+    def __init__(self, nodes: list[TensorNode], copy=True) -> None:
+        super().__init__(nodes, copy)
+        self._in_canonical_leg_order : bool = False
+
     # ================================================= #
     #|           nodes and their relations             |#
     # ================================================= #       
@@ -705,6 +709,7 @@ class EdgeTN(_FrozenSpecificNetwork):
     
     @property
     def open_mps_env(self)->list[np.ndarray]:
+        assert self._in_canonical_leg_order, "Run `self.rearrange_tensors_and_legs_into_canonical_order()` before asking for env"
         environment_nodes = self.nodes[2:]
         assert len(environment_nodes)==6
         environment_tensors = [physical_tensor_with_split_mid_leg(n) for n in environment_nodes]    # Open environment mps legs:        
@@ -751,6 +756,7 @@ class EdgeTN(_FrozenSpecificNetwork):
         tn = self.to_arbitrary_tn()
         tn, permutation_orders = _edge_tn_rearrange_tensors_and_legs_into_canonical_order(tn)
         self._nodes = tn.nodes
+        self._in_canonical_leg_order = True
         return permutation_orders
 
 

@@ -549,7 +549,7 @@ def ite_per_mode(
             # Just update the tensors 
             mode_tn.update_unit_cell_tensors(unit_cell)
 
-        edge_tn = reduce_tn(mode_tn, EdgeTN, contract_config=config.contraction, edge_tuple=edge_tuple)
+        edge_tn = reduce_tn(mode_tn, EdgeTN, contract_config=config.contraction, edge_tuple=edge_tuple, arange_legs=False)
         permutation_orders = edge_tn.rearrange_tensors_and_legs_into_canonical_order()
 
         # Perform ITE update:

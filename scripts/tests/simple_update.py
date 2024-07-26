@@ -39,7 +39,7 @@ def _log_and_update(
 
     for edge_tuple, energy in energies.items():
         edge_name = f"({edge_tuple[0]},{edge_tuple[1]})"
-        energies_plot.append(**{edge_name:(size, energy)}, plt_kwargs=dict(alpha=0.5, marker="+"))
+        energies_plot.append(**{edge_name:(size, energy)}, plot_kwargs=dict(alpha=0.5, marker="+"))
 
     save_figure(expectation_plot.fig, file_name=f"Expectation-size={size}")
     save_figure(energies_plot.fig, file_name=f"Energies-size={size}")

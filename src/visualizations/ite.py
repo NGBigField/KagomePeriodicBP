@@ -472,8 +472,8 @@ class ITEPlots():
             self.plots.main["expectations"].append(values=mean_expectation_values, draw_now_=False)
 
             # Time and space complexity
-            self.plots.main["exec_t"].append(time=segment_stats.execution_time, plt_kwargs={'c':COLORS.time_complexity}, draw_now_=False)
-            self.plots.main["memory_use"].append(space=segment_stats.memory_usage, plt_kwargs={'c':COLORS.space_complexity}, draw_now_=False)
+            self.plots.main["exec_t"].append(time=segment_stats.execution_time, plot_kwargs={'c':COLORS.time_complexity}, draw_now_=False)
+            self.plots.main["memory_use"].append(space=segment_stats.memory_usage, plot_kwargs={'c':COLORS.space_complexity}, draw_now_=False)
 
             ## Energies per edge:
             i = self._iteration
@@ -499,7 +499,7 @@ class ITEPlots():
 
             # Ground-truth
             if self.config.ite.reference_ground_energy is not None:
-                _plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
+                _plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plot_kwargs={'linestyle':'dotted', 'marker':''})
 
             ## Entanglement
             _scatter_plot_at_main_per_edge(results_dict=entanglement, iteration=i, base_style=energies_after_segment_style, axis_name="entanglement", alpha=1.0)

@@ -64,7 +64,13 @@ def _reduce_tn_one_step(tn:TensorNetworkType, contract_config:ContractionConfig,
     return res
 
 
-def reduce_tn(tn:TensorNetwork, target_type:Type[TensorNetworkOutput], contract_config:ContractionConfig, copy:bool=True, **kwargs)->TensorNetworkOutput:
+def reduce_tn(
+    tn:TensorNetwork, 
+    target_type:Type[TensorNetworkOutput], 
+    contract_config:ContractionConfig, 
+    copy:bool=True, 
+    **kwargs
+)->TensorNetworkOutput:
     """A general "fits-all" function that reduces the given TN into a chosen TN.
 
     # Args:
