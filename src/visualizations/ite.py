@@ -814,11 +814,12 @@ def _mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[st
 
 
 def _capture_network_movie(log_name:str, ite_fig:Figure) -> None:
-    pass
+    axes = ite_fig.axes
 
 def plot_from_log(
     # log_name:str = "log - from zero to hero",
-    log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3",
+    # log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3",
+    log_name:str = "2024.06.13_09.57.29 GZCIVS",
     save:bool = True,
     plot_health_figure:bool = False,
     capture_lattice_movie:bool = True,

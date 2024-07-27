@@ -1,8 +1,8 @@
 import csv
-from typing import Any, TypeVar
+from typing import Any, TypeVar, overload
 import os, sys
 from pathlib import Path
-from utils import strings
+from utils import strings, lists
 from project_paths import data as DATA_FOLDER
 from utils.saveload import force_folder_exists
 _T = TypeVar("_T")
@@ -110,8 +110,6 @@ def get_matching_table_element(table:dict[str, _T], **kwargs)->list[dict[str, _T
             row[key] = val
         matching_rows.append(row)
     return matching_rows
-        
-
 
 class CSVManager():
     __slots__ = {"fullpath", "columns"}
@@ -131,3 +129,80 @@ class CSVManager():
     def append(self, row:list)->None:
         append_row_to_csv(row, file_name=self.fullpath)
 
+
+class _TableByOrder():
+    __slots__ = "_list"
+
+    def __init__(self, input_list:list[dict[str, str]]) -> None:
+        self._list : list[dict[str, str]] = input_list
+
+    def __repr__(self) -> str:
+        return _table_by_order_str(self._list)
+    
+    def __str__(self) -> str:
+        return self.__repr__()
+
+    @overload
+    def __getitem__(self, key:str) -> list[Any]:...
+    @overload
+    def __getitem__(self, key:int) -> dict[Any]:...
+    def __getitem__(self, key:str|int) -> list[Any]|dict[Any]:
+        if isinstance(key, str):
+            return [d[key] for d in self._list]
+        elif isinstance(key, int):
+            return self._list[key]
+        else:
+            raise TypeError("Not an expected type")
+
+    def __len__(self) -> int:
+        return len(self._list)
+
+
+class TableByKey():
+    __slots__ = "_table"
+
+    def __init__(self, csv_fullpath:str) -> None:
+        self._table : dict[str, list[str]] = read_csv_table(csv_fullpath)
+
+    def __getitem__(self, key) -> list[str]:
+        return self._table[key]
+    
+    def unique_values(self, key) -> set[str]:
+        return lists.deep_unique(self[key])
+
+    def get_matching_table_elements(self, **kwargs) -> _TableByOrder:
+        matching_elements = get_matching_table_element(self._table, **kwargs)
+        return _TableByOrder(matching_elements)
+    
+
+def _table_by_order_str(list_:list[dict[str, Any]]) -> str:
+    ## Collect length data
+    order_str_length = len(str(len(list_)-1)) + 2
+    keys = list(list_[0].keys())
+    str_lengths = {key:0 for key in keys}
+    for dict_ in list_:
+        for key, value in dict_.items():
+            s = str(value)
+            str_lengths[key] = max(str_lengths[key], len(s))
+
+    ## Print title row:
+    res = " "*order_str_length
+    for key in keys:
+        res += strings.formatted(key, width=str_lengths[key], alignment='^') + " "
+    res += "\n" 
+    res += " "*order_str_length
+    for key in keys:
+        res += strings.formatted("-"*len(key), width=str_lengths[key], alignment='^') + " "
+    res += "\n" 
+
+    ## Print values:
+    for i, dict_ in enumerate(list_):
+        res += str(i)+": "
+        for key in keys:
+            value = dict_[key]
+            s = str(value)
+            _remaining_len = str_lengths[key]-len(s)
+            res += s + " " + " "*_remaining_len
+        res += "\n" 
+    
+    return res

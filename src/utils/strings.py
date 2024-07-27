@@ -114,7 +114,8 @@ def formatted(
     format += f"{width}"            
     
     precision = arguments.default_value(precision, 0)
-    format += f".{precision}f"    
+    if not isinstance(val, str):
+        format += f".{precision}f"    
         
     return f"{val:{format}}"  
 

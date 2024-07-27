@@ -91,7 +91,7 @@ def _common_name(name:str, typ:Literal['data', 'log']='data') -> str:
         
     if given_extension == "."+target_extension:
         return name
-    elif given_extension == ".pkl":
+    elif given_extension == ".pkl" or given_extension == ".csv" :
         return name
     else:
         return name+"."+target_extension

@@ -29,7 +29,8 @@ from time import perf_counter, sleep
 import numpy as np
 
 # useful utils:
-from utils import visuals, saveload, csvs, dicts
+from utils import visuals, saveload, csvs, dicts, lists
+from utils.visuals import AppendablePlot
 from matplotlib import pyplot as plt
 import matplotlib as mpl
 import matplotlib.transforms as mtransforms
@@ -295,7 +296,7 @@ def test_bp_convergence_steps(
     
     unit_cell = UnitCell.random(d, D)
 
-    plot = visuals.AppendablePlot()
+    plot = AppendablePlot()
     plt.xlabel("N")
     plt.ylabel("#Iterations")
     plt.title(f"#Iteration for Block-BP convergence")
@@ -447,28 +448,26 @@ def per_D_N_single_convergence_run(
 def _get_full_converges_run_plots(
     combined_figure:bool, 
     live_plots:bool=True
-) -> tuple[visuals.AppendablePlot, visuals.AppendablePlot]:
-    plot_values = visuals.AppendablePlot()
+) -> tuple[AppendablePlot, ...]:
+    plot_values = AppendablePlot()
     plt.xlabel("linear system size", fontsize=12)
-    plt.ylabel("$<Z>$", fontsize=12)
+    plt.ylabel("$\left\langle Z \right\rangle>$", fontsize=12)
     plot_values.axis.set_yscale('log')
 
     if combined_figure:
         plot_times  = plot_values.get_twin_plot()
     else:
-        plot_times  = visuals.AppendablePlot()
+        plot_times  = AppendablePlot()
         plt.xlabel("linear system size", fontsize=12)
     plt.ylabel("Computation time [sec]", fontsize=12)
 
-    # for plot in [plot_values, plot_times]:
-    #     points = [[0.17, 0.06], [0.90, 0.98]]
-    #     box = mtransforms.Bbox(points)
-    #     plot.fig.set_size_inches((4.5, 8))
-    #     plot.axis.set_position(box)
+    p_values_vs_times = AppendablePlot()
+    plt.xlabel("Computation time [sec]", fontsize=12)
+    plt.ylabel(r"<Z>", fontsize=12)
 
     if live_plots:
         visuals.draw_now()
-    return plot_values, plot_times
+    return plot_values, plot_times, p_values_vs_times
 
 
 def test_bp_convergence_all_runs(
@@ -482,7 +481,7 @@ def test_bp_convergence_all_runs(
     ["random", "exact", "bp"],
     methods_and_Ns:dict[str: list[int]] = dict(
         # exact  = [2, 3, 4],
-        random = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+        random = [2, 3, 4, 5, 6, 7, 8, 9, 10],
         bp     = [2, 3, 4]
     ) 
 
@@ -490,11 +489,11 @@ def test_bp_convergence_all_runs(
     mode = UpdateMode.A
     update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
     config = Config.derive_from_dimensions(D)
-    config.chi    = 2*D**2 
-    config.chi_bp = 2*D**2 + 10
+    config.chi_bp =   D**2 
+    config.chi    = 2*D**2 + 10
 
     ## Prepare plots and csv:
-    plot_values, plot_times = _get_full_converges_run_plots(combined_figure, live_plots)
+    p_values, p_times, p_values_vs_times = _get_full_converges_run_plots(combined_figure, live_plots)
     csv = csvs.CSVManager(["D", "N", "method", "z", "t"])
 
     line_styles =   {'bp': "-", 'random': '--', 'exact':":"}
@@ -527,20 +526,53 @@ def test_bp_convergence_all_runs(
 
             ## plot:
             plt_kwargs = _get_plt_kwargs(method)
-            plot_values.append(plot_kwargs=plt_kwargs ,**{ method : (N, z)}, draw_now_=live_plots)
-            plot_times.append( plot_kwargs=plt_kwargs ,**{ method : (N, t)}, draw_now_=live_plots)
-
-            plot_values._update()
-            plot_times._update()
+            p_values.append(plot_kwargs=plt_kwargs ,**{ method : (N, z)}, draw_now_=live_plots)
+            p_times.append( plot_kwargs=plt_kwargs ,**{ method : (N, t)}, draw_now_=live_plots)
+            p_values_vs_times.append( 
+                               plot_kwargs=plt_kwargs ,**{ method : (t, z)}, draw_now_=live_plots
+            )
 
             # csv:
             csv.append([D, N, method, z, t])
 
     # plot_values.axis.set_ylim(bottom=1e-8*2)
     
-    visuals.save_figure(plot_values.fig)
+    visuals.save_figure(p_values.fig)
     print("Done")    
 
+def plot_bp_convergence_results(
+    filename:str = "2024.07.26_22.01.47 YRU"
+) -> None:
+    
+    ## Get Data:
+    fullpath = saveload._fullpath(filename+".csv", sub_folder="results")
+    table = csvs.TableByKey(fullpath)
+
+    ## Derive params:
+    Ds = table.unique_values("D")
+    methods = table.unique_values("method")
+
+    ## Prepare plots:
+    ax_z_vs_t = plt.subplot(1,1,1)
+    ax_z_vs_t.set_xlabel("compute time [sec]")
+    ax_z_vs_t.set_ylabel("expectation value <Z>")
+    ax_z_vs_t.grid()
+
+    ## Get lists and plot:
+    for D in Ds:
+        for method in methods:
+            t, z = [], []
+            data = table.get_matching_table_elements(D=D, method=method)
+
+            print(data)
+            N = data['N']
+            z = data['z']
+            t = data['t']
+            
+            ax_z_vs_t.plot(t, z, label=method, linewidth=4)
+            
+
+    print("Done")
     
 
 def main_test():
@@ -549,8 +581,8 @@ def main_test():
     # growing_tn_bp_test2()
     # load_results()
     # test_bp_convergence_steps_single_run()
-    test_bp_convergence_all_runs()
-
+    # test_bp_convergence_all_runs()
+    plot_bp_convergence_results()
 
 if __name__ == "__main__":
     main_test()
