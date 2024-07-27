@@ -38,371 +38,12 @@ import matplotlib.transforms as mtransforms
 
 from libs import TenQI
 
+## common config:
+mode = UpdateMode.A
+update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 d=2
 
-def _standard_row_from_results(D:int, N:int, results:list[UnitCell])->None:
-    row = [D, N]
-    for tensor_key in ['A', 'B', 'C']:
-        for per_expectation, observable_name in zip( results, ['x', 'y', 'z'], strict=True):
-            per_expectation_per_tensor = per_expectation[tensor_key]
-            row.append(per_expectation_per_tensor)
-    return row
-
-def load_results(
-    D = 3
-):
-    all_results = saveload.load(f"all_results_D={D}", sub_folder="results")
-    csv = csvs.CSVManager(['D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'], name=f"Results_D={D}")
-    # ['N', 'D', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z']
-    for N, results in all_results:
-        row = _standard_row_from_results(D, N, results)
-        csv.append(row)
-    print("Done")
-
-def bp_single_call(
-    D : int = 3,
-    N : int = 2,
-    with_bp : bool = True        
-):
-    ## Config:
-    bubblecon_trunc_dim = 4*D**2
-    bp_config = BPConfig(
-        trunc_dim=D**2,
-        max_iterations=50,
-        msg_diff_terminate=1e-5
-    )
-
-    ## Tensor-Network
-    unit_cell= UnitCell.load(f"random_D={D}")
-    tn = create_repeated_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
-    tn.validate()
-
-    ## Find or guess messages:
-    if with_bp:
-        tn, messages, stats = belief_propagation(tn, messages=None, bp_config=bp_config)
-    else:
-        tn.connect_random_messages()
-    
-    return calc_unit_cell_expectation_values_from_tn(tn, operators=[pauli.x, pauli.y, pauli.z], bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=False)
-
-
-def growing_tn_bp_test2(
-    D = 2,
-    min_N = 2,
-    max_N = 4,
-    live_plot = False,
-    with_bp = True
-):
-    ## Config:
-    bubblecon_trunc_dim = 2*D**2
-    bp_config = BPConfig(
-        trunc_dim=D**2,
-        max_iterations=50,
-        msg_diff_terminate=1e-5
-    )
-    
-    ## Load or randomize unit_cell
-    unit_cell= UnitCell.load(f"random_D={D}")
-    if unit_cell is None:
-        unit_cell = UnitCell.random(d=d, D=D)
-        unit_cell.save(f"random_D={D}")
-
-
-    # if with_bp:
-    #     csv_name =  f"bp_res_D={D}_with-BP"
-    # else:
-    #     csv_name =  f"bp_res_D={D}_random-messages"
-    # csv = csvs.CSVManager(['D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'], name=csv_name)
-
-    ## Growing N networks:
-    all_results = []
-    for N in range(min_N, max_N+1, 1):
-        print(" ")
-        print(f"N={N:2}: ")
-        tn = create_repeated_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
-        tn.validate()
-
-        ## Find or guess messages:
-        if with_bp:
-            tn, messages, stats = belief_propagation(tn, messages=None, bp_config=bp_config)
-        else:
-            tn.connect_random_messages()
-        
-        results = calc_unit_cell_expectation_values_from_tn(tn, operators=[pauli.x, pauli.y, pauli.z], bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=False)
-        zs = results[2]
-        print(zs)
-        a = zs['A']
-        b = zs['B']
-        c = zs['C']
-
-        all_results.append((N, results))
-        saveload.save(all_results, f"all_results_D={D}", sub_folder="results")
-
-        row = _standard_row_from_results(D, N, results)
-        # csv.append(row)
-        
-    ## End:
-    print("Done")
-                
-
-def growing_tn_bp_test(
-    D = 2,
-    bp_N = 2,
-    min_N = 2,
-    max_N = 13
-):
-    ## Config:
-    bp_config = BPConfig(
-        trunc_dim=8,
-        msg_diff_terminate=1e-7
-    )
-    unit_cell = UnitCell.random(d=d, D=D)
-
-    ## small network:
-    small_tn = create_repeated_kagome_tn(d=d, D=D, N=bp_N, unit_cell=unit_cell)
-    small_tn, messages, stats = belief_propagation(small_tn, messages=None, bp_config=bp_config)
-    small_res = derive_xyz_expectation_values_with_tn(small_tn, reduce=False)
-    print(" ")
-    print("Base values")
-    print(small_res)
-
-    ## Big network
-    distances = []
-    Ns = []
-    for N in range(min_N, max_N+1):
-        big_tn = create_repeated_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
-        big_tn.connect_random_messages()
-        big_res = derive_xyz_expectation_values_with_tn(big_tn, reduce=False)
-        print(" ")
-        print(f"N={N:2}: ")
-        print(big_res)
-        distance = 0.0
-        for op in ['x', 'y', 'x']:
-            for key in UnitCell.all_keys():
-                r_small = small_res[op].__getattribute__(key)
-                r_big = big_res[op].__getattribute__(key) 
-                distance += abs(r_small - r_big)
-        print(f"    Distance={distance}")
-        distances.append(distance)
-        Ns.append(N)
-
-    ## Plot:
-    visuals.draw_now()
-    for linear_or_log in ["linear", "log"]:
-        plt.figure()
-        plt.plot(Ns, distances)
-        plt.xlabel("N")
-        plt.ylabel("L1 Error in expectation values")
-        plt.title(f"Error Convergence to BP on block of size N={bp_N}")
-        plt.yscale(linear_or_log)
-        plt.grid()
-
-    visuals.draw_now()
-    print("Done")
-                
-
-
-def test_single_bp_vs_growing_TN(
-    Ds = [2, 3, 4],
-    bp_N = 4
-):
-    
-    fig1 = plt.figure()
-    plt.yscale("log")
-    plt.xlabel("# tensors in lattice")
-    plt.ylabel("energy error")
-    # plt.title(f"Error between Block-BP on {bp_num_tensors} tensors and random environment tensors")
-    plt.grid("on")
-    plt.legend()
-
-    visuals.draw_now()
-
-
-    
-    csv_fullpath = project_paths.data/"condor"/"results_bp_convergence.csv"
-    table = csvs.read_csv_table(csv_fullpath)
-    # markers = ["x", "+", "*"]
-
-
-    for i, D in enumerate(Ds):
-        marker_style = "*"
-        
-        chi = 2*D**2 + 40
-        bp_chi = D**2 + 20
-        unit_cell = UnitCell.load(f"best_heisenberg_AFM_D{D}")
-        hamiltonian = hamiltonians.heisenberg_afm()
-
-        bp_config = BPConfig(
-            max_iterations=60,
-            trunc_dim=bp_chi,
-            msg_diff_terminate=1e-7
-        )
-
-        tn = create_repeated_kagome_tn(d, D, bp_N, unit_cell)
-        bp_num_tensors = tn.size
-
-        _, _ = robust_belief_propagation(tn, None, bp_config)
-
-        core = reduce_tn(tn, CoreTN, chi)
-        _, _, mean_energy = measure_energies_and_observables_together(core, hamiltonian, trunc_dim=chi)
-
-        print(f"mean_energy={mean_energy}") 
-        print(f"num_tensors={bp_num_tensors}") 
-        print(f"chi={chi}") 
-
-
-        delta_energies = []
-        times = []
-        num_tensors = []
-
-        Ns = list(set(table["N"]))
-        Ns.sort()
-        for N in Ns:
-            matching_rows = csvs.get_matching_table_element(table, N=N, D=D)
-
-            mean, std = dicts.statistics_along_key(matching_rows, "energy")
-            d_e = abs(mean-mean_energy)
-            delta_energies.append(d_e)
-
-            mean, std = dicts.statistics_along_key(matching_rows, "exec_time")
-            times.append(mean)
-
-            n_t = matching_rows[0]["num_tensors"]
-            num_tensors.append(n_t)
-
-            
-        
-        assert len(num_tensors)==len(times)==len(delta_energies)
-
-        p, *_ = plt.plot(num_tensors, delta_energies, label=f"D={D}", linewidth=3, marker=marker_style)
-        
-
-    
-    plt.legend()
-    visuals.draw_now()
-    visuals.save_figure()
-
-    print("Done")
-
-    return mean_energy, num_tensors, chi
-
-
-
-def test_bp_convergence_steps(
-    D = 2,
-    N_vals   = [2, 3, 4, 5, 6, 7, 8, 9, 10],
-    chi_vals = [2, 4, 8, 16]
-):
-    
-    unit_cell = UnitCell.random(d, D)
-
-    plot = AppendablePlot()
-    plt.xlabel("N")
-    plt.ylabel("#Iterations")
-    plt.title(f"#Iteration for Block-BP convergence")
-    plt.grid("on")
-    plt.legend()
-
-    visuals.draw_now()
-    
-    for chi in chi_vals:
-
-        ## Config:
-        bp_config = BPConfig(
-            trunc_dim=chi,
-            msg_diff_terminate=1e-5
-        )
-
-
-        for N in N_vals:
-            tn = create_repeated_kagome_tn(d, D, N, unit_cell)
-            messages, stats = belief_propagation(tn, None, bp_config)
-
-            x = N
-            y = stats.iterations
-
-            dict_ = {f"chi={chi}" : (x, y)}
-            plot.append(**dict_)
-
-
-    print("Done")
-                
-
-
-def test_bp_convergence_steps_single_run(
-    N:int=2,
-    D:int=2,
-    parallel_bp:bool=True,
-    ref_rdm : np.ndarray|None = None
-):
-    
-    chi = 2*D**2 + 10
-    update_mode = UpdateMode.A
-    update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
-    bp_chi = D**2 
-
-    def _get_rho_i(tn:KagomeTNRepeatedUnitCell)->np.ndarray:
-        edge_tn = reduce_tn(tn , EdgeTN, trunc_dim=chi, mode=update_mode, edge_tuple=update_edge)
-        rdm = edge_tn.rdm
-        return np.trace(rdm, axis1=2, axis2=3)
-
-    unit_cell = UnitCell.load(f"best_heisenberg_AFM_D{D}")
-
-
-    if ref_rdm is None:
-        N_inf = 10
-        fname = f"ref_rdm_D{D}_N{N_inf}"
-        
-        if saveload.exist(fname):
-            ref_rdm = saveload.load(fname)
-        else:
-            tn_inf = create_repeated_kagome_tn(d, D, N_inf, unit_cell)
-            tn_inf.connect_random_messages()
-            ref_rdm = _get_rho_i(tn_inf)
-            saveload.save(ref_rdm, fname)
-
-
-    tn = create_repeated_kagome_tn(d, D, N, unit_cell)
-    tn.connect_random_messages()
-
-    t1 = perf_counter()
-    rho_no_bp = _get_rho_i(tn)
-    t2 = perf_counter()
-    time_none = t2-t1
-
-
-    diff_random = TenQI.op_norm(rho_no_bp - ref_rdm, ntype='tr')
-    time_bp = None
-    diff_bp = None
-    z_bp    = None
-
-    if N>4:
-        t1 = perf_counter()
-        bp_config = BPConfig(max_iterations=50, trunc_dim=bp_chi, msg_diff_terminate=1e-7, parallel_msgs=parallel_bp)
-        _, stats = belief_propagation(tn, None, config=bp_config)
-        t2 = perf_counter()
-        time_bp = t2-t1
-            
-        if not parallel_bp:
-            time_bp /= 4
-
-        t1 = perf_counter()
-        rho_with_bp = _get_rho_i(tn)
-        t2 = perf_counter()
-        time_bp += t2-t1
-
-    
-        diff_bp     = TenQI.op_norm(rho_with_bp - ref_rdm, ntype='tr')
-
-        z_random = np.trace(pauli.z @ rho_no_bp)
-        z_bp     = np.trace(pauli.z @ rho_with_bp)
-        z_random = np.real(z_random)
-        z_bp     = np.real(z_bp)
-
-    iterations = stats.iterations
-
-    return iterations, chi, time_none, time_bp, z_random, z_bp, diff_random, diff_bp
-
+  
 
 def _get_expectation_values(edge_tn:EdgeTN) -> float:
     rho = edge_tn.rdm
@@ -412,10 +53,14 @@ def _get_expectation_values(edge_tn:EdgeTN) -> float:
     return z
 
 
-def per_D_N_single_convergence_run(
+def _per_D_N_single_test(
     D:int, N:int, method:str, config:Config, parallel:bool,
     **kwargs
-) -> float:
+) -> tuple[
+    EdgeTN, 
+    float,  # z
+    float  # energy
+]:
     
     config = config.copy()
 
@@ -433,16 +78,21 @@ def per_D_N_single_convergence_run(
     ## Define contraction precision and other config andjustments:
     match method:
         case "exact":
-            config.chi = 200
+            config.chi = 1e3*D**2
         case "bp":
             config.set_parallel(parallel)
 
     ## Contract to edge:
-    edge_tn = reduce_tn(tn, EdgeTN, config.contraction, **kwargs)
+    edge_tn = reduce_tn(
+        tn, EdgeTN, config.contraction, 
+        mode=mode, edge_tuple=update_edge
+    )
     ## Get results:
     z = _get_expectation_values(edge_tn)
+    h = hamiltonians.heisenberg_afm()
+    energy = np.dot(edge_tn.rdm.flatten(),  h.flatten()) 
 
-    return z
+    return edge_tn, z, energy
 
 
 def _get_full_converges_run_plots(
@@ -470,31 +120,46 @@ def _get_full_converges_run_plots(
     return plot_values, plot_times, p_values_vs_times
 
 
+def test_bp_convergence_single_run(
+    D:int, N:int, method:str, config:Config,
+    parallel:bool
+)->None:
+
+    _t1 = perf_counter()
+    edge_tn, z, energy = _per_D_N_single_test(
+        D, N, method, config, parallel
+    )
+    _t2 = perf_counter()
+    t = _t2 - _t1
+
+    return z, t
+
 def test_bp_convergence_all_runs(
     D:int = 3,
     combined_figure:bool = False,
-    live_plots:bool = False,
+    live_plots:bool|None = None,  # True: live, False: at end, None: no plots
     parallel:bool = True,
 ) -> None:
     
-    ## 
-    ["random", "exact", "bp"],
+    ##  Params:
     methods_and_Ns:dict[str: list[int]] = dict(
         # exact  = [2, 3, 4],
         random = [2, 3, 4, 5, 6, 7, 8, 9, 10],
-        bp     = [2, 3, 4]
+        bp     = [2, 3, 4, 5]
     ) 
 
     ## config:
-    mode = UpdateMode.A
-    update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
     config = Config.derive_from_dimensions(D)
-    config.chi_bp =   D**2 
+    config.chi_bp = 2*D**2 
     config.chi    = 2*D**2 + 10
+    config.bp.msg_diff_terminate = 1e-6
+
+    # exact_config = config.copy()
 
     ## Prepare plots and csv:
-    p_values, p_times, p_values_vs_times = _get_full_converges_run_plots(combined_figure, live_plots)
-    csv = csvs.CSVManager(["D", "N", "method", "z", "t"])
+    if live_plots is not None:
+        p_values, p_times, p_values_vs_times = _get_full_converges_run_plots(combined_figure, live_plots)
+    csv = csvs.CSVManager(["D", "N", "method", "z", "energy" "time"])
 
     line_styles =   {'bp': "-", 'random': '--', 'exact':":"}
     marker_styles = {'bp': "X", 'random': 'o' , 'exact':"^"}
@@ -515,30 +180,31 @@ def test_bp_convergence_all_runs(
             ## Get results:
             _t1 = perf_counter()
             try:
-                z = per_D_N_single_convergence_run(
-                    D, N, method, config, parallel, 
-                    mode=mode, edge_tuple=update_edge
+                edge_tn, z, energy = _per_D_N_single_test(
+                    D, N, method, config, parallel
                 )
             except Exception:
                 break
             _t2 = perf_counter()
-            t = _t2 - _t1
+            time = _t2 - _t1
 
             ## plot:
-            plt_kwargs = _get_plt_kwargs(method)
-            p_values.append(plot_kwargs=plt_kwargs ,**{ method : (N, z)}, draw_now_=live_plots)
-            p_times.append( plot_kwargs=plt_kwargs ,**{ method : (N, t)}, draw_now_=live_plots)
-            p_values_vs_times.append( 
-                               plot_kwargs=plt_kwargs ,**{ method : (t, z)}, draw_now_=live_plots
-            )
+            if live_plots is not None:
+                plt_kwargs = _get_plt_kwargs(method)
+                p_values.append(plot_kwargs=plt_kwargs ,**{ method : (N, z)}, draw_now_=live_plots)
+                p_times.append( plot_kwargs=plt_kwargs ,**{ method : (N, time)}, draw_now_=live_plots)
+                p_values_vs_times.append( 
+                                plot_kwargs=plt_kwargs ,**{ method : (time, z)}, draw_now_=live_plots
+                )
 
             # csv:
-            csv.append([D, N, method, z, t])
+            csv.append([D, N, method, z, energy, time])
 
     # plot_values.axis.set_ylim(bottom=1e-8*2)
-    
-    visuals.save_figure(p_values.fig)
+    if live_plots is not None:
+        visuals.save_figure(p_values.fig)
     print("Done")    
+
 
 def plot_bp_convergence_results(
     filename:str = "2024.07.26_22.01.47 YRU"
@@ -571,18 +237,47 @@ def plot_bp_convergence_results(
             
             ax_z_vs_t.plot(t, z, label=method, linewidth=4)
             
-
+    visuals.draw_now()
+    ax_z_vs_t.legend()
     print("Done")
     
 
+def _calc_inf_exact_results(D:int) -> dict:
+    ## Config:
+    method = "exact"
+    N = 10
+    config = Config.derive_from_dimensions(D)
+
+    ## Compute:
+    edge_tn, z, energy = _per_D_N_single_test(D, N, method, config, parallel=False)
+
+    ## Save:
+    res = dict(
+        edge_tn=edge_tn,
+        z=z,
+        energy=energy,
+        D=D,
+        N=N,
+    )
+
+    return res
+    
+
+ResultsSubFolderName = "results"
+def get_inf_exact_results(D:int=3) -> dict:
+    filename = f"infinite_exact_results D={D}"
+    if saveload.exist(filename, sub_folder=ResultsSubFolderName):
+        results = saveload.load(filename, sub_folder=ResultsSubFolderName)
+    else:
+        results = _calc_inf_exact_results(D)
+        saveload.save(results, filename, sub_folder=ResultsSubFolderName)
+    return results
+
+
 def main_test():
-    # test_single_bp_vs_growing_TN()
-    # growing_tn_bp_test()
-    # growing_tn_bp_test2()
-    # load_results()
-    # test_bp_convergence_steps_single_run()
+    get_inf_exact_results()
     # test_bp_convergence_all_runs()
-    plot_bp_convergence_results()
+    # plot_bp_convergence_results()
 
 if __name__ == "__main__":
     main_test()
