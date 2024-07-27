@@ -78,7 +78,7 @@ def _per_D_N_single_test(
     ## Define contraction precision and other config andjustments:
     match method:
         case "exact":
-            config.chi = 1e3*D**2
+            config.chi = 1e2*D**2
         case "bp":
             config.set_parallel(parallel)
 
