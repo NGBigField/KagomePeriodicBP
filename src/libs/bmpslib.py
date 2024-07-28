@@ -755,6 +755,7 @@ class mps:
 					S_eff = S[S>cutoff]
 				
 				myD = min(len(S_eff),maxD)
+				myD = _assert_int(myD)
 
 				err = sqrt(sum(S[myD:]**2)/sum(S**2))
 				
@@ -2863,7 +2864,10 @@ def add_two_MPSs(mpsA, alpha, mpsB, beta):
 	return mp
 		
 		
-	
+def _assert_int(x:int|float) -> int:
+	int_version = int(x)	
+	assert int_version==x, f"{x} must be an integer!"
+	return int_version
 	
 	
 
