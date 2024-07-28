@@ -62,6 +62,34 @@ class COLORS:
     space_complexity = "tab:red"
 
 
+def get_color_in_warm_to_cold_range(value, min_, max_):
+    # Normalize the value of e to range from 0 to 1
+    normalized = (value - min_) / (max_ - min_)
+    
+    # Define RGB for blue, white, and red
+    blue = (0, 0, 1)
+    white = (1, 1, 1)
+    red = (1, 0, 0)
+    
+    if normalized < 0.5:
+        # Interpolate between blue and white
+        # Scale normalized to range from 0 to 1 within this segment
+        scale = normalized / 0.5
+        r = blue[0] * (1 - scale) + white[0] * scale
+        g = blue[1] * (1 - scale) + white[1] * scale
+        b = blue[2] * (1 - scale) + white[2] * scale
+    else:
+        # Interpolate between white and red
+        # Adjust normalized to range from 0 to 1 within this segment
+        scale = (normalized - 0.5) / 0.5
+        r = white[0] * (1 - scale) + red[0] * scale
+        g = white[1] * (1 - scale) + red[1] * scale
+        b = white[2] * (1 - scale) + red[2] * scale
+    
+    return (r, g, b)
+
+
+
 def _set_window_title(window, title:str)->None:
     full_title="KagomePeriodicBP - "+title
     if hasattr(window, "wm_title"):
@@ -780,7 +808,7 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure
     ax.plot(iterations, x, label="x")
     ax.plot(iterations, y, label="y")
     ax.plot(iterations, z, label="z")
-    ax.legend(loc='best', fontsize='small')
+    ax.legend(loc='best', fontsize=8)
 
     data["expectations"] = dict(
         x=x,
@@ -838,13 +866,15 @@ def _mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[st
     return mean_per_direction
 
 
-def _capture_network_movie(log_name:str, ite_fig:Figure, ite_axes:dict[str, Axes]) -> None:
+def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], ite_data:dict[str, Any]) -> None:
     ## 
-    draw_now = visuals.draw_now
+    def draw_now():
+        visuals.draw_now()
 
     ## Get basic info:
     delta_t_axes = ite_axes["delta_t"]
     delta_ts = delta_t_axes.lines[0].get_ydata()
+    edges_orders = list(UpdateEdge.all_options())
 
     ## Derive from log:
     d_str, D_str, N_str = logs.search_words_in_log(log_name, 
@@ -855,6 +885,33 @@ def _capture_network_movie(log_name:str, ite_fig:Figure, ite_axes:dict[str, Axes
     D = int(D_str[0])
     N = 2  # ignore the actual string
 
+    
+    ## Adjust existing figure:
+    # reshape figure:
+    fig.set_tight_layout(False)
+    fig.set_constrained_layout(False)
+    fig_width = fig.get_figwidth()
+    fig.set_figwidth(2.5*fig_width)
+    # Reshape all previous axes:
+    for axes in fig.axes:
+        pos = axes.get_position()
+        axes.set_position([0.1, pos.ymin, pos.width*0.48, pos.height])
+    # ``[[xmin, ymin], [xmax, ymax]]``
+    ## Get info:
+    _y_min = min([ax.get_position().y0 for ax in fig.axes])
+    _y_max = max([ax.get_position().y1 for ax in fig.axes])
+    _x_min = min([ax.get_position().x0 for ax in fig.axes])
+    _x_max = max([ax.get_position().x1 for ax in fig.axes])
+    b = _y_min
+    h = _y_max - _y_min
+    l = 0.5
+    w = 0.48
+    ## New axes:
+    ax = fig.add_axes((l, b, w, h))
+    # fig.set_tight_layout('w_pad')
+    # ax.set_box_aspect(0.8)
+
+
     ## plot network:
     from lattices.kagome import plot_lattice, create_kagome_lattice
     from tensor_networks.tensor_network import KagomeTNArbitrary, TNDimensions
@@ -862,19 +919,40 @@ def _capture_network_movie(log_name:str, ite_fig:Figure, ite_axes:dict[str, Axes
     dimensions = TNDimensions(physical_dim=d, virtual_dim=D, big_lattice_size=N)
     kagome_tn = KagomeTNArbitrary.random(dimensions)
     kagome_tn.deal_cell_flavors()
-    kagome_tn.plot(detailed=False)
-    net_axis : Axes   = plt.gca()
-    net_fig  : Figure = plt.gcf()
+    kagome_tn.plot(detailed=False, axes=ax, beautify=False)
+    
 
-    ## Iterative process:
-    for i, delta_t in enumerate(delta_ts):
-        pass
+    
+    ## Define color scales:
+    e_min, e_max = np.inf, -np.inf
+    for i_delta_t, delta_t in enumerate(delta_ts):  
+        if i_delta_t>=len(ite_data["energies_per_edge"]):
+            break
 
+        for i_edge, edge in enumerate(edges_orders):
+            energy = ite_data["energies_per_edge"][i_delta_t][i_edge]
+            e_min = min(e_min, energy)
+            e_max = max(e_max, energy)
+
+
+    ## Iterative Plotting:
+    for i_delta_t, delta_t in enumerate(delta_ts):        
+        if i_delta_t>=len(ite_data["energies_per_edge"]):
+            break
+
+        for i_edge, edge in enumerate(edges_orders):
+            energy = ite_data["energies_per_edge"][i_delta_t][i_edge]
+            color = get_color_in_warm_to_cold_range(energy, e_min, e_max)
+
+    ## Finish
+    print("Done movie!")
 
 
 def plot_from_log(
     # log_name:str = "log - from zero to hero",
-    log_name:str = "2024.07.25_17.16.49_HKUJ_AFM_D=2_N=3",
+    # log_name:str = "2024.07.25_17.16.49_HKUJ_AFM_D=2_N=3",  # Best log so far
+    # log_name:str = "2024.07.25_14.11.58_URRC_AFM_D=2_N=3",  # Wasn't tried before
+    log_name:str = "2024.07.23_18.22.55_VGTT_AFM_D=2_N=2",  # short
     save:bool = True,
     plot_health_figure:bool = False,
     capture_lattice_movie:bool = True
@@ -895,7 +973,7 @@ def plot_from_log(
             continue
 
         if name=="network_movie" and capture_lattice_movie:
-            movie = _plot_func(log_name, all_figs["main"], all_axes["main"])
+            movie = _plot_func(log_name, all_figs["main"], all_axes["main"], all_data["main"])
             continue
 
         # Plot

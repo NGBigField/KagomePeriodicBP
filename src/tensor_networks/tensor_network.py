@@ -132,11 +132,11 @@ class TensorNetwork(ABC):
     # ================================================= #
     #|                    Visuals                      |#
     # ================================================= #
-    def plot(self, detailed:bool=True)->None:
+    def plot(self, detailed:bool=True, axes=None, beautify=True)->None:
         from tensor_networks.visualizations import plot_network
         nodes = self.nodes
         edges = self.edges_dict
-        plot_network(nodes=nodes, edges=edges, detailed=detailed)
+        plot_network(nodes=nodes, edges=edges, detailed=detailed, axes=axes, beautify=beautify)
 
     # ================================================= #
     #|                   Get Nodes                     |#

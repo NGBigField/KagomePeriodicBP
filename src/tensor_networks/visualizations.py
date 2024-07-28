@@ -226,7 +226,9 @@ def plot_contraction_nodes(positions:List[Tuple[int,...]], con_order:List[int])-
 def plot_network(
 	nodes : List[TensorNode],
 	edges : Dict[str, Tuple[int, int]],
-    detailed : bool = True
+    detailed : bool = True,
+    beautify : bool = True,
+    axes=None
 )-> None:
     
     ## Constants:
@@ -240,6 +242,11 @@ def plot_network(
 
     ## Define helper functions:
     average = lambda lst: sum(lst) / len(lst)
+
+    if axes is not None:
+        plotting_obj = axes
+    else:
+        plotting_obj = plt
 
     def node_style(node:TensorNode):
         # Marker:
@@ -332,11 +339,11 @@ def plot_network(
         assert node.pos == pos
         x, y = pos
         color, marker, size1, size2, name = node_style(node)
-        plt.scatter(x, y, c="black", s=size2, marker=marker, zorder=3)
-        plt.scatter(x, y, c=color, s=size1, marker=marker, zorder=4)
+        plotting_obj.scatter(x, y, c="black", s=size2, marker=marker, zorder=3)
+        plotting_obj.scatter(x, y, c=color, s=size1, marker=marker, zorder=4)
         if detailed:
             text = f" [{node.index}]" + f" {name}" 
-            plt.text(x, y, text)
+            plotting_obj.text(x, y, text)
             assert i==node.index, "Non consistent indexing"
 
     ## Collect basic data:
@@ -352,7 +359,7 @@ def plot_network(
         
         ## Define plot function:      
         def plot_and_text(x_vec, y_vec, on_boundary):
-            plt.plot(x_vec, y_vec, color=edge_color, alpha=alpha, linewidth=linewidth, zorder=1 )
+            plotting_obj.plot(x_vec, y_vec, color=edge_color, alpha=alpha, linewidth=linewidth, zorder=1 )
             if detailed:
                 if on_boundary is None:
                     x = average(x_vec)
@@ -360,8 +367,8 @@ def plot_network(
                 else: 
                     x = x_vec[1]
                     y = y_vec[1]
-                plt.text(x, y, f"{edge_name!r}\n", fontdict={'color':'darkorchid', 'size':10 } )
-                plt.text(x, y, f"\n{edge_dim}", fontdict={'color':'crimson', 'size':10 } )
+                plotting_obj.text(x, y, f"{edge_name!r}\n", fontdict={'color':'darkorchid', 'size':10 } )
+                plotting_obj.text(x, y, f"\n{edge_dim}", fontdict={'color':'crimson', 'size':10 } )
             
         ## Plot this edge:
         on_boundary = _check_on_boundaries(tensors_indices, network_bounds=network_bounds, pos_list=pos_list, edge_name=edge_name, nodes=nodes, delta=smallest_distance)
@@ -379,15 +386,14 @@ def plot_network(
             dx, dy = angle_dis*np.cos(angle), angle_dis*np.sin(angle)
             x1, y1 = origin
             x2, y2 = x1+dx, y1+dy
-            plt.plot([x1, x2], [y1, y2], color=angle_color, alpha=alpha, linewidth=angle_linewidth )
-            plt.text(x2, y2, f"{i_edge}", fontdict={'color':'olivedrab', 'size':8 } )	
+            plotting_obj.plot([x1, x2], [y1, y2], color=angle_color, alpha=alpha, linewidth=angle_linewidth )
+            plotting_obj.text(x2, y2, f"{i_edge}", fontdict={'color':'olivedrab', 'size':8 } )	
 
     ## Beautify:
     net_axis = plt.gca()
     net_fig  = plt.gcf()
-
-    ## Beautify:
     net_axis.set_xticklabels([])
     net_axis.set_yticklabels([])
-    net_fig.set_tight_layout('rect')
+    if beautify:
+        net_fig.set_tight_layout('rect')
 

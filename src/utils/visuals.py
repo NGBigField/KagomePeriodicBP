@@ -43,6 +43,7 @@ else:
 from enum import Enum
 from functools import wraps
 from dataclasses import dataclass
+import itertools
 
 # for copy:
 from copy import deepcopy
@@ -146,6 +147,15 @@ def random_uniform_spray(num_coordinates:int, origin:Optional[Tuple[float, ...]]
     return coordinates
 
 
+def _find_axes_in_inputs(*args, **kwargs):
+    # from mpl_toolkits.mplot3d import Axes3D
+    # from matplotlib.pyplot import Axes
+    for x in itertools.chain(args, kwargs.values()):
+        if isinstance(x, (Axes, Axes3D)):
+            return x
+    else:
+        return None
+
 def close_all():
     plt.close('all')
 
@@ -162,7 +172,11 @@ def matplotlib_wrapper(on:bool=True) -> Callable[[Callable[_InputType, _OutputTy
                 raise ModuleNotFoundError("matplotlib was not imported. Probably because `'no_visuals'=true` in config.")
             # Pre-plot                
             if on:
-                fig, (ax) = plt.subplots(nrows=1, ncols=1) 
+                ax = _find_axes_in_inputs(*args, **kwargs)
+                if ax is None:
+                    fig, (ax) = plt.subplots(nrows=1, ncols=1) 
+                else:
+                    fig = ax.get_figure()
             # plot:
             results = func(*args, **kwargs)
             # Post-plot

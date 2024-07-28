@@ -183,11 +183,11 @@ def main(
     # config.iterative_process.start_segment_with_new_bp_message = True
     # config.iterative_process.use_bp = True
     # config.ite.random_edge_order = True
-    config.ite.always_use_lowest_energy_state = True
+    config.ite.always_use_lowest_energy_state = False
     # config.ite.symmetric_second_order_trotterization = True
     config.ite.add_gaussian_noise_fraction = 1e-2
     # config.iterative_process.bp_every_edge = True
-    config.iterative_process.num_mode_repetitions_per_segment = 5
+    config.iterative_process.num_mode_repetitions_per_segment = 1
 
     ## time steps:
     if D<4:

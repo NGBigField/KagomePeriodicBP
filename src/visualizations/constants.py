@@ -27,7 +27,7 @@ SCATTER_STYLE_FOR_ITE = ScatterStyleFoeITE(
         color="black",
         marker="d",
         size=2,
-        alpha=0.2
+        alpha=0.1
     )
     ,
     energies_after_segment = ScatterStyle(
