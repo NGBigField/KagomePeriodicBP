@@ -185,6 +185,7 @@ from scipy.sparse.linalg import eigs
 
 from numpy.linalg import norm, svd, qr
 from scipy.linalg import rq
+from quimb.linalg.rand_linalg import rsvd
 
 from numpy import zeros, ones, array, tensordot, sqrt, diag, dot, \
 	reshape, transpose, conj, eye, trace, floor, log10
@@ -605,10 +606,9 @@ class mps:
 	# optimal.
 	#
 
-	def left_canonical(self, maxD=None, eps=None):
+	def left_canonical(self, maxD=None, eps=None, svd_emthod:str="rsvd"):
 		if self.N<2:
-			return
-
+			return		
 
 		for i in range(self.N-1):
 
@@ -619,10 +619,10 @@ class mps:
 			M = self.A[i].reshape(D1*d, D2)
 				
 			try:
-				U,S,V = svd(M, full_matrices=False)
+				U,S,V = perf_svd(M, svd_emthod)
 			except:
 				M = M + np.random.randn(*M.shape)*norm(M)*1e-12
-				U,S,V = svd(M, full_matrices=False)
+				U,S,V = perf_svd(M, svd_emthod)
 
 
 
@@ -2869,7 +2869,13 @@ def _assert_int(x:int|float) -> int:
 	assert int_version==x, f"{x} must be an integer!"
 	return int_version
 	
-	
+def perf_svd(m:np.ndarray, svd_emthod:str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:		
+	if svd_emthod=="svd":
+		return svd(m, full_matrices=False)
+	elif svd_emthod=="rsvd":
+		return rsvd(m, 1e-5)
+	else:
+		raise ValueError(f"Not an expected case `svd_emthod=={svd_emthod!r}`")	
 
 
 
