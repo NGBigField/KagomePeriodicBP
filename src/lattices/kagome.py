@@ -655,14 +655,14 @@ def _search_lattice_size_by_num_nodes(num_nodes:int, _max_attempted_size:int=20)
     raise ValueError(f"num_nodes={num_nodes} does not match any Kagome lattice size.")
 
 
-def plot_lattice(all_nodes:list[Node], node_color:str="red", node_size=40, edge_style:str="b-", periodic:bool=False)->None:
+def plot_lattice(all_nodes:list[Node], node_color:str="red", node_size=40, edge_style:str="b-", edge_name_color:str|None="green", periodic:bool=False)->None:
     from matplotlib import pyplot as plt
 
     ## Plot node positions:
     for node in all_nodes:
         x, y = node.pos
         plt.scatter(x, y, c=node_color, s=node_size)
-        plt.text(x,y, s=node.index)
+        plt.text(x,y, s=f"{node.index}")
 
     ## Plot edges:
     edges_list = [node.edges for node in all_nodes]
@@ -680,7 +680,8 @@ def plot_lattice(all_nodes:list[Node], node_color:str="red", node_size=40, edge_
                     x_text = x2
                     y_text = y2
                     plt.plot([x1, x2], [y1, y2], edge_style)
-                    plt.text(x_text, y_text, edge, color="green")
+                    if edge_name_color is not None:
+                        plt.text(x_text, y_text, edge, color=edge_name_color)
                 continue
 
             elif len(nodes)==2:
@@ -702,7 +703,8 @@ def plot_lattice(all_nodes:list[Node], node_color:str="red", node_size=40, edge_
                 y_text = y2
 
             plt.plot([x1, x2], [y1, y2], edge_style)
-            plt.text(x_text, y_text, edge, color="green")
+            if edge_name_color is not None:
+                plt.text(x_text, y_text, edge, color=edge_name_color)
             
 
     print("Done")

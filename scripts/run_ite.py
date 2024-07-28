@@ -5,7 +5,7 @@ from containers import Config, HamiltonianFuncAndInputs
 from unit_cell import UnitCell, get_from
 
 from utils import strings, lists
-from typing import Iterable, TypeAlias
+from typing import Iterable, TypeAlias, Literal
 _Bool : TypeAlias = bool|int
 
 # Algos we test here:
@@ -140,15 +140,15 @@ def _plot_field_over_time() -> None:
 
 def main(
     D = 2,
-    N = 3,
-    chi_factor : int|float = 2,
+    N = 2,
+    chi_factor : int|float = 0.6,
     live_plots:_Bool|Iterable[_Bool] = [0,0,0],   #type: ignore
     progress_bar:bool=True,
     results_filename:str|None = None,
     parallel:bool = False,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.0,
-    unit_cell_from:str = "random"
+    unit_cell_from:Literal["random","last","best","tnsu"]|str = "best"
 )->tuple[float, str]:
 
     assert N>=2
@@ -174,12 +174,12 @@ def main(
     config.chi = int(config.chi*chi_factor)
     config.chi_bp = int(config.chi_bp*chi_factor)
 
-    config.bp.msg_diff_good_enough = 1e-7
-    config.bp.msg_diff_terminate = 1e-14
+    config.bp.msg_diff_good_enough = 1e-5
+    config.bp.msg_diff_terminate = 1e-6 # 1e-14
     # config.bp.times_to_deem_failure_when_diff_increases = 3
     # config.bp.max_iterations = 50
     # config.bp.allowed_retries = 2
-    config.iterative_process.change_config_for_measurements_func = _config_at_measurement
+    # config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     # config.iterative_process.start_segment_with_new_bp_message = True
     # config.iterative_process.use_bp = True
     # config.ite.random_edge_order = True

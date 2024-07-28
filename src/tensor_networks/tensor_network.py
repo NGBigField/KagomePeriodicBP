@@ -53,6 +53,7 @@ from typing import Any, Final
 
 _T = TypeVar("_T")
 _FrozenSpecificNetworkType = TypeVar("_FrozenSpecificNetworkType", bound="_FrozenSpecificNetwork")
+_KagomeArbitraryTNType = TypeVar("_KagomeArbitraryTNType", bound="KagomeTNArbitrary")
 
 class TensorDims(NamedTuple):
     virtual  : int
@@ -427,6 +428,22 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
         if DEBUG_MODE: 
             new.validate()
         return new
+
+    # ================================================= #
+    #|                 Constructors                    |#
+    # ================================================= #
+    @classmethod
+    def random(cls:Type[_KagomeArbitraryTNType], dimensions:TNDimensions) -> _KagomeArbitraryTNType:
+        N = dimensions.big_lattice_size
+        D = dimensions.virtual_dim
+        d = dimensions.physical_dim
+        def _rand_tensor()->np.ndarray:
+            return np.random.normal(size=(d, D, D, D, D)) + 1j*np.random.normal(size=(d, D, D, D, D)) 
+        num_tensors = kagome.num_nodes_by_lattice_size(N)
+        tensors = [_rand_tensor() for i in range(num_tensors)]
+        new = cls(tensors)
+        return new
+
 
     # ================================================= #
     #|              Geometry Functions                 |#

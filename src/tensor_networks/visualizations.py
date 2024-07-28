@@ -382,3 +382,12 @@ def plot_network(
             plt.plot([x1, x2], [y1, y2], color=angle_color, alpha=alpha, linewidth=angle_linewidth )
             plt.text(x2, y2, f"{i_edge}", fontdict={'color':'olivedrab', 'size':8 } )	
 
+    ## Beautify:
+    net_axis = plt.gca()
+    net_fig  = plt.gcf()
+
+    ## Beautify:
+    net_axis.set_xticklabels([])
+    net_axis.set_yticklabels([])
+    net_fig.set_tight_layout('rect')
+

@@ -582,7 +582,7 @@ def _values_from_values_str_line(line:str)->list[float]:
 def _scatter_values(
     ax:Axes,    
     values_line:str, i:int, style:visual_constants.ScatterStyle=default_marker_style, label:str=None,  is_first:bool=None, value_func:Callable|None=None
-)->None:
+)->list[float]:
     
     values = _values_from_values_str_line(values_line)
     for value in values:
@@ -595,6 +595,7 @@ def _scatter_values(
         ax.scatter(i, value, s=style.size, c=style.color, alpha=style.alpha, marker=style.marker, label=label)
         is_first = False
 
+    return values
 
 def _remove_x_axis_labels(ax:Axes) -> None:
     x_axis = ax.get_xaxis()
@@ -617,7 +618,7 @@ def _plot_per_segment_health_common(ax:Axes, strs:list[str], style:visual_consta
             ax.scatter(i, value, s=style.size, c=style.color, alpha=style.alpha, marker=style.marker)
 
 
-def _plot_health_figure_from_log(log_name:str) -> tuple[Figure, dict]: 
+def _plot_health_figure_from_log(log_name:str) -> tuple[Figure, dict, dict]: 
     ## Get matching words:
     hermicity_strs, tensor_distance_strs = logs.search_words_in_log(log_name, 
         ("Hermicity of environment=", "Tensor update distance") 
@@ -647,7 +648,9 @@ def _plot_health_figure_from_log(log_name:str) -> tuple[Figure, dict]:
     return fig, axes
 
 
-def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure, dict]: 
+def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure, dict, dict]: 
+
+    data = dict()
 
     ## Get matching words:
     edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, \
@@ -657,6 +660,7 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure
     )
 
     num_segments = len(mean_energies_strs)
+    data["num_segments"] = num_segments
     
     ## Parse num modes per segment:
     num_mode_repetitions_per_segment = num_mode_repetitions_per_segment_str[0].removeprefix(": ")
@@ -670,6 +674,8 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure
         word = word.removeprefix(" = ")
         word = word.removesuffix("\n")
         mean_energies.append(float(word))
+
+    data["mean_energies"] = mean_energies
 
     ## Prepare plots        
     fig = plt.figure(figsize=(5, 6))
@@ -698,15 +704,17 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure
     value_func = lambda v: v*2
 
     # Plot:
+    energies_per_edge_all = []
     for i in range(num_segments):
-        _scatter_values(ax, values_line=edge_energies_for_mean_strs.pop(0), i=i, style=energies_after_segment_style, label="energies per edge", is_first=is_first, value_func=value_func)
-
+        energies_per_edge = _scatter_values(ax, values_line=edge_energies_for_mean_strs.pop(0), i=i, style=energies_after_segment_style, label="energies per edge", is_first=is_first, value_func=value_func)
+        energies_per_edge_all.append(energies_per_edge)
 
         for j in range(num_mode_repetitions_per_segment):
             index = i + j/num_mode_repetitions_per_segment
             _scatter_values(ax, values_line=edge_energies_during_strs.pop(0), i=index, style=energies_at_update_style, label="energies at update", is_first=is_first, value_func=value_func)
             is_first = False
 
+    data["energies_per_edge"] = energies_per_edge_all
                 
     ## Plot reference energy:
     if len(reference_energy_str)==0:
@@ -739,7 +747,7 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure
         delta_t_vec.append(delta_t)
 
     ax.plot(delta_t_vec)
-
+    data["delta_t_vec"] = delta_t_vec
 
     ## Plot Entanglement:    
     ax = axes['entangle']
@@ -774,6 +782,13 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure
     ax.plot(iterations, z, label="z")
     ax.legend(loc='best', fontsize='small')
 
+    data["expectations"] = dict(
+        x=x,
+        y=y,
+        z=z,
+        iterations=iterations
+    )
+
     # link x axes:
     first_ax = None
     for first, _, _, ax in dicts.iterate_with_edge_indicators(axes):
@@ -794,7 +809,7 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure
     ## Reshape fig a bit
     fig.set_tight_layout('w_pad')
 
-    return fig, axes
+    return fig, axes, data
 
             
 
@@ -823,20 +838,52 @@ def _mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[st
     return mean_per_direction
 
 
-def _capture_network_movie(log_name:str, ite_fig:Figure) -> None:
-    axes = ite_fig.axes
+def _capture_network_movie(log_name:str, ite_fig:Figure, ite_axes:dict[str, Axes]) -> None:
+    ## 
+    draw_now = visuals.draw_now
+
+    ## Get basic info:
+    delta_t_axes = ite_axes["delta_t"]
+    delta_ts = delta_t_axes.lines[0].get_ydata()
+
+    ## Derive from log:
+    d_str, D_str, N_str = logs.search_words_in_log(log_name, 
+        ("physical_dim:", "virtual_dim:", "big_lattice_size:"),
+        max_line=CONFIG_NUM_HEADER_LINES
+    )
+    d = int(d_str[0])
+    D = int(D_str[0])
+    N = 2  # ignore the actual string
+
+    ## plot network:
+    from lattices.kagome import plot_lattice, create_kagome_lattice
+    from tensor_networks.tensor_network import KagomeTNArbitrary, TNDimensions
+    # kagome_lattice, triangles = create_kagome_lattice(N)
+    dimensions = TNDimensions(physical_dim=d, virtual_dim=D, big_lattice_size=N)
+    kagome_tn = KagomeTNArbitrary.random(dimensions)
+    kagome_tn.deal_cell_flavors()
+    kagome_tn.plot(detailed=False)
+    net_axis : Axes   = plt.gca()
+    net_fig  : Figure = plt.gcf()
+
+    ## Iterative process:
+    for i, delta_t in enumerate(delta_ts):
+        pass
+
+
 
 def plot_from_log(
     # log_name:str = "log - from zero to hero",
     log_name:str = "2024.07.25_17.16.49_HKUJ_AFM_D=2_N=3",
     save:bool = True,
     plot_health_figure:bool = False,
-    capture_lattice_movie:bool = True,
+    capture_lattice_movie:bool = True
 ):
     
     _print_log_header(log_name)
-    all_figs : dict[str,Figure] = dict()
-    all_axes : dict[str,dict]   = dict()
+    all_figs : dict[str, Figure] = dict()
+    all_axes : dict[str, dict]   = dict()
+    all_data : dict[str, dict]   = dict()
 
 
     for _plot_func, name in [
@@ -848,11 +895,11 @@ def plot_from_log(
             continue
 
         if name=="network_movie" and capture_lattice_movie:
-            movie = _plot_func(log_name, figs["main"])
+            movie = _plot_func(log_name, all_figs["main"], all_axes["main"])
             continue
 
         # Plot
-        fig, axes = _plot_func(log_name)
+        fig, axes, data = _plot_func(log_name)
 
         # save:
         if save:
@@ -861,6 +908,7 @@ def plot_from_log(
         # Keep:
         all_figs[name] = fig
         all_axes[name] = axes
+        all_data[name] = data
 
     # Show:
     plt.show()
