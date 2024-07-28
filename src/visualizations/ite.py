@@ -20,6 +20,7 @@ _T = TypeVar('_T')
 
 from _types import UnitCellExpectationValuesDict
 
+from typing import TypeAlias, Any
 
 # Control flags:
 from _config_reader import ALLOW_VISUALS
@@ -30,7 +31,10 @@ if ALLOW_VISUALS:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 else:
-    Axes3D, Quiver, Line3D, Text = None, None, None, None
+    Axes3D : TypeAlias = Any 
+    Quiver : TypeAlias = Any 
+    Line3D : TypeAlias = Any 
+    Text   : TypeAlias = Any 
 
 from visualizations import constants as visual_constants
 
@@ -48,7 +52,7 @@ NEW_TRACK_POINT_THRESHOLD = 0.02
 PLOT_ENTANGLEMENT = True
 PLOT_COMPLEXITY = False
 
-CONFIG_NUM_HEADER_LINES = 48
+CONFIG_NUM_HEADER_LINES = 54
 
 
 @dataclass
@@ -109,7 +113,7 @@ class BlockSpherePlot():
 
         # Figure variables:
         self.fig  = fig
-        self.axis = axis
+        self.axis : Axes3D = axis
         self.axis.get_yaxis().get_major_formatter().set_useOffset(False)  # Stop the weird pyplot tendency to give a "string" offset to graphs
 
         # inner memory:
@@ -613,7 +617,7 @@ def _plot_per_segment_health_common(ax:Axes, strs:list[str], style:visual_consta
             ax.scatter(i, value, s=style.size, c=style.color, alpha=style.alpha, marker=style.marker)
 
 
-def _plot_health_figure_from_log(log_name:str) -> Figure: 
+def _plot_health_figure_from_log(log_name:str) -> tuple[Figure, dict]: 
     ## Get matching words:
     hermicity_strs, tensor_distance_strs = logs.search_words_in_log(log_name, 
         ("Hermicity of environment=", "Tensor update distance") 
@@ -640,10 +644,10 @@ def _plot_health_figure_from_log(log_name:str) -> Figure:
     _plot_per_segment_health_common(ax, tensor_distance_strs)
     ax.set_ylabel("Update Distance")
 
-    return fig
+    return fig, axes
 
 
-def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
+def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure, dict]: 
 
     ## Get matching words:
     edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, \
@@ -768,15 +772,7 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
     ax.plot(iterations, x, label="x")
     ax.plot(iterations, y, label="y")
     ax.plot(iterations, z, label="z")
-    ax.legend(loc="lower left")
-
-
-    ## Finally:
-    # Remove x-ticks from all axes but last:
-    for _, last, _, ax in dicts.iterate_with_edge_indicators(axes):
-        if last:
-            continue
-        _remove_x_axis_labels(ax)        
+    ax.legend(loc='best', fontsize='small')
 
     # link x axes:
     first_ax = None
@@ -785,6 +781,20 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
             first_ax = ax
             continue
         ax.sharex(first_ax)
+
+    
+    # Remove x-ticks from all axes but last:
+    for _, last, _, ax in dicts.iterate_with_edge_indicators(axes):
+        if last:
+            continue
+        ax.tick_params(labelbottom=False)
+        # ax.set_xticklabels([])
+        # _remove_x_axis_labels(ax)        
+
+    ## Reshape fig a bit
+    fig.set_tight_layout('w_pad')
+
+    return fig, axes
 
             
 
@@ -818,15 +828,15 @@ def _capture_network_movie(log_name:str, ite_fig:Figure) -> None:
 
 def plot_from_log(
     # log_name:str = "log - from zero to hero",
-    # log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3",
-    log_name:str = "2024.06.13_09.57.29 GZCIVS",
+    log_name:str = "2024.07.25_17.16.49_HKUJ_AFM_D=2_N=3",
     save:bool = True,
     plot_health_figure:bool = False,
     capture_lattice_movie:bool = True,
 ):
     
     _print_log_header(log_name)
-    figs : dict[str,Figure] = dict()
+    all_figs : dict[str,Figure] = dict()
+    all_axes : dict[str,dict]   = dict()
 
 
     for _plot_func, name in [
@@ -842,14 +852,15 @@ def plot_from_log(
             continue
 
         # Plot
-        fig = _plot_func(log_name)
+        fig, axes = _plot_func(log_name)
 
         # save:
         if save:
             visuals.save_figure(fig=fig  , file_name=log_name+" - "+name) 
 
         # Keep:
-        figs[name] = fig
+        all_figs[name] = fig
+        all_axes[name] = axes
 
     # Show:
     plt.show()
