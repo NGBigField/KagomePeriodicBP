@@ -678,11 +678,41 @@ class matplotlib_colors(Enum):
 
 
 
+def write_video_from_existing_frames(fps=30) -> None:
+    from moviepy.editor import ImageClip, concatenate_videoclips
+    from utils.files import get_all_files_fullpath_in_folder
+
+    frames_dir = VIDEOS_FOLDER + os.sep + "temp_frames"
+    ## Get files
+    all_files = get_all_files_fullpath_in_folder(frames_dir)
+    num_frames = len(all_files)
+    frames_duration = [1 for _ in range(num_frames)]
+    frames_duration[0] = 10
+    frames_dir = VIDEOS_FOLDER + os.sep + "temp_frames" + os.sep
+
+    def image_clips() -> Generator[ImageClip, None, None] :
+        base_duration = 1/fps
+        for img_path, frame_duration in zip( image_paths(), frames_duration ):
+            yield ImageClip(img_path+".png", duration=base_duration*frame_duration)
+
+    def image_paths() -> Generator[str, None, None] :
+        for i in range(num_frames):
+            yield _get_frame_path(i)
+
+    def _get_frame_path(index:int) -> str:
+        return frames_dir+"frame"+f"{index}"
+
+    name = strings.time_stamp()
+    # Prepare folder for video:
+    saveload.force_folder_exists(VIDEOS_FOLDER)
+    video_slides = concatenate_videoclips( list(image_clips()), method='chain' )
+    # Write video file:
+    fullpath = VIDEOS_FOLDER+name+".mp4"
+    video_slides.write_videofile(fullpath, fps=fps)
+
+
 
 
 if __name__ == "__main__":
-    ap = InactiveAppendablePlot()
-    a = ap.axis
-    g = a.grid()
-
+    write_video_from_existing_frames()
     print("Done.")  
