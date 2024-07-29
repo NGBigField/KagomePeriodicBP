@@ -43,6 +43,8 @@ mode = UpdateMode.A
 update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 d=2
 
+EXACT_CHI = 500
+EXACT_N = 8
   
 
 def _get_expectation_values(edge_tn:EdgeTN) -> float:
@@ -78,7 +80,7 @@ def _per_D_N_single_test(
     ## Define contraction precision and other config andjustments:
     match method:
         case "exact":
-            config.chi = 1e2*D**2
+            config.chi = EXACT_CHI
         case "bp":
             config.set_parallel(parallel)
 
@@ -245,7 +247,7 @@ def plot_bp_convergence_results(
 def _calc_inf_exact_results(D:int) -> dict:
     ## Config:
     method = "exact"
-    N = 10
+    N = EXACT_N
     config = Config.derive_from_dimensions(D)
 
     ## Compute:
@@ -254,6 +256,7 @@ def _calc_inf_exact_results(D:int) -> dict:
     ## Save:
     res = dict(
         edge_tn=edge_tn,
+        rho=edge_tn.rdm,
         z=z,
         energy=energy,
         D=D,
