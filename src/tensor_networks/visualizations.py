@@ -250,14 +250,14 @@ def plot_network(
 
     def node_style(node:TensorNode):
         # Marker:
-        if node.functionality is NodeFunctionality.CenterCore:
+        if node.functionality is NodeFunctionality.CenterCore and beautify:
             if node.cell_flavor is UnitCellFlavor.NoneUnitCell:
                 marker = "*" 
             else:
                 marker = f"${node.cell_flavor}$"
             size1 = 120
             size2 = 180
-        elif node.functionality is NodeFunctionality.AroundCore:
+        elif node.functionality is NodeFunctionality.AroundCore and beautify:
             marker = "H"
             size1 = 60
             size2 = 80

@@ -886,8 +886,6 @@ def _extend_figure_to_include_network_graph(fig:Figure, d:int, D:int, N:int) -> 
     ## Get info:
     _y_min = min([ax.get_position().y0 for ax in fig.axes])
     _y_max = max([ax.get_position().y1 for ax in fig.axes])
-    _x_min = min([ax.get_position().x0 for ax in fig.axes])
-    _x_max = max([ax.get_position().x1 for ax in fig.axes])
     b = _y_min
     h = _y_max - _y_min
     l = 0.5
@@ -898,9 +896,7 @@ def _extend_figure_to_include_network_graph(fig:Figure, d:int, D:int, N:int) -> 
     # ax.set_box_aspect(0.8)
 
     ## plot network:
-    from lattices.kagome import plot_lattice, create_kagome_lattice
     from tensor_networks.tensor_network import KagomeTNArbitrary, TNDimensions
-    # kagome_lattice, triangles = create_kagome_lattice(N)
     dimensions = TNDimensions(physical_dim=d, virtual_dim=D, big_lattice_size=N)
     kagome_tn = KagomeTNArbitrary.random(dimensions)
     kagome_tn.deal_cell_flavors()
@@ -934,7 +930,7 @@ def _update_figure_per_delta_t(
         line = ax.axvline(x = i_delta_t, color = 'r')
         plotted_lines.append(line)
 
-    ## iterate over all edges:
+    ## iterate over all edges and plot energy on edge:
     for i_edge, edge in enumerate(edges_orders):
         energy = ite_data["energies_per_edge"][i_delta_t][i_edge]
         color = energy_color_scale_function(energy)
@@ -995,7 +991,11 @@ def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], i
 
 
     ## Iterative Plotting:
-    movie = visuals.VideoRecorder()
+    wanted_movie_time = 30  # [sec]
+    num_frames = len(delta_ts)
+    fps = num_frames/wanted_movie_time
+    fps = int(fps)
+    movie = visuals.VideoRecorder(fps=fps)
     plotted_lines = []
     is_first = True
     for i_delta_t, delta_t in enumerate(delta_ts):        
@@ -1005,7 +1005,7 @@ def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], i
         _clear_plotted_lines(plotted_lines)
         plotted_lines = _update_figure_per_delta_t(i_delta_t, delta_t, fig, kagome_tn, kagome_ax, ite_data, ite_axes, energy_color_scale_function)
         if is_first:
-            movie.capture(fig, duration=5)
+            movie.capture(fig, duration=10)
         else:
             movie.capture(fig, duration=1)
         visuals.draw_now()
@@ -1017,8 +1017,8 @@ def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], i
 
 
 def plot_from_log(
-    # log_name:str = "2024.07.25_17.16.49_HKUJ_AFM_D=2_N=3",  # Best log so far
-    log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3",  # short
+    log_name:str = "2024.07.25_17.16.49_HKUJ_AFM_D=2_N=3",  # Best log so far
+    # log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3",  # short
     save:bool = True,
     plot_health_figure:bool = False,
     capture_lattice_movie:bool = True
