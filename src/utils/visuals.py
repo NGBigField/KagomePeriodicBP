@@ -10,7 +10,6 @@ if __name__ == "__main__":
 
 
 # Everyone needs numpy:
-from matplotlib.pyplot import Axes
 import numpy as np
 
 # for type hints:
@@ -21,7 +20,7 @@ from _config_reader import ALLOW_VISUALS
 if ALLOW_VISUALS:
     # For visuals
     import matplotlib.pyplot as plt
-    from matplotlib.pyplot import Axes
+    from matplotlib.axes import Axes
     from matplotlib.figure import Figure
     from mpl_toolkits.mplot3d import Axes3D
     from mpl_toolkits.mplot3d.art3d import Line3D

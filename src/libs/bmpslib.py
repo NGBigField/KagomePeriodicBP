@@ -606,7 +606,7 @@ class mps:
 	# optimal.
 	#
 
-	def left_canonical(self, maxD=None, eps=None, svd_emthod:str="rsvd"):
+	def left_canonical(self, maxD=None, eps=None, svd_emthod:str="svd"):
 		if self.N<2:
 			return		
 
@@ -2869,7 +2869,7 @@ def _assert_int(x:int|float) -> int:
 	assert int_version==x, f"{x} must be an integer!"
 	return int_version
 	
-def perf_svd(m:np.ndarray, svd_emthod:str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:		
+def perf_svd(m:np.ndarray, svd_emthod:str="svd") -> tuple[np.ndarray, np.ndarray, np.ndarray]:		
 	if svd_emthod=="svd":
 		return svd(m, full_matrices=False)
 	elif svd_emthod=="rsvd":

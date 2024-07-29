@@ -11,7 +11,7 @@ if __name__ == "__main__":
 from utils import visuals, strings, logs, prints, tuples, lists, saveload, dicts, files
 import project_paths
 
-from tensor_networks import UnitCell
+from tensor_networks import UnitCell, KagomeTNArbitrary
 from containers import Config, ITESegmentStats, UpdateEdge, MeasurementsOnUnitCell
 import numpy as np
 from dataclasses import dataclass, fields
@@ -635,16 +635,20 @@ def _remove_x_axis_labels(ax:Axes) -> None:
         new_ticks.append(new_text)
     x_axis.set_ticklabels(new_ticks)
 
-def _plot_per_segment_health_common(ax:Axes, strs:list[str], style:visual_constants.ScatterStyle=default_marker_style) -> None:
-
+def _plot_per_segment_health_common(ax:Axes, strs:list[str], style:visual_constants.ScatterStyle=default_marker_style) -> list[list[float]]:
+    all_values = []
     for i, line in enumerate(strs):
+        values = []
         _, line = line.split("[")
         line, _ = line.split("]")
         words = line.split(",")
         for word in words:
             value = float(word)
             ax.scatter(i, value, s=style.size, c=style.color, alpha=style.alpha, marker=style.marker)
+            values.append(value)
 
+        all_values.append(values)
+    return all_values
 
 def _plot_health_figure_from_log(log_name:str) -> tuple[Figure, dict, dict]: 
     ## Get matching words:
@@ -661,19 +665,19 @@ def _plot_health_figure_from_log(log_name:str) -> tuple[Figure, dict, dict]:
         ]
     )
     axes : dict[str, Axes] = {axis._label : axis for axis in fig.get_axes()}
-
+    data = dict()
 
     ## Hermicity:
     ax = axes["Hermicity"]
-    _plot_per_segment_health_common(ax, hermicity_strs)
+    data["hermicity"] = _plot_per_segment_health_common(ax, hermicity_strs)
     ax.set_ylabel("Hermicity")
 
     ## Hermicity:
     ax = axes["distance"]
-    _plot_per_segment_health_common(ax, tensor_distance_strs)
+    data["tensor_distance"] = _plot_per_segment_health_common(ax, tensor_distance_strs)
     ax.set_ylabel("Update Distance")
 
-    return fig, axes
+    return fig, axes, data
 
 
 def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure, dict, dict]: 
@@ -866,36 +870,18 @@ def _mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[st
     return mean_per_direction
 
 
-def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], ite_data:dict[str, Any]) -> None:
-    ## 
-    def draw_now():
-        visuals.draw_now()
 
-    ## Get basic info:
-    delta_t_axes = ite_axes["delta_t"]
-    delta_ts = delta_t_axes.lines[0].get_ydata()
-    edges_orders = list(UpdateEdge.all_options())
-
-    ## Derive from log:
-    d_str, D_str, N_str = logs.search_words_in_log(log_name, 
-        ("physical_dim:", "virtual_dim:", "big_lattice_size:"),
-        max_line=CONFIG_NUM_HEADER_LINES
-    )
-    d = int(d_str[0])
-    D = int(D_str[0])
-    N = 2  # ignore the actual string
-
-    
+def _extend_figure_to_include_network_graph(fig:Figure, d:int, D:int, N:int) -> tuple[KagomeTNArbitrary, Axes]:
     ## Adjust existing figure:
     # reshape figure:
-    fig.set_tight_layout(False)
-    fig.set_constrained_layout(False)
+    fig.set_tight_layout(False)        #type: ignore 
+    fig.set_constrained_layout(False)  #type: ignore
     fig_width = fig.get_figwidth()
     fig.set_figwidth(2.5*fig_width)
     # Reshape all previous axes:
     for axes in fig.axes:
         pos = axes.get_position()
-        axes.set_position([0.1, pos.ymin, pos.width*0.48, pos.height])
+        axes.set_position([0.1, pos.ymin, pos.width*0.48, pos.height])  #type: ignore
     # ``[[xmin, ymin], [xmax, ymax]]``
     ## Get info:
     _y_min = min([ax.get_position().y0 for ax in fig.axes])
@@ -911,7 +897,6 @@ def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], i
     # fig.set_tight_layout('w_pad')
     # ax.set_box_aspect(0.8)
 
-
     ## plot network:
     from lattices.kagome import plot_lattice, create_kagome_lattice
     from tensor_networks.tensor_network import KagomeTNArbitrary, TNDimensions
@@ -920,39 +905,120 @@ def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], i
     kagome_tn = KagomeTNArbitrary.random(dimensions)
     kagome_tn.deal_cell_flavors()
     kagome_tn.plot(detailed=False, axes=ax, beautify=False)
-    
 
+    return kagome_tn, ax
+    
+def _plot_edge_energy(kagome_ax:Axes, kagome_tn:KagomeTNArbitrary, color:tuple[float, ...], edge:UpdateEdge) -> list:
+    lines = []
+    for n1, n2 in kagome_tn.all_node_pairs_in_lattice_by_edge_type(edge):
+        x1, y1 = n1.pos
+        x2, y2 = n2.pos
+        line = kagome_ax.plot([x1, x2], [y1, y2], color=color, linewidth=5, zorder=4)
+        lines.append(line)
+    return lines
+
+
+def _update_figure_per_delta_t(
+    i_delta_t:int, delta_t:float, fig:Figure, 
+    kagome_tn:KagomeTNArbitrary, kagome_ax:Axes, 
+    ite_data:dict, ite_axes:dict[str, Axes], 
+    energy_color_scale_function:Callable[[float], tuple[float, ...]]
+) -> list:  # plotted lines
+
+    ## Basic data and track output: 
+    edges_orders = list(UpdateEdge.all_options())
+    plotted_lines = []
+
+    ## Add red delta_t line:
+    for ax in ite_axes.values():
+        line = ax.axvline(x = i_delta_t, color = 'r')
+        plotted_lines.append(line)
+
+    ## iterate over all edges:
+    for i_edge, edge in enumerate(edges_orders):
+        energy = ite_data["energies_per_edge"][i_delta_t][i_edge]
+        color = energy_color_scale_function(energy)
+        lines = _plot_edge_energy(kagome_ax, kagome_tn, color, edge)
+        plotted_lines += lines
+
+    return plotted_lines
+
+
+def _clear_plotted_lines(lines:list[Any]) -> None:
+    for line in lines:
+        ## Try removing line as an object
+        try:
+            line.remove()
+        except:
+            pass
+
+        ## Try removing line as a collection of objects:
+        try:
+            for obj in line:
+                try:
+                    obj.remove()
+                except:
+                    continue
+        except:
+            pass
+
+def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], ite_data:dict[str, Any]) -> None:
+    ## Get basic info:
+    delta_t_axes = ite_axes["delta_t"]
+    delta_ts = delta_t_axes.lines[0].get_ydata()
+    delta_ts = [val for val in delta_ts]  #type: ignore
+    edges_orders = list(UpdateEdge.all_options())
+
+    ## Derive from log:
+    d_str, D_str, N_str = logs.search_words_in_log(log_name, 
+        ("physical_dim:", "virtual_dim:", "big_lattice_size:"),
+        max_line=CONFIG_NUM_HEADER_LINES
+    )
+    d = int(d_str[0])
+    D = int(D_str[0])
+    N = 2  # ignore the actual string
+
+    kagome_tn, kagome_ax = _extend_figure_to_include_network_graph(fig, d, D, N)
     
     ## Define color scales:
     e_min, e_max = np.inf, -np.inf
     for i_delta_t, delta_t in enumerate(delta_ts):  
         if i_delta_t>=len(ite_data["energies_per_edge"]):
             break
-
         for i_edge, edge in enumerate(edges_orders):
             energy = ite_data["energies_per_edge"][i_delta_t][i_edge]
             e_min = min(e_min, energy)
             e_max = max(e_max, energy)
 
+    def energy_color_scale_function(energy) -> tuple[float, float, float]:
+        return get_color_in_warm_to_cold_range(energy, e_min, e_max)
+
 
     ## Iterative Plotting:
+    movie = visuals.VideoRecorder()
+    plotted_lines = []
+    is_first = True
     for i_delta_t, delta_t in enumerate(delta_ts):        
         if i_delta_t>=len(ite_data["energies_per_edge"]):
             break
 
-        for i_edge, edge in enumerate(edges_orders):
-            energy = ite_data["energies_per_edge"][i_delta_t][i_edge]
-            color = get_color_in_warm_to_cold_range(energy, e_min, e_max)
+        _clear_plotted_lines(plotted_lines)
+        plotted_lines = _update_figure_per_delta_t(i_delta_t, delta_t, fig, kagome_tn, kagome_ax, ite_data, ite_axes, energy_color_scale_function)
+        if is_first:
+            movie.capture(fig, duration=5)
+        else:
+            movie.capture(fig, duration=1)
+        visuals.draw_now()
+        is_first = False
 
     ## Finish
+    movie.write_video()
     print("Done movie!")
 
 
 def plot_from_log(
-    # log_name:str = "log - from zero to hero",
     # log_name:str = "2024.07.25_17.16.49_HKUJ_AFM_D=2_N=3",  # Best log so far
-    # log_name:str = "2024.07.25_14.11.58_URRC_AFM_D=2_N=3",  # Wasn't tried before
-    log_name:str = "2024.07.23_18.22.55_VGTT_AFM_D=2_N=2",  # short
+    log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3",  # short
     save:bool = True,
     plot_health_figure:bool = False,
     capture_lattice_movie:bool = True

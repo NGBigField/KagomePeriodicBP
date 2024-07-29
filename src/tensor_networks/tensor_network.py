@@ -30,6 +30,7 @@ from _error_types import TensorNetworkError, LatticeError, DirectionError, Netwo
 from enums import NodeFunctionality, UpdateMode, UnitCellFlavor, MessageModel
 from containers.belief_propagation import MessageDictType, Message, MPSOrientation
 from containers.sizes_and_dimensions import TNDimensions
+from containers.imaginary_time_evolution import UpdateEdge
 
 # utilities used in our code:
 from utils import lists, tuples, numerics, indices, strings, arguments
@@ -303,6 +304,23 @@ class KagomeTensorNetwork(TensorNetwork, ABC):
     
     def get_center_triangle(self)->UpperTriangle:
         return self.lattice.get_center_triangle()
+    
+    def all_node_pairs_in_lattice_by_edge_type(self, edge:UpdateEdge) -> Generator[tuple[TensorNode, TensorNode], None, None]:
+        nodes1 = self.get_nodes_by_cell_flavor(edge.first)
+        nodes2 = self.get_nodes_by_cell_flavor(edge.second)
+        for n1 in nodes1:
+            for n2 in nodes2:
+                # Are connected?
+                if not self.are_neighbors(n1, n2):
+                    continue
+                # Are in correct order?
+                common_edge = set(n1.edges).intersection(set(n2.edges)).pop()
+                n1_to_n2_direction = n1.directions[n1.edges.index(common_edge)]
+                if edge.first_to_second_direction() != n1_to_n2_direction:
+                    continue
+                # This is the correct edge:
+                yield n1, n2
+                
     
     # ================================================= #
     #|                 Cache Control                   |#

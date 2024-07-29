@@ -17,6 +17,7 @@ from enums.imaginary_time_evolution import UpdateMode
 from enums.tensor_networks import UnitCellFlavor
 from containers.belief_propagation import BPStats
 from tensor_networks import UnitCell
+from lattices.directions import LatticeDirection
 from _error_types import ITEError
 
 
@@ -33,11 +34,14 @@ NUM_EDGES_PER_MODE : int = 6
 def _Identity_function(x):
     return x
 
+A = UnitCellFlavor.A
+B = UnitCellFlavor.B
+C = UnitCellFlavor.C
 
 _NEXT_IN_ABC_ORDER = {
-    UnitCellFlavor.A : UnitCellFlavor.B,
-    UnitCellFlavor.B : UnitCellFlavor.C,
-    UnitCellFlavor.C : UnitCellFlavor.A
+    A : B,
+    B : C,
+    C : A
 }
 
 
@@ -140,6 +144,22 @@ class UpdateEdge(NamedTuple):
         """
         return self.second is _NEXT_IN_ABC_ORDER[self.first]
     
+    def first_to_second_direction(self) -> LatticeDirection:
+        if self.first == A:
+                if   self.second == B:    return LatticeDirection.DL 
+                elif self.second == C:    return LatticeDirection.UL 
+                        
+        elif self.first == B:
+                if   self.second == A:    return LatticeDirection.DL
+                elif self.second == C:    return LatticeDirection.R
+
+        elif self.first == C:
+                if   self.second == A:    return LatticeDirection.UL
+                elif self.second == B:    return LatticeDirection.R
+
+        raise ValueError("Not an expected case")
+
+    
     def __repr__(self) -> str:
         return UpdateEdge.to_str(self)
     
@@ -148,7 +168,7 @@ class UpdateEdge(NamedTuple):
 
     @staticmethod
     def all_options()->Generator["UpdateEdge", None, None]:
-        flavors = [UnitCellFlavor.A, UnitCellFlavor.B, UnitCellFlavor.C]
+        flavors = [A, B, C]
         for a, b in itertools.permutations(flavors, 2):
             yield UpdateEdge(a, b)
 
