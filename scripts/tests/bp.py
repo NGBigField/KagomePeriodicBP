@@ -240,40 +240,77 @@ def test_bp_convergence_all_runs(
     print("Done")    
 
 
+
+
+
+def _plot_from_table_per_D(D:str, methods:set[str], table:csvs.TableByKey) -> None:
+
+    ## Prepare plots:
+    # Z vs t plot:
+    plt.figure()
+    ax_z_vs_t = plt.subplot(1,1,1)
+    ax_z_vs_t.set_xlabel("compute time [sec]")
+    ax_z_vs_t.set_ylabel("expectation value <Z>")
+
+    # Fidelity vs t plot:
+    plt.figure()
+    ax_fidelity = plt.subplot(1,1,1)
+    ax_fidelity.set_xlabel("compute time [sec]")
+    ax_fidelity.set_ylabel("1 - Fidelity to Exact")
+    ax_fidelity.set_yscale('log')
+
+
+    def plot(ax, x, y, method:str) -> None:
+        ax.plot(x, y, label=method, linewidth=4)
+        visuals.draw_now()
+
+    for method in methods:
+        t, z = [], []
+        data = table.get_matching_table_elements(D=D, method=method)
+
+        print(data)
+        N = data['N']
+        z = data['z']
+        t = data['time']
+        f = [1-f for f in data['fidelity']]
+
+        plot(ax_z_vs_t,   t, z, method)
+        plot(ax_fidelity, t, f, method)
+        
+    ## Get reference:
+    exact = get_inf_exact_results(int(D))
+    z_ref = exact['z']
+    x_range = table.unique_values("time")
+    ax_z_vs_t.hlines(y=[z_ref], xmin=min(x_range), xmax=max(x_range), linestyles="--", color='k', label="Exact")
+
+
+    for ax in [ax_z_vs_t, ax_fidelity]:
+        ax.legend(loc="best")
+        ax.grid()
+    visuals.draw_now()
+
+    print("Done")
+
+
 def plot_bp_convergence_results(
-    filename:str = "2024.07.26_22.01.47 YRU"
+    filename:str = "2024.07.30_17.26.26 SGV"
 ) -> None:
     
     ## Get Data:
-    fullpath = saveload._fullpath(filename+".csv", sub_folder="results")
+    fullpath = saveload.derive_fullpath(filename+".csv", sub_folder="results")
     table = csvs.TableByKey(fullpath)
 
     ## Derive params:
     Ds = table.unique_values("D")
     methods = table.unique_values("method")
 
-    ## Prepare plots:
-    ax_z_vs_t = plt.subplot(1,1,1)
-    ax_z_vs_t.set_xlabel("compute time [sec]")
-    ax_z_vs_t.set_ylabel("expectation value <Z>")
-    ax_z_vs_t.grid()
-
     ## Get lists and plot:
     for D in Ds:
-        for method in methods:
-            t, z = [], []
-            data = table.get_matching_table_elements(D=D, method=method)
+        print(f"D={D}")
+        _plot_from_table_per_D(D, methods, table)
 
-            print(data)
-            N = data['N']
-            z = data['z']
-            t = data['t']
-            
-            ax_z_vs_t.plot(t, z, label=method, linewidth=4)
-            
-    visuals.draw_now()
-    ax_z_vs_t.legend()
-    print("Done")
+    ## Finish:
+    print("Done printing for all Ds")
     
 
 def _calc_inf_exact_results(D:int) -> dict:
@@ -311,8 +348,8 @@ def get_inf_exact_results(D:int=3) -> dict:
 
 def main_test():
     # results = get_inf_exact_results(); print(results)
-    test_bp_convergence_all_runs()
-    # plot_bp_convergence_results()
+    # test_bp_convergence_all_runs()
+    plot_bp_convergence_results()
 
 if __name__ == "__main__":
     main_test()

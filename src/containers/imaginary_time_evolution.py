@@ -360,7 +360,7 @@ class ITEProgressTracker():
     
     @property
     def full_path(self) -> str:
-        return saveload._fullpath(name=self.file_name, sub_folder=SUB_FOLDER)
+        return saveload.derive_fullpath(name=self.file_name, sub_folder=SUB_FOLDER)
 
     @property
     def last_unit_cell(self) ->UnitCell:

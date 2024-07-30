@@ -108,7 +108,7 @@ def main():
             case "bp_convergence":
                 results = job_bp_convergence.main(D=D, N=N, chi=chi, method=method, parallel=parallel)
             case "ite_afm":
-                results = job_ite_afm.main(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel)
+                results = job_ite_afm.main(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel, progress_bar=not active_thread)
             case _:
                 raise ValueError(f"Not an expected job_type={job_type!r}")
     except Exception as e:
