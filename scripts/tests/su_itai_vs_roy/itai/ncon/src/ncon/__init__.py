@@ -1,1 +1,0 @@
-from .ncon import ncon
