@@ -3,6 +3,8 @@ import _import_src  ## Needed to import src folders when scripts are called from
 
 import project_paths
 
+from typing import NamedTuple
+
 # Tensor-Networks creation:
 from tensor_networks.construction import create_repeated_kagome_tn, UnitCell
 
@@ -10,10 +12,7 @@ from tensor_networks.construction import create_repeated_kagome_tn, UnitCell
 from algo.belief_propagation import belief_propagation, robust_belief_propagation
 
 # Config and containers:
-from containers import BPConfig
-from tensor_networks import KagomeTNRepeatedUnitCell, CoreTN, ModeTN, EdgeTN
-
-# config:
+from tensor_networks import EdgeTN
 from enums import UpdateMode, UnitCellFlavor
 from containers import UpdateEdge, Config
 
@@ -35,6 +34,9 @@ from matplotlib import pyplot as plt
 import matplotlib as mpl
 import matplotlib.transforms as mtransforms
 
+## Metrics:
+from physics.metrics import fidelity
+
 
 from libs import TenQI
 
@@ -45,7 +47,31 @@ d=2
 
 EXACT_CHI = 500
 EXACT_N = 8
-  
+
+
+class CSVRowData(NamedTuple):
+    D : int
+    N : int
+    method : str
+    time : float
+    energy : float
+    z : float
+    fidelity : float
+
+    @classmethod
+    def fields(cls) -> list[str]:
+        return list(cls._fields)
+    
+    def row(self) -> list:
+        return [self.__getattribute__(field) for field in self._fields]
+            
+
+
+class ComparisonResultsType(NamedTuple):
+    edge_tn: EdgeTN
+    z : float  #
+    energy: float  
+    rdm_diff : float
 
 def _get_expectation_values(edge_tn:EdgeTN) -> float:
     rho = edge_tn.rdm
@@ -58,13 +84,12 @@ def _get_expectation_values(edge_tn:EdgeTN) -> float:
 def _per_D_N_single_test(
     D:int, N:int, method:str, config:Config, parallel:bool,
     **kwargs
-) -> tuple[
-    EdgeTN, 
-    float,  # z
-    float  # energy
-]:
-    
+) -> ComparisonResultsType:
+    ## Inputs:
     config = config.copy()
+
+    ## Make sure there is something to compare to:
+    exact = get_inf_exact_results(D)
 
     ## Create kagome TN:
     unit_cell = UnitCell.load_best(D)
@@ -93,8 +118,14 @@ def _per_D_N_single_test(
     z = _get_expectation_values(edge_tn)
     h = hamiltonians.heisenberg_afm()
     energy = np.dot(edge_tn.rdm.flatten(),  h.flatten()) 
+    energy = float(energy)
 
-    return edge_tn, z, energy
+    ## Compare with exact results:
+    rho_now = TenQI.op_to_mat(edge_tn.rdm)
+    rho_exact = TenQI.op_to_mat(exact['rho'])
+    fidelity_ = fidelity(rho_now, rho_exact)
+
+    return ComparisonResultsType(edge_tn, z, energy, fidelity_)
 
 
 def _get_full_converges_run_plots(
@@ -103,7 +134,7 @@ def _get_full_converges_run_plots(
 ) -> tuple[AppendablePlot, ...]:
     plot_values = AppendablePlot()
     plt.xlabel("linear system size", fontsize=12)
-    plt.ylabel("$\left\langle Z \right\rangle>$", fontsize=12)
+    plt.ylabel("<Z>", fontsize=12)
     plot_values.axis.set_yscale('log')
 
     if combined_figure:
@@ -115,7 +146,7 @@ def _get_full_converges_run_plots(
 
     p_values_vs_times = AppendablePlot()
     plt.xlabel("Computation time [sec]", fontsize=12)
-    plt.ylabel(r"<Z>", fontsize=12)
+    plt.ylabel("<Z>", fontsize=12)
 
     if live_plots:
         visuals.draw_now()
@@ -128,7 +159,7 @@ def test_bp_convergence_single_run(
 )->None:
 
     _t1 = perf_counter()
-    edge_tn, z, energy = _per_D_N_single_test(
+    edge_tn, z, energy, fidelity = _per_D_N_single_test(
         D, N, method, config, parallel
     )
     _t2 = perf_counter()
@@ -139,12 +170,12 @@ def test_bp_convergence_single_run(
 def test_bp_convergence_all_runs(
     D:int = 3,
     combined_figure:bool = False,
-    live_plots:bool|None = None,  # True: live, False: at end, None: no plots
+    live_plots:bool|None = False,  # True: live, False: at end, None: no plots
     parallel:bool = True,
 ) -> None:
     
     ##  Params:
-    methods_and_Ns:dict[str: list[int]] = dict(
+    methods_and_Ns:dict[str, list[int]] = dict(
         # exact  = [2, 3, 4],
         random = [2, 3, 4, 5, 6, 7, 8, 9, 10],
         bp     = [2, 3, 4, 5]
@@ -161,11 +192,11 @@ def test_bp_convergence_all_runs(
     ## Prepare plots and csv:
     if live_plots is not None:
         p_values, p_times, p_values_vs_times = _get_full_converges_run_plots(combined_figure, live_plots)
-    csv = csvs.CSVManager(["D", "N", "method", "z", "energy" "time"])
+    csv = csvs.CSVManager(CSVRowData.fields())
 
     line_styles =   {'bp': "-", 'random': '--', 'exact':":"}
     marker_styles = {'bp': "X", 'random': 'o' , 'exact':"^"}
-    def _get_plt_kwargs(method:str)->str:
+    def _get_plt_kwargs(method:str)->dict:
         return dict(
             linestyle=line_styles[method], 
             marker=marker_styles[ method]
@@ -182,7 +213,7 @@ def test_bp_convergence_all_runs(
             ## Get results:
             _t1 = perf_counter()
             try:
-                edge_tn, z, energy = _per_D_N_single_test(
+                edge_tn, z, energy, fidelity = _per_D_N_single_test(
                     D, N, method, config, parallel
                 )
             except Exception:
@@ -200,7 +231,8 @@ def test_bp_convergence_all_runs(
                 )
 
             # csv:
-            csv.append([D, N, method, z, energy, time])
+            row_data = CSVRowData(D, N, method, time, energy, z, fidelity)
+            csv.append(row_data.row())
 
     # plot_values.axis.set_ylim(bottom=1e-8*2)
     if live_plots is not None:
@@ -251,7 +283,7 @@ def _calc_inf_exact_results(D:int) -> dict:
     config = Config.derive_from_dimensions(D)
 
     ## Compute:
-    edge_tn, z, energy = _per_D_N_single_test(D, N, method, config, parallel=False)
+    edge_tn, z, energy, fidelity = _per_D_N_single_test(D, N, method, config, parallel=False)
 
     ## Save:
     res = dict(
@@ -278,8 +310,8 @@ def get_inf_exact_results(D:int=3) -> dict:
 
 
 def main_test():
-    get_inf_exact_results()
-    # test_bp_convergence_all_runs()
+    # get_inf_exact_results()
+    test_bp_convergence_all_runs()
     # plot_bp_convergence_results()
 
 if __name__ == "__main__":

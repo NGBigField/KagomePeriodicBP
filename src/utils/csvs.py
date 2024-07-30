@@ -7,6 +7,8 @@ from project_paths import data as DATA_FOLDER
 from utils.saveload import force_folder_exists
 _T = TypeVar("_T")
 
+from dataclasses import dataclass, is_dataclass
+
 
 PATH_SEP = os.sep
 DEFAULT_RESULTS_CSV_FILE_NAME = "temp_results.csv" 
@@ -116,13 +118,14 @@ class CSVManager():
 
     def __init__(
         self, 
-        columns:list,
+        columns:list[str],
         name:str=strings.time_stamp()+" "+strings.random(3),
-        folder:str|None=DEFAULT_RESULTS_CSV_FOLDER
+        folder:str=DEFAULT_RESULTS_CSV_FOLDER
     ) -> None:
-        if folder is not None:
-            force_folder_exists(folder)
+        # Path
+        force_folder_exists(folder)
         self.fullpath = folder +PATH_SEP+_standard_filename(name)
+        # Columns
         self.columns = columns
         create_or_override_csv(columns, file_name=self.fullpath)
 

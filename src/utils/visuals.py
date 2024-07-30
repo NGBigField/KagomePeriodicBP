@@ -432,22 +432,20 @@ class AppendablePlot():
         self, 
         draw_now_:bool=True, 
         plot_kwargs:dict|None=None, 
-        values:dict[str, float]|dict[str, tuple[float,float]]|None=None, 
-        **kwargs:tuple[float,float]|float
+        **values:float|tuple[float,float], 
     )->None:
         
         ## Default values:
         if values is None: values = dict()
         if plot_kwargs is None: plot_kwargs = dict()
         ## append to values
-        for dict_ in [values, kwargs]:
-            for name, val in dict_.items():
-                ## Derive x, y from tuple:
-                x, y = self._derive_x_y(val)
-                ## Deal with kwargs:
-                plot_kwargs = self._fix_plot_kwargs(**plot_kwargs)
-                ## Keep:
-                self._add_xy(name, x, y, plot_kwargs=plot_kwargs)
+        for name, val in values.items():
+            ## Derive x, y from tuple:
+            x, y = self._derive_x_y(val)
+            ## Deal with kwargs:
+            plot_kwargs = self._fix_plot_kwargs(**plot_kwargs)
+            ## Keep:
+            self._add_xy(name, x, y, plot_kwargs=plot_kwargs)
 
         ## Update plot:
         self._update(draw_now_=draw_now_)
