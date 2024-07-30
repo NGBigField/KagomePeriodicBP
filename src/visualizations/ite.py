@@ -89,6 +89,45 @@ def get_color_in_warm_to_cold_range(value, min_, max_):
     return (r, g, b)
 
 
+def plot_color_bar(ax_main:Axes, min_:float, max_:float, num_steps=100) -> Axes:
+    from matplotlib import gridspec
+
+    # Generate values
+    values = np.linspace(min_, max_, num_steps)
+    
+    # Map values to colors
+    colors = [get_color_in_warm_to_cold_range(val, min_, max_) for val in values]
+    
+    # Create gridspec layout on existing figure
+    gs = gridspec.GridSpec(1, 2, width_ratios=[40, 0.2], figure=ax_main.figure)
+    
+    # Create a new axis for the color bar beside the main axis
+    ax_color_bar = ax_main.figure.add_subplot(gs[1])
+    
+    # Plot each color as a horizontal line across the plot
+    for i, color in enumerate(colors):
+        ax_color_bar.axhline(i, color=color, linewidth=4)  # linewidth controls the thickness of bars
+    
+    # Set the y-ticks to show min, max, and mid values
+    ax_color_bar.set_yticks([0, num_steps // 2, num_steps - 1])
+    ax_color_bar.set_yticklabels([min_, (min_ + max_) / 2, max_])
+    
+    # Remove x-ticks as they are not necessary
+    ax_color_bar.set_xticks([])
+
+    # Move y-ticks to the right
+    ax_color_bar.yaxis.tick_right()
+
+    # Add a title or label if desired
+    # ax_color_bar.set_title('Color Scale')
+
+    pos = ax_color_bar.get_position()
+    pos.xmin
+    # [l, b, width, height]
+    ax_color_bar.set_position([pos.xmin-0.03, pos.ymin, pos.width, pos.height])  #type: ignore
+
+    return ax_color_bar
+
 
 def _set_window_title(window, title:str)->None:
     full_title="KagomePeriodicBP - "+title
@@ -877,7 +916,7 @@ def _extend_figure_to_include_network_graph(fig:Figure, d:int, D:int, N:int) -> 
     fig.set_tight_layout(False)        #type: ignore 
     fig.set_constrained_layout(False)  #type: ignore
     fig_width = fig.get_figwidth()
-    fig.set_figwidth(2.5*fig_width)
+    fig.set_figwidth(2.7*fig_width)
     # Reshape all previous axes:
     for axes in fig.axes:
         pos = axes.get_position()
@@ -888,8 +927,8 @@ def _extend_figure_to_include_network_graph(fig:Figure, d:int, D:int, N:int) -> 
     _y_max = max([ax.get_position().y1 for ax in fig.axes])
     b = _y_min
     h = _y_max - _y_min
-    l = 0.5
-    w = 0.48
+    l = 0.48
+    w = 0.45
     ## New axes:
     ax = fig.add_axes((l, b, w, h))
     # fig.set_tight_layout('w_pad')
@@ -989,6 +1028,8 @@ def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], i
     def energy_color_scale_function(energy) -> tuple[float, float, float]:
         return get_color_in_warm_to_cold_range(energy, e_min, e_max)
 
+    ## Plot color bar:
+    ax_color_bar = plot_color_bar(kagome_ax, e_min, e_max, num_steps=1000)
 
     ## Iterative Plotting:
     wanted_movie_time = 30  # [sec]
@@ -1017,8 +1058,8 @@ def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], i
 
 
 def plot_from_log(
-    log_name:str = "2024.07.25_17.16.49_HKUJ_AFM_D=2_N=3",  # Best log so far
-    # log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3",  # short
+    # log_name:str = "2024.07.28_08.59.04_RCWB_AFM_D=2_N=4 - good",  # Best log so far
+    log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3 - short",  # short
     save:bool = True,
     plot_health_figure:bool = False,
     capture_lattice_movie:bool = True
