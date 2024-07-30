@@ -267,7 +267,7 @@ def add_color(s:str, color:PrintColors)->str:
 def print_warning(s:str)->None:
     warn1color = PrintColors.HIGHLIGHTED_YELLOW
     warn2color = PrintColors.YELLOW_DARK
-    s = add_color("Warning: ", warn1color)+add_color(s, warn2color)
+    s = add_color("Warning:", warn1color)+add_color(s, warn2color)+" "
     print(s)
 
 

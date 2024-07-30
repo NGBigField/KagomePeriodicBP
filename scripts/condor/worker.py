@@ -17,7 +17,6 @@ import threading
 from src.utils import errors
 
 # Import the possible job types:
-from scripts.condor import job_bp
 from scripts.condor import job_parallel_timing 
 from scripts.condor import job_bp_convergence 
 from scripts.condor import job_ite_afm
@@ -93,21 +92,21 @@ def main():
 
 
     ## Force usage of requested Giga-bytes:
-    stop_event = threading.Event()
-    thread = threading.Thread(target=_auto_timed_compute_with_random_mat_by_ram, args=(req_mem_gb, stop_event), daemon=True)
-    thread.start()
+    active_thread = SAFETY_BUFFER_FRACTION is not None
+    if active_thread:
+        stop_event = threading.Event()
+        thread = threading.Thread(target=_auto_timed_compute_with_random_mat_by_ram, args=(req_mem_gb, stop_event), daemon=True)
+        thread.start()
 
     ## Run:
     results : dict[str, Any]
     t1 = perf_counter()
     try:
         match job_type:
-            case "bp":  
-                results = job_bp.main(D=D, N=N, method=method)
             case "parallel_timings":             
                 results = job_parallel_timing.main(D=D, N=N, parallel=parallel)
             case "bp_convergence":
-                results = job_bp_convergence.main(D=D, N=N)
+                results = job_bp_convergence.main(D=D, N=N, chi=chi, method=method, parallel=parallel)
             case "ite_afm":
                 results = job_ite_afm.main(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel)
             case _:
@@ -119,8 +118,9 @@ def main():
     t2 = perf_counter()
 
     ## Call thread to stop:
-    stop_event.set()
-    thread.join()
+    if active_thread:
+        stop_event.set()
+        thread.join()
 
     print(f"res={results}")
     

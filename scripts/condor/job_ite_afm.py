@@ -18,7 +18,7 @@ def main(
     # Values from sender:
     D : int = 2,
     N : int = 2,
-    chi_factor : int = 1,
+    chi_factor : int|float = 1,
     seed : int = -1,
     method : int = 1,
     parallel : int = 0,

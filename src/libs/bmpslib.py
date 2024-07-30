@@ -2870,15 +2870,19 @@ def _assert_int(x:int|float) -> int:
 	return int_version
 	
 
-def _perf_svd(m:np.ndarray, svd_emthod:str="rsvd") -> tuple[np.ndarray, np.ndarray, np.ndarray]:		
-
+def _perf_svd(m:np.ndarray, svd_emthod:str="rsvd", check_result:bool=False) -> tuple[np.ndarray, np.ndarray, np.ndarray]:		
 	if svd_emthod=="svd":
-		return svd(m, full_matrices=False)
+		u, s, vh = svd(m, full_matrices=False)
 	elif svd_emthod=="rsvd":
-		eps_or_k = 1e-4
-		return rsvd(m, eps_or_k)
+		eps_or_k = 1e-5
+		u, s, vh = rsvd(m, eps_or_k)
 	else:
 		raise ValueError(f"Not an expected case `svd_emthod=={svd_emthod!r}`")	
+
+	if check_result:
+		m1 = (u * s) @ vh
+		diff = np.sum(abs(m - m1))
+	return u, s, vh
 
 
 

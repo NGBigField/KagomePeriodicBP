@@ -28,11 +28,9 @@ from time import perf_counter, sleep
 import numpy as np
 
 # useful utils:
-from utils import visuals, saveload, csvs, dicts, lists
+from utils import visuals, saveload, csvs, dicts, lists, strings
 from utils.visuals import AppendablePlot
 from matplotlib import pyplot as plt
-import matplotlib as mpl
-import matplotlib.transforms as mtransforms
 
 ## Metrics:
 from physics.metrics import fidelity
@@ -45,8 +43,8 @@ mode = UpdateMode.A
 update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 d=2
 
-EXACT_CHI = 500
-EXACT_N = 8
+EXACT_CHI = 300
+EXACT_N = 12
 
 
 class CSVRowData(NamedTuple):
@@ -71,7 +69,7 @@ class ComparisonResultsType(NamedTuple):
     edge_tn: EdgeTN
     z : float  #
     energy: float  
-    rdm_diff : float
+    fidelity : float
 
 def _get_expectation_values(edge_tn:EdgeTN) -> float:
     rho = edge_tn.rdm
@@ -89,11 +87,21 @@ def _per_D_N_single_test(
     config = config.copy()
 
     ## Make sure there is something to compare to:
-    exact = get_inf_exact_results(D)
+    this_is_exact_run = 'exact_run' in kwargs and kwargs['exact_run']==True
+
+    if not this_is_exact_run:
+        exact = get_inf_exact_results(D)
 
     ## Create kagome TN:
     unit_cell = UnitCell.load_best(D)
     tn = create_repeated_kagome_tn(d, D, N, unit_cell)
+
+    ## Define contraction precision and other config adjustments:
+    match method:
+        case "exact":
+            config.chi = EXACT_CHI
+        case "bp":
+            config.set_parallel(parallel)
 
     ## Get environment:
     match method:   #["random", "exact","bp"]
@@ -102,12 +110,6 @@ def _per_D_N_single_test(
         case "bp":
             belief_propagation(tn, None, config.bp, update_plots_between_steps=False)
             
-    ## Define contraction precision and other config andjustments:
-    match method:
-        case "exact":
-            config.chi = EXACT_CHI
-        case "bp":
-            config.set_parallel(parallel)
 
     ## Contract to edge:
     edge_tn = reduce_tn(
@@ -121,9 +123,12 @@ def _per_D_N_single_test(
     energy = float(energy)
 
     ## Compare with exact results:
-    rho_now = TenQI.op_to_mat(edge_tn.rdm)
-    rho_exact = TenQI.op_to_mat(exact['rho'])
-    fidelity_ = fidelity(rho_now, rho_exact)
+    if this_is_exact_run:
+        fidelity_ = 0
+    else:
+        rho_now = TenQI.op_to_mat(edge_tn.rdm)
+        rho_exact = TenQI.op_to_mat(exact['rho'])
+        fidelity_ = fidelity(rho_now, rho_exact)
 
     return ComparisonResultsType(edge_tn, z, energy, fidelity_)
 
@@ -132,6 +137,8 @@ def _get_full_converges_run_plots(
     combined_figure:bool, 
     live_plots:bool=True
 ) -> tuple[AppendablePlot, ...]:
+    
+    ## Create figures:
     plot_values = AppendablePlot()
     plt.xlabel("linear system size", fontsize=12)
     plt.ylabel("<Z>", fontsize=12)
@@ -150,42 +157,28 @@ def _get_full_converges_run_plots(
 
     if live_plots:
         visuals.draw_now()
+
     return plot_values, plot_times, p_values_vs_times
 
-
-def test_bp_convergence_single_run(
-    D:int, N:int, method:str, config:Config,
-    parallel:bool
-)->None:
-
-    _t1 = perf_counter()
-    edge_tn, z, energy, fidelity = _per_D_N_single_test(
-        D, N, method, config, parallel
-    )
-    _t2 = perf_counter()
-    t = _t2 - _t1
-
-    return z, t
 
 def test_bp_convergence_all_runs(
     D:int = 3,
     combined_figure:bool = False,
-    live_plots:bool|None = False,  # True: live, False: at end, None: no plots
+    live_plots:bool|None = None,  # True: live, False: at end, None: no plots
     parallel:bool = True,
 ) -> None:
     
     ##  Params:
     methods_and_Ns:dict[str, list[int]] = dict(
-        # exact  = [2, 3, 4],
-        random = [2, 3, 4, 5, 6, 7, 8, 9, 10],
-        bp     = [2, 3, 4, 5]
+        random = list(range(2, 10)),
+        bp     = [2, 3, 4]
     ) 
 
     ## config:
     config = Config.derive_from_dimensions(D)
-    config.chi_bp = 2*D**2 
     config.chi    = 2*D**2 + 10
-    config.bp.msg_diff_terminate = 1e-6
+    config.chi_bp =   D**2 
+    config.bp.msg_diff_terminate = 1e-9
 
     # exact_config = config.copy()
 
@@ -236,7 +229,14 @@ def test_bp_convergence_all_runs(
 
     # plot_values.axis.set_ylim(bottom=1e-8*2)
     if live_plots is not None:
-        visuals.save_figure(p_values.fig)
+        ## Add reference:
+        exact = get_inf_exact_results()
+        z = exact['z']
+        for i, plot in enumerate([p_values, p_values_vs_times]):
+            ax = plot.axis
+            ax.axhline(y=z, color='k', linestyle='--', linewidth=2, label="Exact")
+            ax.legend()
+            visuals.save_figure(plot.fig, file_name=strings.time_stamp()+f" {i+1}")
     print("Done")    
 
 
@@ -283,7 +283,7 @@ def _calc_inf_exact_results(D:int) -> dict:
     config = Config.derive_from_dimensions(D)
 
     ## Compute:
-    edge_tn, z, energy, fidelity = _per_D_N_single_test(D, N, method, config, parallel=False)
+    edge_tn, z, energy, fidelity = _per_D_N_single_test(D, N, method, config, parallel=False, exact_run=True)
 
     ## Save:
     res = dict(
@@ -310,7 +310,7 @@ def get_inf_exact_results(D:int=3) -> dict:
 
 
 def main_test():
-    # get_inf_exact_results()
+    # results = get_inf_exact_results(); print(results)
     test_bp_convergence_all_runs()
     # plot_bp_convergence_results()
 
