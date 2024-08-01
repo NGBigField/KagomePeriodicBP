@@ -5,7 +5,9 @@ from typing import Callable
 from algo.belief_propagation import BPConfig, BPStats
 
 # Import containers of ite:
-from containers.imaginary_time_evolution import ITEProgressTracker, ITESegmentStats
+from containers.imaginary_time_evolution import ITESegmentStats
+from containers._ite_tracker import ITEProgressTracker
+from containers.visuals import ProgBarPrintLevel
 from containers import Config
 from unit_cell import UnitCell
 
@@ -17,9 +19,15 @@ from utils import lists, logs, strings, prints
 
 
 
-def get_progress_bar(config:Config, num_repeats:int, print_prefix:str)->prints.ProgressBar:
+def get_progress_bar(config:Config, num_repeats:int, print_prefix:str, level:ProgBarPrintLevel, also_verify:bool|None=None)->prints.ProgressBar:
     # Progress bar:
-    if config.visuals.progress_bars:
+    is_active_progress_bar = config.visuals.progress_bars.is_active_at(level)
+
+    if also_verify is not None:
+        assert isinstance(also_verify, bool)
+        is_active_progress_bar &= also_verify
+
+    if is_active_progress_bar:
         return prints.ProgressBar(num_repeats, print_prefix=print_prefix)
     else:
         return prints.ProgressBar.inactive()
@@ -85,7 +93,7 @@ def print_or_log_ite_segment_progress(
 
     num_segments = len(config.ite.time_steps)
 
-    if config.visuals.progress_bars:
+    if config.visuals.progress_bars.is_active_at('ITE-per-delta-t'):
         logger_method = logger.debug
     else:
         logger_method = logger.info

@@ -40,13 +40,19 @@ def main(
     else:
         raise ValueError(f"Invalid parallel value {parallel!r}")
 
+    # Progress bar:
+    if progress_bar == True:
+        progress_bar_in = 'only_main'
+    else:
+        progress_bar_in = 'all_disabled'
+
 
     ## Run:
     energy, unit_cell_file_path = run_ite(
         N=N, D=D, chi_factor=chi_factor, 
         live_plots=False, 
         parallel=parallel, 
-        progress_bar=progress_bar,
+        progress_bar=progress_bar_in,
         unit_cell_from=unit_cell_from
     )
     

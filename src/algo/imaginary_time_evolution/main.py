@@ -17,7 +17,8 @@ from typing import Callable, NamedTuple
 from _types import UnitCellValuePerEdgeDict, EnergiesOfEdgesDuringUpdateType
 
 # Import containers needed for ite:
-from containers.imaginary_time_evolution import ITEConfig, ITEProgressTracker, ITEPerModeStats, ITESegmentStats
+from containers.imaginary_time_evolution import ITEConfig, ITEPerModeStats, ITESegmentStats
+from containers._ite_tracker import ITEProgressTracker
 from containers import Config
 
 # Import other needed types:
@@ -189,7 +190,7 @@ def _calculate_unit_cell_measurements(
     
     ## BP:
     if config.iterative_process.use_bp:
-        messages, _ = robust_belief_propagation(full_tn, messages, config.bp    , live_plots, allow_prog_bar)
+        messages, _ = robust_belief_propagation(full_tn, messages, config.bp, live_plots, allow_prog_bar)
     else:
         full_tn.connect_uniform_messages()
 
@@ -250,7 +251,6 @@ def _pre_segment_init_params(
 ]:
     ## Copy and parse config:
     config = config_in.copy()
-    use_prog_bar = config.visuals.progress_bars
     num_modes = config.iterative_process.num_mode_repetitions_per_segment
 
     ## Init messages or use old ones
@@ -269,15 +269,11 @@ def _pre_segment_init_params(
     stats.delta_t = delta_t
     energies_at_updates : EnergiesOfEdgesDuringUpdateType = []
 
-    if use_prog_bar:  
-        log_method = logger.debug
-    else:          
+    prog_bar = get_progress_bar(config, len(modes_order), "Executing ITE Segment  ", 'ITE-per-segment', also_verify=len(modes_order)>1)    
+    if isinstance(prog_bar, prints.InactiveProgressBar):
         log_method = logger.info
-
-    if use_prog_bar and len(modes_order)>1:  
-        prog_bar = prints.ProgressBar(len(modes_order), print_prefix=f"Executing ITE Segment  ")
-    else:
-        prog_bar = prints.ProgressBar.inactive()
+    else:          
+        log_method = logger.debug
 
     ## Add gaussian noise?
     if config.ite.add_gaussian_noise_fraction is not None:
@@ -491,13 +487,14 @@ def _from_unit_cell_to_stable_mode(
     ## Duplicate core into a big tensor-network:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
     if DEBUG_MODE: full_tn.validate()
+    active_prog_bar = config.visuals.progress_bars.is_active_at('blockBP')
 
     ## Perform BlockBP:
     if config.iterative_process.use_bp:
         messages, bp_stats = robust_belief_propagation(
             full_tn, messages, config.bp, 
             update_plots_between_steps=config.visuals.live_plots, 
-            allow_prog_bar=config.visuals.progress_bars
+            allow_prog_bar=active_prog_bar
         )
 
         print_or_log_bp_message(config.bp, config.iterative_process.bp_not_converged_raises_error, bp_stats, logger)
@@ -535,7 +532,7 @@ def ite_per_mode(
     edge_energies = dict()
     mode_tn : ModeTN
 
-    prog_bar = get_progress_bar(config, len(edge_order), "Executing ITE per-mode:")
+    prog_bar = get_progress_bar(config, len(edge_order), "Executing ITE per-mode:", 'ITE-per-mode')
     for is_first, is_last, (edge_tuple, delta_t) in lists.iterate_with_edge_indicators(list(edge_order)):
         prog_bar.next(extra_str=f"{edge_tuple}")
 
@@ -630,7 +627,7 @@ def ite_per_delta_t(
     config = config_in.copy()
     use_lowest_energy_results = config.ite.always_use_lowest_energy_state
     # Progress bar:
-    prog_bar = get_progress_bar(config, num_repeats, f"Per delta-t...         ")
+    prog_bar = get_progress_bar(config, num_repeats, f"Per delta-t...         ", level='ITE-per-delta-t')
     # track success:
     at_least_one_successful_run : bool = False
     errors_count : int = 0
@@ -699,7 +696,7 @@ def full_ite(
     ## Repetitively perform ITE algo:
     delta_t_list_with_repetitions = list(lists.repeated_items(config.ite.time_steps))
     # Progress bar:
-    prog_bar = get_progress_bar(config, len(delta_t_list_with_repetitions), "Executing ITE Algo...  ")
+    prog_bar = get_progress_bar(config, len(delta_t_list_with_repetitions), "Executing ITE Algo...  ", level='ITE-Main')
     # Main loop:
     for delta_t, num_repeats in delta_t_list_with_repetitions:
         prog_bar.next(extra_str=f"delta-t={delta_t}")

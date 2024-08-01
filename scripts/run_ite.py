@@ -1,5 +1,7 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 
+from matplotlib import pyplot as plt
+
 # Types in the code:
 from containers import Config, HamiltonianFuncAndInputs
 from unit_cell import UnitCell, get_from
@@ -143,7 +145,7 @@ def main(
     N = 2,
     chi_factor : int|float = 0.6,
     live_plots:_Bool|Iterable[_Bool] = [0,0,0],   #type: ignore
-    progress_bar:bool=True,
+    progress_bar:Literal['all_active', 'all_disabled', 'only_main']='only_main',
     results_filename:str|None = None,
     parallel:bool = False,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic

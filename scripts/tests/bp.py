@@ -43,8 +43,8 @@ mode = UpdateMode.A
 update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 d=2
 
-EXACT_CHI = 300
-EXACT_N = 12
+EXACT_CHI = 200
+EXACT_N = 8
 
 
 class CSVRowData(NamedTuple):
@@ -336,7 +336,7 @@ def _calc_inf_exact_results(D:int) -> dict:
     
 
 ResultsSubFolderName = "results"
-def get_inf_exact_results(D:int=3) -> dict:
+def get_inf_exact_results(D:int=4) -> dict:
     filename = f"infinite_exact_results D={D}"
     if saveload.exist(filename, sub_folder=ResultsSubFolderName):
         results = saveload.load(filename, sub_folder=ResultsSubFolderName)
@@ -347,9 +347,9 @@ def get_inf_exact_results(D:int=3) -> dict:
 
 
 def main_test():
-    # results = get_inf_exact_results(); print(results)
+    results = get_inf_exact_results(); print(results)
     # test_bp_convergence_all_runs()
-    plot_bp_convergence_results()
+    # plot_bp_convergence_results()
 
 if __name__ == "__main__":
     main_test()

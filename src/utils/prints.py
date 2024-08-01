@@ -156,6 +156,7 @@ class ProgressBar(StaticNumOutOfNum):
         self._print(s)
 
 
+
 class InactiveProgressBar(ProgressBar):
     def __init__(self):
         print_prefix=""
