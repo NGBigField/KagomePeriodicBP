@@ -21,7 +21,7 @@ class ProgressBarSConfig(Enum):
 
     @staticmethod
     def _main_levels_threshold() -> ProgBarPrintLevel:
-        return 'ITE-per-mode'
+        return 'ITE-per-segment'
 
     def __bool__(self) -> bool:
         match self:
