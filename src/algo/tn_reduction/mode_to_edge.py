@@ -20,7 +20,7 @@ from tensor_networks.node import TensorNode, two_nodes_ordered_by_relative_direc
 from tensor_networks.mps import mps_index_of_open_leg, MPS
 from enums import ContractionDepth, NodeFunctionality
 from containers import UpdateEdge, MPSOrientation
-from containers.configs import ContractionConfig
+from containers.configs import BubbleconContractionConfig
 from _types import EdgeIndicatorType
 from _error_types import TensorNetworkError
 
@@ -200,7 +200,7 @@ def _contract_half_using_bubblecon(
         raise TensorNetworkError("Couldn't find the correct side to contract mode-tn into edge-tn")
 
     ## Contract to get an MPS
-    mps, contraction_order, orientation = contract_tensor_network(mode_tn, direction=edge_side, depth=ContractionDepth.ToEdge, bubblecon_trunc_dim=trunc_dim, print_progress=False)
+    mps, contraction_order, orientation = contract_tensor_network(mode_tn, direction=edge_side, depth=ContractionDepth.ToEdge, bubblecon_trunc_dim=trunc_dim, allow_progressbar=False)
     if DEBUG_MODE:
         assert i1 not in contraction_order
         assert i2 not in contraction_order
@@ -250,7 +250,7 @@ def _derive_commons_neighbors_connections_if_it_was_a_matrix(
 def reduce_mode_to_edge(
     mode_tn:ModeTN, 
     edge_tuple:UpdateEdge,
-    contract_config:ContractionConfig,
+    contract_config:BubbleconContractionConfig,
     copy:bool=True,
     arange_legs:bool=True
 )->EdgeTN:

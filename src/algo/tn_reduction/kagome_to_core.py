@@ -31,7 +31,7 @@ from tensor_networks.node import TensorNode, two_nodes_ordered_by_relative_direc
 from lattices.directions import Direction, LatticeDirection, BlockSide, check
 from enums import ContractionDepth, NodeFunctionality, UpdateMode
 from containers import MPSOrientation, UpdateEdge
-from containers.configs import ContractionConfig
+from containers.configs import BubbleconContractionConfig
 
 # Our utilities:
 from utils import parallels, tuples, lists, assertions, prints
@@ -106,13 +106,13 @@ def _contract_half(
     tn:KagomeTensorNetwork,
     directions:_PerSide[BlockSide],
     bubblecon_trunc_dim:int,
-    print_progress:bool
+    allow_progressbar:bool
 )->tuple[MPS|complex|tuple, list[int], MPSOrientation]:        
     """Contraction function that contracts half TN:
     """
     direction = directions[side_key]
     mps, con_order, orientation = contract_tensor_network(
-        tn, direction, depth=ContractionDepth.ToCore, bubblecon_trunc_dim=bubblecon_trunc_dim, print_progress=print_progress
+        tn, direction, depth=ContractionDepth.ToCore, bubblecon_trunc_dim=bubblecon_trunc_dim, allow_progressbar=allow_progressbar
     )
     return mps, con_order, orientation
 
@@ -120,7 +120,7 @@ def _contract_half(
 def _contract_tn_from_sides_and_create_mpss(
     tn:KagomeTensorNetwork,
     directions:_PerSide[BlockSide],
-    contract_config:ContractionConfig
+    contract_config:BubbleconContractionConfig
 )->tuple[
     _PerSide[MPS],
     _PerSide[list[int]],
@@ -133,7 +133,7 @@ def _contract_tn_from_sides_and_create_mpss(
         tn = tn,
         directions = directions,
         bubblecon_trunc_dim = contract_config.trunc_dim,
-        print_progress = not parallel
+        allow_progressbar = contract_config.progress_bar and not parallel
     )
     values = list(_PerSide.side_names())
     res = parallels.concurrent_or_parallel(_contract_half, values=values, value_name="side_key", in_parallel=parallel, fixed_arguments=fixed_arguments)
@@ -316,7 +316,7 @@ def _add_env_tensors_to_open_core(small_tn:ArbitraryTN, env_tensors:list[TensorN
 
 
 
-def reduce_full_kagome_to_core(tn:KagomeTensorNetwork, contract_config:ContractionConfig, direction:BlockSide|None=None) -> CoreTN:
+def reduce_full_kagome_to_core(tn:KagomeTensorNetwork, contract_config:BubbleconContractionConfig, direction:BlockSide|None=None) -> CoreTN:
     ## 0: Check inputs:
     if DEBUG_MODE:
         tn.validate()

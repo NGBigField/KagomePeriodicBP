@@ -177,7 +177,7 @@ def _calculate_unit_cell_measurements(
 ]:
     ## Unpack inputs:
     live_plots = config.visuals.live_plots
-    allow_prog_bar = config.visuals.progress_bars
+    allow_prog_bar = config.visuals.progress_bars.is_active_at('blockBP')
 
     ## if unit_cell is rotated, rotate it back:
     unit_cell.force_zero_rotation()
@@ -270,10 +270,10 @@ def _pre_segment_init_params(
     energies_at_updates : EnergiesOfEdgesDuringUpdateType = []
 
     prog_bar = get_progress_bar(config, len(modes_order), "Executing ITE Segment  ", 'ITE-per-segment', also_verify=len(modes_order)>1)    
-    if isinstance(prog_bar, prints.InactiveProgressBar):
-        log_method = logger.info
-    else:          
+    if config.visuals.progress_bars.is_active_somewhere():
         log_method = logger.debug
+    else:          
+        log_method = logger.info
 
     ## Add gaussian noise?
     if config.ite.add_gaussian_noise_fraction is not None:

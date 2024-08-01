@@ -1,5 +1,5 @@
 from dataclasses import dataclass, fields
-from containers.contractions import BubbleConConfig, ContractionConfig
+from containers.contractions import BubbleConGlobalConfig, BubbleconContractionConfig
 from containers.belief_propagation import BPConfig
 from containers.sizes_and_dimensions import TNDimensions
 from containers.imaginary_time_evolution import ITEConfig, IterativeProcessConfig
@@ -19,7 +19,7 @@ class _StoreConfigClasses:
     ITEConfig     = ITEConfig
     IterativeProcessConfig = IterativeProcessConfig
     VisualsConfig = VisualsConfig
-    ContractionConfig = ContractionConfig
+    ContractionConfig = BubbleconContractionConfig
 
 
 @dataclass
@@ -30,7 +30,7 @@ class Config(_StoreConfigClasses, _ConfigClass):
     iterative_process : IterativeProcessConfig
     dims : TNDimensions
     visuals : VisualsConfig
-    contraction : ContractionConfig   # non-BP contraction config
+    contraction : BubbleconContractionConfig   # non-BP contraction config
 
     @staticmethod
     def derive_from_dimensions(D:int)->"Config":
@@ -41,7 +41,7 @@ class Config(_StoreConfigClasses, _ConfigClass):
             iterative_process=IterativeProcessConfig(),
             dims=TNDimensions(virtual_dim=D),
             visuals=VisualsConfig(),
-            contraction=ContractionConfig(trunc_dim=2*D**2+10)
+            contraction=BubbleconContractionConfig(trunc_dim=2*D**2+10)
         )
 
         # if D>3:
@@ -72,15 +72,19 @@ class Config(_StoreConfigClasses, _ConfigClass):
         self.__post_init__()
         
     def __post_init__(self)->None:
-        # other post inits:
+        ## Call other post inits:
         self.ite.__post_init__()
         self.bp.__post_init__()
-        # specials:
         
+        ## Check chi
         if self.chi_bp > self.chi:
             prints.print_warning(f" truncation dim of BP is greater than that of the other bubblcon usages.")
         if not ALLOW_VISUALS:
             self.visuals.live_plots = False
+
+        ## combination between visuals and contraction progress bar:
+        if not self.visuals.progress_bars.is_active_at('bubblecon'):
+            self.contraction.progress_bar = False 
 
 
     def strengthen(self, _harder_target:bool=True):

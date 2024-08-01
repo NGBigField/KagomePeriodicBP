@@ -94,7 +94,7 @@ def _single_outgoing_message(
         direction, 
         bubblecon_trunc_dim=bubblecon_trunc_dim,
         depth=ContractionDepth.ToMessage,
-        print_progress=print_progress
+        allow_progressbar=print_progress
     )
 
     assert isinstance(mps, MPS)

@@ -11,7 +11,7 @@ from algo.tn_reduction.mode_to_edge import reduce_mode_to_edge
 # Types in the code:
 from tensor_networks import CoreTN, ModeTN, EdgeTN
 from tensor_networks.abstract_classes import TensorNetwork, KagomeTensorNetwork
-from containers.configs import ContractionConfig
+from containers.configs import BubbleconContractionConfig
 
 # For type hinting:
 from typing import TypeVar, Type, Callable, Any, TypeAlias
@@ -48,7 +48,7 @@ def _next_reduction_function(tn:TensorNetworkType)->Callable[[TensorNetworkType,
     raise TypeError(f"Input TN of type {type(tn)!r} didn't match one of the possible reduction functions")
 
 
-def _reduce_tn_one_step(tn:TensorNetworkType, contract_config:ContractionConfig, copy:bool, **kwargs_in)->TensorNetworkType:
+def _reduce_tn_one_step(tn:TensorNetworkType, contract_config:BubbleconContractionConfig, copy:bool, **kwargs_in)->TensorNetworkType:
 
     ## Choose correct function:
     func = _next_reduction_function(tn)
@@ -67,7 +67,7 @@ def _reduce_tn_one_step(tn:TensorNetworkType, contract_config:ContractionConfig,
 def reduce_tn(
     tn:TensorNetwork, 
     target_type:Type[TensorNetworkOutput], 
-    contract_config:ContractionConfig, 
+    contract_config:BubbleconContractionConfig, 
     copy:bool=True, 
     **kwargs
 )->TensorNetworkOutput:

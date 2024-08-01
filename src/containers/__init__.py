@@ -1,4 +1,4 @@
-from .contractions import BubbleConConfig, MPSOrientation
+from .contractions import BubbleConGlobalConfig, MPSOrientation
 from .belief_propagation import BPConfig, BPStats, Message, MessageDictType
 from .imaginary_time_evolution import ITEConfig, ITEPerModeStats, ITESegmentStats, UpdateEdge, HamiltonianFuncAndInputs, UpdateEdgesOrder
 from ._ite_tracker import ITEProgressTracker

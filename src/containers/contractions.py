@@ -6,18 +6,19 @@ from typing import Callable
 
 
 @dataclass
-class ContractionConfig(_ConfigClass):
+class BubbleconContractionConfig(_ConfigClass):
     trunc_dim : int = 20
     parallel : bool = False
+    progress_bar : bool = True
 
     def __repr__(self) -> str:
         return super().__repr__()
 
 @dataclass
-class BubbleConConfig(_ConfigClass): 
+class BubbleConGlobalConfig(_ConfigClass): 
     # trunc_dim_2=None
-    # eps=None    
-    progress_bar : bool =True
+    # eps=None  
+    override_progress_bar : bool|None = None   # None - not overriding; True - Always On; False - Always off
     separate_exp : bool =True
     iterative_compression_max_ier : int =  200
     iterative_compression_error : float = 1e-8

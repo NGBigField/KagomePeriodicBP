@@ -1,14 +1,12 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 
-from matplotlib import pyplot as plt
-
 # Types in the code:
 from containers import Config, HamiltonianFuncAndInputs
 from unit_cell import UnitCell, get_from
 
 from utils import strings, lists
 from typing import Iterable, TypeAlias, Literal
-_Bool : TypeAlias = bool|int
+_Bool : TypeAlias = bool|Literal[0, 1]
 
 # Algos we test here:
 from algo.imaginary_time_evolution import full_ite
@@ -89,7 +87,6 @@ def _get_unit_cell(D:int, source:str) -> tuple[UnitCell, bool]:
 
         case "tnsu":
             print("Get unit_cell by simple-update:")
-            is_random = True
             unit_cell, energy = get_from.simple_update(D=D)
 
         case _:
@@ -143,13 +140,13 @@ def _plot_field_over_time() -> None:
 def main(
     D = 2,
     N = 2,
-    chi_factor : int|float = 0.6,
+    chi_factor : int|float = 1,
     live_plots:_Bool|Iterable[_Bool] = [0,0,0],   #type: ignore
-    progress_bar:Literal['all_active', 'all_disabled', 'only_main']='only_main',
+    progress_bar:Literal['all_active', 'all_disabled', 'only_main']='all_active',
     results_filename:str|None = None,
     parallel:bool = False,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0.0,
+    damping:float|None = 0.1,
     unit_cell_from:Literal["random","last","best","tnsu"]|str = "best"
 )->tuple[float, str]:
 
@@ -176,8 +173,8 @@ def main(
     config.chi = int(config.chi*chi_factor)
     config.chi_bp = int(config.chi_bp*chi_factor)
 
-    config.bp.msg_diff_good_enough = 1e-5
-    config.bp.msg_diff_terminate = 1e-6 # 1e-14
+    config.bp.msg_diff_good_enough = 1e-6
+    config.bp.msg_diff_terminate = 1e-14
     # config.bp.times_to_deem_failure_when_diff_increases = 3
     # config.bp.max_iterations = 50
     # config.bp.allowed_retries = 2
@@ -185,34 +182,27 @@ def main(
     # config.iterative_process.start_segment_with_new_bp_message = True
     # config.iterative_process.use_bp = True
     # config.ite.random_edge_order = True
-    config.ite.always_use_lowest_energy_state = False
+    config.ite.always_use_lowest_energy_state = True
     # config.ite.symmetric_second_order_trotterization = True
     config.ite.add_gaussian_noise_fraction = 1e-2
     # config.iterative_process.bp_every_edge = True
-    config.iterative_process.num_mode_repetitions_per_segment = 1
+    config.iterative_process.num_mode_repetitions_per_segment = 5
 
     ## time steps:
-    if D<4:
-        n_per_dt = 300
-        e_start = 4
-        e_end   = 7
+    if unit_cell_from == 'best':
+        e_start = 5
+        e_end   = 8
     else:
-        n_per_dt = 300
         e_start = 4
         e_end   = 7
-    # 
+    n_per_dt = 200
+    #    
     config.ite.time_steps = _get_time_steps(e_start, e_end, n_per_dt)
 
     if _radom_unit_cell:
         append_to_head = []
-        n_per_dt = 100
-        e_start = 2
-        e_end   = 2
-        append_to_head += _get_time_steps(e_start, e_end, n_per_dt) 
-        n_per_dt = 400
-        e_start = 3
-        e_end   = 3
-        append_to_head += _get_time_steps(e_start, e_end, n_per_dt)
+        append_to_head += _get_time_steps(2, 2, 100) 
+        append_to_head += _get_time_steps(3, 3, 300)
         config.ite.time_steps = append_to_head + config.ite.time_steps
 
     ## Run:

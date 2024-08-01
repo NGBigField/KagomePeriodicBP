@@ -20,8 +20,8 @@ class ProgressBarSConfig(Enum):
 
 
     @staticmethod
-    def _main_levels_threshold() -> str:
-        return "ITE-per-delta-t"
+    def _main_levels_threshold() -> ProgBarPrintLevel:
+        return 'ITE-per-mode'
 
     def __bool__(self) -> bool:
         match self:
@@ -31,6 +31,9 @@ class ProgressBarSConfig(Enum):
                 return False
         raise AttributeError("No valid response. Use method `is_active_at`. For exact result")
     
+    def is_active_somewhere(self) -> bool:
+        return not self is ProgressBarSConfig.ALL_DISABLED
+
     def is_active_at(self, func_level:ProgBarPrintLevel) -> bool:
         if self is ProgressBarSConfig.ALL_ACTIVE:
             return True
