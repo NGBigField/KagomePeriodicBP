@@ -9,6 +9,7 @@ if __name__ == "__main__":
     add_base()
     add_scripts()
 
+
 # Get Global-Config:
 from _config_reader import DEBUG_MODE, KEEP_LOGS, ALLOW_VISUALS
 
@@ -39,10 +40,10 @@ from utils import lists, logs, decorators, errors, prints, visuals, strings
 from copy import deepcopy
 
 # Helper function and types for ITE:
-from algo.imaginary_time_evolution._logs_and_prints import print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, \
-                                                            print_or_log_ite_segment_progress, get_progress_bar
-from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
-from algo.imaginary_time_evolution._tn_update import ite_update_unit_cell
+from ._logs_and_prints import print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, \
+                                                            print_or_log_ite_segment_progress, get_progress_bar, formatted_delta_t_str
+from ._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
+from ._tn_update import ite_update_unit_cell
 from visualizations.ite import ITEPlots
 
 # Import belief propagation code:
@@ -699,7 +700,7 @@ def full_ite(
     prog_bar = get_progress_bar(config, len(delta_t_list_with_repetitions), "Executing ITE Algo...  ", level='ITE-Main')
     # Main loop:
     for delta_t, num_repeats in delta_t_list_with_repetitions:
-        prog_bar.next(extra_str=f"delta-t={delta_t}")
+        prog_bar.next(extra_str="delta-t="+formatted_delta_t_str(delta_t))
         try:
             mean_energy, unit_cell, messages, success, step_stats = ite_per_delta_t(unit_cell, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)  
         except Exception as e:

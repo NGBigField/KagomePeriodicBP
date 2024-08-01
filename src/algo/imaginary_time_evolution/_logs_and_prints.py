@@ -18,6 +18,26 @@ from _error_types import BPNotConvergedError
 from utils import lists, logs, strings, prints
 
 
+EPSILON = 1e-5
+
+def _close_to(x:float, y:float) -> bool:
+    return abs(x-y)<EPSILON
+
+def formatted_delta_t_str(delta_t:float) -> str:
+    ## Try exponent notation:
+    for e in range(1, 20):
+        for sign in [-1, +1]:
+            val = 10**(sign*e)
+            if _close_to(val, delta_t):
+                return f"{val}"
+
+    ## Try int:
+    int_version = int(delta_t)
+    if _close_to(int_version, delta_t):
+        return f"{int_version}"
+
+    ## Else, regular float:
+    return f"{delta_t}"
 
 def get_progress_bar(config:Config, num_repeats:int, print_prefix:str, level:ProgBarPrintLevel, also_verify:bool|None=None)->prints.ProgressBar:
     # Progress bar:

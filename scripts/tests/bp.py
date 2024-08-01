@@ -43,7 +43,7 @@ mode = UpdateMode.A
 update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 d=2
 
-EXACT_CHI = 200
+EXACT_CHI = 150
 EXACT_N = 8
 
 

@@ -48,6 +48,7 @@ def main():
     print(f"request_memory_gb: {request_memory_gb}gb")
 
     return main_sender(
+        job_type="ite_afm",
         vals=vals,
         request_memory_gb=request_memory_gb
     )
