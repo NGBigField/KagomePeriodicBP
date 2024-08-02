@@ -2,7 +2,8 @@ import _import_src  ## Needed to import src folders when scripts are called from
 
 # Types in the code:
 from containers import Config, HamiltonianFuncAndInputs
-from unit_cell import UnitCell, get_from
+from unit_cell import UnitCell
+import unit_cell.get_from as get_unit_cell_from 
 
 from utils import strings, lists
 from typing import Iterable, TypeAlias, Literal
@@ -17,7 +18,7 @@ import numpy as np
 d = 2
 
 
-crnt_force_value = 1e-4
+crnt_force_value = 1e-2
 def decreasing_global_field_func(delta_t:float|None)->float:
     global crnt_force_value
     if delta_t is None:
@@ -87,7 +88,7 @@ def _get_unit_cell(D:int, source:str) -> tuple[UnitCell, bool]:
 
         case "tnsu":
             print("Get unit_cell by simple-update:")
-            unit_cell, energy = get_from.simple_update(D=D)
+            unit_cell, energy = get_unit_cell_from.simple_update(D=D)
 
         case _:
             assert isinstance(source, str)
@@ -102,7 +103,7 @@ def _plot_field_over_time() -> None:
     from matplotlib import pyplot as plt
 
     ## Config:
-    n_per_dt = 200
+    n_per_dt = 500
     e_start = 3
     e_end   = 8
     time_steps = _get_time_steps(e_start=e_start, e_end=e_end, n_per_dt=n_per_dt)
@@ -192,14 +193,14 @@ def main(
     else:
         e_start = 4
         e_end   = 7
-    n_per_dt = 200
+    n_per_dt = 100
     #    
     config.ite.time_steps = _get_time_steps(e_start, e_end, n_per_dt)
 
     if _radom_unit_cell:
         append_to_head = []
-        append_to_head += _get_time_steps(2, 2, 100) 
-        append_to_head += _get_time_steps(3, 3, 300)
+        append_to_head += _get_time_steps(2, 2, 50) 
+        append_to_head += _get_time_steps(3, 3, 100)
         config.ite.time_steps = append_to_head + config.ite.time_steps
 
     ## Run:

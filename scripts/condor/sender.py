@@ -2,10 +2,6 @@ import pathlib, sys, os
 if __name__ == "__main__":
     sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
 
-    
-import numpy as np
-from copy import deepcopy
-
 # Import DictWriter class from CSV module
 from csv import DictWriter
 
@@ -38,9 +34,9 @@ RESULT_KEYS_DICT = dict(
 
 ## all values:
 DEFAULT_VALS = {}
-DEFAULT_VALS['D'] = [3]
-DEFAULT_VALS['N'] = list(range(3, 6))
-DEFAULT_VALS['chi'] = [2, 3]
+DEFAULT_VALS['D'] = [2]
+DEFAULT_VALS['N'] = [2] # list(range(3, 6))
+DEFAULT_VALS['chi'] = [1] # [2, 3]
 DEFAULT_VALS['method'] = [1, 2, 3]
 DEFAULT_VALS['seed'] = list(range(5))
 DEFAULT_VALS['parallel'] = [0]
