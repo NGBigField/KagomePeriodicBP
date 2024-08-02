@@ -30,7 +30,7 @@ import numpy as np
 from utils import sizes
 
 
-NUM_EXPECTED_ARGS = 10
+NUM_EXPECTED_ARGS = 11
 SAFETY_BUFFER_FRACTION : Final[float|None] = None  # safety buffer (adjust based on needs)
 
 # A main function to parse inputs:
@@ -87,6 +87,10 @@ def main():
     print(f"{i}: parallel={parallel}")
 
     i += 1  # 10
+    control = int(argv[i])
+    print(f"{i}: control={control}")
+
+    i += 1  # 11
     result_keys = _parse_list_of_strings(argv[i])
     print(f"{i}: result_keys={result_keys}")
 
@@ -108,7 +112,7 @@ def main():
             case "bp_convergence":
                 results = job_bp_convergence.main(D=D, N=N, chi=chi, method=method, parallel=parallel)
             case "ite_afm":
-                results = job_ite_afm.main(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel, progress_bar=not active_thread)
+                results = job_ite_afm.main(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel, progress_bar=not active_thread, control=control)
             case _:
                 raise ValueError(f"Not an expected job_type={job_type!r}")
     except Exception as e:

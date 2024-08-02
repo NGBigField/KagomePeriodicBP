@@ -1,4 +1,4 @@
-
+import numpy as np
 
 def _random_quantum_state_tensor(dims:tuple[int,...]) -> np.ndarray:
     _rand = lambda: np.random.rand(*dims)

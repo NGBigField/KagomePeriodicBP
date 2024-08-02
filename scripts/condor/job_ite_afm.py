@@ -22,8 +22,9 @@ def main(
     seed : int = -1,
     method : int = 1,
     parallel : int = 0,
+    control : int = 0,
     # Default values:
-    progress_bar : bool = True
+    progress_bar : bool = True,
 ) -> dict:
     
     # method
@@ -46,6 +47,11 @@ def main(
     else:
         progress_bar_in = 'all_disabled'
 
+    ## Additional control:
+    if control == 0:
+        hamiltonian_str = "AFM"
+    elif control == 1:
+        hamiltonian_str = "AFM-T"
 
     ## Run:
     energy, unit_cell_file_path = run_ite(
@@ -53,6 +59,7 @@ def main(
         live_plots=False, 
         parallel=parallel, 
         progress_bar=progress_bar_in,
+        hamiltonian=hamiltonian_str,
         unit_cell_from=unit_cell_from
     )
     

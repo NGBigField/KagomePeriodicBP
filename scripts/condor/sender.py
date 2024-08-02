@@ -44,8 +44,9 @@ DEFAULT_VALS['chi'] = [2, 3]
 DEFAULT_VALS['method'] = [1, 2, 3]
 DEFAULT_VALS['seed'] = list(range(5))
 DEFAULT_VALS['parallel'] = [0]
+DEFAULT_VALS['control'] = [0, 1]
 
-Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(parallel) $(result_keys)'
+Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(parallel) $(control) $(result_keys)'
 
 
 def main(
@@ -85,7 +86,7 @@ def main(
     ## Define job params:
     req_ram_mem_gb = f"{request_memory_gb}"
     job_params_dicts : list[dict] = []
-    for N, D, method, seed, chi, parallel in product(vals['N'], vals['D'], vals['method'], vals['seed'], vals['chi'], vals['parallel'] ):
+    for N, D, method, seed, chi, parallel, control in product(vals['N'], vals['D'], vals['method'], vals['seed'], vals['chi'], vals['parallel'], vals['control'] ):
         # To strings:
         N = f"{N}"
         D = f"{D}"
@@ -93,6 +94,7 @@ def main(
         seed = f"{seed}"
         chi = f"{chi}"
         parallel = f"{parallel}"
+        control = f"{control}"
 
         job_params_dicts.append( {
             "outfile"       : results_fullpath,                 # outfile
@@ -104,6 +106,7 @@ def main(
             "N"             : N,                                # N
             "chi"           : chi,                              # chi
             "parallel"      : parallel,                         # parallel
+            "control"       : control,                          # control
             "result_keys"   : _encode_list_as_str(result_keys)  # result_keys
         })
 
