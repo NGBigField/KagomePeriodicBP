@@ -75,6 +75,8 @@ def _collect_best_results():
         D = data.D
         unit_cell = data.unit_cell
 
+        print(f"D={D}")
+
         ## Verify energy:
         measurements = _robust_energy_measurement(unit_cell)
         energy = measurements.mean_energy

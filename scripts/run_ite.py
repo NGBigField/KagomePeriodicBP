@@ -143,7 +143,7 @@ def main(
     N = 2,
     chi_factor : int|float = 1,
     live_plots:_Bool|Iterable[_Bool] = [0,0,0],   #type: ignore
-    progress_bar:Literal['all_active', 'all_disabled', 'only_main']='all_active',
+    progress_bar:Literal['all_active', 'all_disabled', 'only_main']='only_main',
     results_filename:str|None = None,
     parallel:bool = False,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
@@ -174,8 +174,8 @@ def main(
     config.chi = int(config.chi*chi_factor)
     config.chi_bp = int(config.chi_bp*chi_factor)
 
-    config.bp.msg_diff_good_enough = 1e-6
-    config.bp.msg_diff_terminate = 1e-14
+    config.bp.msg_diff_good_enough = 1e-2
+    config.bp.msg_diff_terminate = 1e-4
     # config.bp.times_to_deem_failure_when_diff_increases = 3
     # config.bp.max_iterations = 50
     # config.bp.allowed_retries = 2

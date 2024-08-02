@@ -191,7 +191,7 @@ def _calculate_unit_cell_measurements(
     
     ## BP:
     if config.iterative_process.use_bp:
-        messages, _ = robust_belief_propagation(full_tn, messages, config.bp, live_plots, allow_prog_bar)
+        messages, _ = robust_belief_propagation(full_tn, messages, config.bp)
     else:
         full_tn.connect_uniform_messages()
 
@@ -488,15 +488,10 @@ def _from_unit_cell_to_stable_mode(
     ## Duplicate core into a big tensor-network:
     full_tn = kagome_tn_from_unit_cell(unit_cell, config.dims)
     if DEBUG_MODE: full_tn.validate()
-    active_prog_bar = config.visuals.progress_bars.is_active_at('blockBP')
 
     ## Perform BlockBP:
     if config.iterative_process.use_bp:
-        messages, bp_stats = robust_belief_propagation(
-            full_tn, messages, config.bp, 
-            update_plots_between_steps=config.visuals.live_plots, 
-            allow_prog_bar=active_prog_bar
-        )
+        messages, bp_stats = robust_belief_propagation(full_tn, messages, config.bp)
 
         print_or_log_bp_message(config.bp, config.iterative_process.bp_not_converged_raises_error, bp_stats, logger)
 

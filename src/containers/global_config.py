@@ -85,6 +85,11 @@ class Config(_StoreConfigClasses, _ConfigClass):
         ## combination between visuals and contraction progress bar:
         if not self.visuals.progress_bars.is_active_at('bubblecon'):
             self.contraction.progress_bar = False 
+            self.bp.visuals.bubblecon_progress_bar = False
+
+        if not self.visuals.progress_bars.is_active_at('blockBP'):
+            self.bp.visuals.main_progress_bar = False
+        
 
 
     def strengthen(self, _harder_target:bool=True):

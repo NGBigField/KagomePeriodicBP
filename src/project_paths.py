@@ -17,7 +17,7 @@ def _unique_paths()->None:
 def _add_path(path:Path)->None:
     s = path.__str__()
     if s not in sys.path:
-        sys.path.append(s)
+        sys.path.insert(0, s)
 
 
 def add_base()->None:

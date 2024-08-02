@@ -345,7 +345,7 @@ def calc_measurements_on_unit_cell(
 
 def run_converged_measurement_test(
     unit_cell:UnitCell, 
-    sizes:Iterable[int]=range(2,10),
+    sizes:Iterable[int]=range(2,4),
     config:Config|None=None,
     progress_bar:bool=True,
     plot:bool=True

@@ -92,8 +92,8 @@ def _single_outgoing_message(
     mps, _, mps_direction = contract_tensor_network(
         tn, 
         direction, 
-        bubblecon_trunc_dim=bubblecon_trunc_dim,
         depth=ContractionDepth.ToMessage,
+        bubblecon_trunc_dim=bubblecon_trunc_dim,
         allow_progressbar=print_progress
     )
 
@@ -118,18 +118,22 @@ def _out_going_messages(
     tn:KagomeTensorNetwork, 
     config:BPConfig,
     prev_error:float|None,
-    prog_bar_obj:prints.ProgressBar,
-    allow_prog_bar:bool=True
+    prog_bar_obj:prints.ProgressBar
 )->MessageDictType:
+    
+    ## Parse config:
+    main_progress_bar = config.visuals.main_progress_bar
+    bubblecon_progress_bar = config.visuals.bubblecon_progress_bar
+
     ## prepare inputs:
     fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=config.trunc_dim)
     multi_processing = config.parallel_msgs 
 
     ## Different behavior between parallel or concurrent comp:
-    if not multi_processing and allow_prog_bar:
+    if not multi_processing and main_progress_bar:
         str_func = lambda s: prog_bar_obj.append_extra_str(s+f" error={_bp_error_str(prev_error)}")
         directions_iter=BlockSide.iterator_with_str_output(str_func)  # append prog-bar msg after each sub-step
-        fixed_arguments["print_progress"] = allow_prog_bar
+        fixed_arguments["print_progress"] = bubblecon_progress_bar
     else:
         prog_bar_obj.append_extra_str(f" error={_bp_error_str(prev_error)}")  # append prog-bar msg now
         directions_iter=BlockSide.all_in_counter_clockwise_order()
@@ -155,8 +159,7 @@ def _belief_propagation_step(
     prev_messages:MessageDictType,
     prev_error:float|None,
     config:BPConfig,
-    prog_bar_obj:prints.ProgressBar,
-    allow_prog_bar:bool=True
+    prog_bar_obj:prints.ProgressBar
 )->tuple[
     MessageDictType,   # out_messages
     MessageDictType,   # next_messages
@@ -164,7 +167,7 @@ def _belief_propagation_step(
 ]:
 
     ## Compute out-going message for all possible block-sides:
-    out_messages = _out_going_messages(tn, config, prev_error, prog_bar_obj, allow_prog_bar)
+    out_messages = _out_going_messages(tn, config, prev_error, prog_bar_obj)
 
     ## Check error between messages:
     next_error = _compute_error(prev_messages, out_messages, config.msg_diff_squared)
@@ -182,9 +185,7 @@ def _belief_propagation_step(
 def belief_propagation(
     tn:KagomeTensorNetwork, 
     messages:MessageDictType|None=None, # initial messages
-    config:BPConfig=BPConfig(),
-    update_plots_between_steps:bool=False,
-    allow_prog_bar:bool=True
+    config:BPConfig=BPConfig()
 ) -> tuple[ 
     MessageDictType, # final messages
     BPStats
@@ -203,7 +204,7 @@ def belief_propagation(
     messages = tn.messages
     
     ## Visualizations:
-    if allow_prog_bar:
+    if config.visuals.main_progress_bar:
         if max_iterations is None:  steps_iterator = prints.ProgressBar.unlimited( "Performing BlockBP...  ")
         else:                       steps_iterator = prints.ProgressBar(max_iterations, "Performing BlockBP...  ")
     else:
@@ -228,11 +229,11 @@ def belief_propagation(
                
 
         ## Preform BP step:
-        out_messages, next_messages, error = _belief_propagation_step(tn, next_messages, error, config, steps_iterator, allow_prog_bar)
+        out_messages, next_messages, error = _belief_propagation_step(tn, next_messages, error, config, steps_iterator)
         # out_messages are what we would return out of the algorithm
         # next_messages is a damped starting-point for the next bp_step
         
-        if update_plots_between_steps:
+        if config.visuals.update_plots_between_steps:
             visuals.refresh()
 
         # Check success conditions:
@@ -277,9 +278,7 @@ def belief_propagation(
 def robust_belief_propagation(
     tn:KagomeTensorNetwork, 
     messages:MessageDictType|None=None, # initial messages
-    config:BPConfig=BPConfig(),
-    update_plots_between_steps:bool=False,
-    allow_prog_bar:bool=True
+    config:BPConfig=BPConfig()
 ) -> tuple[ 
     MessageDictType, # final messages
     BPStats
@@ -301,7 +300,7 @@ def robust_belief_propagation(
     ## For each attempt, run and check success:    
     for attempt_ind in range(config.allowed_retries):
         # Run:
-        messages, stats = belief_propagation(tn, messages_in, config, update_plots_between_steps, allow_prog_bar)
+        messages, stats = belief_propagation(tn, messages_in, config)
 
         # unpack:
         error = stats.final_error
