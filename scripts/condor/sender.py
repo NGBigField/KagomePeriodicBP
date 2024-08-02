@@ -36,9 +36,9 @@ RESULT_KEYS_DICT = dict(
 DEFAULT_VALS = {}
 DEFAULT_VALS['D'] = [2]
 DEFAULT_VALS['N'] = [2] # list(range(3, 6))
-DEFAULT_VALS['chi'] = [1] # [2, 3]
+DEFAULT_VALS['chi'] = [0.7, 1, 1.5, 2]
 DEFAULT_VALS['method'] = [1, 2, 3]
-DEFAULT_VALS['seed'] = list(range(5))
+DEFAULT_VALS['seed'] = list(range(3))
 DEFAULT_VALS['parallel'] = [0]
 DEFAULT_VALS['control'] = [1, 0]
 

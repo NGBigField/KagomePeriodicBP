@@ -1058,7 +1058,8 @@ def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], i
 
 
 def plot_from_log(
-    log_name:str = "2024.07.28_08.59.04_RCWB_AFM_D=2_N=4 - good",  # Best log so far
+    # log_name:str = "2024.07.28_08.59.04_RCWB_AFM_D=2_N=4 - good",  # Best log so far
+    log_name:str = "from zero to hero - 1",  # Best log so far
     # log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3 - short",  # short
     save:bool = True,
     plot_health_figure:bool = False,
