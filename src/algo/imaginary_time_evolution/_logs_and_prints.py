@@ -119,7 +119,7 @@ def print_or_log_ite_segment_progress(
         logger_method = logger.info
 
     logger_method(" ")
-    logger_method("segment: "+strings.num_out_of_num(counter+1, num_segments)+f" ; delta_t={delta_t}: "+strings.num_out_of_num(i+1, num_repeats))
+    logger_method("segment: "+strings.num_out_of_num(counter+1, num_segments)+f" ; delta_t={formatted_delta_t_str(delta_t)}: "+strings.num_out_of_num(i+1, num_repeats))
     logger_method("------------------------------")
     
     return logger_method

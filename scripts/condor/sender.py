@@ -27,7 +27,7 @@ if not os.path.exists(results_dir_str):
     os.makedirs(results_dir_str)
 
 RAM_MEMORY_IN_2_EXPONENTS = False
-LOCAL_TEST = True
+LOCAL_TEST = False
 
 
 RESULT_KEYS_DICT = dict(
