@@ -17,7 +17,7 @@ import numpy as np
 d = 2
 
 
-crnt_force_value = 1e-2
+crnt_force_value = 1e-4
 def decreasing_global_field_func(delta_t:float|None)->float:
     global crnt_force_value
     if delta_t is None:
@@ -139,8 +139,8 @@ def _plot_field_over_time() -> None:
 
 def main(
     D = 2,
-    N = 4,
-    chi_factor : int|float = 1.4,
+    N = 2,
+    chi_factor : int|float = 1,
     live_plots:_Bool|Iterable[_Bool] = [0,0,0],   #type: ignore
     progress_bar:Literal['all_active', 'all_disabled', 'only_main']='all_active',
     results_filename:str|None = None,
@@ -178,10 +178,7 @@ def main(
     # config.bp.times_to_deem_failure_when_diff_increases = 3
     # config.bp.max_iterations = 50
     # config.bp.allowed_retries = 2
-    # config.iterative_process.change_config_for_measurements_func = _config_at_measurement
-    # config.iterative_process.start_segment_with_new_bp_message = True
-    # config.iterative_process.use_bp = True
-    # config.ite.random_edge_order = True
+    config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.ite.always_use_lowest_energy_state = True
     # config.ite.symmetric_second_order_trotterization = True
     config.ite.add_gaussian_noise_fraction = 1e-2
@@ -215,6 +212,6 @@ def main(
 
 
 if __name__ == "__main__":
-    _plot_field_over_time()
-    # main()
+    # _plot_field_over_time()
+    main()
 

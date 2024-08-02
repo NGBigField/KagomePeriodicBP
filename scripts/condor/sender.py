@@ -27,7 +27,7 @@ if not os.path.exists(results_dir_str):
     os.makedirs(results_dir_str)
 
 RAM_MEMORY_IN_2_EXPONENTS = False
-LOCAL_TEST = False
+LOCAL_TEST = True
 
 
 RESULT_KEYS_DICT = dict(
@@ -44,14 +44,14 @@ DEFAULT_VALS['chi'] = [2, 3]
 DEFAULT_VALS['method'] = [1, 2, 3]
 DEFAULT_VALS['seed'] = list(range(5))
 DEFAULT_VALS['parallel'] = [0]
-DEFAULT_VALS['control'] = [0, 1]
+DEFAULT_VALS['control'] = [1, 0]
 
 Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(parallel) $(control) $(result_keys)'
 
 
 def main(
     job_type="ite_afm",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
-    request_cpus:int=8,
+    request_cpus:int=2,
     request_memory_gb:int=8,
     vals:dict=DEFAULT_VALS,
     result_file_name:str|None=None
