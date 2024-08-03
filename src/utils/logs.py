@@ -160,15 +160,19 @@ def get_logger(
 
 
 def search_words_in_log(
-    filename:str,
+    filename_or_fullpath:str,
     words:Iterable[str],
     max_line:int = np.iinfo(np.int64).max
 )->tuple[list[str], ...]:
-    ## Read file:
-    folder = project_paths.logs
-    name_with_extension = saveload._common_name(filename, typ='log')
-    full_path = str(folder)+PATH_SEP+name_with_extension
-
+    ## Fullpath:
+    if os.path.isabs(filename_or_fullpath):  
+        # absolute path:
+        full_path = filename_or_fullpath
+    else:
+        ## get full path:
+        folder = project_paths.logs
+        name_with_extension = saveload._common_name(filename_or_fullpath, typ='log')
+        full_path = str(folder)+PATH_SEP+name_with_extension
 
 
     ## Init outputs:

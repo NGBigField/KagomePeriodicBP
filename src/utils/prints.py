@@ -1,12 +1,14 @@
 from utils.strings import StrEnum, SpecialChars, num_out_of_num
 from utils import decorators, lists, arguments
-from typing import Any, Literal, Optional, TextIO, List
+from typing import Any, Literal, Optional, TextIO, List, overload, TypeVar, Iterator
 
 # For defining print std_out or other:
 import sys
 import warnings
 
 from numpy import inf
+
+_T = TypeVar("_T")
 
 
 class StaticPrinter():
@@ -63,14 +65,28 @@ class StaticPrinter():
 
 
 class StaticNumOutOfNum():
-    def __init__(self, expected_end:int, print_prefix:str="", print_suffix:str="", print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False) -> None:
+    @overload
+    def __init__(self, list:list[_T], print_prefix:str="", print_suffix:str="", print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False) -> None: ...
+    @overload
+    def __init__(self, expected_end:int, print_prefix:str="", print_suffix:str="", print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False) -> None: ...
+    def __init__(self, expected_end_or_list:int|list[_T], print_prefix:str="", print_suffix:str="", print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False) -> None:
+        if isinstance(expected_end_or_list, list):
+            items = iter(expected_end_or_list)
+            expected_end = len(expected_end_or_list)
+        elif isinstance(expected_end_or_list, int):
+            items = None
+            expected_end = expected_end_or_list
+        else:
+            raise TypeError(f"Not a supported type {type(expected_end_or_list)!r} for variable `expected_end_or_list`")
+
         self.static_printer : StaticPrinter = StaticPrinter(print_out=print_out, in_place=in_place)
         self.expected_end :int = expected_end    
         self.print_prefix :str = print_prefix
         self.print_suffix :str = print_suffix
         self.counter : int = -1
         self._sparse_show_counter : int = 0
-        self._as_iterator : bool = False
+        self._is_iterated : bool = False
+        self._following_items : None|list[_T] = items
         # First print:
         if expected_end>0:
             self._show()
@@ -84,11 +100,11 @@ class StaticNumOutOfNum():
         return val
 
     def __iter__(self) -> "StaticNumOutOfNum":
-        self._as_iterator = True
+        self._is_iterated = True
         return self
 
     def _check_end_iterations(self)->bool:
-        return self._as_iterator and self.iteration_num > self.expected_end
+        return self._is_iterated and self.iteration_num > self.expected_end
 
     def next(self, increment:int=1, extra_str:Optional[str]=None, every:int=1) -> int:
         self.counter += increment
@@ -99,7 +115,13 @@ class StaticNumOutOfNum():
         self._show(extra_str)
         if self._check_end_iterations():
             raise StopIteration
-        return self.counter
+        
+        ## Chose return values:
+        if self._following_items is not None:
+            res = next(self._following_items)
+        else:
+            res = self.counter
+        return res
 
     def append_extra_str(self, extra_str:str)->None:
         self._show(extra_str)
@@ -123,7 +145,7 @@ class StaticNumOutOfNum():
 
 
 class ProgressBar(StaticNumOutOfNum):
-    def __init__(self, expected_end:int, print_prefix:str="", print_suffix:str="", print_length:int=40, print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False): 
+    def __init__(self, expected_end:int|list, print_prefix:str="", print_suffix:str="", print_length:int=40, print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False): 
         # Save basic data:        
         self.print_length :int = print_length
         super().__init__(expected_end, print_prefix, print_suffix, print_out, in_place)
