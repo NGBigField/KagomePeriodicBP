@@ -79,7 +79,7 @@ def iterate_with_edge_indicators(d:dict[_T, _T2]|np.ndarray) -> Generator[tuple[
         is_first = False
 
 
-def pass_values_from_dict1_to_dict2(dict1:dict[_T, _T2], dict2:dict[_T, _T2]) -> None:
+def pass_values_from_dict1_to_dict2_on_matching_keys(dict1:dict[_T, _T2], dict2:dict[_T, _T2]) -> None:
     for key, val in dict1.items():
         if key in dict2:
             dict2[key] = val

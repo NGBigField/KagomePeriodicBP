@@ -106,7 +106,7 @@ def sender() -> None:
         request_memory_gb=8,
         vals=vals,
         result_keys=RESULT_KEYS,
-        _local_test=True
+        _local_test=False
     )
 
 

@@ -7,7 +7,7 @@ from physics.metrics.src.densitymats import DensityMatrix, CommonDensityMatrices
 from utils import assertions
 
 # Global Constants:
-IS_VALIDATE_CORRECT_METHOD = False
+IS_VALIDATE_CORRECT_METHOD = True
 EPSILON = 0.0001
 
 

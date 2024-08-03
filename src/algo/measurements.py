@@ -90,7 +90,7 @@ def _find_not_none_item_in_double_dict( d :dict[str, dict[str, _T]], keys1, keys
 
 def compute_negativity_of_rdm(rdm:np.ndarray)->float:
     matrix : np.matrix = op_to_mat(rdm)
-    value = negativity(matrix)
+    value = negativity(matrix, validate=False)
     return value
 
 def print_results_table(results:dict[str, dict[str, float]])->None:

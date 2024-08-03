@@ -17,7 +17,7 @@ from enums import UpdateMode, UnitCellFlavor
 from containers import UpdateEdge, Config
 
 # Measure core data
-from algo.measurements import derive_xyz_expectation_values_with_tn, calc_unit_cell_expectation_values_from_tn, pauli, measure_energies_and_observables_together
+from algo.measurements import pauli, compute_negativity_of_rdm
 from algo.tn_reduction import reduce_tn
 from physics import hamiltonians
 
@@ -28,7 +28,7 @@ from time import perf_counter, sleep
 import numpy as np
 
 # useful utils:
-from utils import visuals, saveload, csvs, dicts, lists, strings
+from utils import visuals, saveload, csvs, dicts, lists, strings, files
 from utils.visuals import AppendablePlot
 from matplotlib import pyplot as plt
 
@@ -43,8 +43,8 @@ mode = UpdateMode.A
 update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 d=2
 
-EXACT_CHI = 150
-EXACT_N = 8
+EXACT_CHI = 200
+EXACT_N = 7
 
 
 class CSVRowData(NamedTuple):
@@ -55,6 +55,7 @@ class CSVRowData(NamedTuple):
     energy : float
     z : float
     fidelity : float
+    negativity : float
 
     @classmethod
     def fields(cls) -> list[str]:
@@ -70,6 +71,10 @@ class ComparisonResultsType(NamedTuple):
     z : float  #
     energy: float  
     fidelity : float
+    unit_cell : UnitCell
+    negativity : float
+
+
 
 def _get_expectation_values(edge_tn:EdgeTN) -> float:
     rho = edge_tn.rdm
@@ -89,11 +94,13 @@ def _per_D_N_single_test(
     ## Make sure there is something to compare to:
     this_is_exact_run = 'exact_run' in kwargs and kwargs['exact_run']==True
 
-    if not this_is_exact_run:
+    if this_is_exact_run:
+        unit_cell = UnitCell.load_best(D)
+    else:
         exact = get_inf_exact_results(D)
+        unit_cell = exact['unit_cell']
 
     ## Create kagome TN:
-    unit_cell = UnitCell.load_best(D)
     tn = create_repeated_kagome_tn(d, D, N, unit_cell)
 
     ## Define contraction precision and other config adjustments:
@@ -108,7 +115,7 @@ def _per_D_N_single_test(
         case "random"|"exact":
             tn.connect_uniform_messages()
         case "bp":
-            belief_propagation(tn, None, config.bp, update_plots_between_steps=False)
+            belief_propagation(tn, None, config.bp)
             
 
     ## Contract to edge:
@@ -117,10 +124,15 @@ def _per_D_N_single_test(
         mode=mode, edge_tuple=update_edge
     )
     ## Get results:
+    rdm = edge_tn.rdm
+    # expectations:
     z = _get_expectation_values(edge_tn)
+    # energy:
     h = hamiltonians.heisenberg_afm()
-    energy = np.dot(edge_tn.rdm.flatten(),  h.flatten()) 
+    energy = np.dot(rdm.flatten(),  h.flatten()) 
     energy = float(energy)
+    # negativity:
+    negativity = compute_negativity_of_rdm(rdm)
 
     ## Compare with exact results:
     if this_is_exact_run:
@@ -130,7 +142,7 @@ def _per_D_N_single_test(
         rho_exact = TenQI.op_to_mat(exact['rho'])
         fidelity_ = fidelity(rho_now, rho_exact)
 
-    return ComparisonResultsType(edge_tn, z, energy, fidelity_)
+    return ComparisonResultsType(edge_tn, z, energy, fidelity_, unit_cell, negativity)
 
 
 def _get_full_converges_run_plots(
@@ -162,23 +174,25 @@ def _get_full_converges_run_plots(
 
 
 def test_bp_convergence_all_runs(
-    D:int = 3,
+    D:int = 2,
     combined_figure:bool = False,
-    live_plots:bool|None = None,  # True: live, False: at end, None: no plots
     parallel:bool = True,
+    live_plots:bool|None = None,  # True: live, False: at end, None: no plots
 ) -> None:
     
     ##  Params:
     methods_and_Ns:dict[str, list[int]] = dict(
-        random = list(range(2, 10)),
+        random = list(range(2, 8)),
         bp     = [2, 3, 4]
     ) 
 
     ## config:
     config = Config.derive_from_dimensions(D)
-    config.chi    = 2*D**2 + 10
-    config.chi_bp =   D**2 
-    config.bp.msg_diff_terminate = 1e-9
+    config.chi    =  3*D**2 + 2
+    config.chi_bp =    D**2 
+    config.bp.msg_diff_terminate = 1e-14
+    config.bp.max_iterations = 4
+    config.bp.visuals.set_all_progress_bars(False)
 
     # exact_config = config.copy()
 
@@ -206,7 +220,7 @@ def test_bp_convergence_all_runs(
             ## Get results:
             _t1 = perf_counter()
             try:
-                edge_tn, z, energy, fidelity = _per_D_N_single_test(
+                res = _per_D_N_single_test(
                     D, N, method, config, parallel
                 )
             except Exception:
@@ -224,7 +238,7 @@ def test_bp_convergence_all_runs(
                 )
 
             # csv:
-            row_data = CSVRowData(D, N, method, time, energy, z, fidelity)
+            row_data = CSVRowData(D, N, method, time, res.energy, res.z, res.fidelity, res.negativity)
             csv.append(row_data.row())
 
     # plot_values.axis.set_ylim(bottom=1e-8*2)
@@ -237,9 +251,8 @@ def test_bp_convergence_all_runs(
             ax.axhline(y=z, color='k', linestyle='--', linewidth=2, label="Exact")
             ax.legend()
             visuals.save_figure(plot.fig, file_name=strings.time_stamp()+f" {i+1}")
+
     print("Done")    
-
-
 
 
 
@@ -249,20 +262,32 @@ def _plot_from_table_per_D(D:str, methods:set[str], table:csvs.TableByKey) -> No
     # Z vs t plot:
     plt.figure()
     ax_z_vs_t = plt.subplot(1,1,1)
-    ax_z_vs_t.set_xlabel("compute time [sec]")
-    ax_z_vs_t.set_ylabel("expectation value <Z>")
+    ax_z_vs_t.set_xlabel("expectation value <Z>")
+    ax_z_vs_t.set_ylabel("compute time [sec]")
+    ax_z_vs_t.set_xscale('log')
 
     # Fidelity vs t plot:
     plt.figure()
     ax_fidelity = plt.subplot(1,1,1)
-    ax_fidelity.set_xlabel("compute time [sec]")
-    ax_fidelity.set_ylabel("1 - Fidelity to Exact")
-    ax_fidelity.set_yscale('log')
+    ax_fidelity.set_xlabel("1 - Fidelity to Exact")
+    ax_fidelity.set_ylabel("compute time [sec]")
+    ax_fidelity.set_xscale('log')
+
+    ## Get reference:
+    exact = get_inf_exact_results(int(D))
+    z_ref = exact['z']
+    x_range = table.unique_values("time")
+    ax_z_vs_t.hlines(y=[0], xmin=min(x_range), xmax=max(x_range), linestyles="--", color='k', label="Exact")
+    visuals.draw_now()
 
 
     def plot(ax, x, y, method:str) -> None:
+        sorted_xy = sorted(( (x_, y_) for x_, y_ in zip(x, y, strict=True)), key=lambda tuple_: tuple_[0])
+        x = [tuple_[0] for tuple_ in sorted_xy]
+        y = [tuple_[1] for tuple_ in sorted_xy]
         ax.plot(x, y, label=method, linewidth=4)
         visuals.draw_now()
+
 
     for method in methods:
         t, z = [], []
@@ -270,20 +295,14 @@ def _plot_from_table_per_D(D:str, methods:set[str], table:csvs.TableByKey) -> No
 
         print(data)
         N = data['N']
-        z = data['z']
+        z = [f-z_ref for f in data['z']]
         t = data['time']
         f = [1-f for f in data['fidelity']]
 
-        plot(ax_z_vs_t,   t, z, method)
-        plot(ax_fidelity, t, f, method)
-        
-    ## Get reference:
-    exact = get_inf_exact_results(int(D))
-    z_ref = exact['z']
-    x_range = table.unique_values("time")
-    ax_z_vs_t.hlines(y=[z_ref], xmin=min(x_range), xmax=max(x_range), linestyles="--", color='k', label="Exact")
+        plot(ax_z_vs_t,   z, t, method)
+        plot(ax_fidelity, f, t, method)
 
-
+    ## Pretify
     for ax in [ax_z_vs_t, ax_fidelity]:
         ax.legend(loc="best")
         ax.grid()
@@ -292,13 +311,41 @@ def _plot_from_table_per_D(D:str, methods:set[str], table:csvs.TableByKey) -> No
     print("Done")
 
 
+def _get_data_from_csvs(filename:str|None) -> csvs.TableByKey:
+    if isinstance(filename, str):
+        fullpath = saveload.derive_fullpath(filename+".csv", sub_folder="results")
+        table = csvs.TableByKey(fullpath)
+    elif filename is None:
+        folder_fullpath = saveload.DATA_FOLDER + saveload.PATH_SEP + "results"
+        table = csvs.TableByKey()
+        for fullpath in files.get_all_files_fullpath_in_folder(folder_fullpath):
+
+            try:
+                crnt_table = csvs.TableByKey(fullpath)
+            except UnicodeDecodeError:
+                continue
+
+            crnt_table.verify()
+
+            try:
+                table += crnt_table
+            except KeyError:
+                continue
+
+            table.verify()
+            
+
+    table.verify()
+    return table
+
+
+
 def plot_bp_convergence_results(
-    filename:str = "2024.07.30_17.26.26 SGV"
+    filename:str|None = None
 ) -> None:
     
     ## Get Data:
-    fullpath = saveload.derive_fullpath(filename+".csv", sub_folder="results")
-    table = csvs.TableByKey(fullpath)
+    table = _get_data_from_csvs(filename)
 
     ## Derive params:
     Ds = table.unique_values("D")
@@ -320,23 +367,19 @@ def _calc_inf_exact_results(D:int) -> dict:
     config = Config.derive_from_dimensions(D)
 
     ## Compute:
-    edge_tn, z, energy, fidelity = _per_D_N_single_test(D, N, method, config, parallel=False, exact_run=True)
+    res = _per_D_N_single_test(D, N, method, config, parallel=False, exact_run=True)
 
-    ## Save:
-    res = dict(
-        edge_tn=edge_tn,
-        rho=edge_tn.rdm,
-        z=z,
-        energy=energy,
-        D=D,
-        N=N,
-    )
+    ## Prepare output:
+    res = res._asdict()
+    res['D'] = D
+    res['N'] = N
+    res['chi'] = EXACT_CHI
 
     return res
     
 
 ResultsSubFolderName = "results"
-def get_inf_exact_results(D:int=4) -> dict:
+def get_inf_exact_results(D:int=2) -> dict:
     filename = f"infinite_exact_results D={D}"
     if saveload.exist(filename, sub_folder=ResultsSubFolderName):
         results = saveload.load(filename, sub_folder=ResultsSubFolderName)
@@ -347,9 +390,10 @@ def get_inf_exact_results(D:int=4) -> dict:
 
 
 def main_test():
-    results = get_inf_exact_results(); print(results)
-    # test_bp_convergence_all_runs()
-    # plot_bp_convergence_results()
+    # results = get_inf_exact_results(2); print(results)
+    # test_bp_convergence_all_runs(3)
+    plot_bp_convergence_results()
+
 
 if __name__ == "__main__":
     main_test()

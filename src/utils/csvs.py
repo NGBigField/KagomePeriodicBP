@@ -2,9 +2,10 @@ import csv
 from typing import Any, TypeVar, overload
 import os, sys
 from pathlib import Path
-from utils import strings, lists
+from utils import strings, lists, dicts
 from project_paths import data as DATA_FOLDER
 from utils.saveload import force_folder_exists
+from copy import deepcopy
 _T = TypeVar("_T")
 
 from dataclasses import dataclass, is_dataclass
@@ -164,12 +165,26 @@ class _TableByOrder():
 class TableByKey():
     __slots__ = "_table"
 
-    def __init__(self, csv_fullpath:str) -> None:
-        self._table : dict[str, list[str]] = read_csv_table(csv_fullpath)
+    def __init__(self, csv_fullpath:str|None=None) -> None:
+        if csv_fullpath is None:
+            table = {}
+        else:
+            table = read_csv_table(csv_fullpath)
+        self._table : dict[str, list[str]] = table
+
+    def __iadd__(self, other:"TableByKey") -> "TableByKey":
+        self.extend(other)
+        return self
 
     def __getitem__(self, key) -> list[str]:
         return self._table[key]
-    
+
+    def extend(self, other:"TableByKey") -> None:
+        if self.is_empty:
+            self._table = other._table
+        else:
+            self._table = _extend_matching_tables(self._table, other._table)
+
     def unique_values(self, key) -> set[str]:
         return lists.deep_unique(self[key])
 
@@ -177,6 +192,27 @@ class TableByKey():
         matching_elements = get_matching_table_element(self._table, **kwargs)
         return _TableByOrder(matching_elements)
     
+    @property
+    def is_empty(self) -> bool:
+        return len(self._table)==0
+    
+    def verify(self) -> None:
+        d = self._table
+        dummy_val = next(iter(d.values()))
+        length = len(dummy_val)
+        for key, value in d.items():
+            assert len(value)==length, f"key {key!r} not matching length {length!r}. The length of this key is {len(value)!r}"
+    
+
+def  _extend_matching_tables(target:dict[str, list[str]], source:dict[str, list[str]]) -> dict[str, list[str]]:
+    trgt_copy = deepcopy(target)
+    for key in target.keys():
+        if key not in source:
+            raise KeyError("Tables don't match")
+        other_vals = source[key]
+        trgt_copy[key].extend( other_vals )
+    return trgt_copy
+
 
 def _table_by_order_str(list_:list[dict[str, Any]]) -> str:
     ## Collect length data

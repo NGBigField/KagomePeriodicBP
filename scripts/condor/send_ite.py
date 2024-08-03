@@ -2,7 +2,7 @@ import _import_main_and_src
 
 from scripts.condor.main_sender import main as main_sender
 from scripts.run_ite import main as run_ite
-from utils.dicts import pass_values_from_dict1_to_dict2
+from utils.dicts import pass_values_from_dict1_to_dict2_on_matching_keys
 
 from sys import argv
 
@@ -125,15 +125,15 @@ def sender(
     vals = {}
     vals['D'] = [2, 3]
     vals['N'] = list(range(3, 6))
-    vals['chi'] = [1]
-    vals['method'] = [1, 2]
-    vals['seed'] = list(range(3))
-    vals['parallel'] = [1]
+    vals['chi'] = [1, 2, 3]
+    vals['method'] = [1, 3]
+    vals['seed'] = list(range(5))
+    vals['parallel'] = [0]
     vals['control'] = [0]
 
     user_input = _check_given_dimensions()
     if user_input is not None:
-        pass_values_from_dict1_to_dict2(user_input, vals)
+        pass_values_from_dict1_to_dict2_on_matching_keys(user_input, vals)
 
     if len(vals['D'])==1:
         request_memory_gb = _choose_requested_memory(vals['D'][0])
@@ -144,7 +144,7 @@ def sender(
         request_memory_gb=request_memory_gb,
         vals=vals,
         result_keys=RESULT_KEYS,
-        _local_test=True
+        _local_test=False
     )
 
 if __name__ == "__main__":    
