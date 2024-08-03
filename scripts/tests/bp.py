@@ -20,6 +20,7 @@ from containers import UpdateEdge, Config
 from algo.measurements import pauli, compute_negativity_of_rdm
 from algo.tn_reduction import reduce_tn
 from physics import hamiltonians
+from physics.metrics import entanglement_entropy
 
 # Performance:
 from time import perf_counter, sleep
@@ -43,8 +44,8 @@ mode = UpdateMode.A
 update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 d=2
 
-EXACT_CHI = 200
-EXACT_N = 7
+EXACT_CHI = 250
+EXACT_N = 12
 
 
 class CSVRowData(NamedTuple):
@@ -68,11 +69,13 @@ class CSVRowData(NamedTuple):
 
 class ComparisonResultsType(NamedTuple):
     edge_tn: EdgeTN
-    z : float  #
+    z : float  
     energy: float  
     fidelity : float
     unit_cell : UnitCell
     negativity : float
+    entanglement_entropy : float
+
 
 
 
@@ -133,6 +136,7 @@ def _per_D_N_single_test(
     energy = float(energy)
     # negativity:
     negativity = compute_negativity_of_rdm(rdm)
+    entanglement_entropy_ = entanglement_entropy(rdm)
 
     ## Compare with exact results:
     if this_is_exact_run:
@@ -142,7 +146,7 @@ def _per_D_N_single_test(
         rho_exact = TenQI.op_to_mat(exact['rho'])
         fidelity_ = fidelity(rho_now, rho_exact)
 
-    return ComparisonResultsType(edge_tn, z, energy, fidelity_, unit_cell, negativity)
+    return ComparisonResultsType(edge_tn, z, energy, fidelity_, unit_cell, negativity, entanglement_entropy_)
 
 
 def _get_full_converges_run_plots(
@@ -379,7 +383,11 @@ def _calc_inf_exact_results(D:int) -> dict:
     
 
 ResultsSubFolderName = "results"
-def get_inf_exact_results(D:int=2) -> dict:
+def get_inf_exact_results(D:int|list[int]=2) -> dict:
+
+    if isinstance(D, list):
+        return [get_inf_exact_results(val) for val in D]
+
     filename = f"infinite_exact_results D={D}"
     if saveload.exist(filename, sub_folder=ResultsSubFolderName):
         results = saveload.load(filename, sub_folder=ResultsSubFolderName)
@@ -390,9 +398,9 @@ def get_inf_exact_results(D:int=2) -> dict:
 
 
 def main_test():
-    # results = get_inf_exact_results(2); print(results)
-    # test_bp_convergence_all_runs(3)
-    plot_bp_convergence_results()
+    results = get_inf_exact_results([2, 3]); print(results)
+    test_bp_convergence_all_runs(3)
+    # plot_bp_convergence_results()
 
 
 if __name__ == "__main__":
