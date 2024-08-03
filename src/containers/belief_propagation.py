@@ -18,7 +18,12 @@ class BPVisualsConfig(_ConfigClass):
     bubblecon_progress_bar:bool=True
 
     def __repr__(self) -> str:
-        return super().__repr__()
+        return super().__repr__(level=2)
+    
+    def set_all_progress_bars(self, value:bool) -> None:
+        assert isinstance(value, bool)
+        for attr_nmae in ["main_progress_bar", "bubblecon_progress_bar"]:
+            self.__setattr__(attr_nmae, value)
     
 
 @dataclass

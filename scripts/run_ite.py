@@ -1,4 +1,5 @@
-import _import_src  ## Needed to import src folders when scripts are called from an outside directory
+if __name__ == "__main__":
+    import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 
 # Types in the code:
 from containers import Config, HamiltonianFuncAndInputs

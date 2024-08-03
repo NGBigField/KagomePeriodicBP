@@ -1,20 +1,28 @@
-import pathlib, sys, os
 if __name__ == "__main__":
-    sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
+    import _import_main_and_src
+
+
+import pathlib, sys, os
 
 # Import DictWriter class from CSV module
 from csv import DictWriter
 
-
 # for smart iterations:
 from itertools import product
+
+# for cached look-ups
 from functools import cache
 
+# for user hinting:
+from typing import Literal, TypeAlias
+
+# for time stamps and random strings:
 import string
 import random
 import time
 
-from src import project_paths
+# for paths
+import project_paths
 
 sep = os.sep
 _results_dir = project_paths.data/"condor"
@@ -23,13 +31,11 @@ if not os.path.exists(results_dir_str):
     os.makedirs(results_dir_str)
 
 RAM_MEMORY_IN_2_EXPONENTS = False
-LOCAL_TEST = False
 
-
-RESULT_KEYS_DICT = dict(
+DEFAULT_RESULT_KEYS_DICT = dict(
     parallel_timings = ["parallel", 'D', 'N', 'seed', 'bp_step'],
     ite_afm = ["seed","D", "N", "chi", "energy", "parallel", "method", "path"],
-    bp_convergence = ["seed", "D", "N", "method", "time", "energy", "z", "fidelity"]
+    bp = ["seed", "D", "N", "method", "time", "energy", "z", "fidelity"]
 )
 
 ## all values:
@@ -43,14 +49,17 @@ DEFAULT_VALS['parallel'] = [0]
 DEFAULT_VALS['control'] = [1, 0]
 
 Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(parallel) $(control) $(result_keys)'
+JobType : TypeAlias = Literal["ite_afm", "bp", "parallel_timings"]
 
 
 def main(
-    job_type="ite_afm",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
+    job_type:JobType="ite_afm",  
     request_cpus:int=2,
     request_memory_gb:int=8,
     vals:dict=DEFAULT_VALS,
-    result_file_name:str|None=None
+    result_file_name:str|None=None,
+    result_keys:list[str]|None=None,
+    _local_test = False
 ):
 
     ## Check inputs and fix:
@@ -61,18 +70,17 @@ def main(
     request_memory_gb = _legit_memory_sizes(request_memory_gb)
     # CPUs:
     if "parallel" in vals and (1 in vals["parallel"] or True in vals["parallel"]):
-        request_cpus = max(request_cpus, 8)
-
-
-    ## Get from job type:
-    result_keys = RESULT_KEYS_DICT[job_type]
+        request_cpus = max(request_cpus, 10)
+    # keys:
+    if result_keys is None:
+        result_keys = DEFAULT_RESULT_KEYS_DICT[job_type]
 
     ## Define paths and names:
     this_folder_path = pathlib.Path(__file__).parent.__str__()
     #
     worker_script_fullpath = this_folder_path+sep+"worker.py"
     results_fullpath       = results_dir_str+sep+result_file_name+".csv"
-    output_files_prefix    = "kagome-bp-"+job_type+"-"+_time_stamp()
+    output_files_prefix    = "kagome-"+job_type+"-"+_time_stamp()+"-"+_random_letters(3)
     #
     print(f"script_fullpath={worker_script_fullpath!r}")
     print(f"results_fullpath={results_fullpath!r}")
@@ -125,7 +133,7 @@ def main(
     print(f"    Arguments={Arguments}")
 
 
-    if LOCAL_TEST:
+    if _local_test:
         from src import project_paths
         project_paths.add_src()
         from utils.prints import print_warning

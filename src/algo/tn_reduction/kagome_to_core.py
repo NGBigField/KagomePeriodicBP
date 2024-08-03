@@ -127,7 +127,7 @@ def _contract_tn_from_sides_and_create_mpss(
     _PerSide[MPSOrientation]
 ]:
 
-    ## Run in parallel or sequential:
+    ## Choose parallel or sequential:
     parallel = contract_config.parallel
     fixed_arguments = dict(
         tn = tn,
@@ -136,6 +136,9 @@ def _contract_tn_from_sides_and_create_mpss(
         allow_progressbar = contract_config.progress_bar and not parallel
     )
     values = list(_PerSide.side_names())
+    
+
+    ## Run
     res = parallels.concurrent_or_parallel(_contract_half, values=values, value_name="side_key", in_parallel=parallel, fixed_arguments=fixed_arguments)
 
     ## Unpack Results:

@@ -42,6 +42,9 @@ def _hermitize_messages(messages:MessageDictType) -> MessageDictType:
 
 
 def _compute_error(prev_messages:MessageDictType, out_messages:MessageDictType, msg_diff_squared:bool)->float:
+    if prev_messages is None:
+        return None
+
     # The error is the average L_2 distance divided by the total number of coordinates if we stack all messages as one huge vector:
     distances: list[float] = [ 
         mps_distance(prev_messages[direction].mps, out_messages[direction].mps) 
@@ -118,12 +121,16 @@ def _out_going_messages(
     tn:KagomeTensorNetwork, 
     config:BPConfig,
     prev_error:float|None,
-    prog_bar_obj:prints.ProgressBar
+    prog_bar_obj:prints.ProgressBar|None
 )->MessageDictType:
     
     ## Parse config:
     main_progress_bar = config.visuals.main_progress_bar
     bubblecon_progress_bar = config.visuals.bubblecon_progress_bar
+
+    ## check and fix inputs:
+    if prog_bar_obj is None:
+        prog_bar_obj = prints.ProgressBar.inactive()
 
     ## prepare inputs:
     fixed_arguments = dict(tn=tn, bubblecon_trunc_dim=config.trunc_dim)
@@ -159,7 +166,7 @@ def _belief_propagation_step(
     prev_messages:MessageDictType,
     prev_error:float|None,
     config:BPConfig,
-    prog_bar_obj:prints.ProgressBar
+    prog_bar_obj:prints.ProgressBar|None
 )->tuple[
     MessageDictType,   # out_messages
     MessageDictType,   # next_messages

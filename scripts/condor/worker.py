@@ -6,7 +6,7 @@ if __name__ == "__main__":
 from sys import argv
 
 # Import scripts to use
-import _import_scripts
+import scripts.condor._import_main_and_src as _import_main_and_src
 
 # Import DictWriter class from CSV module
 from time import perf_counter, sleep
@@ -17,11 +17,11 @@ import threading
 from src.utils import errors
 
 # Import the possible job types:
-from scripts.condor import job_parallel_timing 
-from scripts.condor import job_bp_convergence 
-from scripts.condor import job_ite_afm
+from scripts.condor import send_parallel_timing 
+from scripts.condor import send_bp
+from scripts.condor import send_ite
 
-from scripts.condor.sender import Arguments
+from scripts.condor.main_sender import Arguments, JobType
 
 
 # import numpy for random matrices:
@@ -55,7 +55,7 @@ def main():
     print(f"{i}: output_file={output_file!r}")
 
     i += 1  # 2
-    job_type = argv[i]
+    job_type : JobType= argv[i]
     print(f"{i}: job_type={job_type}")
 
     i += 1  # 3
@@ -108,11 +108,11 @@ def main():
     try:
         match job_type:
             case "parallel_timings":             
-                results = job_parallel_timing.main(D=D, N=N, parallel=parallel)
-            case "bp_convergence":
-                results = job_bp_convergence.main(D=D, N=N, chi=chi, method=method, parallel=parallel)
+                results = send_parallel_timing.job(D=D, N=N, parallel=parallel)
+            case "bp":
+                results = send_bp.job(D=D, N=N, chi=chi, method=method, parallel=parallel)
             case "ite_afm":
-                results = job_ite_afm.main(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel, progress_bar=not active_thread, control=control)
+                results = send_ite.job(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel, progress_bar=not active_thread, control=control)
             case _:
                 raise ValueError(f"Not an expected job_type={job_type!r}")
     except Exception as e:
@@ -147,9 +147,11 @@ def main():
         dict_writer = DictWriter(f, fieldnames=result_keys )
         dict_writer.writerow(row_to_write)
 
-    ## End
-    print("Results are written into:")
-    print(f"{output_file!r}")
+        ## End
+        print("Results are written into:")
+        print(f"{output_file!r}")
+
+    print("::Worker out")
 
 
 def _clean_item(s:str)->str:

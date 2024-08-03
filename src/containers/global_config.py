@@ -55,13 +55,13 @@ class Config(_StoreConfigClasses, _ConfigClass):
         return self.contraction.trunc_dim
     @chi.setter
     def chi(self, value) -> None:
-        self.contraction.trunc_dim = value
+        self.contraction.trunc_dim = int(value)
     @property
     def chi_bp(self) -> int:
         return self.bp.trunc_dim
     @chi_bp.setter
     def chi_bp(self, value) -> None:
-        self.bp.trunc_dim = value
+        self.bp.trunc_dim = int(value)
 
     def set_parallel(self, value:bool) -> None:
         assert isinstance(self, bool) or value in [0, 1]

@@ -1,18 +1,13 @@
-import pathlib, sys
+import _import_main_and_src
 
-if __name__ == "__main__":
-    sys.path.append(
-        str(pathlib.Path(__file__).parent.parent)
-    )
-    import _import_src
-    sys.path.append(
-        str(pathlib.Path(__file__).parent.parent.parent)
-    )
-
+from scripts.condor.main_sender import main as main_sender
 
 from scripts.tests.bp import _per_D_N_single_test, ComparisonResultsType
 from containers.configs import Config
 from time import perf_counter
+
+
+RESULT_KEYS = ["seed", "D", "N", "method", "time", "energy", "z", "fidelity"]
 
 
 def _parse_method(method:int) -> str:
@@ -26,9 +21,7 @@ def _parse_method(method:int) -> str:
     raise ValueError("Not an expected case")
 
 
-
-
-def main(
+def job(
     D : int = 2,
     N : int = 2,
     chi : float = 1, 
@@ -66,6 +59,25 @@ def main(
     return results
 
 
+def sender() -> None:
+    vals = {}
+    vals['D'] = [2, 3]
+    vals['N'] = list(range(2, 12))
+    vals['chi'] = [1]
+    vals['method'] = [1, 2]
+    vals['seed'] = list(range(3))
+    vals['parallel'] = [1]
+    vals['control'] = [0]
+
+    main_sender(
+        job_type="bp",
+        request_cpus=10,
+        request_memory_gb=8,
+        vals=vals,
+        result_keys=RESULT_KEYS,
+        _local_test=True
+    )
+
 if __name__ == "__main__":    
-    main(h=2.2, method=2)
+    sender()
 

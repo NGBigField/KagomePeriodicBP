@@ -4,6 +4,7 @@ from typing import Any, Literal, Optional, TextIO, List
 
 # For defining print std_out or other:
 import sys
+import warnings
 
 from numpy import inf
 
@@ -265,10 +266,14 @@ class PrintColors(StrEnum):
 def add_color(s:str, color:PrintColors)->str:
     return color+s+PrintColors.DEFAULT
 
-def print_warning(s:str)->None:
+def print_warning(s:str, standard_with_path:bool=False)->None:
     warn1color = PrintColors.HIGHLIGHTED_YELLOW
     warn2color = PrintColors.YELLOW_DARK
     s = add_color("Warning:", warn1color)+add_color(s, warn2color)+" "
-    print(s)
+
+    if standard_with_path:
+        warnings.warn(s, category=UserWarning)
+    else:
+        print(s)
 
 
