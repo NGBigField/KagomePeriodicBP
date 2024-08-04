@@ -44,8 +44,8 @@ mode = UpdateMode.A
 update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 d=2
 
-EXACT_CHI = 250
-EXACT_N = 12
+EXACT_CHI = 150
+EXACT_N = 7
 
 
 class CSVRowData(NamedTuple):
@@ -57,6 +57,7 @@ class CSVRowData(NamedTuple):
     z : float
     fidelity : float
     negativity : float
+    entanglement_entropy : float
 
     @classmethod
     def fields(cls) -> list[str]:
@@ -139,12 +140,13 @@ def _per_D_N_single_test(
     entanglement_entropy_ = entanglement_entropy(rdm)
 
     ## Compare with exact results:
+    rho_exact = exact['edge_tn'].rdm
     if this_is_exact_run:
         fidelity_ = 0
     else:
         rho_now = TenQI.op_to_mat(edge_tn.rdm)
-        rho_exact = TenQI.op_to_mat(exact['rho'])
-        fidelity_ = fidelity(rho_now, rho_exact)
+        rho_exact = TenQI.op_to_mat(rho_exact)
+        fidelity_ = 1-fidelity(rho_now, rho_exact)
 
     return ComparisonResultsType(edge_tn, z, energy, fidelity_, unit_cell, negativity, entanglement_entropy_)
 
@@ -178,12 +180,18 @@ def _get_full_converges_run_plots(
 
 
 def test_bp_convergence_all_runs(
-    D:int = 2,
+    D:int|list = 2,
     combined_figure:bool = False,
     parallel:bool = True,
     live_plots:bool|None = None,  # True: live, False: at end, None: no plots
 ) -> None:
     
+    if isinstance(D, list):
+        return [
+            test_bp_convergence_all_runs(val, combined_figure=combined_figure, parallel=parallel, live_plots=live_plots) 
+            for val in D
+        ]
+
     ##  Params:
     methods_and_Ns:dict[str, list[int]] = dict(
         random = list(range(2, 8)),
@@ -192,10 +200,10 @@ def test_bp_convergence_all_runs(
 
     ## config:
     config = Config.derive_from_dimensions(D)
-    config.chi    =  3*D**2 + 2
-    config.chi_bp =    D**2 
+    config.chi    = 2*D**2 + 4
+    config.chi_bp =   D**2 
     config.bp.msg_diff_terminate = 1e-14
-    config.bp.max_iterations = 4
+    config.bp.max_iterations = 6
     config.bp.visuals.set_all_progress_bars(False)
 
     # exact_config = config.copy()
@@ -227,7 +235,8 @@ def test_bp_convergence_all_runs(
                 res = _per_D_N_single_test(
                     D, N, method, config, parallel
                 )
-            except Exception:
+            except Exception as e:
+                print(e)
                 break
             _t2 = perf_counter()
             time = _t2 - _t1
@@ -242,7 +251,7 @@ def test_bp_convergence_all_runs(
                 )
 
             # csv:
-            row_data = CSVRowData(D, N, method, time, res.energy, res.z, res.fidelity, res.negativity)
+            row_data = CSVRowData(D, N, method, time, res.energy, res.z, res.fidelity, res.negativity, res.entanglement_entropy)
             csv.append(row_data.row())
 
     # plot_values.axis.set_ylim(bottom=1e-8*2)
@@ -398,8 +407,8 @@ def get_inf_exact_results(D:int|list[int]=2) -> dict:
 
 
 def main_test():
-    results = get_inf_exact_results([2, 3]); print(results)
-    test_bp_convergence_all_runs(3)
+    # results = get_inf_exact_results([2, 3]); print(results)
+    test_bp_convergence_all_runs([3])
     # plot_bp_convergence_results()
 
 
