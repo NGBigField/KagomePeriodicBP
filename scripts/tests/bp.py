@@ -1,7 +1,7 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 import project_paths
 
-from typing import NamedTuple, overload
+from typing import NamedTuple, overload, Literal
 
 # Tensor-Networks creation:
 from tensor_networks.construction import create_repeated_kagome_tn, UnitCell
@@ -275,38 +275,52 @@ def test_bp_convergence_all_runs(
     print("Done")    
 
 
-
 def _new_axes() -> Axes:
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
     return ax
 
-def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str) -> Axes:
+
+def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, what:Literal['true', 'error']) -> Axes:
     ## Prepare plots:
     ax = _new_axes()
 
     ## Get data:
     data = table.get_matching_table_elements(D=D)    
+    ref_y = 0
 
-    def plot(method:str) -> list[Line2D]:
+    def plot(method:Literal['random', 'bp', 'exact']) -> list[Line2D]:
+        ## init output:
+        lines = []
+
         ## Style:
         color = _method_color(method)
-        marker = _method_marker(method)
+        marker, marker_size = _method_marker(method)
 
         ## Get data:
         data = table.get_matching_table_elements(D=D, method=method)            
         x_vals = _x_values(data)
-        y_vals = [abs(y-y_ref) for y in data[y]] 
-        lines = visuals.plot_with_spread(x_vals=x_vals, y_vals=y_vals, axes=ax, also_plot_max_min_dots=False, 
-                                         linewidth=3, marker="*", color=color)
+        if what == 'true':
+            y_vals = [y for y in data[y]] 
+            if method == 'exact':
+                ref_line = plt.hlines([ref_y], xmin=min(x_values), xmax=max(x_values), label="reference", linestyles="--", color="k")
+                lines.append(ref_line)
+                return lines
+        elif what == 'error':
+            y_vals = [abs(y-ref_y) for y in data[y]] 
+            if method == 'exact':
+                return []
 
-        lines[0].set_label(method)
+        lines += visuals.plot_with_spread(x_vals=x_vals, y_vals=y_vals, axes=ax, also_plot_max_min_dots=False, 
+                                         linewidth=2, marker=marker, color=color, markersize=marker_size, label=method)
+
         return lines
     
-    def _method_marker(method:str) -> str:
+    def _method_marker(method:str) -> tuple[str, int]:
         match method:
-            case 'bp':      return "*"
-            case 'random':  return "D"
+            case 'bp':      return ("*", 8)
+            case 'random':  return (".", 8)
+            case 'exact':   return ("" , 0)
             case _:
                 raise ValueError("")
 
@@ -314,16 +328,16 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str) -
         match method:
             case 'bp':      return "tab:blue"
             case 'random':  return "tab:orange"
+            case 'exact':   return "k"
             case _:
                 raise ValueError("")
-            
+
     def _x_values(data) -> list[float]|list[int]:
         if x == "N":
             x_vals = [kagome.num_nodes_by_lattice_size(N) for N in data[x]]
         else:
             x_vals = data[x]
         return x_vals
-
 
     def _print_reference_data(dict) -> None:
         print("Reference:")
@@ -336,11 +350,11 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str) -
     ## get reference:
     x_values = _x_values(data)
     ref = get_inf_exact_results(D)
-    ref_line = plt.hlines([0], xmin=min(x_values), xmax=max(x_values), label="reference", linestyles="--", color="k")
+    ref_y = ref[y]    
     _print_reference_data(ref)
             
     ## Plot:
-    for method in ['random', 'bp']:
+    for method in ['random', 'bp', 'exact']:
         lines = plot(method)
 
 
@@ -348,12 +362,26 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str) -
     ax.legend(loc="best")
     ax.grid()
     #
-    ax.set_xlabel(x)
-    ax.set_ylabel(y)
-    #
-    # ax.set_xscale('log')
-    # ax.set_yscale('log')
 
+    ## Labels:
+    if x == "N":
+        xlabel = "#tensors"
+    else:
+        xlabel = x    
+
+    if what == 'true':
+        ylabel = y
+    elif what == 'error':
+        ylabel = "abs "+y+" error"
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    #
+    # ax.set_xscale('linear')
+    # ax.set_yscale('log')
+    ax.set_yscale('linear')
+
+    ax.figure.tight_layout()
 
     visuals.draw_now()
     print("")
@@ -370,7 +398,8 @@ def _plot_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
         ('N', 'energy'),
     ]:
         print(f"x={x!r} ; y={y!r}")
-        ax =_plot_from_table_per_D_per_x_y(D, table, x, y)
+        ax =_plot_from_table_per_D_per_x_y(D, table, x, y, 'true')
+        ax =_plot_from_table_per_D_per_x_y(D, table, x, y, 'error')
 
     print("Done")
 
@@ -405,7 +434,8 @@ def _get_data_from_csvs(filename:str|None) -> csvs.TableByKey:
 
 
 def plot_bp_convergence_results(
-    filename:str|None = None
+    filename:str|None = None,
+    Ds:list[int]=[2, 3]
 ) -> None:
     
     ## Get Data:
@@ -413,10 +443,8 @@ def plot_bp_convergence_results(
     print(table)
 
     ## Get lists and plot:
-    Ds = table.unique_values("D")
     for D in Ds:
         print(f"D={D}")
-        D = int(D)
         _plot_from_table_per_D(D, table)
 
     ## Finish:
@@ -462,8 +490,8 @@ def get_inf_exact_results(D:int|list[int]=2) -> dict|list[dict]:
 
 def main_test():
     # results = get_inf_exact_results([2, 3]); print(results)
-    # test_bp_convergence_all_runs([2, 3])
-    plot_bp_convergence_results()
+    # test_bp_convergence_all_runs([3])
+    plot_bp_convergence_results(Ds=[3])
 
 
 if __name__ == "__main__":
