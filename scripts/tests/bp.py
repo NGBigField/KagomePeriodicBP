@@ -44,8 +44,8 @@ mode = UpdateMode.A
 update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 d=2
 
-EXACT_CHI = 150
-EXACT_N = 7
+EXACT_CHI = 200
+EXACT_N = 10
 
 
 class CSVRowData(NamedTuple):
@@ -408,7 +408,7 @@ def get_inf_exact_results(D:int|list[int]=2) -> dict:
 
 def main_test():
     # results = get_inf_exact_results([2, 3]); print(results)
-    test_bp_convergence_all_runs([3])
+    test_bp_convergence_all_runs([4])
     # plot_bp_convergence_results()
 
 

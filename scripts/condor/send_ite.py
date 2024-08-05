@@ -108,7 +108,7 @@ def _choose_requested_memory(D:int) -> int:
     match D:
         case 1:     raise ValueError("No ITE for D=1")
         case 2:     request_memory_gb = 2
-        case 3:     request_memory_gb = 4 
+        case 3:     request_memory_gb = 4
         case 4:     request_memory_gb = 8
         case 5:     request_memory_gb = 8 
         case 6:     request_memory_gb = 16
