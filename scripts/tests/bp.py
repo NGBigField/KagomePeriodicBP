@@ -201,7 +201,7 @@ def test_bp_convergence_all_runs(
 
     ##  Params:
     methods_and_Ns:dict[str, list[int]] = dict(
-        random = list(range(2, 9)),
+        random = list(range(2, 7)),
         bp     = [2, 3]
     ) 
 
@@ -392,6 +392,7 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, w
 def _plot_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
 
     for x, y in [
+        ('time', 'z'), 
         ('N', 'entanglement_entropy'), 
         ('N', 'negativity'), 
         ('N', 'fidelity'),
@@ -435,17 +436,24 @@ def _get_data_from_csvs(filename:str|None) -> csvs.TableByKey:
 
 def plot_bp_convergence_results(
     filename:str|None = None,
-    Ds:list[int]=[2, 3]
+    D:list[int]|None=None
 ) -> None:
     
     ## Get Data:
     table = _get_data_from_csvs(filename)
     print(table)
 
+    if D is None:
+        Ds = table.unique_values('D')
+    elif isinstance(D, list):
+        assert isinstance(D[0], int)
+        Ds = D
+
+
     ## Get lists and plot:
-    for D in Ds:
-        print(f"D={D}")
-        _plot_from_table_per_D(D, table)
+    for D_ in Ds:
+        print(f"D={D_}")
+        _plot_from_table_per_D(D_, table)
 
     ## Finish:
     print("Done printing for all Ds")
@@ -479,6 +487,10 @@ def get_inf_exact_results(D:int|list[int]=2) -> dict|list[dict]:
     if isinstance(D, list):
         return [get_inf_exact_results(val) for val in D]
 
+    if isinstance(D, float):
+        assert int(D)==D
+        D = int(D)
+
     filename = f"infinite_exact_results D={D}"
     if saveload.exist(filename, sub_folder=ResultsSubFolderName):
         results = saveload.load(filename, sub_folder=ResultsSubFolderName)
@@ -490,8 +502,8 @@ def get_inf_exact_results(D:int|list[int]=2) -> dict|list[dict]:
 
 def main_test():
     # results = get_inf_exact_results([2, 3]); print(results)
-    # test_bp_convergence_all_runs([3])
-    plot_bp_convergence_results(Ds=[3])
+    test_bp_convergence_all_runs([2, 3])
+    plot_bp_convergence_results()
 
 
 if __name__ == "__main__":

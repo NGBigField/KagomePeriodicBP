@@ -121,9 +121,12 @@ class CSVManager():
     def __init__(
         self, 
         columns:list[str],
-        name:str=strings.time_stamp()+" "+strings.random(3),
+        name:str|None=None,
         folder:str=DEFAULT_RESULTS_CSV_FOLDER
     ) -> None:
+        # Name:
+        if name is None:
+            name = strings.time_stamp()+" "+strings.random(3)
         # Path
         force_folder_exists(folder)
         self.fullpath = folder +PATH_SEP+_standard_filename(name)
@@ -195,7 +198,7 @@ class TableByKey(Generic[_T]):
         else:
             self._table = _extend_matching_tables(self._table, other._table)
 
-    def unique_values(self, key) -> set[str]:
+    def unique_values(self, key) -> set[_T]:
         return lists.deep_unique(self[key])
 
     def get_matching_table_elements(self, **kwargs) -> _TableByOrder[_T]:

@@ -117,7 +117,7 @@ def get_saved_figures_folder()->Path:
     return folder
 
 
-def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None, extensions:list[str]=["png", "svg"], ) -> None:
+def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None, extensions:list[str]=["png", "svg"]) -> None:
     # Figure:
     if fig is None:
         fig = plt.gcf()
@@ -133,6 +133,13 @@ def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None, extensi
         # Save:
         fig.savefig(fullpath_str)
     return 
+
+def save_figure_all_figures(extensions:list[str]=["svg"]) -> None:
+    time_stamp = strings.time_stamp()
+    for i in plt.get_fignums():
+        fig = plt.figure(i)
+        name = time_stamp + f"_{i}"
+        save_figure(fig, file_name=name, extensions=extensions)
 
 
 def random_uniform_spray(num_coordinates:int, origin:Optional[Tuple[float, ...]]=None):
