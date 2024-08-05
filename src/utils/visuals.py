@@ -13,7 +13,7 @@ if __name__ == "__main__":
 import numpy as np
 
 # for type hints:
-from typing import Optional, Literal, Any, List, Tuple, Iterator, Callable, TypeVar, ClassVar, Generator, TypeAlias, ParamSpec, NamedTuple
+from typing import Optional, Any, List, Tuple, Callable, TypeVar, Generator, TypeAlias, ParamSpec, NamedTuple, overload
 
 from _config_reader import ALLOW_VISUALS
 
@@ -36,7 +36,10 @@ if ALLOW_VISUALS:    #pylint: disable=condition-expression-used-as-statement
         ImageClip, concatenate_videoclips = None, None
 
     ## Matplotlib real time:
-    mpl.use('TkAgg')
+    try:
+        mpl.use('TkAgg')
+    except:
+        pass
 
 
 else:
@@ -55,7 +58,7 @@ import itertools
 from copy import deepcopy
 
 # Use our other utils 
-from utils import strings, assertions, arguments, saveload, types, prints
+from . import strings, assertions, arguments, saveload, types, prints, lists
 
 # For saving plots:
 from pathlib import Path
@@ -85,6 +88,7 @@ DEFAULT_PYPLOT_FIGSIZE = [6.4, 4.8]
 # ============================================================================ #
 _InputType = ParamSpec("_InputType")
 _OutputType = TypeVar("_OutputType")
+_Numeric = TypeVar("_Numeric", int, float)
 _XYZ : TypeAlias = tuple[float, float, float]
 
 # ============================================================================ #
@@ -513,7 +517,28 @@ class InactiveAppendablePlot(AppendablePlot):
             setattr(self, name, method)
 
 
-def plot_with_spread(x_y_values_dict:dict[float|int, list[float|int]], plt_kwargs:dict):
+def _xs_and_ys_to_values_dict(x_vals:list[_Numeric], y_vals:list[_Numeric]) -> dict[_Numeric, list[_Numeric]]:
+    x_y_values_dict : dict[_Numeric, list[_Numeric]] = {}
+    for x, y in zip(x_vals, y_vals, strict=True):
+        if x in x_y_values_dict:
+            x_y_values_dict[x].append(y)
+        else:
+            x_y_values_dict[x] = [y]
+    return x_y_values_dict
+
+
+
+def plot_with_spread(x_y_values_dict:dict[_Numeric, list[_Numeric]]|None=None, x_vals:list[_Numeric]|None=None, y_vals:list[_Numeric]|None=None, **plt_kwargs):
+    ## Check inputs:
+    if x_y_values_dict is None:
+        assert x_vals is not None
+        assert y_vals is not None
+        x_y_values_dict = _xs_and_ys_to_values_dict(x_vals, y_vals)
+    else:
+        assert x_vals is None
+        assert y_vals is None
+    
+
     # Convert y_values_matrix to a NumPy array for easier manipulation
     y_means = []
     y_stds  = []
@@ -730,7 +755,11 @@ def plot_x_y_from_table(table, x:str, y:str, axes:Axes|None) -> Line2D:
     x_vals = [tuple_[0] for tuple_ in sorted_xy]
     y_vals = [tuple_[1] for tuple_ in sorted_xy]
 
-    lines = axes.plot(x_vals, y_vals)
+    if lists.sorted.unique_values(x_vals):
+        lines = axes.plot(x_vals, y_vals)
+    else:        
+        lines, fill = plot_with_spread(x_vals=x_vals, y_vals=y_vals)
+
 
     axes.set_xlabel(x)
     axes.set_ylabel(y)

@@ -39,8 +39,8 @@ from matplotlib.lines import Line2D
 from matplotlib import pyplot as plt
 
 
-
 from libs import TenQI
+
 
 ## common config:
 mode = UpdateMode.A
@@ -199,14 +199,14 @@ def test_bp_convergence_all_runs(
     ##  Params:
     methods_and_Ns:dict[str, list[int]] = dict(
         random = list(range(2, 9)),
-        bp     = [2, 3, 4]
+        bp     = [2, 3]
     ) 
 
     ## config:
     config = Config.derive_from_dimensions(D)
-    config.chi    = 2*D**2 + 10
-    config.chi_bp = 2*D**2 
-    config.bp.msg_diff_terminate = 1e-12
+    config.chi    = 3*D**2 + 10
+    config.chi_bp = 2*D**2 + 10
+    config.bp.msg_diff_terminate = 1e-14
     config.bp.max_iterations = 50
     config.bp.visuals.set_all_progress_bars(False)
 
@@ -290,10 +290,6 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str) -
     y_ref = get_inf_exact_results(D)[y]
     ref_line = plt.hlines([y_ref], xmin=min(x_values), xmax=max(x_values), label="reference", linestyles="--", color="k")
 
-    ## Pretty:
-    ax.legend(loc="best")
-    ax.grid()
-
     def plot(method:str) -> Line2D:
         ## Get data:
         data = table.get_matching_table_elements(D=D, method=method)    
@@ -306,6 +302,10 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str) -
         line = plot(method)
         visuals.draw_now()
 
+    ## Pretty:
+    ax.legend(loc="best")
+    ax.grid()
+
     print("")
     return ax
 
@@ -315,7 +315,8 @@ def _plot_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
     for x, y in [
         ('N', 'entanglement_entropy'), 
         ('N', 'negativity'), 
-        ('N', 'fidelity')
+        ('N', 'fidelity'),
+        ('N', 'energy'),
     ]:
         print(f"x={x!r} ; y={y!r}")
         ax =_plot_from_table_per_D_per_x_y(D, table, x, y)
@@ -410,7 +411,7 @@ def get_inf_exact_results(D:int|list[int]=2) -> dict|list[dict]:
 
 def main_test():
     # results = get_inf_exact_results([2, 3]); print(results)
-    test_bp_convergence_all_runs(2)
+    test_bp_convergence_all_runs([2, 3])
     plot_bp_convergence_results()
 
 
