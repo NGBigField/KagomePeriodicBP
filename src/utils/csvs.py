@@ -89,10 +89,10 @@ def read_csv_table(fullpath:str|Path)->dict[str, list[str]]:
     #
     return results
     
-def get_matching_table_element(table:dict[str, _T], **kwargs)->list[dict[str, _T]]:
+def get_matching_table_element(table:dict[str, list[_T]], **kwargs)->list[dict[str, _T]]:
     # info:
     dummy_key_ = list(kwargs.keys())[0]
-    dummy_val_ = table[dummy_key_]
+    dummy_val_ : list[_T] = table[dummy_key_]
     n = len(dummy_val_)
 
     # search matching indices of rows::
@@ -113,6 +113,7 @@ def get_matching_table_element(table:dict[str, _T], **kwargs)->list[dict[str, _T
             row[key] = val
         matching_rows.append(row)
     return matching_rows
+
 
 class CSVManager():
     __slots__ = {"fullpath", "columns"}
@@ -137,20 +138,23 @@ class CSVManager():
 class _TableByOrder():
     __slots__ = "_list"
 
-    def __init__(self, input_list:list[dict[str, str]]) -> None:
-        self._list : list[dict[str, str]] = input_list
+    def __init__(self, input_list:list[dict[str, _T]]) -> None:
+        self._list : list[dict[str, _T]] = input_list
 
     def __repr__(self) -> str:
         return _table_by_order_str(self._list)
     
     def __str__(self) -> str:
         return self.__repr__()
+    
+    def unique_values(self, key:str) -> set[str]:
+        return lists.deep_unique(self[key])
 
     @overload
-    def __getitem__(self, key:str) -> list[Any]:...
+    def __getitem__(self, key:str) -> list:...
     @overload
-    def __getitem__(self, key:int) -> dict[Any]:...
-    def __getitem__(self, key:str|int) -> list[Any]|dict[Any]:
+    def __getitem__(self, key:int) -> dict:...
+    def __getitem__(self, key:str|int) -> list|dict:
         if isinstance(key, str):
             return [d[key] for d in self._list]
         elif isinstance(key, int):
@@ -171,6 +175,12 @@ class TableByKey():
         else:
             table = read_csv_table(csv_fullpath)
         self._table : dict[str, list[str]] = table
+
+    def __repr__(self) -> str:
+        return _table_by_key_str(self._table)
+    
+    def __str__(self) -> str:
+        return self.__repr__()
 
     def __iadd__(self, other:"TableByKey") -> "TableByKey":
         self.extend(other)
@@ -214,16 +224,7 @@ def  _extend_matching_tables(target:dict[str, list[str]], source:dict[str, list[
     return trgt_copy
 
 
-def _table_by_order_str(list_:list[dict[str, Any]]) -> str:
-    ## Collect length data
-    order_str_length = len(str(len(list_)-1)) + 2
-    keys = list(list_[0].keys())
-    str_lengths = {key:0 for key in keys}
-    for dict_ in list_:
-        for key, value in dict_.items():
-            s = str(value)
-            str_lengths[key] = max(str_lengths[key], len(s))
-
+def _table_common_title_row_str(order_str_length:int, str_lengths:dict[str, int], keys:list[str]) -> str:
     ## Print title row:
     res = " "*order_str_length
     for key in keys:
@@ -233,15 +234,66 @@ def _table_by_order_str(list_:list[dict[str, Any]]) -> str:
     for key in keys:
         res += strings.formatted("-"*len(key), width=str_lengths[key], alignment='^') + " "
     res += "\n" 
+    return res
+
+
+def _common_value_formatting(value:Any) -> str:
+    if isinstance(value, int|float):
+        if int(value)==value:
+            return f"{int(value)}"
+    return f"{value}"
+
+
+def _table_common_value_str(value:Any, key:str, str_lengths:dict[str, int]) -> str:
+    s = _common_value_formatting(value)
+    _remaining_len = str_lengths[key]-len(s)
+    res = s + " "*(_remaining_len+1)
+    return res
+
+
+def _table_by_key_str(table:dict[str, list[str]]) -> str:
+    ## Collect length data
+    keys = list(table.keys())
+    str_lengths = {key:0 for key in keys}
+    dummy_list_ = table[keys[0]]
+    num_items = len(dummy_list_)
+    order_str_length = len(str(num_items-1)) + 2
+    for key, _list in table.items():
+        str_lengths[key] = max([len(_common_value_formatting(val)) for val in _list])
+
+    ## Print title row:
+    res = _table_common_title_row_str(order_str_length=order_str_length, str_lengths=str_lengths, keys=keys)
+
+    ## Print values:
+    for i in range(num_items):
+        res += str(i)+": "
+        for j, (key, list_ )in enumerate(table.items()):
+            value = list_[i]
+            res += _table_common_value_str(value, key, str_lengths)
+        res += "\n" 
+
+    return res
+
+
+def _table_by_order_str(list_:list[dict[str, Any]]) -> str:
+    ## Collect length data
+    order_str_length = len(str(len(list_)-1)) + 2
+    keys = list(list_[0].keys())
+    str_lengths = {key:0 for key in keys}
+    for dict_ in list_:
+        for key, value in dict_.items():
+            s = _common_value_formatting(value)
+            str_lengths[key] = max(str_lengths[key], len(s))
+
+    ## Print title row:
+    res = _table_common_title_row_str(order_str_length=order_str_length, str_lengths=str_lengths, keys=keys)
 
     ## Print values:
     for i, dict_ in enumerate(list_):
         res += str(i)+": "
         for key in keys:
             value = dict_[key]
-            s = str(value)
-            _remaining_len = str_lengths[key]-len(s)
-            res += s + " " + " "*_remaining_len
+            res += _table_common_value_str(value, key, str_lengths)
         res += "\n" 
     
     return res

@@ -1,9 +1,7 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
-
-
 import project_paths
 
-from typing import NamedTuple
+from typing import NamedTuple, overload
 
 # Tensor-Networks creation:
 from tensor_networks.construction import create_repeated_kagome_tn, UnitCell
@@ -29,12 +27,17 @@ from time import perf_counter, sleep
 import numpy as np
 
 # useful utils:
-from utils import visuals, saveload, csvs, dicts, lists, strings, files
+from utils import visuals, saveload, csvs, dicts, lists, strings, files, errors
 from utils.visuals import AppendablePlot
-from matplotlib import pyplot as plt
 
 ## Metrics:
 from physics.metrics import fidelity
+
+## plots:
+from matplotlib.axes import Axes
+from matplotlib.lines import Line2D
+from matplotlib import pyplot as plt
+
 
 
 from libs import TenQI
@@ -140,10 +143,10 @@ def _per_D_N_single_test(
     entanglement_entropy_ = entanglement_entropy(rdm)
 
     ## Compare with exact results:
-    rho_exact = exact['edge_tn'].rdm
     if this_is_exact_run:
         fidelity_ = 0
     else:
+        rho_exact = exact['edge_tn'].rdm
         rho_now = TenQI.op_to_mat(edge_tn.rdm)
         rho_exact = TenQI.op_to_mat(rho_exact)
         fidelity_ = 1-fidelity(rho_now, rho_exact)
@@ -180,30 +183,31 @@ def _get_full_converges_run_plots(
 
 
 def test_bp_convergence_all_runs(
-    D:int|list = 2,
+    D:int|list[int] = 3,
     combined_figure:bool = False,
     parallel:bool = True,
     live_plots:bool|None = None,  # True: live, False: at end, None: no plots
 ) -> None:
     
     if isinstance(D, list):
-        return [
+        _ = [
             test_bp_convergence_all_runs(val, combined_figure=combined_figure, parallel=parallel, live_plots=live_plots) 
             for val in D
         ]
+        return None
 
     ##  Params:
     methods_and_Ns:dict[str, list[int]] = dict(
-        random = list(range(2, 8)),
+        random = list(range(2, 9)),
         bp     = [2, 3, 4]
     ) 
 
     ## config:
     config = Config.derive_from_dimensions(D)
-    config.chi    = 2*D**2 + 4
-    config.chi_bp =   D**2 
-    config.bp.msg_diff_terminate = 1e-14
-    config.bp.max_iterations = 6
+    config.chi    = 2*D**2 + 10
+    config.chi_bp = 2*D**2 
+    config.bp.msg_diff_terminate = 1e-12
+    config.bp.max_iterations = 50
     config.bp.visuals.set_all_progress_bars(False)
 
     # exact_config = config.copy()
@@ -236,7 +240,7 @@ def test_bp_convergence_all_runs(
                     D, N, method, config, parallel
                 )
             except Exception as e:
-                print(e)
+                errors.print_traceback(e)
                 break
             _t2 = perf_counter()
             time = _t2 - _t1
@@ -257,7 +261,7 @@ def test_bp_convergence_all_runs(
     # plot_values.axis.set_ylim(bottom=1e-8*2)
     if live_plots is not None:
         ## Add reference:
-        exact = get_inf_exact_results()
+        exact = get_inf_exact_results(D)
         z = exact['z']
         for i, plot in enumerate([p_values, p_values_vs_times]):
             ax = plot.axis
@@ -269,57 +273,52 @@ def test_bp_convergence_all_runs(
 
 
 
-def _plot_from_table_per_D(D:str, methods:set[str], table:csvs.TableByKey) -> None:
+def _new_axes() -> Axes:
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    return ax
 
+def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str) -> Axes:
     ## Prepare plots:
-    # Z vs t plot:
-    plt.figure()
-    ax_z_vs_t = plt.subplot(1,1,1)
-    ax_z_vs_t.set_xlabel("expectation value <Z>")
-    ax_z_vs_t.set_ylabel("compute time [sec]")
-    ax_z_vs_t.set_xscale('log')
+    ax = _new_axes()
 
-    # Fidelity vs t plot:
-    plt.figure()
-    ax_fidelity = plt.subplot(1,1,1)
-    ax_fidelity.set_xlabel("1 - Fidelity to Exact")
-    ax_fidelity.set_ylabel("compute time [sec]")
-    ax_fidelity.set_xscale('log')
+    ## Get data:
+    data = table.get_matching_table_elements(D=D)    
+    x_values = data.unique_values(x)
 
-    ## Get reference:
-    exact = get_inf_exact_results(int(D))
-    z_ref = exact['z']
-    x_range = table.unique_values("time")
-    ax_z_vs_t.hlines(y=[0], xmin=min(x_range), xmax=max(x_range), linestyles="--", color='k', label="Exact")
-    visuals.draw_now()
+    ## get reference:
+    y_ref = get_inf_exact_results(D)[y]
+    ref_line = plt.hlines([y_ref], xmin=min(x_values), xmax=max(x_values), label="reference", linestyles="--", color="k")
 
+    ## Pretty:
+    ax.legend(loc="best")
+    ax.grid()
 
-    def plot(ax, x, y, method:str) -> None:
-        sorted_xy = sorted(( (x_, y_) for x_, y_ in zip(x, y, strict=True)), key=lambda tuple_: tuple_[0])
-        x = [tuple_[0] for tuple_ in sorted_xy]
-        y = [tuple_[1] for tuple_ in sorted_xy]
-        ax.plot(x, y, label=method, linewidth=4)
+    def plot(method:str) -> Line2D:
+        ## Get data:
+        data = table.get_matching_table_elements(D=D, method=method)    
+        line : Line2D= visuals.plot_x_y_from_table(data, x, y, axes=ax)
+        line.set_label(method)
+        return line
+    
+    ## Plot:
+    for method in table.unique_values('method'):
+        line = plot(method)
         visuals.draw_now()
 
+    print("")
+    return ax
 
-    for method in methods:
-        t, z = [], []
-        data = table.get_matching_table_elements(D=D, method=method)
 
-        print(data)
-        N = data['N']
-        z = [f-z_ref for f in data['z']]
-        t = data['time']
-        f = [1-f for f in data['fidelity']]
+def _plot_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
 
-        plot(ax_z_vs_t,   z, t, method)
-        plot(ax_fidelity, f, t, method)
-
-    ## Pretify
-    for ax in [ax_z_vs_t, ax_fidelity]:
-        ax.legend(loc="best")
-        ax.grid()
-    visuals.draw_now()
+    for x, y in [
+        ('N', 'entanglement_entropy'), 
+        ('N', 'negativity'), 
+        ('N', 'fidelity')
+    ]:
+        print(f"x={x!r} ; y={y!r}")
+        ax =_plot_from_table_per_D_per_x_y(D, table, x, y)
 
     print("Done")
 
@@ -359,15 +358,14 @@ def plot_bp_convergence_results(
     
     ## Get Data:
     table = _get_data_from_csvs(filename)
-
-    ## Derive params:
-    Ds = table.unique_values("D")
-    methods = table.unique_values("method")
+    print(table)
 
     ## Get lists and plot:
+    Ds = table.unique_values("D")
     for D in Ds:
         print(f"D={D}")
-        _plot_from_table_per_D(D, methods, table)
+        D = int(D)
+        _plot_from_table_per_D(D, table)
 
     ## Finish:
     print("Done printing for all Ds")
@@ -392,7 +390,11 @@ def _calc_inf_exact_results(D:int) -> dict:
     
 
 ResultsSubFolderName = "results"
-def get_inf_exact_results(D:int|list[int]=2) -> dict:
+@overload
+def get_inf_exact_results(D:int) -> dict: ...
+@overload
+def get_inf_exact_results(D:list[int]) -> list[dict]: ...
+def get_inf_exact_results(D:int|list[int]=2) -> dict|list[dict]:
 
     if isinstance(D, list):
         return [get_inf_exact_results(val) for val in D]
@@ -408,8 +410,8 @@ def get_inf_exact_results(D:int|list[int]=2) -> dict:
 
 def main_test():
     # results = get_inf_exact_results([2, 3]); print(results)
-    test_bp_convergence_all_runs([4])
-    # plot_bp_convergence_results()
+    test_bp_convergence_all_runs(2)
+    plot_bp_convergence_results()
 
 
 if __name__ == "__main__":

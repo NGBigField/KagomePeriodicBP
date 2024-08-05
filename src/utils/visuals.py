@@ -17,23 +17,30 @@ from typing import Optional, Literal, Any, List, Tuple, Iterator, Callable, Type
 
 from _config_reader import ALLOW_VISUALS
 
-if ALLOW_VISUALS:
+if ALLOW_VISUALS:    #pylint: disable=condition-expression-used-as-statement
     # For visuals
     import matplotlib.pyplot as plt
     from matplotlib.axes import Axes
+    from matplotlib.lines import Line2D
     from matplotlib.figure import Figure
     from mpl_toolkits.mplot3d import Axes3D
     from mpl_toolkits.mplot3d.art3d import Line3D
     from matplotlib.quiver import Quiver
     from matplotlib.text import Text
+    import matplotlib as mpl
 
     # For videos:
     try:
         from moviepy.editor import ImageClip, concatenate_videoclips
     except ImportError as e:
         ImageClip, concatenate_videoclips = None, None
+
+    ## Matplotlib real time:
+    mpl.use('TkAgg')
+
+
 else:
-    Figure, Axes = Any, Any
+    Line2D = None
     plt = None
     ImageClip, concatenate_videoclips = None, None
 
@@ -709,6 +716,36 @@ def write_video_from_existing_frames(fps=30) -> None:
     video_slides.write_videofile(fullpath, fps=fps)
 
 
+def plot_x_y_from_table(table, x:str, y:str, axes:Axes|None) -> Line2D:
+
+    if axes is None:
+        fig = plt.figure()
+        axes = fig.add_subplot(1,1,1)
+
+    x_vals = table[x]
+    y_vals = table[y]
+
+    ## sort:
+    sorted_xy = sorted(( (x_, y_) for x_, y_ in zip(x_vals, y_vals, strict=True)), key=lambda tuple_: tuple_[0])
+    x_vals = [tuple_[0] for tuple_ in sorted_xy]
+    y_vals = [tuple_[1] for tuple_ in sorted_xy]
+
+    lines = axes.plot(x_vals, y_vals)
+
+    axes.set_xlabel(x)
+    axes.set_ylabel(y)
+
+    if isinstance(lines, list):
+        line = lines[0]
+    else:
+        line = lines
+
+    return line
+
+
+
+    
+    
 
 
 if __name__ == "__main__":
