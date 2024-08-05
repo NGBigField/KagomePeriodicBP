@@ -1,15 +1,15 @@
 import csv
-from typing import Any, TypeVar, overload
+from typing import Any, TypeVar, overload, Generic
 import os, sys
 from pathlib import Path
 from utils import strings, lists, dicts
 from project_paths import data as DATA_FOLDER
 from utils.saveload import force_folder_exists
 from copy import deepcopy
-_T = TypeVar("_T")
 
 from dataclasses import dataclass, is_dataclass
 
+_T = TypeVar("_T")
 
 PATH_SEP = os.sep
 DEFAULT_RESULTS_CSV_FILE_NAME = "temp_results.csv" 
@@ -39,7 +39,7 @@ def create_or_override_csv(row:list, file_name:str=DEFAULT_RESULTS_CSV_FILE_NAME
     _write_or_append_to_csv(row=row, file_name=file_name, mode='w')      
 
 
-def read_csv_table(fullpath:str|Path)->dict[str, list[str]]:
+def read_csv_table(fullpath:str|Path)->dict[str, list[_T]]:
     # Parse inputs:
     fullpath_str : str
     if isinstance(fullpath, str):
@@ -135,7 +135,7 @@ class CSVManager():
         append_row_to_csv(row, file_name=self.fullpath)
 
 
-class _TableByOrder():
+class _TableByOrder(Generic[_T]):
     __slots__ = "_list"
 
     def __init__(self, input_list:list[dict[str, _T]]) -> None:
@@ -147,13 +147,13 @@ class _TableByOrder():
     def __str__(self) -> str:
         return self.__repr__()
     
-    def unique_values(self, key:str) -> set[str]:
+    def unique_values(self, key:str) -> set[_T]:
         return lists.deep_unique(self[key])
 
     @overload
-    def __getitem__(self, key:str) -> list:...
+    def __getitem__(self, key:str) -> list[_T]:...
     @overload
-    def __getitem__(self, key:int) -> dict:...
+    def __getitem__(self, key:int) -> dict[str, _T]:...
     def __getitem__(self, key:str|int) -> list|dict:
         if isinstance(key, str):
             return [d[key] for d in self._list]
@@ -166,7 +166,7 @@ class _TableByOrder():
         return len(self._list)
 
 
-class TableByKey():
+class TableByKey(Generic[_T]):
     __slots__ = "_table"
 
     def __init__(self, csv_fullpath:str|None=None) -> None:
@@ -174,7 +174,7 @@ class TableByKey():
             table = {}
         else:
             table = read_csv_table(csv_fullpath)
-        self._table : dict[str, list[str]] = table
+        self._table : dict[str, list[_T]] = table
 
     def __repr__(self) -> str:
         return _table_by_key_str(self._table)
@@ -186,7 +186,7 @@ class TableByKey():
         self.extend(other)
         return self
 
-    def __getitem__(self, key) -> list[str]:
+    def __getitem__(self, key) -> list[_T]:
         return self._table[key]
 
     def extend(self, other:"TableByKey") -> None:
@@ -198,7 +198,7 @@ class TableByKey():
     def unique_values(self, key) -> set[str]:
         return lists.deep_unique(self[key])
 
-    def get_matching_table_elements(self, **kwargs) -> _TableByOrder:
+    def get_matching_table_elements(self, **kwargs) -> _TableByOrder[_T]:
         matching_elements = get_matching_table_element(self._table, **kwargs)
         return _TableByOrder(matching_elements)
     
@@ -214,7 +214,7 @@ class TableByKey():
             assert len(value)==length, f"key {key!r} not matching length {length!r}. The length of this key is {len(value)!r}"
     
 
-def  _extend_matching_tables(target:dict[str, list[str]], source:dict[str, list[str]]) -> dict[str, list[str]]:
+def  _extend_matching_tables(target:dict[str, list[_T]], source:dict[str, list[_T]]) -> dict[str, list[_T]]:
     trgt_copy = deepcopy(target)
     for key in target.keys():
         if key not in source:
@@ -251,7 +251,7 @@ def _table_common_value_str(value:Any, key:str, str_lengths:dict[str, int]) -> s
     return res
 
 
-def _table_by_key_str(table:dict[str, list[str]]) -> str:
+def _table_by_key_str(table:dict[str, list[_T]]) -> str:
     ## Collect length data
     keys = list(table.keys())
     str_lengths = {key:0 for key in keys}

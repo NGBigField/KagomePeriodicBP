@@ -1,4 +1,5 @@
-
+"""Specific operations for lists that are sorted
+"""
 
 from typing import TypeAlias, TypeVar
 _T = TypeVar("_T")

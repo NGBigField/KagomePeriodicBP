@@ -33,6 +33,9 @@ from utils.visuals import AppendablePlot
 ## Metrics:
 from physics.metrics import fidelity
 
+## Lattice soze:
+from lattices import kagome
+
 ## plots:
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
@@ -284,29 +287,77 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str) -
 
     ## Get data:
     data = table.get_matching_table_elements(D=D)    
-    x_values = data.unique_values(x)
+
+    def plot(method:str) -> list[Line2D]:
+        ## Style:
+        color = _method_color(method)
+        marker = _method_marker(method)
+
+        ## Get data:
+        data = table.get_matching_table_elements(D=D, method=method)            
+        x_vals = _x_values(data)
+        y_vals = [abs(y-y_ref) for y in data[y]] 
+        lines = visuals.plot_with_spread(x_vals=x_vals, y_vals=y_vals, axes=ax, also_plot_max_min_dots=False, 
+                                         linewidth=3, marker="*", color=color)
+
+        lines[0].set_label(method)
+        return lines
+    
+    def _method_marker(method:str) -> str:
+        match method:
+            case 'bp':      return "*"
+            case 'random':  return "D"
+            case _:
+                raise ValueError("")
+
+    def _method_color(method:str) -> str:
+        match method:
+            case 'bp':      return "tab:blue"
+            case 'random':  return "tab:orange"
+            case _:
+                raise ValueError("")
+            
+    def _x_values(data) -> list[float]|list[int]:
+        if x == "N":
+            x_vals = [kagome.num_nodes_by_lattice_size(N) for N in data[x]]
+        else:
+            x_vals = data[x]
+        return x_vals
+
+
+    def _print_reference_data(dict) -> None:
+        print("Reference:")
+        print(f"    D={D}")
+        print(f"    N={dict['N']}")
+        print(f"    chi={dict['chi']}")
+        print(f"    num_tensors={kagome.num_nodes_by_lattice_size(dict['N'])}")
+
 
     ## get reference:
-    y_ref = get_inf_exact_results(D)[y]
-    ref_line = plt.hlines([y_ref], xmin=min(x_values), xmax=max(x_values), label="reference", linestyles="--", color="k")
-
-    def plot(method:str) -> Line2D:
-        ## Get data:
-        data = table.get_matching_table_elements(D=D, method=method)    
-        line : Line2D= visuals.plot_x_y_from_table(data, x, y, axes=ax)
-        line.set_label(method)
-        return line
-    
+    x_values = _x_values(data)
+    ref = get_inf_exact_results(D)
+    ref_line = plt.hlines([0], xmin=min(x_values), xmax=max(x_values), label="reference", linestyles="--", color="k")
+    _print_reference_data(ref)
+            
     ## Plot:
-    for method in table.unique_values('method'):
-        line = plot(method)
-        visuals.draw_now()
+    for method in ['random', 'bp']:
+        lines = plot(method)
+
 
     ## Pretty:
     ax.legend(loc="best")
     ax.grid()
+    #
+    ax.set_xlabel(x)
+    ax.set_ylabel(y)
+    #
+    # ax.set_xscale('log')
+    # ax.set_yscale('log')
 
+
+    visuals.draw_now()
     print("")
+
     return ax
 
 
@@ -411,7 +462,7 @@ def get_inf_exact_results(D:int|list[int]=2) -> dict|list[dict]:
 
 def main_test():
     # results = get_inf_exact_results([2, 3]); print(results)
-    test_bp_convergence_all_runs([2, 3])
+    # test_bp_convergence_all_runs([2, 3])
     plot_bp_convergence_results()
 
 

@@ -527,8 +527,16 @@ def _xs_and_ys_to_values_dict(x_vals:list[_Numeric], y_vals:list[_Numeric]) -> d
     return x_y_values_dict
 
 
+PlotWithSpreadReturnValue : TypeAlias = list[Line2D]
 
-def plot_with_spread(x_y_values_dict:dict[_Numeric, list[_Numeric]]|None=None, x_vals:list[_Numeric]|None=None, y_vals:list[_Numeric]|None=None, **plt_kwargs):
+def plot_with_spread(
+    x_y_values_dict:dict[_Numeric, list[_Numeric]]|None=None, 
+    x_vals:list[_Numeric]|None=None, 
+    y_vals:list[_Numeric]|None=None, 
+    also_plot_max_min_dots:bool=True,
+    axes:Axes|None=None,
+    **plt_kwargs
+) -> PlotWithSpreadReturnValue:
     ## Check inputs:
     if x_y_values_dict is None:
         assert x_vals is not None
@@ -537,11 +545,16 @@ def plot_with_spread(x_y_values_dict:dict[_Numeric, list[_Numeric]]|None=None, x
     else:
         assert x_vals is None
         assert y_vals is None
-    
+
+    if axes is None:
+        fig = plt.figure()
+        axes = fig.add_subplot(1,1,1)
 
     # Convert y_values_matrix to a NumPy array for easier manipulation
     y_means = []
     y_stds  = []
+    y_maxs  = []
+    y_mins  = []
     x_values = sorted(list(x_y_values_dict.keys()))
     for x in x_values:
         y_values = x_y_values_dict[x]
@@ -550,17 +563,28 @@ def plot_with_spread(x_y_values_dict:dict[_Numeric, list[_Numeric]]|None=None, x
         # Calculate the mean and standard deviation along the 1st axis (columns)
         y_means.append(np.mean(y_values))
         y_stds.append(np.std(y_values))
+        y_maxs.append(max(y_values))
+        y_mins.append(min(y_values))
     
     # Plotting the mean values
-    line = plt.plot(x_values, y_means, **plt_kwargs)
-    color = line[0].get_color()
+    lines = axes.plot(x_values, y_means, **plt_kwargs)
+    color = lines[0].get_color()
     
     # Adding a shaded region to represent the spread (1 standard deviation here)
     y_means = np.array(y_means)
     y_stds = np.array(y_stds)
-    fill = plt.fill_between(x_values, y_means - y_stds, y_means + y_stds, color=color, alpha=0.2)
-    
-    return line, fill
+    fill = axes.fill_between(x_values, y_means - y_stds, y_means + y_stds, color=color, alpha=0.2)
+    lines.append(fill)
+
+    # Add max-min lines:
+    if also_plot_max_min_dots:
+        maxs = axes.plot(x_values, y_maxs, ":", color=color)
+        mins = axes.plot(x_values, y_mins, ":", color=color)
+
+        lines.append(maxs)
+        lines.append(mins)
+
+    return lines
 
 
 class matplotlib_colors(Enum):
