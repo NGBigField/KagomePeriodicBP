@@ -1,5 +1,6 @@
+import sys, pathlib
+
 if __name__ == "__main__":
-    import sys, pathlib
     src_folder = pathlib.Path(__file__).parent.parent.__str__()
     if src_folder not in sys.path:
         sys.path.append(src_folder)
@@ -18,7 +19,7 @@ import threading
 def _update_state(max_memory, max_cpu, print_out:TextIO):
     s = ""
     s += add_color(f"max_memory", PrintColors.CYAN) +f" = "+ add_color(f"{max_memory!r}", PrintColors.RED) +"[GB]\n"
-    s += add_color(f"max_cpu   ", PrintColors.CYAN) +f" = "+ add_color(f"{max_cpu!r}"   , PrintColors.RED) +"[%]"
+    s += add_color(f"max_cpu   ", PrintColors.CYAN) +f" = "+ add_color(f"{max_cpu!r}"   , PrintColors.RED) +"[%]\n\n\n\n"
     print(s, file=print_out)
 
 

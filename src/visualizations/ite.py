@@ -1080,7 +1080,7 @@ def plot_from_log(
         if name=="health" and not plot_health_figure:
             continue
 
-        if name=="network_movie" 
+        if name=="network_movie":
             if capture_lattice_movie:
                 movie = _plot_func(log_name, all_figs["main"], all_axes["main"], all_data["main"])                
             continue

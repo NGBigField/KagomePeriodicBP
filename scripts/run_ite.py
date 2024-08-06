@@ -6,7 +6,7 @@ from containers import Config, HamiltonianFuncAndInputs
 from unit_cell import UnitCell
 import unit_cell.get_from as get_unit_cell_from 
 
-from utils import strings, lists
+from utils import strings, lists, processes
 from typing import Iterable, TypeAlias, Literal
 _Bool : TypeAlias = bool|Literal[0, 1]
 
@@ -140,16 +140,17 @@ def _plot_field_over_time() -> None:
 
 
 def main(
-    D = 3,
-    N = 3,
-    chi_factor : int|float = 1.2,
+    D = 4,
+    N = 2,
+    chi_factor : int|float = 1.0,
     live_plots:_Bool|Iterable[_Bool] = [0,0,0], 
     progress_bar:Literal['all_active', 'all_disabled', 'only_main'] = 'all_active',
     results_filename:str|None = None,
     parallel:bool = False,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
-    unit_cell_from:Literal["random","last","best","tnsu"]|str = "best"
+    unit_cell_from:Literal["random","last","best","tnsu"]|str = "best",
+    monitor_cpu_and_ram:bool = True
 )->tuple[float, str]:
 
     assert N>=2
@@ -203,6 +204,9 @@ def main(
         append_to_head += _get_time_steps(2, 2, 50) 
         append_to_head += _get_time_steps(3, 3, 100)
         config.ite.time_steps = append_to_head + config.ite.time_steps
+
+    if monitor_cpu_and_ram:
+        processes.monitor_crnt_process()
 
     ## Run:
     energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config, common_results_name=results_filename)
