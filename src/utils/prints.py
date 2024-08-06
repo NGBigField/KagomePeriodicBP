@@ -35,11 +35,11 @@ class StaticPrinter():
     @decorators.ignore_first_method_call
     def clear(self) -> None:
         # Get info about what was printed until now:
-        reversed_prined_lengths = self.printed_lines_lengths.copy()
-        reversed_prined_lengths.reverse()
+        reversed_printed_lengths = self.printed_lines_lengths.copy()
+        reversed_printed_lengths.reverse()
 
         # Act according to `in_place`:
-        for is_first, is_last, line_width in lists.iterate_with_edge_indicators(reversed_prined_lengths):
+        for is_first, is_last, line_width in lists.iterate_with_edge_indicators(reversed_printed_lengths):
             if self.in_place:
                 if not is_first:
                     pass   #TODO: Here we have a small bug that causes stacked static printers to override one-another                    
@@ -66,9 +66,9 @@ class StaticPrinter():
 
 class StaticNumOutOfNum():
     @overload
-    def __init__(self, list:list[_T], print_prefix:str="", print_suffix:str="", print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False) -> None: ...
+    def __init__(self, expected_end_or_list:list[_T], print_prefix:str="", print_suffix:str="", print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False) -> None: ...
     @overload
-    def __init__(self, expected_end:int, print_prefix:str="", print_suffix:str="", print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False) -> None: ...
+    def __init__(self, expected_end_or_list:int, print_prefix:str="", print_suffix:str="", print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False) -> None: ...
     def __init__(self, expected_end_or_list:int|list[_T], print_prefix:str="", print_suffix:str="", print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False) -> None:
         if isinstance(expected_end_or_list, list):
             items = iter(expected_end_or_list)

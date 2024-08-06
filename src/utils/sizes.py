@@ -3,8 +3,7 @@ if __name__ == "__main__":
     src_folder = pathlib.Path(__file__).parent.parent.__str__()
     if src_folder not in sys.path:
         sys.path.append(src_folder)
-    
-    from memory_profiler import profile
+
     import cProfile 
     import pstats
 
