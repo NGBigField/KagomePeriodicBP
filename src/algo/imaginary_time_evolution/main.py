@@ -156,7 +156,6 @@ def _initial_inputs(
     ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config,filename=common_results_name)
     plots = ITEPlots(active=config.visuals.live_plots, config=config)
 
-
     ## Monitor system performance:
     if config.monitoring_system.monitor_cpu or config.monitoring_system.monitor_ram:
         processes.monitor_crnt_process(

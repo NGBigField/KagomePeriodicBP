@@ -22,7 +22,7 @@ class MonitorProcessKwargs(TypedDict):
     cpu_interval_time:   NotRequired[float]
     sleep_time_interval: NotRequired[float]
     print_out:           NotRequired[TextIO]
-    
+
 class _MonitorProcessKwargsFilled(TypedDict):
     track_cpu:           Required[bool]
     track_ram:           Required[bool]
@@ -40,7 +40,7 @@ _monitor_process_kwargs_defaults = MonitorProcessKwargs(
     track_cpu=True,
     track_ram=True,
     cpu_interval_time=1,
-    sleep_time_interval=4,
+    sleep_time_interval=15,
     print_out=sys.stdout
 )
 

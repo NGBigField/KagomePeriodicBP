@@ -140,7 +140,7 @@ def _plot_field_over_time() -> None:
 
 
 def main(
-    D = 2,
+    D = 5,
     N = 2,
     chi_factor : int|float = 1.0,
     live_plots:_Bool|Iterable[_Bool] = [0,0,0], 
