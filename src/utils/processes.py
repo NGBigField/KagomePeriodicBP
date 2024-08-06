@@ -14,16 +14,54 @@ import os
 import time
 from typing import TextIO
 import threading 
+from typing import TypedDict, Unpack, NotRequired, Required, Optional, TypeGuard
+
+class MonitorProcessKwargs(TypedDict):
+    track_cpu:           NotRequired[bool]
+    track_ram:           NotRequired[bool]
+    cpu_interval_time:   NotRequired[float]
+    sleep_time_interval: NotRequired[float]
+    print_out:           NotRequired[TextIO]
+    
+class _MonitorProcessKwargsFilled(TypedDict):
+    track_cpu:           Required[bool]
+    track_ram:           Required[bool]
+    cpu_interval_time:   Required[float]
+    sleep_time_interval: Required[float]
+    print_out:           Required[TextIO]
+
+def fill_defaults(kwargs:MonitorProcessKwargs) -> TypeGuard[_MonitorProcessKwargsFilled]:
+    for key, default_value in _monitor_process_kwargs_defaults.items():
+        if key not in kwargs:
+            kwargs[key] = default_value
+    return True
+
+_monitor_process_kwargs_defaults = MonitorProcessKwargs(
+    track_cpu=True,
+    track_ram=True,
+    cpu_interval_time=1,
+    sleep_time_interval=4,
+    print_out=sys.stdout
+)
 
 
-def _update_state(max_memory, max_cpu, print_out:TextIO):
+
+def _results_str(max_memory, max_cpu, **kwargs:Unpack[_MonitorProcessKwargsFilled]) -> str:
     s = ""
-    s += add_color(f"max_memory", PrintColors.CYAN) +f" = "+ add_color(f"{max_memory!r}", PrintColors.RED) +"[GB]\n"
-    s += add_color(f"max_cpu   ", PrintColors.CYAN) +f" = "+ add_color(f"{max_cpu!r}"   , PrintColors.RED) +"[%]\n\n\n\n"
-    print(s, file=print_out)
+    if kwargs['track_ram']:
+        s += add_color(f"max_memory", PrintColors.CYAN) +f" = "+ add_color(f"{max_memory!r}", PrintColors.RED) +"[GB]\n"
+    if kwargs['track_cpu']:
+        s += add_color(f"max_cpu   ", PrintColors.CYAN) +f" = "+ add_color(f"{max_cpu!r}"   , PrintColors.RED) +"[%]\n\n\n\n"
+    return s
+
+def _update_state(max_memory, max_cpu, **kwargs:Unpack[_MonitorProcessKwargsFilled]):
+    out = kwargs['print_out']
+    s = _results_str(max_memory, max_cpu, **kwargs)
+    print(s, file=out)
 
 
-def _thread_job(process:psutil.Process, sleep_time:float=2, cpu_interval_time:float=1, print_out:TextIO=sys.stdout) -> None:
+def _thread_job(process:psutil.Process, **kwargs:Unpack[_MonitorProcessKwargsFilled]) -> None:
+
     max_memory = 0
     max_cpu = 0
 
@@ -31,32 +69,32 @@ def _thread_job(process:psutil.Process, sleep_time:float=2, cpu_interval_time:fl
         ## Get memory and cpu
         memory_info = process.memory_info()
         crnt_memory = memory_info.rss / (1024 ** 3)   # Convert bytes to GB
-        crnt_cpu = process.cpu_percent(interval=cpu_interval_time)
+        crnt_cpu = process.cpu_percent(interval=kwargs["cpu_interval_time"])
 
         ## Follow max value:
-        if crnt_memory > max_memory:
+        if kwargs["track_ram"] and crnt_memory > max_memory:
             max_memory = crnt_memory
-            _update_state(max_memory, max_cpu, print_out)
+            _update_state(max_memory, max_cpu, **kwargs)
         
-        if crnt_cpu > max_cpu:
+        if kwargs['track_cpu'] and crnt_cpu > max_cpu:
             max_cpu = crnt_cpu
-            _update_state(max_memory, max_cpu, print_out)
+            _update_state(max_memory, max_cpu, **kwargs)
 
         # SLeep:
-        time.sleep(sleep_time)  # Adjust sleep time as needed
+        time.sleep(kwargs["sleep_time_interval"])  # Adjust sleep time as needed
 
     ## end:
-    print(f"max_memory = {max_memory!r}[GB]")
-    print(f"max_cpu    = {max_cpu!r}[%]")
+    s = _results_str(max_memory, max_cpu, **kwargs)
+    print(s)
     return 
 
 
-def monitor_crnt_process() -> None:
+def monitor_crnt_process(**kwargs:Unpack[MonitorProcessKwargs]) -> None:
     process = psutil.Process(os.getpid())
-    return monitor_process(process)
+    return monitor_process(process, **kwargs)
 
 
-def monitor_process(process:psutil.Process, sleep_time:float=2, cpu_interval_time:float=1) -> None:
+def monitor_process(process:psutil.Process, **kwargs:Unpack[MonitorProcessKwargs]) -> None:
     """Measures the peak memory usage of a process in GB.
 
     Args:
@@ -64,8 +102,9 @@ def monitor_process(process:psutil.Process, sleep_time:float=2, cpu_interval_tim
 
     Returns:
     The peak memory usage in GB.
-    """
-    thread = threading.Thread(target=_thread_job, args=(process, sleep_time, cpu_interval_time), daemon=True)
+    """    
+    fill_defaults(kwargs)
+    thread = threading.Thread(target=_thread_job, args=[process], kwargs=kwargs, daemon=True)
     thread.start()
 
 

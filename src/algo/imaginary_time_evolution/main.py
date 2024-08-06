@@ -34,7 +34,7 @@ import numpy as np
 from numpy.linalg import norm
 
 # Import our shared utilities
-from utils import lists, logs, decorators, errors, prints, visuals, strings
+from utils import lists, logs, decorators, prints, visuals, strings, processes
 
 # For copying config:
 from copy import deepcopy
@@ -155,6 +155,14 @@ def _initial_inputs(
     ## Init tracking lists and plots:
     ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config,filename=common_results_name)
     plots = ITEPlots(active=config.visuals.live_plots, config=config)
+
+
+    ## Monitor system performance:
+    if config.monitoring_system.monitor_cpu or config.monitoring_system.monitor_ram:
+        processes.monitor_crnt_process(
+            track_cpu=config.monitoring_system.monitor_cpu,
+            track_ram=config.monitoring_system.monitor_ram
+        )
 
     return config, unit_cell, logger, messages, step_stats, ite_tracker, plots
 

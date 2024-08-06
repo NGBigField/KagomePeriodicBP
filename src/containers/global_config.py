@@ -1,9 +1,10 @@
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, field
 from containers.contractions import BubbleConGlobalConfig, BubbleconContractionConfig
 from containers.belief_propagation import BPConfig
 from containers.sizes_and_dimensions import TNDimensions
 from containers.imaginary_time_evolution import ITEConfig, IterativeProcessConfig
 from containers.visuals import VisualsConfig
+from containers.performance import MonitoringSystemConfig
 from containers._meta import _ConfigClass
 from utils import prints, sizes
 from copy import deepcopy
@@ -25,25 +26,20 @@ class _StoreConfigClasses:
 @dataclass
 class Config(_StoreConfigClasses, _ConfigClass): 
     # The actual stored data:
-    bp : BPConfig 
-    ite : ITEConfig 
-    iterative_process : IterativeProcessConfig
-    dims : TNDimensions
-    visuals : VisualsConfig
-    contraction : BubbleconContractionConfig   # non-BP contraction config
+    bp : BPConfig                               = field(default_factory=BPConfig) 
+    ite : ITEConfig                             = field(default_factory=ITEConfig) 
+    iterative_process : IterativeProcessConfig  = field(default_factory=IterativeProcessConfig)
+    dims : TNDimensions                         = field(default_factory=TNDimensions)
+    visuals : VisualsConfig                     = field(default_factory=VisualsConfig)
+    contraction : BubbleconContractionConfig    = field(default_factory=BubbleconContractionConfig)  
+    monitoring_system : MonitoringSystemConfig  = field(default_factory=MonitoringSystemConfig)  
 
     @staticmethod
     def derive_from_dimensions(D:int)->"Config":
-
-        config = Config(
-            bp=BPConfig(trunc_dim=2*D**2),
-            ite=ITEConfig(),
-            iterative_process=IterativeProcessConfig(),
-            dims=TNDimensions(virtual_dim=D),
-            visuals=VisualsConfig(),
-            contraction=BubbleconContractionConfig(trunc_dim=2*D**2+10)
-        )
-
+        config = Config()
+        config.bp=BPConfig(trunc_dim=2*D**2)
+        config.dims=TNDimensions(virtual_dim=D)
+        config.contraction=BubbleconContractionConfig(trunc_dim=2*D**2+10)
         # if D>3:
         #     config.bp.trunc_dim = D**2
         #     config.trunc_dim = 2*D**2

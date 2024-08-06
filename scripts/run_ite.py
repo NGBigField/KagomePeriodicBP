@@ -140,7 +140,7 @@ def _plot_field_over_time() -> None:
 
 
 def main(
-    D = 4,
+    D = 2,
     N = 2,
     chi_factor : int|float = 1.0,
     live_plots:_Bool|Iterable[_Bool] = [0,0,0], 
@@ -205,8 +205,7 @@ def main(
         append_to_head += _get_time_steps(3, 3, 100)
         config.ite.time_steps = append_to_head + config.ite.time_steps
 
-    if monitor_cpu_and_ram:
-        processes.monitor_crnt_process()
+    config.monitoring_system.set_all(monitor_cpu_and_ram)
 
     ## Run:
     energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config, common_results_name=results_filename)
