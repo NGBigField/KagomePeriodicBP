@@ -1063,7 +1063,7 @@ def plot_from_log(
     # log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3 - short",  # short
     save:bool = True,
     plot_health_figure:bool = False,
-    capture_lattice_movie:bool = True
+    capture_lattice_movie:bool = False
 ):
     
     _print_log_header(log_name)
@@ -1080,8 +1080,9 @@ def plot_from_log(
         if name=="health" and not plot_health_figure:
             continue
 
-        if name=="network_movie" and capture_lattice_movie:
-            movie = _plot_func(log_name, all_figs["main"], all_axes["main"], all_data["main"])
+        if name=="network_movie" 
+            if capture_lattice_movie:
+                movie = _plot_func(log_name, all_figs["main"], all_axes["main"], all_data["main"])                
             continue
 
         # Plot

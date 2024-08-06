@@ -38,16 +38,14 @@ def job(
         raise ValueError(f"Invalid parallel value {parallel!r}")
 
     # Progress bar:
-    if progress_bar == True:
-        progress_bar_in = 'only_main'
-    else:
-        progress_bar_in = 'all_disabled'
+    if progress_bar == True:    progress_bar_in = 'only_main'
+    else:                       progress_bar_in = 'all_disabled'
 
     ## Additional control:
-    if control == 0:
-        hamiltonian_str = "AFM"
-    elif control == 1:
-        hamiltonian_str = "AFM-T"
+    if control == 0:    hamiltonian_str = "AFM"
+    elif control == 1:  hamiltonian_str = "AFM-T"
+    else:
+        raise ValueError(f"Invalid control value {control!r}")
 
     ## Run:
     energy, unit_cell_file_path = run_ite(
@@ -129,7 +127,7 @@ def sender(
     vals['method'] = [1, 3]
     vals['seed'] = list(range(5))
     vals['parallel'] = [0]
-    vals['control'] = [0]
+    vals['control'] = [0, 1]
 
     user_input = _check_given_dimensions()
     if user_input is not None:
