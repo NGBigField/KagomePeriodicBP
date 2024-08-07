@@ -77,7 +77,7 @@ def _check_given_dimensions() -> dict[str, int]|None:
 
     ## Check function call:
     if len(argv) != NUM_EXPECTED_ARGS:
-        None
+        return None
 
     ## Parse args:
     print(f"The {NUM_EXPECTED_ARGS} arguments are:")
