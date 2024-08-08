@@ -14,7 +14,15 @@ import os
 import time
 from typing import TextIO
 import threading 
-from typing import TypedDict, Unpack, NotRequired, Required, Optional, TypeGuard
+
+from typing import TypedDict, TypeGuard
+
+try:  ## Depend on python version
+    from typing import Unpack, NotRequired, Required
+except ImportError:
+    from typing import Optional as NotRequired
+    from typing import Optional as Required
+    from typing import Optional as Unpack
 
 class MonitorProcessKwargs(TypedDict):
     track_cpu:           NotRequired[bool]

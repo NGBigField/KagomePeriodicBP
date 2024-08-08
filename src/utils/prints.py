@@ -1,6 +1,6 @@
 from utils.strings import StrEnum, SpecialChars, num_out_of_num
 from utils import decorators, lists, arguments
-from typing import Any, Literal, Optional, TextIO, List, overload, TypeVar, Iterator
+from typing import Any, Literal, Optional, TextIO, List, overload, TypeVar, Iterator, Generic
 
 # For defining print std_out or other:
 import sys
@@ -64,7 +64,7 @@ class StaticPrinter():
     
 
 
-class StaticNumOutOfNum():
+class StaticNumOutOfNum(Generic[_T]):
     @overload
     def __init__(self, expected_end_or_list:list[_T], print_prefix:str="", print_suffix:str="", print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False) -> None: ...
     @overload
@@ -86,12 +86,12 @@ class StaticNumOutOfNum():
         self.counter : int = -1
         self._sparse_show_counter : int = 0
         self._is_iterated : bool = False
-        self._following_items : None|list[_T] = items
+        self._following_items : None|Iterator[_T] = items
         # First print:
         if expected_end>0:
             self._show()
 
-    def __next__(self) -> int:
+    def __next__(self) -> int|_T:
         try:
             val = self.next()
         except StopIteration:
@@ -106,7 +106,7 @@ class StaticNumOutOfNum():
     def _check_end_iterations(self)->bool:
         return self._is_iterated and self.iteration_num > self.expected_end
 
-    def next(self, increment:int=1, extra_str:Optional[str]=None, every:int=1) -> int:
+    def next(self, increment:int=1, extra_str:Optional[str]=None, every:int=1) -> int|_T:
         self.counter += increment
         self._sparse_show_counter += 1
         if self._sparse_show_counter < every:
@@ -145,7 +145,7 @@ class StaticNumOutOfNum():
 
 
 class ProgressBar(StaticNumOutOfNum):
-    def __init__(self, expected_end:int|list, print_prefix:str="", print_suffix:str="", print_length:int=40, print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False): 
+    def __init__(self, expected_end:int|list[_T], print_prefix:str="", print_suffix:str="", print_length:int=40, print_out:TextIO|Literal[False]=sys.stdout, in_place:bool=False): 
         # Save basic data:        
         self.print_length :int = print_length
         super().__init__(expected_end, print_prefix, print_suffix, print_out, in_place)

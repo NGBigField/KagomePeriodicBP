@@ -14,6 +14,12 @@ class _LogData:
     filename : str
 
 
+def _parse_strings(D_str:list[str], energies_str:list[str]) -> tuple[int, list[float]]:
+    D = int(D_str[0])
+    energies = [float(e) for e in energies_str]
+    return D, energies
+
+
 def main(
     logs_location:str=DEFAULT_LOG_FOLDER
 ):
@@ -27,11 +33,10 @@ def main(
         D, energies = logs.search_words_in_log(fullpath, words=["virtual_dim:", "Mean energy after segment ="])
 
         # Parse data:
-        D = int(D[0])
-        energies = [float(e) for e in energies]
         try:
+            D, energies = _parse_strings(D, energies)
             best_energy = min(energies)
-        except ValueError:
+        except (ValueError, IndexError) as e:
             continue
 
         this_data = _LogData(D=D, best_energy=best_energy, filename=filename)
