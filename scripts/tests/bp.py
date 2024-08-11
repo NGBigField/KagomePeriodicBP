@@ -202,7 +202,7 @@ def test_bp_convergence_all_runs(
     ##  Params:
     methods_and_Ns:dict[str, list[int]] = dict(
         random = list(range(2, 7)),
-        bp     = [2, 3]
+        bp     = [2, 3, 4]
     ) 
 
     ## config:
@@ -281,7 +281,7 @@ def _new_axes() -> Axes:
     return ax
 
 
-def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, what:Literal['true', 'error']) -> Axes:
+def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, what:Literal['true', 'error'], yscale:Literal['linear', 'log']="linear") -> Axes:
     ## Prepare plots:
     ax = _new_axes()
 
@@ -310,9 +310,14 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, w
             y_vals = [abs(y-ref_y) for y in data[y]] 
             if method == 'exact':
                 return []
+            
+        if method == "bp":
+            label = "blockBP"
+        elif method == "random":
+            label = "Random"
 
         lines += visuals.plot_with_spread(x_vals=x_vals, y_vals=y_vals, axes=ax, also_plot_max_min_dots=False, 
-                                         linewidth=2, marker=marker, color=color, markersize=marker_size, label=method)
+                                         linewidth=3, marker=marker, color=color, markersize=marker_size, label=label)
 
         return lines
     
@@ -379,7 +384,7 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, w
     #
     # ax.set_xscale('linear')
     # ax.set_yscale('log')
-    ax.set_yscale('linear')
+    ax.set_yscale(yscale)
 
     ax.figure.tight_layout()
 
@@ -401,6 +406,7 @@ def _plot_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
         print(f"x={x!r} ; y={y!r}")
         ax =_plot_from_table_per_D_per_x_y(D, table, x, y, 'true')
         ax =_plot_from_table_per_D_per_x_y(D, table, x, y, 'error')
+        ax =_plot_from_table_per_D_per_x_y(D, table, x, y, 'error', yscale='log')
 
     print("Done")
 
@@ -505,6 +511,7 @@ def main_test():
     test_bp_convergence_all_runs([2, 3])
     plot_bp_convergence_results()
 
+    print("Done.")
 
 if __name__ == "__main__":
     main_test()
