@@ -21,7 +21,7 @@ from containers.sizes_and_dimensions import TNDimensions
 #|                           Declared Function                                |#
 # ============================================================================ #
      
-def create_kagome_tn(
+def create_repeated_kagome_tn(
     d : int,  # Physical dimenstion 
     D : int,  # Virutal\Bond dimenstion  
     N : int,  # Lattice-size - Number of upper-triangles at each edge of the hexagon-block
@@ -43,7 +43,7 @@ def create_kagome_tn(
 
 
 def kagome_tn_from_unit_cell(unit_cell:UnitCell, dims:TNDimensions) -> KagomeTNRepeatedUnitCell:
-    return create_kagome_tn(
+    return create_repeated_kagome_tn(
         d = dims.physical_dim,
         D = dims.virtual_dim,
         N = dims.big_lattice_size,

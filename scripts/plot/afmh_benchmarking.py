@@ -66,7 +66,7 @@ def _robust_energy_measurement(unit_cell:UnitCell) -> MeasurementsOnUnitCell:
     return measurements.run_converged_measurement_test(unit_cell, config=config)
     
 
-def _collect_best_results():
+def _collect_best_results(measure_again:bool=False):
     Ds = []
     energies = []
     for fullpath in files.get_all_files_fullpath_in_folder(BestUnitCellData._folder_fullpath()):
@@ -75,9 +75,16 @@ def _collect_best_results():
         D = data.D
         unit_cell = data.unit_cell
 
-        ## Verify energy:
-        measurements = _robust_energy_measurement(unit_cell)
-        energy = measurements.mean_energy
+        print(f"D={D}")
+        print(f"    Energy at run: {energy_at_run}")
+
+        if measure_again:
+            ## Verify energy:
+            measurements = _robust_energy_measurement(unit_cell)
+            energy = measurements.mean_energy
+            print(f"    Energy verified: {energy}")
+        else:
+            energy = energy_at_run
         
         
         ## Keep data:
@@ -87,8 +94,8 @@ def _collect_best_results():
     return Ds, energies
 
 
-def _plot_line(x, y, linestyle:str="-", label:str|None=None, ) -> Line2D:
-    line = plt.plot(x, y, label=label, linewidth=4, linestyle=linestyle)
+def _plot_line(x, y, **kwargs) -> Line2D:
+    line = plt.plot(x, y, **kwargs)
     return line[0]
 
 
@@ -138,22 +145,33 @@ def _create_csv(Ds, SUs, VUs, Ds_2, energies) -> None:
     print(tabular)
 
 
-def main():
+def main(
+    measure_again:bool = False
+):
     ## Collect reference results
     Ds, SUs, VUs = _collect_references()
 
     ## Plot references::
-    line1 = _plot_line(Ds, SUs, linestyle=":", label="reference simple-update"     )
-    line2 = _plot_line(Ds, VUs, linestyle=":", label="reference variational-update")
+    line1 = _plot_line(Ds, SUs, linestyle=":", label="simple-update"     , linewidth=3, alpha=0.8)
+    line2 = _plot_line(Ds, VUs, linestyle=":", label="variational-update", linewidth=3, alpha=0.8)
 
     ## collet my results:
-    Ds_2, energies = _collect_best_results()
-    line3 = _plot_line(Ds_2, energies, label="BlockBP")
+    Ds_2, energies = _collect_best_results(measure_again=measure_again)
+    line3 = _plot_line(Ds_2, energies, marker="*", markersize=15, linestyle="", label="BlockBP")
 
-    ## Pretty plot:
+    ## colors:
+    line1.set_color("tab:green")
+    line2.set_color("tab:blue")
+    line3.set_color("tab:red")
+
+    ## Pretty and labels:
     ax = line1.axes
     ax.grid()
+    ax.set_xlabel("bond-dimension $D$")
+    ax.set_ylabel("Ground-State Energy")
+    ax.set_title("Comparing ground state energies on AFM-H Kagome")
     ax.legend()
+
 
     visuals.draw_now()
 

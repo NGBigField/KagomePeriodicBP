@@ -1,9 +1,10 @@
-from dataclasses import dataclass, fields
-from containers.contractions import BubbleConConfig, ContractionConfig
+from dataclasses import dataclass, fields, field
+from containers.contractions import BubbleConGlobalConfig, BubbleconContractionConfig
 from containers.belief_propagation import BPConfig
 from containers.sizes_and_dimensions import TNDimensions
 from containers.imaginary_time_evolution import ITEConfig, IterativeProcessConfig
 from containers.visuals import VisualsConfig
+from containers.performance import MonitoringSystemConfig
 from containers._meta import _ConfigClass
 from utils import prints, sizes
 from copy import deepcopy
@@ -19,31 +20,26 @@ class _StoreConfigClasses:
     ITEConfig     = ITEConfig
     IterativeProcessConfig = IterativeProcessConfig
     VisualsConfig = VisualsConfig
-    ContractionConfig = ContractionConfig
+    ContractionConfig = BubbleconContractionConfig
 
 
 @dataclass
 class Config(_StoreConfigClasses, _ConfigClass): 
     # The actual stored data:
-    bp : BPConfig 
-    ite : ITEConfig 
-    iterative_process : IterativeProcessConfig
-    dims : TNDimensions
-    visuals : VisualsConfig
-    contraction : ContractionConfig   # non-BP contraction config
+    bp : BPConfig                               = field(default_factory=BPConfig) 
+    ite : ITEConfig                             = field(default_factory=ITEConfig) 
+    iterative_process : IterativeProcessConfig  = field(default_factory=IterativeProcessConfig)
+    dims : TNDimensions                         = field(default_factory=TNDimensions)
+    visuals : VisualsConfig                     = field(default_factory=VisualsConfig)
+    contraction : BubbleconContractionConfig    = field(default_factory=BubbleconContractionConfig)  
+    monitoring_system : MonitoringSystemConfig  = field(default_factory=MonitoringSystemConfig)  
 
     @staticmethod
     def derive_from_dimensions(D:int)->"Config":
-
-        config = Config(
-            bp=BPConfig(trunc_dim=2*D**2),
-            ite=ITEConfig(),
-            iterative_process=IterativeProcessConfig(),
-            dims=TNDimensions(virtual_dim=D),
-            visuals=VisualsConfig(),
-            contraction=ContractionConfig(trunc_dim=2*D**2+10)
-        )
-
+        config = Config()
+        config.bp=BPConfig(trunc_dim=2*D**2)
+        config.dims=TNDimensions(virtual_dim=D)
+        config.contraction=BubbleconContractionConfig(trunc_dim=2*D**2+10)
         # if D>3:
         #     config.bp.trunc_dim = D**2
         #     config.trunc_dim = 2*D**2
@@ -55,13 +51,13 @@ class Config(_StoreConfigClasses, _ConfigClass):
         return self.contraction.trunc_dim
     @chi.setter
     def chi(self, value) -> None:
-        self.contraction.trunc_dim = value
+        self.contraction.trunc_dim = int(value)
     @property
     def chi_bp(self) -> int:
         return self.bp.trunc_dim
     @chi_bp.setter
     def chi_bp(self, value) -> None:
-        self.bp.trunc_dim = value
+        self.bp.trunc_dim = int(value)
 
     def set_parallel(self, value:bool) -> None:
         assert isinstance(self, bool) or value in [0, 1]
@@ -72,15 +68,24 @@ class Config(_StoreConfigClasses, _ConfigClass):
         self.__post_init__()
         
     def __post_init__(self)->None:
-        # other post inits:
+        ## Call other post inits:
         self.ite.__post_init__()
         self.bp.__post_init__()
-        # specials:
         
+        ## Check chi
         if self.chi_bp > self.chi:
             prints.print_warning(f" truncation dim of BP is greater than that of the other bubblcon usages.")
         if not ALLOW_VISUALS:
             self.visuals.live_plots = False
+
+        ## combination between visuals and contraction progress bar:
+        if not self.visuals.progress_bars.is_active_at('bubblecon'):
+            self.contraction.progress_bar = False 
+            self.bp.visuals.bubblecon_progress_bar = False
+
+        if not self.visuals.progress_bars.is_active_at('blockBP'):
+            self.bp.visuals.main_progress_bar = False
+        
 
 
     def strengthen(self, _harder_target:bool=True):

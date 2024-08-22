@@ -1,19 +1,12 @@
-import pathlib, sys
+import _import_main_and_src
 
-if __name__ == "__main__":
-    sys.path.append(
-        str(pathlib.Path(__file__).parent.parent)
-    )
-    import _import_src
-    sys.path.append(
-        str(pathlib.Path(__file__).parent.parent.parent)
-    )
+from scripts.condor.main_sender import main as main_sender
+from scripts.tests.parallel import _single_test_parallel_execution_time_single_bp_step
+
+RESULT_KEYS = ["parallel", 'D', 'N', 'seed', 'bp_step']
 
 
-from scripts.tests.parallel import test_parallel_execution_time, _single_test_parallel_execution_time_single_bp_step
-
-
-def main(
+def job(
     D : int = 2,
     N : int = 2,
     parallel : int = 0   
@@ -39,7 +32,6 @@ def main(
     }
 
     return results
-
 
 
 def plot_results(
@@ -98,5 +90,27 @@ def plot_results(
     print("Done.")
 
 
+def sender() -> None:
+    vals = {}
+    vals['D'] = [2, 3, 4]
+    vals['N'] = list(range(2, 12))
+    vals['chi'] = [1]
+    vals['method'] = [-1]
+    vals['seed'] = list(range(5))
+    vals['parallel'] = [0, 1]
+    vals['control'] = [-1]
+
+    main_sender(
+        job_type="parallel_timings",
+        request_cpus=10,
+        request_memory_gb=8,
+        vals=vals,
+        result_keys=RESULT_KEYS,
+        _local_test=False
+    )
+
+
+
 if __name__ == "__main__":    
-    plot_results()
+    # plot_results()
+    sender()

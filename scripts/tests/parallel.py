@@ -64,7 +64,7 @@ def _single_test_parallel_execution_time_single_bp_step(
     bp_config = BPConfig(
         max_iterations=10, trunc_dim=D**2, msg_diff_terminate=1e-8, parallel_msgs=parallel
     )
-    steps_iterator = prints.ProgressBar.inactive()
+    bp_config.visuals.set_all_progress_bars(False)
 
     ## Prepare TN:
     if unit_cell is None:
@@ -75,7 +75,7 @@ def _single_test_parallel_execution_time_single_bp_step(
 
     ## Preform BP step:
     t1 = perf_counter()
-    messages, error = _belief_propagation_step(full_tn, None, bp_config, steps_iterator, False)
+    _, _, _ = _belief_propagation_step(full_tn, None, None, config=bp_config, prog_bar_obj=None)
     t2 = perf_counter()
     bp_step_time = t2-t1
 

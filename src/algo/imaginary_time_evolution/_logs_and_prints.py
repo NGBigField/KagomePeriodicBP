@@ -5,7 +5,9 @@ from typing import Callable
 from algo.belief_propagation import BPConfig, BPStats
 
 # Import containers of ite:
-from containers.imaginary_time_evolution import ITEProgressTracker, ITESegmentStats
+from containers.imaginary_time_evolution import ITESegmentStats
+from containers._ite_tracker import ITEProgressTracker
+from containers.visuals import ProgBarPrintLevel
 from containers import Config
 from unit_cell import UnitCell
 
@@ -16,10 +18,36 @@ from _error_types import BPNotConvergedError
 from utils import lists, logs, strings, prints
 
 
+EPSILON = 1e-5
 
-def get_progress_bar(config:Config, num_repeats:int, print_prefix:str)->prints.ProgressBar:
+def _close_to(x:float, y:float) -> bool:
+    return abs(x-y)<EPSILON
+
+def formatted_delta_t_str(delta_t:float) -> str:
+    ## Try exponent notation:
+    for e in range(1, 20):
+        for sign in [-1, +1]:
+            val = 10**(sign*e)
+            if _close_to(val, delta_t):
+                return f"{val}"
+
+    ## Try int:
+    int_version = int(delta_t)
+    if _close_to(int_version, delta_t):
+        return f"{int_version}"
+
+    ## Else, regular float:
+    return f"{delta_t}"
+
+def get_progress_bar(config:Config, num_repeats:int, print_prefix:str, level:ProgBarPrintLevel, also_verify:bool|None=None)->prints.ProgressBar:
     # Progress bar:
-    if config.visuals.progress_bars:
+    is_active_progress_bar = config.visuals.progress_bars.is_active_at(level)
+
+    if also_verify is not None:
+        assert isinstance(also_verify, bool)
+        is_active_progress_bar &= also_verify
+
+    if is_active_progress_bar:
         return prints.ProgressBar(num_repeats, print_prefix=print_prefix)
     else:
         return prints.ProgressBar.inactive()
@@ -85,13 +113,13 @@ def print_or_log_ite_segment_progress(
 
     num_segments = len(config.ite.time_steps)
 
-    if config.visuals.progress_bars:
+    if config.visuals.progress_bars.is_active_at('ITE-per-delta-t'):
         logger_method = logger.debug
     else:
         logger_method = logger.info
 
     logger_method(" ")
-    logger_method("segment: "+strings.num_out_of_num(counter+1, num_segments)+f" ; delta_t={delta_t}: "+strings.num_out_of_num(i+1, num_repeats))
+    logger_method("segment: "+strings.num_out_of_num(counter+1, num_segments)+f" ; delta_t={formatted_delta_t_str(delta_t)}: "+strings.num_out_of_num(i+1, num_repeats))
     logger_method("------------------------------")
     
     return logger_method

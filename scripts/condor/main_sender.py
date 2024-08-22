@@ -1,24 +1,28 @@
-import pathlib, sys, os
 if __name__ == "__main__":
-    sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
+    import _import_main_and_src
 
-    
-import numpy as np
-from copy import deepcopy
+
+import pathlib, sys, os
 
 # Import DictWriter class from CSV module
 from csv import DictWriter
 
-
 # for smart iterations:
 from itertools import product
+
+# for cached look-ups
 from functools import cache
 
+# for user hinting:
+from typing import Literal, TypeAlias
+
+# for time stamps and random strings:
 import string
 import random
 import time
 
-from src import project_paths
+# for paths
+import project_paths
 
 sep = os.sep
 _results_dir = project_paths.data/"condor"
@@ -27,34 +31,35 @@ if not os.path.exists(results_dir_str):
     os.makedirs(results_dir_str)
 
 RAM_MEMORY_IN_2_EXPONENTS = False
-LOCAL_TEST = False
 
-
-RESULT_KEYS_DICT = dict(
-    bp = ["with_bp", 'D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'],
+DEFAULT_RESULT_KEYS_DICT = dict(
     parallel_timings = ["parallel", 'D', 'N', 'seed', 'bp_step'],
     ite_afm = ["seed","D", "N", "chi", "energy", "parallel", "method", "path"],
-    bp_convergence = ['seed', 'D', 'N', 'chi', 'iterations', 'rdm_diff_bp', 'rdm_diff_random', 'z_bp', 'z_random', 'time_bp', 'time_random']
+    bp = ["seed", "D", "N", "method", "time", "energy", "z", "fidelity"]
 )
 
 ## all values:
 DEFAULT_VALS = {}
-DEFAULT_VALS['D'] = list(range(2, 5))
-DEFAULT_VALS['N'] = list(range(2, 5))
-DEFAULT_VALS['chi'] = [1, 2, 3]
-DEFAULT_VALS['method'] = [1, 3]
-DEFAULT_VALS['seed'] = [1]
-DEFAULT_VALS['parallel'] = [0, 1]
+DEFAULT_VALS['D'] = [2]
+DEFAULT_VALS['N'] = [2] # list(range(3, 6))
+DEFAULT_VALS['chi'] = [0.7, 1, 1.5, 2]
+DEFAULT_VALS['method'] = [1, 2, 3]
+DEFAULT_VALS['seed'] = list(range(3))
+DEFAULT_VALS['parallel'] = [0]
+DEFAULT_VALS['control'] = [1, 0]
 
-Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(parallel) $(result_keys)'
+Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(parallel) $(control) $(result_keys)'
+JobType : TypeAlias = Literal["ite_afm", "bp", "parallel_timings"]
 
 
 def main(
-    job_type="ite_afm",  # "ite_afm" / "bp" / "parallel_timings" / "bp_convergence"
-    request_cpus:int=4,
-    request_memory_gb:int=16,
+    job_type:JobType="ite_afm",  
+    request_cpus:int=2,
+    request_memory_gb:int=8,
     vals:dict=DEFAULT_VALS,
-    result_file_name:str|None=None
+    result_file_name:str|None=None,
+    result_keys:list[str]|None=None,
+    _local_test = False
 ):
 
     ## Check inputs and fix:
@@ -65,18 +70,17 @@ def main(
     request_memory_gb = _legit_memory_sizes(request_memory_gb)
     # CPUs:
     if "parallel" in vals and (1 in vals["parallel"] or True in vals["parallel"]):
-        request_cpus = max(request_cpus, 8)
-
-
-    ## Get from job type:
-    result_keys = RESULT_KEYS_DICT[job_type]
+        request_cpus = max(request_cpus, 10)
+    # keys:
+    if result_keys is None:
+        result_keys = DEFAULT_RESULT_KEYS_DICT[job_type]
 
     ## Define paths and names:
     this_folder_path = pathlib.Path(__file__).parent.__str__()
     #
     worker_script_fullpath = this_folder_path+sep+"worker.py"
     results_fullpath       = results_dir_str+sep+result_file_name+".csv"
-    output_files_prefix    = "kagome-bp-"+job_type+"-"+_time_stamp()
+    output_files_prefix    = "kagome-"+job_type+"-"+_time_stamp()+"-"+_random_letters(3)
     #
     print(f"script_fullpath={worker_script_fullpath!r}")
     print(f"results_fullpath={results_fullpath!r}")
@@ -86,7 +90,7 @@ def main(
     ## Define job params:
     req_ram_mem_gb = f"{request_memory_gb}"
     job_params_dicts : list[dict] = []
-    for N, D, method, seed, chi, parallel in product(vals['N'], vals['D'], vals['method'], vals['seed'], vals['chi'], vals['parallel'] ):
+    for N, D, method, seed, chi, parallel, control in product(vals['N'], vals['D'], vals['method'], vals['seed'], vals['chi'], vals['parallel'], vals['control'] ):
         # To strings:
         N = f"{N}"
         D = f"{D}"
@@ -94,6 +98,7 @@ def main(
         seed = f"{seed}"
         chi = f"{chi}"
         parallel = f"{parallel}"
+        control = f"{control}"
 
         job_params_dicts.append( {
             "outfile"       : results_fullpath,                 # outfile
@@ -105,6 +110,7 @@ def main(
             "N"             : N,                                # N
             "chi"           : chi,                              # chi
             "parallel"      : parallel,                         # parallel
+            "control"       : control,                          # control
             "result_keys"   : _encode_list_as_str(result_keys)  # result_keys
         })
 
@@ -127,8 +133,13 @@ def main(
     print(f"    Arguments={Arguments}")
 
 
-    if LOCAL_TEST:
+    if _local_test:
+        from src import project_paths
+        project_paths.add_src()
+        from utils.prints import print_warning
+        print_warning(f"Running a local test!")
         import subprocess
+
         for params_dict in job_params_dicts:
             arguments = ["python", worker_script_fullpath]
             for argument_name in _split_argument():

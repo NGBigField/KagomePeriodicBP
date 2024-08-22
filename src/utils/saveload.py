@@ -66,7 +66,7 @@ class Modes():
 # ==================================================================================== #
 #|                               Inner Functions                                      |#
 # ==================================================================================== #
-def _fullpath(name:str, sub_folder:Optional[str]=None, typ:Literal['data', 'log']='data') -> str:
+def derive_fullpath(name:str, sub_folder:Optional[str]=None, typ:Literal['data', 'log']='data') -> str:
     # Complete missing inputs:
     sub_folder = arguments.default_value(sub_folder, "")
     name = _common_name(name, typ)
@@ -91,7 +91,7 @@ def _common_name(name:str, typ:Literal['data', 'log']='data') -> str:
         
     if given_extension == "."+target_extension:
         return name
-    elif given_extension == ".pkl":
+    elif given_extension == ".pkl" or given_extension == ".csv" :
         return name
     else:
         return name+"."+target_extension
@@ -118,7 +118,7 @@ def append_text(text:str, name:str, sub_folder:Optional[str]=None, in_new_line:b
     assert isinstance(text, str), f"`text` Must be of type str"
     if in_new_line:
         text = "\n"+text
-    fullpath = _fullpath(name, sub_folder, typ='log')
+    fullpath = derive_fullpath(name, sub_folder, typ='log')
     mode = Modes.Append.str()
     flog = open(fullpath, mode)
     flog.write(text)
@@ -126,7 +126,7 @@ def append_text(text:str, name:str, sub_folder:Optional[str]=None, in_new_line:b
 
 
 def exist(name:str, sub_folder:Optional[str]=None) -> bool:
-    fullpath = _fullpath(name, sub_folder)
+    fullpath = derive_fullpath(name, sub_folder)
     return os.path.exists(fullpath)
 
 
@@ -155,7 +155,7 @@ def save(var:Any, name:Optional[str]=None, sub_folder:Optional[str]=None, if_not
     if if_not_exist and exist(name=name, sub_folder=sub_folder):
         return ""
     # fullpath:
-    fullpath = _fullpath(name, sub_folder)
+    fullpath = derive_fullpath(name, sub_folder)
     # Common save or load:
     save_or_load_with_fullpath(fullpath, mode=Modes.Write, var=var)
     # print:
@@ -168,7 +168,7 @@ def load(name:str, sub_folder:Optional[str]=None, none_if_not_exist:bool=False) 
     if none_if_not_exist and not exist(name=name, sub_folder=sub_folder):
         return None
     # fullpath:
-    fullpath = _fullpath(name, sub_folder)
+    fullpath = derive_fullpath(name, sub_folder)
     # Common save or load:
     data = save_or_load_with_fullpath(fullpath, mode=Modes.Read)
     # Load:
@@ -179,7 +179,7 @@ def delete(name:str, sub_folder:Optional[str]=None, if_exist:bool=False)->None:
     if if_exist and not exist(name=name, sub_folder=sub_folder):
         return None 
     # fullpath:
-    fullpath = _fullpath(name, sub_folder)   
+    fullpath = derive_fullpath(name, sub_folder)   
     os.remove(fullpath)
 
 
@@ -187,7 +187,7 @@ def get_size(name:str, sub_folder:Optional[str]=None, if_exist:bool=False) -> in
     if if_exist and not exist(name=name, sub_folder=sub_folder):
         return None  #type: ignore
     # fullpath:
-    fullpath = _fullpath(name, sub_folder)
+    fullpath = derive_fullpath(name, sub_folder)
     # get size
     return os.path.getsize(fullpath)
 

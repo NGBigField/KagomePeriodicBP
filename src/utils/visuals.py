@@ -10,31 +10,40 @@ if __name__ == "__main__":
 
 
 # Everyone needs numpy:
-from matplotlib.pyplot import Axes
 import numpy as np
 
 # for type hints:
-from typing import Optional, Literal, Any, List, Tuple, Iterator, Callable, TypeVar, ClassVar, Generator, TypeAlias, ParamSpec
+from typing import Optional, Any, List, Tuple, Callable, TypeVar, Generator, TypeAlias, ParamSpec, NamedTuple, overload
 
 from _config_reader import ALLOW_VISUALS
 
-if ALLOW_VISUALS:
+if ALLOW_VISUALS:    #pylint: disable=condition-expression-used-as-statement
     # For visuals
     import matplotlib.pyplot as plt
-    from matplotlib.pyplot import Axes
+    from matplotlib.axes import Axes
+    from matplotlib.lines import Line2D
     from matplotlib.figure import Figure
     from mpl_toolkits.mplot3d import Axes3D
     from mpl_toolkits.mplot3d.art3d import Line3D
     from matplotlib.quiver import Quiver
     from matplotlib.text import Text
+    import matplotlib as mpl
 
     # For videos:
     try:
         from moviepy.editor import ImageClip, concatenate_videoclips
     except ImportError as e:
         ImageClip, concatenate_videoclips = None, None
+
+    ## Matplotlib real time:
+    try:
+        mpl.use('TkAgg')
+    except:
+        pass
+
+
 else:
-    Figure, Axes = Any, Any
+    Line2D = None
     plt = None
     ImageClip, concatenate_videoclips = None, None
 
@@ -42,12 +51,14 @@ else:
 # For OOP:
 from enum import Enum
 from functools import wraps
+from dataclasses import dataclass
+import itertools
 
 # for copy:
 from copy import deepcopy
 
 # Use our other utils 
-from utils import strings, assertions, arguments, saveload, types
+from . import strings, assertions, arguments, saveload, types, prints, lists
 
 # For saving plots:
 from pathlib import Path
@@ -77,6 +88,7 @@ DEFAULT_PYPLOT_FIGSIZE = [6.4, 4.8]
 # ============================================================================ #
 _InputType = ParamSpec("_InputType")
 _OutputType = TypeVar("_OutputType")
+_Numeric = TypeVar("_Numeric", int, float)
 _XYZ : TypeAlias = tuple[float, float, float]
 
 # ============================================================================ #
@@ -105,7 +117,7 @@ def get_saved_figures_folder()->Path:
     return folder
 
 
-def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None, extensions:list[str]=["png", "svg"], ) -> None:
+def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None, extensions:list[str]=["png", "svg"]) -> None:
     # Figure:
     if fig is None:
         fig = plt.gcf()
@@ -121,6 +133,13 @@ def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None, extensi
         # Save:
         fig.savefig(fullpath_str)
     return 
+
+def save_figure_all_figures(extensions:list[str]=["svg"]) -> None:
+    time_stamp = strings.time_stamp()
+    for i in plt.get_fignums():
+        fig = plt.figure(i)
+        name = time_stamp + f"_{i}"
+        save_figure(fig, file_name=name, extensions=extensions)
 
 
 def random_uniform_spray(num_coordinates:int, origin:Optional[Tuple[float, ...]]=None):
@@ -145,6 +164,15 @@ def random_uniform_spray(num_coordinates:int, origin:Optional[Tuple[float, ...]]
     return coordinates
 
 
+def _find_axes_in_inputs(*args, **kwargs):
+    # from mpl_toolkits.mplot3d import Axes3D
+    # from matplotlib.pyplot import Axes
+    for x in itertools.chain(args, kwargs.values()):
+        if isinstance(x, (Axes, Axes3D)):
+            return x
+    else:
+        return None
+
 def close_all():
     plt.close('all')
 
@@ -161,7 +189,11 @@ def matplotlib_wrapper(on:bool=True) -> Callable[[Callable[_InputType, _OutputTy
                 raise ModuleNotFoundError("matplotlib was not imported. Probably because `'no_visuals'=true` in config.")
             # Pre-plot                
             if on:
-                fig, (ax) = plt.subplots(nrows=1, ncols=1) 
+                ax = _find_axes_in_inputs(*args, **kwargs)
+                if ax is None:
+                    fig, (ax) = plt.subplots(nrows=1, ncols=1) 
+                else:
+                    fig = ax.get_figure()
             # plot:
             results = func(*args, **kwargs)
             # Post-plot
@@ -255,6 +287,31 @@ class VideoRecorder():
         return frames_dir
 
 
+class _ValuesTupleType(NamedTuple):
+    x: list[float]
+    y: list[float] 
+    kwargs: dict
+
+@dataclass
+class _TwinPlotData:
+    has_twin : bool = False
+    twin_ref : "AppendablePlot" = None 
+    _twin_ordering : int = 0
+
+    def is_first_twin(self) -> bool:
+        return self.has_twin and self._twin_ordering==1
+    
+    def is_second_twin(self) -> bool:
+        return self.has_twin and self._twin_ordering==2
+    
+    def default_color(self) -> str:
+        if self.is_first_twin():
+            return "tab:blue"
+        elif self.is_second_twin():
+            return "tab:red"
+        else:
+            raise ValueError("Unexpected")
+    
 class AppendablePlot():
     def __init__(self, size_factor:float=1.0, axis:Optional[Axes]=None, legend_on:bool=True) -> None:
         #
@@ -266,18 +323,40 @@ class AppendablePlot():
         else:
             assert isinstance(axis, plt.Axes)           
             fig = axis.figure
-        # save data:
+        
+        # Publoc data:
         self.fig  = fig
         self.axis : plt.Axes = axis
-        self.values : dict[str, tuple[list[float], list[float], dict] ] = dict()
+        self.values : dict[str, _ValuesTupleType ] = dict()
         self.axis.get_yaxis().get_major_formatter().set_useOffset(False)  # Stop the weird pyplot tendency to give a "string" offset to graphs
         self.legend_on : bool = legend_on
+        
+        # Private data:
+        self._twin_plot_data : _TwinPlotData = _TwinPlotData() 
+
+        # Update:
         self._update()        
 
 
     @classmethod
     def inactive(cls)->"InactiveAppendablePlot":
         return InactiveAppendablePlot()
+
+    def get_twin_plot(self) -> "AppendablePlot":  
+        ## Prepare twin:
+        twin = AppendablePlot(axis=self.axis.twinx())
+        for ap, color in zip([self, twin], ["tab:blue", "tab:red"], strict=True):
+            ap.axis.set_ylabel(ap.axis.get_ylabel(), color=color)
+            ap.axis.tick_params(axis='y',       labelcolor=color)
+        ## Update twin data:
+        self._twin_plot_data.has_twin = True
+        self._twin_plot_data.twin_ref = twin
+        self._twin_plot_data._twin_ordering = 1
+        twin._twin_plot_data.has_twin = True 
+        twin._twin_plot_data.twin_ref = self
+        twin._twin_plot_data._twin_ordering = 2
+        ## Return
+        return twin
 
     def _next_x(self, name:str) -> float|int:
         x_vals = self.values[name][0]
@@ -287,10 +366,10 @@ class AppendablePlot():
             return x_vals[-1]+1
 
     def _get_xy(self, name:str)->tuple[list[float], list[float]]:
-        x, y = self.values[name]
+        x, y, _ = self.values[name]
         return x, y
 
-    def _add_xy(self, name:str, x:float|None ,y:float|None, plt_kwargs:dict=dict())->None:
+    def _add_xy(self, name:str, x:float|None ,y:float|None, plot_kwargs:dict=dict())->None:
         # If new argument name:
         if name not in self.values:
             self.values[name] = ([], [], {})
@@ -300,7 +379,7 @@ class AppendablePlot():
         # Append:     
         self.values[name][0].append(x) 
         self.values[name][1].append(y) 
-        for key, value in plt_kwargs.items():
+        for key, value in plot_kwargs.items():
             self.values[name][2][key] = value
 
     def _clear_plots(self)->list[str]:
@@ -323,9 +402,7 @@ class AppendablePlot():
         # Add values:
         for name, values in self.values.items():    
             # Get plot info:
-            x = values[0]
-            y = values[1]
-            kwargs = values[2]
+            x, y, kwargs = values
             # choose marker:
             if "marker" not in kwargs:
                 kwargs = deepcopy( values[2] )
@@ -346,35 +423,47 @@ class AppendablePlot():
         if draw_now_:
             draw_now()
 
-    # def scatter(self, x, y, draw_now_:bool=True, plt_kwargs:dict=dict())->None:
-    #     pass
+    def _derive_x_y(self, val:tuple|float|int|None) -> tuple[float, float]:
+        if isinstance(val, tuple):
+            x = val[0]
+            y = val[1]
+        elif isinstance(val, float|int):
+            x = None
+            y = val
+        elif val is None:
+            x = None
+            y = None
+        else:
+            raise TypeError(f"val of type {type(val)!r} does not match possible cases.")
+        return x, y
+
+    def _fix_plot_kwargs(self, **plot_kwargs) -> dict:
+        if self._twin_plot_data.has_twin:
+            color = self._twin_plot_data.default_color()
+            if 'color' in plot_kwargs:
+                prints.print_warning("given color as input to twin plot")
+            plot_kwargs['color'] = color
+
+        return plot_kwargs 
 
     def append(
         self, 
         draw_now_:bool=True, 
-        plt_kwargs:dict|None=None, 
-        values:dict[str, float]|dict[str, tuple[float,float]]|None=None, 
-        **kwargs:tuple[float,float]|float
+        plot_kwargs:dict|None=None, 
+        **values:float|tuple[float,float], 
     )->None:
         
         ## Default values:
         if values is None: values = dict()
-        if plt_kwargs is None: plt_kwargs = dict()
+        if plot_kwargs is None: plot_kwargs = dict()
         ## append to values
-        for dict_ in [values, kwargs]:
-            for name, val in dict_.items():
-                if isinstance(val, tuple):
-                    x = val[0]
-                    y = val[1]
-                elif isinstance(val, float|int):
-                    x = None
-                    y = val
-                elif val is None:
-                    x = None
-                    y = None
-                else:
-                    raise TypeError(f"val of type {type(val)!r} does not match possible cases.")
-                self._add_xy(name, x, y, plt_kwargs=plt_kwargs)
+        for name, val in values.items():
+            ## Derive x, y from tuple:
+            x, y = self._derive_x_y(val)
+            ## Deal with kwargs:
+            plot_kwargs = self._fix_plot_kwargs(**plot_kwargs)
+            ## Keep:
+            self._add_xy(name, x, y, plot_kwargs=plot_kwargs)
 
         ## Update plot:
         self._update(draw_now_=draw_now_)
@@ -435,10 +524,44 @@ class InactiveAppendablePlot(AppendablePlot):
             setattr(self, name, method)
 
 
-def plot_with_spread(x_y_values_dict:dict[float|int, list[float|int]], plt_kwargs:dict):
+def _xs_and_ys_to_values_dict(x_vals:list[_Numeric], y_vals:list[_Numeric]) -> dict[_Numeric, list[_Numeric]]:
+    x_y_values_dict : dict[_Numeric, list[_Numeric]] = {}
+    for x, y in zip(x_vals, y_vals, strict=True):
+        if x in x_y_values_dict:
+            x_y_values_dict[x].append(y)
+        else:
+            x_y_values_dict[x] = [y]
+    return x_y_values_dict
+
+
+PlotWithSpreadReturnValue : TypeAlias = list[Line2D]
+
+def plot_with_spread(
+    x_y_values_dict:dict[_Numeric, list[_Numeric]]|None=None, 
+    x_vals:list[_Numeric]|None=None, 
+    y_vals:list[_Numeric]|None=None, 
+    also_plot_max_min_dots:bool=True,
+    axes:Axes|None=None,
+    **plt_kwargs
+) -> PlotWithSpreadReturnValue:
+    ## Check inputs:
+    if x_y_values_dict is None:
+        assert x_vals is not None
+        assert y_vals is not None
+        x_y_values_dict = _xs_and_ys_to_values_dict(x_vals, y_vals)
+    else:
+        assert x_vals is None
+        assert y_vals is None
+
+    if axes is None:
+        fig = plt.figure()
+        axes = fig.add_subplot(1,1,1)
+
     # Convert y_values_matrix to a NumPy array for easier manipulation
     y_means = []
     y_stds  = []
+    y_maxs  = []
+    y_mins  = []
     x_values = sorted(list(x_y_values_dict.keys()))
     for x in x_values:
         y_values = x_y_values_dict[x]
@@ -447,17 +570,28 @@ def plot_with_spread(x_y_values_dict:dict[float|int, list[float|int]], plt_kwarg
         # Calculate the mean and standard deviation along the 1st axis (columns)
         y_means.append(np.mean(y_values))
         y_stds.append(np.std(y_values))
+        y_maxs.append(max(y_values))
+        y_mins.append(min(y_values))
     
     # Plotting the mean values
-    line = plt.plot(x_values, y_means, **plt_kwargs)
-    color = line[0].get_color()
+    lines = axes.plot(x_values, y_means, **plt_kwargs)
+    color = lines[0].get_color()
     
     # Adding a shaded region to represent the spread (1 standard deviation here)
     y_means = np.array(y_means)
     y_stds = np.array(y_stds)
-    fill = plt.fill_between(x_values, y_means - y_stds, y_means + y_stds, color=color, alpha=0.2)
-    
-    return line, fill
+    fill = axes.fill_between(x_values, y_means - y_stds, y_means + y_stds, color=color, alpha=0.2)
+    lines.append(fill)
+
+    # Add max-min lines:
+    if also_plot_max_min_dots:
+        maxs = axes.plot(x_values, y_maxs, ":", color=color)
+        mins = axes.plot(x_values, y_mins, ":", color=color)
+
+        lines.append(maxs)
+        lines.append(mins)
+
+    return lines
 
 
 class matplotlib_colors(Enum):
@@ -605,11 +739,75 @@ class matplotlib_colors(Enum):
 
 
 
+def write_video_from_existing_frames(fps=30) -> None:
+    from moviepy.editor import ImageClip, concatenate_videoclips
+    from utils.files import get_all_files_fullpath_in_folder
+
+    frames_dir = VIDEOS_FOLDER + os.sep + "temp_frames"
+    ## Get files
+    all_files = get_all_files_fullpath_in_folder(frames_dir)
+    num_frames = len(all_files)
+    frames_duration = [1 for _ in range(num_frames)]
+    frames_duration[0] = 10
+    frames_dir = VIDEOS_FOLDER + os.sep + "temp_frames" + os.sep
+
+    def image_clips() -> Generator[ImageClip, None, None] :
+        base_duration = 1/fps
+        for img_path, frame_duration in zip( image_paths(), frames_duration ):
+            yield ImageClip(img_path+".png", duration=base_duration*frame_duration)
+
+    def image_paths() -> Generator[str, None, None] :
+        for i in range(num_frames):
+            yield _get_frame_path(i)
+
+    def _get_frame_path(index:int) -> str:
+        return frames_dir+"frame"+f"{index}"
+
+    name = strings.time_stamp()
+    # Prepare folder for video:
+    saveload.force_folder_exists(VIDEOS_FOLDER)
+    video_slides = concatenate_videoclips( list(image_clips()), method='chain' )
+    # Write video file:
+    fullpath = VIDEOS_FOLDER+name+".mp4"
+    video_slides.write_videofile(fullpath, fps=fps)
+
+
+def plot_x_y_from_table(table, x:str, y:str, axes:Axes|None) -> Line2D:
+
+    if axes is None:
+        fig = plt.figure()
+        axes = fig.add_subplot(1,1,1)
+
+    x_vals = table[x]
+    y_vals = table[y]
+
+    ## sort:
+    sorted_xy = sorted(( (x_, y_) for x_, y_ in zip(x_vals, y_vals, strict=True)), key=lambda tuple_: tuple_[0])
+    x_vals = [tuple_[0] for tuple_ in sorted_xy]
+    y_vals = [tuple_[1] for tuple_ in sorted_xy]
+
+    if lists.sorted.unique_values(x_vals):
+        lines = axes.plot(x_vals, y_vals)
+    else:        
+        lines, fill = plot_with_spread(x_vals=x_vals, y_vals=y_vals)
+
+
+    axes.set_xlabel(x)
+    axes.set_ylabel(y)
+
+    if isinstance(lines, list):
+        line = lines[0]
+    else:
+        line = lines
+
+    return line
+
+
+
+    
+    
 
 
 if __name__ == "__main__":
-    ap = InactiveAppendablePlot()
-    a = ap.axis
-    g = a.grid()
-
+    write_video_from_existing_frames()
     print("Done.")  

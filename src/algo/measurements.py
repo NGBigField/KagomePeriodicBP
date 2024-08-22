@@ -21,8 +21,8 @@ import numpy as np
 from libs.ITE import rho_ij
 
 # Common types in the code:
-from containers import BubbleConConfig, UpdateEdge
-from containers.configs import Config, ContractionConfig
+from containers import BubbleConGlobalConfig, UpdateEdge
+from containers.configs import Config, BubbleconContractionConfig
 from containers.imaginary_time_evolution import HamiltonianFuncAndInputs
 from containers.results import MeasurementsOnUnitCell
 from tensor_networks import KagomeTNRepeatedUnitCell, KagomeTNArbitrary, ModeTN, EdgeTN, TensorNode, MPS
@@ -90,7 +90,7 @@ def _find_not_none_item_in_double_dict( d :dict[str, dict[str, _T]], keys1, keys
 
 def compute_negativity_of_rdm(rdm:np.ndarray)->float:
     matrix : np.matrix = op_to_mat(rdm)
-    value = negativity(matrix)
+    value = negativity(matrix, validate=False)
     return value
 
 def print_results_table(results:dict[str, dict[str, float]])->None:
@@ -163,7 +163,7 @@ def mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[str
 def measure_energies_and_observables_together(
     tn:TensorNetwork, 
     hamiltonian:HamiltonianFuncAndInputs|np.ndarray, 
-    contract_config:ContractionConfig,
+    contract_config:BubbleconContractionConfig,
     mode:UpdateMode|None=None,
     force_real:bool=True
 )->MeasurementsOnUnitCell:
@@ -345,7 +345,7 @@ def calc_measurements_on_unit_cell(
 
 def run_converged_measurement_test(
     unit_cell:UnitCell, 
-    sizes:Iterable[int]=range(2,10),
+    sizes:Iterable[int]=range(2,4),
     config:Config|None=None,
     progress_bar:bool=True,
     plot:bool=True
@@ -445,7 +445,7 @@ def _sandwich_fused_tensors_with_expectation_values(tn_in:TensorNetworkType, mat
 
 def _calc_and_check_expectation_value(numerator, denominator, force_real:bool) -> float:
     ## Control:
-    separate_exp = BubbleConConfig.separate_exp
+    separate_exp = BubbleConGlobalConfig.separate_exp
 
     ## Check inputs:
     if DEBUG_MODE:
@@ -504,7 +504,7 @@ def _sandwich_with_operator_and_contract_fully(
         direction=direction, 
         depth=ContractionDepth.Full, 
         bubblecon_trunc_dim=max_con_dim, 
-        print_progress=print_progress 
+        allow_progressbar=print_progress 
     )
     # complete contraction so must be a number:
     assert isinstance(numerator, complex|tuple)

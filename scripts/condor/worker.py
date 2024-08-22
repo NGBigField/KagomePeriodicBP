@@ -6,7 +6,7 @@ if __name__ == "__main__":
 from sys import argv
 
 # Import scripts to use
-import _import_scripts
+import scripts.condor._import_main_and_src as _import_main_and_src
 
 # Import DictWriter class from CSV module
 from time import perf_counter, sleep
@@ -17,12 +17,11 @@ import threading
 from src.utils import errors
 
 # Import the possible job types:
-from scripts.condor import job_bp
-from scripts.condor import job_parallel_timing 
-from scripts.condor import job_bp_convergence 
-from scripts.condor import job_ite_afm
+from scripts.condor import send_parallel_timing 
+from scripts.condor import send_bp
+from scripts.condor import send_ite
 
-from scripts.condor.sender import Arguments
+from scripts.condor.main_sender import Arguments, JobType
 
 
 # import numpy for random matrices:
@@ -31,7 +30,7 @@ import numpy as np
 from utils import sizes
 
 
-NUM_EXPECTED_ARGS = 10
+NUM_EXPECTED_ARGS = 11
 SAFETY_BUFFER_FRACTION : Final[float|None] = None  # safety buffer (adjust based on needs)
 
 # A main function to parse inputs:
@@ -56,7 +55,7 @@ def main():
     print(f"{i}: output_file={output_file!r}")
 
     i += 1  # 2
-    job_type = argv[i]
+    job_type : JobType= argv[i]
     print(f"{i}: job_type={job_type}")
 
     i += 1  # 3
@@ -88,28 +87,32 @@ def main():
     print(f"{i}: parallel={parallel}")
 
     i += 1  # 10
+    control = int(argv[i])
+    print(f"{i}: control={control}")
+
+    i += 1  # 11
     result_keys = _parse_list_of_strings(argv[i])
     print(f"{i}: result_keys={result_keys}")
 
 
     ## Force usage of requested Giga-bytes:
-    stop_event = threading.Event()
-    thread = threading.Thread(target=_auto_timed_compute_with_random_mat_by_ram, args=(req_mem_gb, stop_event), daemon=True)
-    thread.start()
+    active_thread = SAFETY_BUFFER_FRACTION is not None
+    if active_thread:
+        stop_event = threading.Event()
+        thread = threading.Thread(target=_auto_timed_compute_with_random_mat_by_ram, args=(req_mem_gb, stop_event), daemon=True)
+        thread.start()
 
     ## Run:
     results : dict[str, Any]
     t1 = perf_counter()
     try:
         match job_type:
-            case "bp":  
-                results = job_bp.main(D=D, N=N, method=method)
             case "parallel_timings":             
-                results = job_parallel_timing.main(D=D, N=N, parallel=parallel)
-            case "bp_convergence":
-                results = job_bp_convergence.main(D=D, N=N)
+                results = send_parallel_timing.job(D=D, N=N, parallel=parallel)
+            case "bp":
+                results = send_bp.job(D=D, N=N, chi=chi, method=method, parallel=parallel)
             case "ite_afm":
-                results = job_ite_afm.main(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel)
+                results = send_ite.job(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel, progress_bar=not active_thread, control=control)
             case _:
                 raise ValueError(f"Not an expected job_type={job_type!r}")
     except Exception as e:
@@ -119,8 +122,9 @@ def main():
     t2 = perf_counter()
 
     ## Call thread to stop:
-    stop_event.set()
-    thread.join()
+    if active_thread:
+        stop_event.set()
+        thread.join()
 
     print(f"res={results}")
     
@@ -143,9 +147,11 @@ def main():
         dict_writer = DictWriter(f, fieldnames=result_keys )
         dict_writer.writerow(row_to_write)
 
-    ## End
-    print("Results are written into:")
-    print(f"{output_file!r}")
+        ## End
+        print("Results are written into:")
+        print(f"{output_file!r}")
+
+    print("::Worker out")
 
 
 def _clean_item(s:str)->str:

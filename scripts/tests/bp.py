@@ -1,521 +1,517 @@
 import _import_src  ## Needed to import src folders when scripts are called from an outside directory
-
-
 import project_paths
 
+from typing import NamedTuple, overload, Literal
+
 # Tensor-Networks creation:
-from tensor_networks.construction import create_kagome_tn, UnitCell
+from tensor_networks.construction import create_repeated_kagome_tn, UnitCell
 
 # BP:
 from algo.belief_propagation import belief_propagation, robust_belief_propagation
 
 # Config and containers:
-from containers import BPConfig
-from tensor_networks import KagomeTNRepeatedUnitCell, CoreTN, ModeTN, EdgeTN
-
-# update config
+from tensor_networks import EdgeTN
 from enums import UpdateMode, UnitCellFlavor
-from containers import UpdateEdge
+from containers import UpdateEdge, Config
 
 # Measure core data
-from algo.measurements import derive_xyz_expectation_values_with_tn, calc_unit_cell_expectation_values_from_tn, pauli, measure_energies_and_observables_together
+from algo.measurements import pauli, compute_negativity_of_rdm
 from algo.tn_reduction import reduce_tn
 from physics import hamiltonians
+from physics.metrics import entanglement_entropy
 
-from time import perf_counter
+# Performance:
+from time import perf_counter, sleep
 
 # Numpy for math stuff:
 import numpy as np
 
 # useful utils:
-from utils import visuals, saveload, csvs, dicts
+from utils import visuals, saveload, csvs, dicts, lists, strings, files, errors
+from utils.visuals import AppendablePlot
+
+## Metrics:
+from physics.metrics import fidelity
+
+## Lattice soze:
+from lattices import kagome
+
+## plots:
+from matplotlib.axes import Axes
+from matplotlib.lines import Line2D
 from matplotlib import pyplot as plt
-import matplotlib as mpl
-import matplotlib.transforms as mtransforms
 
 
 from libs import TenQI
 
+
+## common config:
+mode = UpdateMode.A
+update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 d=2
 
-def _standard_row_from_results(D:int, N:int, results:list[UnitCell])->None:
-    row = [D, N]
-    for tensor_key in ['A', 'B', 'C']:
-        for per_expectation, observable_name in zip( results, ['x', 'y', 'z'], strict=True):
-            per_expectation_per_tensor = per_expectation[tensor_key]
-            row.append(per_expectation_per_tensor)
-    return row
+EXACT_CHI = 200
+EXACT_N = 10
 
-def load_results(
-    D = 3
-):
-    all_results = saveload.load(f"all_results_D={D}", sub_folder="results")
-    csv = csvs.CSVManager(['D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'], name=f"Results_D={D}")
-    # ['N', 'D', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z']
-    for N, results in all_results:
-        row = _standard_row_from_results(D, N, results)
-        csv.append(row)
-    print("Done")
 
-def bp_single_call(
-    D : int = 3,
-    N : int = 2,
-    with_bp : bool = True        
-):
-    ## Config:
-    bubblecon_trunc_dim = 4*D**2
-    bp_config = BPConfig(
-        trunc_dim=D**2,
-        max_iterations=50,
-        msg_diff_terminate=1e-5
-    )
+class CSVRowData(NamedTuple):
+    D : int
+    N : int
+    method : str
+    time : float
+    energy : float
+    z : float
+    fidelity : float
+    negativity : float
+    entanglement_entropy : float
 
-    ## Tensor-Network
-    unit_cell= UnitCell.load(f"random_D={D}")
-    tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
-    tn.validate()
+    @classmethod
+    def fields(cls) -> list[str]:
+        return list(cls._fields)
+    
+    def row(self) -> list:
+        return [self.__getattribute__(field) for field in self._fields]
+            
 
-    ## Find or guess messages:
-    if with_bp:
-        tn, messages, stats = belief_propagation(tn, messages=None, bp_config=bp_config)
+
+class ComparisonResultsType(NamedTuple):
+    edge_tn: EdgeTN
+    z : float  
+    energy: float  
+    fidelity : float
+    unit_cell : UnitCell
+    negativity : float
+    entanglement_entropy : float
+
+
+
+
+def _get_expectation_values(edge_tn:EdgeTN) -> float:
+    rho = edge_tn.rdm
+    rho_i = np.trace(rho, axis1=2, axis2=3)
+    z = np.trace(rho_i @ pauli.z,)
+    z = float(z)
+    return z
+
+
+def _per_D_N_single_test(
+    D:int, N:int, method:str, config:Config, parallel:bool,
+    **kwargs
+) -> ComparisonResultsType:
+    ## Inputs:
+    config = config.copy()
+
+    ## Make sure there is something to compare to:
+    this_is_exact_run = 'exact_run' in kwargs and kwargs['exact_run']==True
+
+    if this_is_exact_run:
+        unit_cell = UnitCell.load_best(D)
     else:
-        tn.connect_random_messages()
-    
-    return calc_unit_cell_expectation_values_from_tn(tn, operators=[pauli.x, pauli.y, pauli.z], bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=False)
+        exact = get_inf_exact_results(D)
+        unit_cell = exact['unit_cell']
 
+    ## Create kagome TN:
+    tn = create_repeated_kagome_tn(d, D, N, unit_cell)
 
-def growing_tn_bp_test2(
-    D = 2,
-    min_N = 2,
-    max_N = 4,
-    live_plot = False,
-    with_bp = True
-):
-    ## Config:
-    bubblecon_trunc_dim = 2*D**2
-    bp_config = BPConfig(
-        trunc_dim=D**2,
-        max_iterations=50,
-        msg_diff_terminate=1e-5
-    )
-    
-    ## Load or randomize unit_cell
-    unit_cell= UnitCell.load(f"random_D={D}")
-    if unit_cell is None:
-        unit_cell = UnitCell.random(d=d, D=D)
-        unit_cell.save(f"random_D={D}")
+    ## Define contraction precision and other config adjustments:
+    match method:
+        case "exact":
+            config.chi = EXACT_CHI
+        case "bp":
+            config.set_parallel(parallel)
 
-
-    # if with_bp:
-    #     csv_name =  f"bp_res_D={D}_with-BP"
-    # else:
-    #     csv_name =  f"bp_res_D={D}_random-messages"
-    # csv = csvs.CSVManager(['D', 'N', 'A_X', 'A_Y', 'A_Z', 'B_X', 'B_Y', 'B_Z', 'C_X', 'C_Y', 'C_Z'], name=csv_name)
-
-    ## Growing N networks:
-    all_results = []
-    for N in range(min_N, max_N+1, 1):
-        print(" ")
-        print(f"N={N:2}: ")
-        tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
-        tn.validate()
-
-        ## Find or guess messages:
-        if with_bp:
-            tn, messages, stats = belief_propagation(tn, messages=None, bp_config=bp_config)
-        else:
-            tn.connect_random_messages()
-        
-        results = calc_unit_cell_expectation_values_from_tn(tn, operators=[pauli.x, pauli.y, pauli.z], bubblecon_trunc_dim=bubblecon_trunc_dim, force_real=True, reduce=False)
-        zs = results[2]
-        print(zs)
-        a = zs['A']
-        b = zs['B']
-        c = zs['C']
-
-        all_results.append((N, results))
-        saveload.save(all_results, f"all_results_D={D}", sub_folder="results")
-
-        row = _standard_row_from_results(D, N, results)
-        # csv.append(row)
-        
-    ## End:
-    print("Done")
-                
-
-def growing_tn_bp_test(
-    D = 2,
-    bp_N = 2,
-    min_N = 2,
-    max_N = 13
-):
-    ## Config:
-    bp_config = BPConfig(
-        trunc_dim=8,
-        msg_diff_terminate=1e-7
-    )
-    unit_cell = UnitCell.random(d=d, D=D)
-
-    ## small network:
-    small_tn = create_kagome_tn(d=d, D=D, N=bp_N, unit_cell=unit_cell)
-    small_tn, messages, stats = belief_propagation(small_tn, messages=None, bp_config=bp_config)
-    small_res = derive_xyz_expectation_values_with_tn(small_tn, reduce=False)
-    print(" ")
-    print("Base values")
-    print(small_res)
-
-    ## Big network
-    distances = []
-    Ns = []
-    for N in range(min_N, max_N+1):
-        big_tn = create_kagome_tn(d=d, D=D, N=N, unit_cell=unit_cell)
-        big_tn.connect_random_messages()
-        big_res = derive_xyz_expectation_values_with_tn(big_tn, reduce=False)
-        print(" ")
-        print(f"N={N:2}: ")
-        print(big_res)
-        distance = 0.0
-        for op in ['x', 'y', 'x']:
-            for key in UnitCell.all_keys():
-                r_small = small_res[op].__getattribute__(key)
-                r_big = big_res[op].__getattribute__(key) 
-                distance += abs(r_small - r_big)
-        print(f"    Distance={distance}")
-        distances.append(distance)
-        Ns.append(N)
-
-    ## Plot:
-    visuals.draw_now()
-    for linear_or_log in ["linear", "log"]:
-        plt.figure()
-        plt.plot(Ns, distances)
-        plt.xlabel("N")
-        plt.ylabel("L1 Error in expectation values")
-        plt.title(f"Error Convergence to BP on block of size N={bp_N}")
-        plt.yscale(linear_or_log)
-        plt.grid()
-
-    visuals.draw_now()
-    print("Done")
-                
-
-
-def test_single_bp_vs_growing_TN(
-    Ds = [2, 3, 4],
-    bp_N = 4
-):
-    
-    fig1 = plt.figure()
-    plt.yscale("log")
-    plt.xlabel("# tensors in lattice")
-    plt.ylabel("energy error")
-    # plt.title(f"Error between Block-BP on {bp_num_tensors} tensors and random environment tensors")
-    plt.grid("on")
-    plt.legend()
-
-    visuals.draw_now()
-
-
-    
-    csv_fullpath = project_paths.data/"condor"/"results_bp_convergence.csv"
-    table = csvs.read_csv_table(csv_fullpath)
-    # markers = ["x", "+", "*"]
-
-
-    for i, D in enumerate(Ds):
-        marker_style = "*"
-        
-        chi = 2*D**2 + 40
-        bp_chi = D**2 + 20
-        unit_cell = UnitCell.load(f"best_heisenberg_AFM_D{D}")
-        hamiltonian = hamiltonians.heisenberg_afm()
-
-        bp_config = BPConfig(
-            max_iterations=60,
-            trunc_dim=bp_chi,
-            msg_diff_terminate=1e-7
-        )
-
-        tn = create_kagome_tn(d, D, bp_N, unit_cell)
-        bp_num_tensors = tn.size
-
-        _, _ = robust_belief_propagation(tn, None, bp_config)
-
-        core = reduce_tn(tn, CoreTN, chi)
-        _, _, mean_energy = measure_energies_and_observables_together(core, hamiltonian, trunc_dim=chi)
-
-        print(f"mean_energy={mean_energy}") 
-        print(f"num_tensors={bp_num_tensors}") 
-        print(f"chi={chi}") 
-
-
-        delta_energies = []
-        times = []
-        num_tensors = []
-
-        Ns = list(set(table["N"]))
-        Ns.sort()
-        for N in Ns:
-            matching_rows = csvs.get_matching_table_element(table, N=N, D=D)
-
-            mean, std = dicts.statistics_along_key(matching_rows, "energy")
-            d_e = abs(mean-mean_energy)
-            delta_energies.append(d_e)
-
-            mean, std = dicts.statistics_along_key(matching_rows, "exec_time")
-            times.append(mean)
-
-            n_t = matching_rows[0]["num_tensors"]
-            num_tensors.append(n_t)
-
+    ## Get environment:
+    match method:   #["random", "exact","bp"]
+        case "random"|"exact":
+            tn.connect_uniform_messages()
+        case "bp":
+            belief_propagation(tn, None, config.bp)
             
-        
-        assert len(num_tensors)==len(times)==len(delta_energies)
 
-        p, *_ = plt.plot(num_tensors, delta_energies, label=f"D={D}", linewidth=3, marker=marker_style)
-        
+    ## Contract to edge:
+    edge_tn = reduce_tn(
+        tn, EdgeTN, config.contraction, 
+        mode=mode, edge_tuple=update_edge
+    )
+    ## Get results:
+    rdm = edge_tn.rdm
+    # expectations:
+    z = _get_expectation_values(edge_tn)
+    # energy:
+    h = hamiltonians.heisenberg_afm()
+    energy = np.dot(rdm.flatten(),  h.flatten()) 
+    energy = float(energy)
+    # negativity:
+    negativity = compute_negativity_of_rdm(rdm)
+    entanglement_entropy_ = entanglement_entropy(rdm)
 
+    ## Compare with exact results:
+    if this_is_exact_run:
+        fidelity_ = 0
+    else:
+        rho_exact = exact['edge_tn'].rdm
+        rho_now = TenQI.op_to_mat(edge_tn.rdm)
+        rho_exact = TenQI.op_to_mat(rho_exact)
+        fidelity_ = 1-fidelity(rho_now, rho_exact)
+
+    return ComparisonResultsType(edge_tn, z, energy, fidelity_, unit_cell, negativity, entanglement_entropy_)
+
+
+def _get_full_converges_run_plots(
+    combined_figure:bool, 
+    live_plots:bool=True
+) -> tuple[AppendablePlot, ...]:
     
-    plt.legend()
-    visuals.draw_now()
-    visuals.save_figure()
+    ## Create figures:
+    plot_values = AppendablePlot()
+    plt.xlabel("linear system size", fontsize=12)
+    plt.ylabel("<Z>", fontsize=12)
+    plot_values.axis.set_yscale('log')
 
-    print("Done")
+    if combined_figure:
+        plot_times  = plot_values.get_twin_plot()
+    else:
+        plot_times  = AppendablePlot()
+        plt.xlabel("linear system size", fontsize=12)
+    plt.ylabel("Computation time [sec]", fontsize=12)
 
-    return mean_energy, num_tensors, chi
+    p_values_vs_times = AppendablePlot()
+    plt.xlabel("Computation time [sec]", fontsize=12)
+    plt.ylabel("<Z>", fontsize=12)
 
+    if live_plots:
+        visuals.draw_now()
 
-
-def test_bp_convergence_steps(
-    D = 2,
-    N_vals   = [2, 3, 4, 5, 6, 7, 8, 9, 10],
-    chi_vals = [2, 4, 8, 16]
-):
-    
-    unit_cell = UnitCell.random(d, D)
-
-    plot = visuals.AppendablePlot()
-    plt.xlabel("N")
-    plt.ylabel("#Iterations")
-    plt.title(f"#Iteration for Block-BP convergence")
-    plt.grid("on")
-    plt.legend()
-
-    visuals.draw_now()
-    
-    for chi in chi_vals:
-
-        ## Config:
-        bp_config = BPConfig(
-            trunc_dim=chi,
-            msg_diff_terminate=1e-5
-        )
-
-
-        for N in N_vals:
-            tn = create_kagome_tn(d, D, N, unit_cell)
-            messages, stats = belief_propagation(tn, None, bp_config)
-
-            x = N
-            y = stats.iterations
-
-            dict_ = {f"chi={chi}" : (x, y)}
-            plot.append(**dict_)
-
-
-    print("Done")
-                
-
-
-def test_bp_convergence_steps_single_run(
-    N:int=2,
-    D:int=2,
-    parallel_bp:bool=True,
-    ref_rdm : np.ndarray|None = None
-):
-    
-    chi = 2*D**2 + 10
-    update_mode = UpdateMode.A
-    update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
-    bp_chi = D**2 
-
-    def _get_rho_i(tn:KagomeTNRepeatedUnitCell)->np.ndarray:
-        edge_tn = reduce_tn(tn , EdgeTN, trunc_dim=chi, mode=update_mode, edge_tuple=update_edge)
-        rdm = edge_tn.rdm
-        return np.trace(rdm, axis1=2, axis2=3)
-
-    unit_cell = UnitCell.load(f"best_heisenberg_AFM_D{D}")
-
-
-    if ref_rdm is None:
-        N_inf = 10
-        fname = f"ref_rdm_D{D}_N{N_inf}"
-        
-        if saveload.exist(fname):
-            ref_rdm = saveload.load(fname)
-        else:
-            tn_inf = create_kagome_tn(d, D, N_inf, unit_cell)
-            tn_inf.connect_random_messages()
-            ref_rdm = _get_rho_i(tn_inf)
-            saveload.save(ref_rdm, fname)
-
-
-    tn = create_kagome_tn(d, D, N, unit_cell)
-    tn.connect_random_messages()
-
-    t1 = perf_counter()
-    rho_no_bp = _get_rho_i(tn)
-    t2 = perf_counter()
-    time_none = t2-t1
-
-
-    diff_random = TenQI.op_norm(rho_no_bp - ref_rdm, ntype='tr')
-    time_bp = None
-    diff_bp = None
-    z_bp    = None
-
-    if N>4:
-        t1 = perf_counter()
-        bp_config = BPConfig(max_iterations=50, trunc_dim=bp_chi, msg_diff_terminate=1e-7, parallel_msgs=parallel_bp)
-        _, stats = belief_propagation(tn, None, config=bp_config)
-        t2 = perf_counter()
-        time_bp = t2-t1
-            
-        if not parallel_bp:
-            time_bp /= 4
-
-        t1 = perf_counter()
-        rho_with_bp = _get_rho_i(tn)
-        t2 = perf_counter()
-        time_bp += t2-t1
-
-    
-        diff_bp     = TenQI.op_norm(rho_with_bp - ref_rdm, ntype='tr')
-
-        z_random = np.trace(pauli.z @ rho_no_bp)
-        z_bp     = np.trace(pauli.z @ rho_with_bp)
-        z_random = np.real(z_random)
-        z_bp     = np.real(z_bp)
-
-    iterations = stats.iterations
-
-    return iterations, chi, time_none, time_bp, z_random, z_bp, diff_random, diff_bp
+    return plot_values, plot_times, p_values_vs_times
 
 
 def test_bp_convergence_all_runs(
-    parallel_bp=False
-):
-
-    N_inf = 14
-    update_mode = UpdateMode.A
-    update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
-
-    def _get_rho_i(tn:KagomeTNRepeatedUnitCell, chi:int)->np.ndarray:
-        edge_tn = reduce_tn(tn , EdgeTN, trunc_dim=chi, mode=update_mode, edge_tuple=update_edge)
-        rdm = edge_tn.rdm
-        return np.trace(rdm, axis1=2, axis2=3)
-
-
-    plot_values = visuals.AppendablePlot()
-    plt.xlabel("linear system size", fontsize=12)
-    plt.ylabel("Trace distance between $\\rho_{A}$ and $\\rho_{A\infty}$", fontsize=12)
-    plot_values.axis.set_yscale('log')
-
-
-    plot_times  = visuals.AppendablePlot()
-    plt.xlabel("linear system size", fontsize=12)
-    plt.ylabel("Computation time [sec]", fontsize=12)
-
-    visuals.draw_now()
-
-
-    colors_D = {2: 'blue', 3: 'red', 4: 'green'}
-    line_styles = {'bp': "-", 'random': '--'}
-    marker_styles = {'bp': "X", 'random': 'o'}
-
-    Ds = [3, 4]
-
-    def _legend_key(D:int, data:str)->str:
-        ## diff bp:
-        if len(Ds)==1:
-            legend_key = ""
-        else:
-            legend_key = f"D={D} " 
-
-        if data=="bp":
-            legend_key += "BlockBP"
-        elif data=="none":
-            legend_key += "random env"
-        return legend_key
-
-
-    for D in Ds:
-
-        chi = 2*D**2 + 10
-
-        chi_inf = 2*D**2 + 40 
-        unit_cell = UnitCell.load(f"best_heisenberg_AFM_D{D}")
-        tn = create_kagome_tn(d, D, N_inf, unit_cell)
-        tn.connect_random_messages()
-
-        fname = f"ref_rdm_D{D}_N{N_inf}"
-        if saveload.exist(fname):
-            ref_rdm = saveload.load(fname)
-        else:
-            ref_rdm = _get_rho_i(tn, chi_inf)
-            saveload.save(ref_rdm, fname)
-
-
-        for N in range(2, 9):
-            iterations, chi, time_none, time_bp, z_none, z_bp, diff_none, diff_bp = test_bp_convergence_steps_single_run(D=D, N=N, parallel_bp=parallel_bp, ref_rdm=ref_rdm)
-
-
-            dict_ = { _legend_key(D, 'bp')  : (N, diff_bp) }
-            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'], marker=marker_styles['bp'])
-            plot_values.append(plt_kwargs=plt_kwargs ,**dict_)
-
-            ## diff random:
-            dict_ = { _legend_key(D, 'none') : (N, diff_none) }
-            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'], marker=marker_styles['random'])
-            plot_values.append(plt_kwargs=plt_kwargs ,**dict_)
-
-            ## Time bp:
-            dict_ = { _legend_key(D, 'bp')  : (N, time_bp) }
-            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['bp'], marker=marker_styles['bp'])
-            plot_times.append(plt_kwargs=plt_kwargs ,**dict_)
-
-            ## Time random:
-            dict_ = { _legend_key(D, 'none') : (N, time_none) }
-            plt_kwargs = dict(color=colors_D[D], linestyle=line_styles['random'], marker=marker_styles['random'])
-            plot_times.append(plt_kwargs=plt_kwargs ,**dict_)
-
-            plot_values._update()
-            plot_times._update()
-
-    visuals.draw_now()
-
-    for plot in [plot_values, plot_times]:
-        points = [[0.17, 0.06], [0.90, 0.98]]
-        box = mtransforms.Bbox(points)
-        plot.fig.set_size_inches((4.5, 8))
-        plot.axis.set_position(box)
-
-
-
-    plot_values.axis.set_ylim(bottom=1e-8*2)
+    D:int|list[int] = 3,
+    combined_figure:bool = False,
+    parallel:bool = True,
+    live_plots:bool|None = None,  # True: live, False: at end, None: no plots
+) -> None:
     
+    if isinstance(D, list):
+        _ = [
+            test_bp_convergence_all_runs(val, combined_figure=combined_figure, parallel=parallel, live_plots=live_plots) 
+            for val in D
+        ]
+        return None
+
+    ##  Params:
+    methods_and_Ns:dict[str, list[int]] = dict(
+        random = list(range(2, 7)),
+        bp     = [2, 3, 4]
+    ) 
+
+    ## config:
+    config = Config.derive_from_dimensions(D)
+    config.chi    = 3*D**2 + 10
+    config.chi_bp = 2*D**2 + 10
+    config.bp.msg_diff_terminate = 1e-14
+    config.bp.max_iterations = 50
+    config.bp.visuals.set_all_progress_bars(False)
+
+    # exact_config = config.copy()
+
+    ## Prepare plots and csv:
+    if live_plots is not None:
+        p_values, p_times, p_values_vs_times = _get_full_converges_run_plots(combined_figure, live_plots)
+    csv = csvs.CSVManager(CSVRowData.fields())
+
+    line_styles =   {'bp': "-", 'random': '--', 'exact':":"}
+    marker_styles = {'bp': "X", 'random': 'o' , 'exact':"^"}
+    def _get_plt_kwargs(method:str)->dict:
+        return dict(
+            linestyle=line_styles[method], 
+            marker=marker_styles[ method]
+        )
+
+
+    for method, Ns in methods_and_Ns.items(): 
+        print(f"method={method}")
+        
+        for N in Ns:
+            print(f"  N={N}")
+            sleep(0.1)
+
+            ## Get results:
+            _t1 = perf_counter()
+            try:
+                res = _per_D_N_single_test(
+                    D, N, method, config, parallel
+                )
+            except Exception as e:
+                errors.print_traceback(e)
+                break
+            _t2 = perf_counter()
+            time = _t2 - _t1
+
+            ## plot:
+            if live_plots is not None:
+                plt_kwargs = _get_plt_kwargs(method)
+                p_values.append(plot_kwargs=plt_kwargs ,**{ method : (N, z)}, draw_now_=live_plots)
+                p_times.append( plot_kwargs=plt_kwargs ,**{ method : (N, time)}, draw_now_=live_plots)
+                p_values_vs_times.append( 
+                                plot_kwargs=plt_kwargs ,**{ method : (time, z)}, draw_now_=live_plots
+                )
+
+            # csv:
+            row_data = CSVRowData(D, N, method, time, res.energy, res.z, res.fidelity, res.negativity, res.entanglement_entropy)
+            csv.append(row_data.row())
+
+    # plot_values.axis.set_ylim(bottom=1e-8*2)
+    if live_plots is not None:
+        ## Add reference:
+        exact = get_inf_exact_results(D)
+        z = exact['z']
+        for i, plot in enumerate([p_values, p_values_vs_times]):
+            ax = plot.axis
+            ax.axhline(y=z, color='k', linestyle='--', linewidth=2, label="Exact")
+            ax.legend()
+            visuals.save_figure(plot.fig, file_name=strings.time_stamp()+f" {i+1}")
+
     print("Done")    
 
+
+def _new_axes() -> Axes:
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    return ax
+
+
+def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, what:Literal['true', 'error'], yscale:Literal['linear', 'log']="linear") -> Axes:
+    ## Prepare plots:
+    ax = _new_axes()
+
+    ## Get data:
+    data = table.get_matching_table_elements(D=D)    
+    ref_y = 0
+
+    def plot(method:Literal['random', 'bp', 'exact']) -> list[Line2D]:
+        ## init output:
+        lines = []
+
+        ## Style:
+        color = _method_color(method)
+        marker, marker_size = _method_marker(method)
+
+        ## Get data:
+        data = table.get_matching_table_elements(D=D, method=method)            
+        x_vals = _x_values(data)
+        if what == 'true':
+            y_vals = [y for y in data[y]] 
+            if method == 'exact':
+                ref_line = plt.hlines([ref_y], xmin=min(x_values), xmax=max(x_values), label="reference", linestyles="--", color="k")
+                lines.append(ref_line)
+                return lines
+        elif what == 'error':
+            y_vals = [abs(y-ref_y) for y in data[y]] 
+            if method == 'exact':
+                return []
+            
+        if method == "bp":
+            label = "blockBP"
+        elif method == "random":
+            label = "Random"
+
+        lines += visuals.plot_with_spread(x_vals=x_vals, y_vals=y_vals, axes=ax, also_plot_max_min_dots=False, 
+                                         linewidth=3, marker=marker, color=color, markersize=marker_size, label=label)
+
+        return lines
+    
+    def _method_marker(method:str) -> tuple[str, int]:
+        match method:
+            case 'bp':      return ("*", 8)
+            case 'random':  return (".", 8)
+            case 'exact':   return ("" , 0)
+            case _:
+                raise ValueError("")
+
+    def _method_color(method:str) -> str:
+        match method:
+            case 'bp':      return "tab:blue"
+            case 'random':  return "tab:orange"
+            case 'exact':   return "k"
+            case _:
+                raise ValueError("")
+
+    def _x_values(data) -> list[float]|list[int]:
+        if x == "N":
+            x_vals = [kagome.num_nodes_by_lattice_size(N) for N in data[x]]
+        else:
+            x_vals = data[x]
+        return x_vals
+
+    def _print_reference_data(dict) -> None:
+        print("Reference:")
+        print(f"    D={D}")
+        print(f"    N={dict['N']}")
+        print(f"    chi={dict['chi']}")
+        print(f"    num_tensors={kagome.num_nodes_by_lattice_size(dict['N'])}")
+
+
+    ## get reference:
+    x_values = _x_values(data)
+    ref = get_inf_exact_results(D)
+    ref_y = ref[y]    
+    _print_reference_data(ref)
+            
+    ## Plot:
+    for method in ['random', 'bp', 'exact']:
+        lines = plot(method)
+
+
+    ## Pretty:
+    ax.legend(loc="best")
+    ax.grid()
+    #
+
+    ## Labels:
+    if x == "N":
+        xlabel = "#tensors"
+    else:
+        xlabel = x    
+
+    if what == 'true':
+        ylabel = y
+    elif what == 'error':
+        ylabel = "abs "+y+" error"
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    #
+    # ax.set_xscale('linear')
+    # ax.set_yscale('log')
+    ax.set_yscale(yscale)
+
+    ax.figure.tight_layout()
+
+    visuals.draw_now()
+    print("")
+
+    return ax
+
+
+def _plot_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
+
+    for x, y in [
+        ('time', 'z'), 
+        ('N', 'entanglement_entropy'), 
+        ('N', 'negativity'), 
+        ('N', 'fidelity'),
+        ('N', 'energy'),
+    ]:
+        print(f"x={x!r} ; y={y!r}")
+        ax =_plot_from_table_per_D_per_x_y(D, table, x, y, 'true')
+        ax =_plot_from_table_per_D_per_x_y(D, table, x, y, 'error')
+        ax =_plot_from_table_per_D_per_x_y(D, table, x, y, 'error', yscale='log')
+
+    print("Done")
+
+
+def _get_data_from_csvs(filename:str|None) -> csvs.TableByKey:
+    if isinstance(filename, str):
+        fullpath = saveload.derive_fullpath(filename+".csv", sub_folder="results")
+        table = csvs.TableByKey(fullpath)
+    elif filename is None:
+        folder_fullpath = saveload.DATA_FOLDER + saveload.PATH_SEP + "results"
+        table = csvs.TableByKey()
+        for fullpath in files.get_all_files_fullpath_in_folder(folder_fullpath):
+
+            try:
+                crnt_table = csvs.TableByKey(fullpath)
+            except UnicodeDecodeError:
+                continue
+
+            crnt_table.verify()
+
+            try:
+                table += crnt_table
+            except KeyError:
+                continue
+
+            table.verify()
+            
+
+    table.verify()
+    return table
+
+
+
+def plot_bp_convergence_results(
+    filename:str|None = None,
+    D:list[int]|None=None
+) -> None:
+    
+    ## Get Data:
+    table = _get_data_from_csvs(filename)
+    print(table)
+
+    if D is None:
+        Ds = table.unique_values('D')
+    elif isinstance(D, list):
+        assert isinstance(D[0], int)
+        Ds = D
+
+
+    ## Get lists and plot:
+    for D_ in Ds:
+        print(f"D={D_}")
+        _plot_from_table_per_D(D_, table)
+
+    ## Finish:
+    print("Done printing for all Ds")
     
 
-def main_test():
-    # test_single_bp_vs_growing_TN()
-    # growing_tn_bp_test()
-    # growing_tn_bp_test2()
-    # load_results()
-    # test_bp_convergence_steps_single_run()
-    test_bp_convergence_all_runs()
+def _calc_inf_exact_results(D:int) -> dict:
+    ## Config:
+    method = "exact"
+    N = EXACT_N
+    config = Config.derive_from_dimensions(D)
 
+    ## Compute:
+    res = _per_D_N_single_test(D, N, method, config, parallel=False, exact_run=True)
+
+    ## Prepare output:
+    res = res._asdict()
+    res['D'] = D
+    res['N'] = N
+    res['chi'] = EXACT_CHI
+
+    return res
+    
+
+ResultsSubFolderName = "results"
+@overload
+def get_inf_exact_results(D:int) -> dict: ...
+@overload
+def get_inf_exact_results(D:list[int]) -> list[dict]: ...
+def get_inf_exact_results(D:int|list[int]=2) -> dict|list[dict]:
+
+    if isinstance(D, list):
+        return [get_inf_exact_results(val) for val in D]
+
+    if isinstance(D, float):
+        assert int(D)==D
+        D = int(D)
+
+    filename = f"infinite_exact_results D={D}"
+    if saveload.exist(filename, sub_folder=ResultsSubFolderName):
+        results = saveload.load(filename, sub_folder=ResultsSubFolderName)
+    else:
+        results = _calc_inf_exact_results(D)
+        saveload.save(results, filename, sub_folder=ResultsSubFolderName)
+    return results
+
+
+def main_test():
+    # results = get_inf_exact_results([2, 3]); print(results)
+    test_bp_convergence_all_runs([2, 3])
+    plot_bp_convergence_results()
+
+    print("Done.")
 
 if __name__ == "__main__":
     main_test()

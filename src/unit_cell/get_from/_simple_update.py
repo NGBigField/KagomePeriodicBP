@@ -206,10 +206,10 @@ def load_or_compute_tnsu_unit_cell(D:int=2, size:int=1, periodic:bool=True) -> t
     tnsu_network = _load_or_compute_tnsu_network(D=D, size=size, periodic=periodic)
     unit_cell = _parse_tnsu_network_to_unit_cell(D=D, size=size, periodic=periodic, tnsu_network=tnsu_network)
     try:
-        tnsu_energy = tnsu_network.final_energy
+        tnsu_energy = tnsu_network.final_energy  #type: ignore
     except AttributeError:
         tnsu_energy = None
-    return unit_cell, tnsu_energy 
+    return unit_cell, tnsu_energy  #type: ignore
 
 
 def _load_or_compute_tnsu_network(D:int=2, size:int=1, periodic:bool=True)->TnsuReturnType:
@@ -290,14 +290,14 @@ def _parse_tnsu_network_to_unit_cell(D:int, size:int, periodic:bool, tnsu_networ
 
 
 def _kagome_afh_peps_ground_state_search(
-    D: list = 2, 
+    D: int = 2, 
     error: float = 1e-7,
     size: int = 1,
     max_iterations: int = 500, 
     dts: list = [0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001],
     plot_results: bool = False, 
     periodic:bool = True,
-    print_process: bool = True
+    print_process: bool = False
 ) -> TnsuReturnType:
     """
     1. construct a random Tensor Network state with spin dimension 2 and virtual dimensions d_max.

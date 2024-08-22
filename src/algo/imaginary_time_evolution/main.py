@@ -9,6 +9,7 @@ if __name__ == "__main__":
     add_base()
     add_scripts()
 
+
 # Get Global-Config:
 from _config_reader import DEBUG_MODE, KEEP_LOGS, ALLOW_VISUALS
 
@@ -17,7 +18,8 @@ from typing import Callable, NamedTuple
 from _types import UnitCellValuePerEdgeDict, EnergiesOfEdgesDuringUpdateType
 
 # Import containers needed for ite:
-from containers.imaginary_time_evolution import ITEConfig, ITEProgressTracker, ITEPerModeStats, ITESegmentStats
+from containers.imaginary_time_evolution import ITEConfig, ITEPerModeStats, ITESegmentStats
+from containers._ite_tracker import ITEProgressTracker
 from containers import Config
 
 # Import other needed types:
@@ -32,16 +34,16 @@ import numpy as np
 from numpy.linalg import norm
 
 # Import our shared utilities
-from utils import lists, logs, decorators, errors, prints, visuals, strings
+from utils import lists, logs, decorators, prints, visuals, strings, processes
 
 # For copying config:
 from copy import deepcopy
 
 # Helper function and types for ITE:
-from algo.imaginary_time_evolution._logs_and_prints import print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, \
-                                                            print_or_log_ite_segment_progress, get_progress_bar
-from algo.imaginary_time_evolution._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
-from algo.imaginary_time_evolution._tn_update import ite_update_unit_cell
+from ._logs_and_prints import print_or_log_bp_message, _log_and_print_finish_message, _log_and_print_starting_message, \
+                                                            print_or_log_ite_segment_progress, get_progress_bar, formatted_delta_t_str
+from ._constants import CONVERGENCE_CHECK_LENGTH, DEFAULT_PHYSICAL_DIM
+from ._tn_update import ite_update_unit_cell
 from visualizations.ite import ITEPlots
 
 # Import belief propagation code:
@@ -154,6 +156,13 @@ def _initial_inputs(
     ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config,filename=common_results_name)
     plots = ITEPlots(active=config.visuals.live_plots, config=config)
 
+    ## Monitor system performance:
+    if config.monitoring_system.monitor_cpu or config.monitoring_system.monitor_ram:
+        processes.monitor_crnt_process(
+            track_cpu=config.monitoring_system.monitor_cpu,
+            track_ram=config.monitoring_system.monitor_ram
+        )
+
     return config, unit_cell, logger, messages, step_stats, ite_tracker, plots
 
 
@@ -176,7 +185,7 @@ def _calculate_unit_cell_measurements(
 ]:
     ## Unpack inputs:
     live_plots = config.visuals.live_plots
-    allow_prog_bar = config.visuals.progress_bars
+    allow_prog_bar = config.visuals.progress_bars.is_active_at('blockBP')
 
     ## if unit_cell is rotated, rotate it back:
     unit_cell.force_zero_rotation()
@@ -189,7 +198,7 @@ def _calculate_unit_cell_measurements(
     
     ## BP:
     if config.iterative_process.use_bp:
-        messages, _ = robust_belief_propagation(full_tn, messages, config.bp    , live_plots, allow_prog_bar)
+        messages, _ = robust_belief_propagation(full_tn, messages, config.bp)
     else:
         full_tn.connect_uniform_messages()
 
@@ -250,7 +259,6 @@ def _pre_segment_init_params(
 ]:
     ## Copy and parse config:
     config = config_in.copy()
-    use_prog_bar = config.visuals.progress_bars
     num_modes = config.iterative_process.num_mode_repetitions_per_segment
 
     ## Init messages or use old ones
@@ -269,15 +277,11 @@ def _pre_segment_init_params(
     stats.delta_t = delta_t
     energies_at_updates : EnergiesOfEdgesDuringUpdateType = []
 
-    if use_prog_bar:  
+    prog_bar = get_progress_bar(config, len(modes_order), "Executing ITE Segment  ", 'ITE-per-segment', also_verify=len(modes_order)>1)    
+    if config.visuals.progress_bars.is_active_somewhere():
         log_method = logger.debug
     else:          
         log_method = logger.info
-
-    if use_prog_bar and len(modes_order)>1:  
-        prog_bar = prints.ProgressBar(len(modes_order), print_prefix=f"Executing ITE Segment  ")
-    else:
-        prog_bar = prints.ProgressBar.inactive()
 
     ## Add gaussian noise?
     if config.ite.add_gaussian_noise_fraction is not None:
@@ -494,11 +498,7 @@ def _from_unit_cell_to_stable_mode(
 
     ## Perform BlockBP:
     if config.iterative_process.use_bp:
-        messages, bp_stats = robust_belief_propagation(
-            full_tn, messages, config.bp, 
-            update_plots_between_steps=config.visuals.live_plots, 
-            allow_prog_bar=config.visuals.progress_bars
-        )
+        messages, bp_stats = robust_belief_propagation(full_tn, messages, config.bp)
 
         print_or_log_bp_message(config.bp, config.iterative_process.bp_not_converged_raises_error, bp_stats, logger)
 
@@ -535,7 +535,7 @@ def ite_per_mode(
     edge_energies = dict()
     mode_tn : ModeTN
 
-    prog_bar = get_progress_bar(config, len(edge_order), "Executing ITE per-mode:")
+    prog_bar = get_progress_bar(config, len(edge_order), "Executing ITE per-mode:", 'ITE-per-mode')
     for is_first, is_last, (edge_tuple, delta_t) in lists.iterate_with_edge_indicators(list(edge_order)):
         prog_bar.next(extra_str=f"{edge_tuple}")
 
@@ -549,7 +549,7 @@ def ite_per_mode(
             # Just update the tensors 
             mode_tn.update_unit_cell_tensors(unit_cell)
 
-        edge_tn = reduce_tn(mode_tn, EdgeTN, contract_config=config.contraction, edge_tuple=edge_tuple)
+        edge_tn = reduce_tn(mode_tn, EdgeTN, contract_config=config.contraction, edge_tuple=edge_tuple, arange_legs=False)
         permutation_orders = edge_tn.rearrange_tensors_and_legs_into_canonical_order()
 
         # Perform ITE update:
@@ -630,7 +630,7 @@ def ite_per_delta_t(
     config = config_in.copy()
     use_lowest_energy_results = config.ite.always_use_lowest_energy_state
     # Progress bar:
-    prog_bar = get_progress_bar(config, num_repeats, f"Per delta-t...         ")
+    prog_bar = get_progress_bar(config, num_repeats, f"Per delta-t...         ", level='ITE-per-delta-t')
     # track success:
     at_least_one_successful_run : bool = False
     errors_count : int = 0
@@ -699,10 +699,10 @@ def full_ite(
     ## Repetitively perform ITE algo:
     delta_t_list_with_repetitions = list(lists.repeated_items(config.ite.time_steps))
     # Progress bar:
-    prog_bar = get_progress_bar(config, len(delta_t_list_with_repetitions), "Executing ITE Algo...  ")
+    prog_bar = get_progress_bar(config, len(delta_t_list_with_repetitions), "Executing ITE Algo...  ", level='ITE-Main')
     # Main loop:
     for delta_t, num_repeats in delta_t_list_with_repetitions:
-        prog_bar.next(extra_str=f"delta-t={delta_t}")
+        prog_bar.next(extra_str="delta-t="+formatted_delta_t_str(delta_t))
         try:
             mean_energy, unit_cell, messages, success, step_stats = ite_per_delta_t(unit_cell, messages, delta_t, num_repeats, config, plots, logger, ite_tracker, step_stats)  
         except Exception as e:

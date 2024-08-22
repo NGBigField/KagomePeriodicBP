@@ -1,12 +1,13 @@
 import sys
 from pathlib import Path
+from typing import Final
 
 
-src : Path = Path(__file__).parent
-base : Path = src.parent
-scripts : Path = base/"scripts"
-logs : Path = base/"logs"
-data : Path = base/"data"
+src     : Final[Path] = Path(__file__).parent
+base    : Final[Path] = src.parent
+scripts : Final[Path] = base/"scripts"
+logs    : Final[Path] = base/"logs"
+data    : Final[Path] = base/"data"
 
 
 def _unique_paths()->None:
@@ -17,7 +18,7 @@ def _unique_paths()->None:
 def _add_path(path:Path)->None:
     s = path.__str__()
     if s not in sys.path:
-        sys.path.append(s)
+        sys.path.insert(0, s)
 
 
 def add_base()->None:

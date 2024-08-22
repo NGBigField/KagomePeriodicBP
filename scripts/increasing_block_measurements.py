@@ -80,7 +80,7 @@ def main(
         energies_plot.append(mean=(N, mean_energy))
         for edge_tuple, energy in energies.items():
             edge_name = f"({edge_tuple[0]},{edge_tuple[1]})"
-            energies_plot.append(**{edge_name:(N, energy)}, plt_kwargs=dict(alpha=0.5, marker="+"))
+            energies_plot.append(**{edge_name:(N, energy)}, plot_kwargs=dict(alpha=0.5, marker="+"))
 
 
     print("Done")

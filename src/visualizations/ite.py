@@ -11,7 +11,7 @@ if __name__ == "__main__":
 from utils import visuals, strings, logs, prints, tuples, lists, saveload, dicts, files
 import project_paths
 
-from tensor_networks import UnitCell
+from tensor_networks import UnitCell, KagomeTNArbitrary
 from containers import Config, ITESegmentStats, UpdateEdge, MeasurementsOnUnitCell
 import numpy as np
 from dataclasses import dataclass, fields
@@ -20,6 +20,7 @@ _T = TypeVar('_T')
 
 from _types import UnitCellExpectationValuesDict
 
+from typing import TypeAlias, Any
 
 # Control flags:
 from _config_reader import ALLOW_VISUALS
@@ -30,7 +31,10 @@ if ALLOW_VISUALS:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 else:
-    Axes3D, Quiver, Line3D, Text = None, None, None, None
+    Axes3D : TypeAlias = Any 
+    Quiver : TypeAlias = Any 
+    Line3D : TypeAlias = Any 
+    Text   : TypeAlias = Any 
 
 from visualizations import constants as visual_constants
 
@@ -48,7 +52,7 @@ NEW_TRACK_POINT_THRESHOLD = 0.02
 PLOT_ENTANGLEMENT = True
 PLOT_COMPLEXITY = False
 
-CONFIG_NUM_HEADER_LINES = 48
+CONFIG_NUM_HEADER_LINES = 54
 
 
 @dataclass
@@ -56,6 +60,73 @@ class COLORS:
     track = 'tomato'
     time_complexity = "tab:blue"
     space_complexity = "tab:red"
+
+
+def get_color_in_warm_to_cold_range(value, min_, max_):
+    # Normalize the value of e to range from 0 to 1
+    normalized = (value - min_) / (max_ - min_)
+    
+    # Define RGB for blue, white, and red
+    blue = (0, 0, 1)
+    white = (1, 1, 1)
+    red = (1, 0, 0)
+    
+    if normalized < 0.5:
+        # Interpolate between blue and white
+        # Scale normalized to range from 0 to 1 within this segment
+        scale = normalized / 0.5
+        r = blue[0] * (1 - scale) + white[0] * scale
+        g = blue[1] * (1 - scale) + white[1] * scale
+        b = blue[2] * (1 - scale) + white[2] * scale
+    else:
+        # Interpolate between white and red
+        # Adjust normalized to range from 0 to 1 within this segment
+        scale = (normalized - 0.5) / 0.5
+        r = white[0] * (1 - scale) + red[0] * scale
+        g = white[1] * (1 - scale) + red[1] * scale
+        b = white[2] * (1 - scale) + red[2] * scale
+    
+    return (r, g, b)
+
+
+def plot_color_bar(ax_main:Axes, min_:float, max_:float, num_steps=100) -> Axes:
+    from matplotlib import gridspec
+
+    # Generate values
+    values = np.linspace(min_, max_, num_steps)
+    
+    # Map values to colors
+    colors = [get_color_in_warm_to_cold_range(val, min_, max_) for val in values]
+    
+    # Create gridspec layout on existing figure
+    gs = gridspec.GridSpec(1, 2, width_ratios=[40, 0.2], figure=ax_main.figure)
+    
+    # Create a new axis for the color bar beside the main axis
+    ax_color_bar = ax_main.figure.add_subplot(gs[1])
+    
+    # Plot each color as a horizontal line across the plot
+    for i, color in enumerate(colors):
+        ax_color_bar.axhline(i, color=color, linewidth=4)  # linewidth controls the thickness of bars
+    
+    # Set the y-ticks to show min, max, and mid values
+    ax_color_bar.set_yticks([0, num_steps // 2, num_steps - 1])
+    ax_color_bar.set_yticklabels([min_, (min_ + max_) / 2, max_])
+    
+    # Remove x-ticks as they are not necessary
+    ax_color_bar.set_xticks([])
+
+    # Move y-ticks to the right
+    ax_color_bar.yaxis.tick_right()
+
+    # Add a title or label if desired
+    # ax_color_bar.set_title('Color Scale')
+
+    pos = ax_color_bar.get_position()
+    pos.xmin
+    # [l, b, width, height]
+    ax_color_bar.set_position([pos.xmin-0.03, pos.ymin, pos.width, pos.height])  #type: ignore
+
+    return ax_color_bar
 
 
 def _set_window_title(window, title:str)->None:
@@ -109,7 +180,7 @@ class BlockSpherePlot():
 
         # Figure variables:
         self.fig  = fig
-        self.axis = axis
+        self.axis : Axes3D = axis
         self.axis.get_yaxis().get_major_formatter().set_useOffset(False)  # Stop the weird pyplot tendency to give a "string" offset to graphs
 
         # inner memory:
@@ -472,8 +543,8 @@ class ITEPlots():
             self.plots.main["expectations"].append(values=mean_expectation_values, draw_now_=False)
 
             # Time and space complexity
-            self.plots.main["exec_t"].append(time=segment_stats.execution_time, plt_kwargs={'c':COLORS.time_complexity}, draw_now_=False)
-            self.plots.main["memory_use"].append(space=segment_stats.memory_usage, plt_kwargs={'c':COLORS.space_complexity}, draw_now_=False)
+            self.plots.main["exec_t"].append(time=segment_stats.execution_time, plot_kwargs={'c':COLORS.time_complexity}, draw_now_=False)
+            self.plots.main["memory_use"].append(space=segment_stats.memory_usage, plot_kwargs={'c':COLORS.space_complexity}, draw_now_=False)
 
             ## Energies per edge:
             i = self._iteration
@@ -499,7 +570,7 @@ class ITEPlots():
 
             # Ground-truth
             if self.config.ite.reference_ground_energy is not None:
-                _plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plt_kwargs={'linestyle':'dotted', 'marker':''})
+                _plot.append(ref=(self._iteration, self.config.ite.reference_ground_energy), draw_now_=False, plot_kwargs={'linestyle':'dotted', 'marker':''})
 
             ## Entanglement
             _scatter_plot_at_main_per_edge(results_dict=entanglement, iteration=i, base_style=energies_after_segment_style, axis_name="entanglement", alpha=1.0)
@@ -578,7 +649,7 @@ def _values_from_values_str_line(line:str)->list[float]:
 def _scatter_values(
     ax:Axes,    
     values_line:str, i:int, style:visual_constants.ScatterStyle=default_marker_style, label:str=None,  is_first:bool=None, value_func:Callable|None=None
-)->None:
+)->list[float]:
     
     values = _values_from_values_str_line(values_line)
     for value in values:
@@ -591,6 +662,7 @@ def _scatter_values(
         ax.scatter(i, value, s=style.size, c=style.color, alpha=style.alpha, marker=style.marker, label=label)
         is_first = False
 
+    return values
 
 def _remove_x_axis_labels(ax:Axes) -> None:
     x_axis = ax.get_xaxis()
@@ -602,18 +674,22 @@ def _remove_x_axis_labels(ax:Axes) -> None:
         new_ticks.append(new_text)
     x_axis.set_ticklabels(new_ticks)
 
-def _plot_per_segment_health_common(ax:Axes, strs:list[str], style:visual_constants.ScatterStyle=default_marker_style) -> None:
-
+def _plot_per_segment_health_common(ax:Axes, strs:list[str], style:visual_constants.ScatterStyle=default_marker_style) -> list[list[float]]:
+    all_values = []
     for i, line in enumerate(strs):
+        values = []
         _, line = line.split("[")
         line, _ = line.split("]")
         words = line.split(",")
         for word in words:
             value = float(word)
             ax.scatter(i, value, s=style.size, c=style.color, alpha=style.alpha, marker=style.marker)
+            values.append(value)
 
+        all_values.append(values)
+    return all_values
 
-def _plot_health_figure_from_log(log_name:str) -> Figure: 
+def _plot_health_figure_from_log(log_name:str) -> tuple[Figure, dict, dict]: 
     ## Get matching words:
     hermicity_strs, tensor_distance_strs = logs.search_words_in_log(log_name, 
         ("Hermicity of environment=", "Tensor update distance") 
@@ -628,22 +704,24 @@ def _plot_health_figure_from_log(log_name:str) -> Figure:
         ]
     )
     axes : dict[str, Axes] = {axis._label : axis for axis in fig.get_axes()}
-
+    data = dict()
 
     ## Hermicity:
     ax = axes["Hermicity"]
-    _plot_per_segment_health_common(ax, hermicity_strs)
+    data["hermicity"] = _plot_per_segment_health_common(ax, hermicity_strs)
     ax.set_ylabel("Hermicity")
 
     ## Hermicity:
     ax = axes["distance"]
-    _plot_per_segment_health_common(ax, tensor_distance_strs)
+    data["tensor_distance"] = _plot_per_segment_health_common(ax, tensor_distance_strs)
     ax.set_ylabel("Update Distance")
 
-    return fig
+    return fig, axes, data
 
 
-def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
+def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure, dict, dict]: 
+
+    data = dict()
 
     ## Get matching words:
     edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, \
@@ -653,6 +731,7 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
     )
 
     num_segments = len(mean_energies_strs)
+    data["num_segments"] = num_segments
     
     ## Parse num modes per segment:
     num_mode_repetitions_per_segment = num_mode_repetitions_per_segment_str[0].removeprefix(": ")
@@ -666,6 +745,8 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
         word = word.removeprefix(" = ")
         word = word.removesuffix("\n")
         mean_energies.append(float(word))
+
+    data["mean_energies"] = mean_energies
 
     ## Prepare plots        
     fig = plt.figure(figsize=(5, 6))
@@ -694,15 +775,17 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
     value_func = lambda v: v*2
 
     # Plot:
+    energies_per_edge_all = []
     for i in range(num_segments):
-        _scatter_values(ax, values_line=edge_energies_for_mean_strs.pop(0), i=i, style=energies_after_segment_style, label="energies per edge", is_first=is_first, value_func=value_func)
-
+        energies_per_edge = _scatter_values(ax, values_line=edge_energies_for_mean_strs.pop(0), i=i, style=energies_after_segment_style, label="energies per edge", is_first=is_first, value_func=value_func)
+        energies_per_edge_all.append(energies_per_edge)
 
         for j in range(num_mode_repetitions_per_segment):
             index = i + j/num_mode_repetitions_per_segment
             _scatter_values(ax, values_line=edge_energies_during_strs.pop(0), i=index, style=energies_at_update_style, label="energies at update", is_first=is_first, value_func=value_func)
             is_first = False
 
+    data["energies_per_edge"] = energies_per_edge_all
                 
     ## Plot reference energy:
     if len(reference_energy_str)==0:
@@ -735,7 +818,7 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
         delta_t_vec.append(delta_t)
 
     ax.plot(delta_t_vec)
-
+    data["delta_t_vec"] = delta_t_vec
 
     ## Plot Entanglement:    
     ax = axes['entangle']
@@ -768,15 +851,14 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
     ax.plot(iterations, x, label="x")
     ax.plot(iterations, y, label="y")
     ax.plot(iterations, z, label="z")
-    ax.legend(loc="lower left")
+    ax.legend(loc='best', fontsize=8)
 
-
-    ## Finally:
-    # Remove x-ticks from all axes but last:
-    for _, last, _, ax in dicts.iterate_with_edge_indicators(axes):
-        if last:
-            continue
-        _remove_x_axis_labels(ax)        
+    data["expectations"] = dict(
+        x=x,
+        y=y,
+        z=z,
+        iterations=iterations
+    )
 
     # link x axes:
     first_ax = None
@@ -785,6 +867,20 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> Figure:
             first_ax = ax
             continue
         ax.sharex(first_ax)
+
+    
+    # Remove x-ticks from all axes but last:
+    for _, last, _, ax in dicts.iterate_with_edge_indicators(axes):
+        if last:
+            continue
+        ax.tick_params(labelbottom=False)
+        # ax.set_xticklabels([])
+        # _remove_x_axis_labels(ax)        
+
+    ## Reshape fig a bit
+    fig.set_tight_layout('w_pad')
+
+    return fig, axes, data
 
             
 
@@ -813,19 +909,167 @@ def _mean_expectation_values(expectation:UnitCellExpectationValuesDict)->dict[st
     return mean_per_direction
 
 
-def _capture_network_movie(log_name:str, ite_fig:Figure) -> None:
-    pass
+
+def _extend_figure_to_include_network_graph(fig:Figure, d:int, D:int, N:int) -> tuple[KagomeTNArbitrary, Axes]:
+    ## Adjust existing figure:
+    # reshape figure:
+    fig.set_tight_layout(False)        #type: ignore 
+    fig.set_constrained_layout(False)  #type: ignore
+    fig_width = fig.get_figwidth()
+    fig.set_figwidth(2.7*fig_width)
+    # Reshape all previous axes:
+    for axes in fig.axes:
+        pos = axes.get_position()
+        axes.set_position([0.1, pos.ymin, pos.width*0.48, pos.height])  #type: ignore
+    # ``[[xmin, ymin], [xmax, ymax]]``
+    ## Get info:
+    _y_min = min([ax.get_position().y0 for ax in fig.axes])
+    _y_max = max([ax.get_position().y1 for ax in fig.axes])
+    b = _y_min
+    h = _y_max - _y_min
+    l = 0.48
+    w = 0.45
+    ## New axes:
+    ax = fig.add_axes((l, b, w, h))
+    # fig.set_tight_layout('w_pad')
+    # ax.set_box_aspect(0.8)
+
+    ## plot network:
+    from tensor_networks.tensor_network import KagomeTNArbitrary, TNDimensions
+    dimensions = TNDimensions(physical_dim=d, virtual_dim=D, big_lattice_size=N)
+    kagome_tn = KagomeTNArbitrary.random(dimensions)
+    kagome_tn.deal_cell_flavors()
+    kagome_tn.plot(detailed=False, axes=ax, beautify=False)
+
+    return kagome_tn, ax
+    
+def _plot_edge_energy(kagome_ax:Axes, kagome_tn:KagomeTNArbitrary, color:tuple[float, ...], edge:UpdateEdge) -> list:
+    lines = []
+    for n1, n2 in kagome_tn.all_node_pairs_in_lattice_by_edge_type(edge):
+        x1, y1 = n1.pos
+        x2, y2 = n2.pos
+        line = kagome_ax.plot([x1, x2], [y1, y2], color=color, linewidth=5, zorder=4)
+        lines.append(line)
+    return lines
+
+
+def _update_figure_per_delta_t(
+    i_delta_t:int, delta_t:float, fig:Figure, 
+    kagome_tn:KagomeTNArbitrary, kagome_ax:Axes, 
+    ite_data:dict, ite_axes:dict[str, Axes], 
+    energy_color_scale_function:Callable[[float], tuple[float, ...]]
+) -> list:  # plotted lines
+
+    ## Basic data and track output: 
+    edges_orders = list(UpdateEdge.all_options())
+    plotted_lines = []
+
+    ## Add red delta_t line:
+    for ax in ite_axes.values():
+        line = ax.axvline(x = i_delta_t, color = 'r')
+        plotted_lines.append(line)
+
+    ## iterate over all edges and plot energy on edge:
+    for i_edge, edge in enumerate(edges_orders):
+        energy = ite_data["energies_per_edge"][i_delta_t][i_edge]
+        color = energy_color_scale_function(energy)
+        lines = _plot_edge_energy(kagome_ax, kagome_tn, color, edge)
+        plotted_lines += lines
+
+    return plotted_lines
+
+
+def _clear_plotted_lines(lines:list[Any]) -> None:
+    for line in lines:
+        ## Try removing line as an object
+        try:
+            line.remove()
+        except:
+            pass
+
+        ## Try removing line as a collection of objects:
+        try:
+            for obj in line:
+                try:
+                    obj.remove()
+                except:
+                    continue
+        except:
+            pass
+
+def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], ite_data:dict[str, Any]) -> None:
+    ## Get basic info:
+    delta_t_axes = ite_axes["delta_t"]
+    delta_ts = delta_t_axes.lines[0].get_ydata()
+    delta_ts = [val for val in delta_ts]  #type: ignore
+    edges_orders = list(UpdateEdge.all_options())
+
+    ## Derive from log:
+    d_str, D_str, N_str = logs.search_words_in_log(log_name, 
+        ("physical_dim:", "virtual_dim:", "big_lattice_size:"),
+        max_line=CONFIG_NUM_HEADER_LINES
+    )
+    d = int(d_str[0])
+    D = int(D_str[0])
+    N = 2  # ignore the actual string
+
+    kagome_tn, kagome_ax = _extend_figure_to_include_network_graph(fig, d, D, N)
+    
+    ## Define color scales:
+    e_min, e_max = np.inf, -np.inf
+    for i_delta_t, delta_t in enumerate(delta_ts):  
+        if i_delta_t>=len(ite_data["energies_per_edge"]):
+            break
+        for i_edge, edge in enumerate(edges_orders):
+            energy = ite_data["energies_per_edge"][i_delta_t][i_edge]
+            e_min = min(e_min, energy)
+            e_max = max(e_max, energy)
+
+    def energy_color_scale_function(energy) -> tuple[float, float, float]:
+        return get_color_in_warm_to_cold_range(energy, e_min, e_max)
+
+    ## Plot color bar:
+    ax_color_bar = plot_color_bar(kagome_ax, e_min, e_max, num_steps=1000)
+
+    ## Iterative Plotting:
+    wanted_movie_time = 30  # [sec]
+    num_frames = len(delta_ts)
+    fps = num_frames/wanted_movie_time
+    fps = int(fps)
+    movie = visuals.VideoRecorder(fps=fps)
+    plotted_lines = []
+    is_first = True
+    for i_delta_t, delta_t in enumerate(delta_ts):        
+        if i_delta_t>=len(ite_data["energies_per_edge"]):
+            break
+
+        _clear_plotted_lines(plotted_lines)
+        plotted_lines = _update_figure_per_delta_t(i_delta_t, delta_t, fig, kagome_tn, kagome_ax, ite_data, ite_axes, energy_color_scale_function)
+        if is_first:
+            movie.capture(fig, duration=10)
+        else:
+            movie.capture(fig, duration=1)
+        visuals.draw_now()
+        is_first = False
+
+    ## Finish
+    movie.write_video()
+    print("Done movie!")
+
 
 def plot_from_log(
-    # log_name:str = "log - from zero to hero",
-    log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3",
+    # log_name:str = "2024.07.28_08.59.04_RCWB_AFM_D=2_N=4 - good",  # Best log so far
+    log_name:str = "from zero to hero - 1",  # Best log so far
+    # log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3 - short",  # short
     save:bool = True,
     plot_health_figure:bool = False,
-    capture_lattice_movie:bool = True,
+    capture_lattice_movie:bool = False
 ):
     
     _print_log_header(log_name)
-    figs : dict[str,Figure] = dict()
+    all_figs : dict[str, Figure] = dict()
+    all_axes : dict[str, dict]   = dict()
+    all_data : dict[str, dict]   = dict()
 
 
     for _plot_func, name in [
@@ -836,19 +1080,22 @@ def plot_from_log(
         if name=="health" and not plot_health_figure:
             continue
 
-        if name=="network_movie" and capture_lattice_movie:
-            movie = _plot_func(log_name, figs["main"])
+        if name=="network_movie":
+            if capture_lattice_movie:
+                movie = _plot_func(log_name, all_figs["main"], all_axes["main"], all_data["main"])                
             continue
 
         # Plot
-        fig = _plot_func(log_name)
+        fig, axes, data = _plot_func(log_name)
 
         # save:
         if save:
             visuals.save_figure(fig=fig  , file_name=log_name+" - "+name) 
 
         # Keep:
-        figs[name] = fig
+        all_figs[name] = fig
+        all_axes[name] = axes
+        all_data[name] = data
 
     # Show:
     plt.show()

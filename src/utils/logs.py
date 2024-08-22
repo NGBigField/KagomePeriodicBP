@@ -13,7 +13,7 @@ import types, project_paths
 from project_paths import logs as logs_path
 
 from typing import Iterable
-
+import numpy as np
 
 # ============================================================================ #
 #|                                  Helpers                                   |#
@@ -160,22 +160,32 @@ def get_logger(
 
 
 def search_words_in_log(
-    filename:str,
-    words:Iterable[str]
+    filename_or_fullpath:str,
+    words:Iterable[str],
+    max_line:int = np.iinfo(np.int64).max
 )->tuple[list[str], ...]:
-    ## Read file:
-    folder = project_paths.logs
-    name_with_extension = saveload._common_name(filename, typ='log')
-    full_path = str(folder)+PATH_SEP+name_with_extension
+    ## Fullpath:
+    if os.path.isabs(filename_or_fullpath):  
+        # absolute path:
+        full_path = filename_or_fullpath
+    else:
+        ## get full path:
+        folder = project_paths.logs
+        name_with_extension = saveload._common_name(filename_or_fullpath, typ='log')
+        full_path = str(folder)+PATH_SEP+name_with_extension
+
 
     ## Init outputs:
     res = [list() for _ in words]
 
     ## Iterate:
     with open(full_path, "r") as file:
-        for line in file:    
-            for word_index, word in enumerate(words):
+        for i, line in enumerate(file):    
 
+            if i>max_line:
+                break
+
+            for word_index, word in enumerate(words):
                 location_in_line = strings.search_pattern_in_text(word, line)
                 if location_in_line != -1:  # if found
                     index_after_word = location_in_line + len(word)

@@ -15,7 +15,7 @@ from lattices.directions import LatticeDirection, BlockSide, check
 from lattices.edges import edges_dict_from_edges_list
 from enums import ContractionDepth
 from _types import EdgeIndicatorType
-from containers import BubbleConConfig, MPSOrientation, MessageDictType
+from containers import BubbleConGlobalConfig, MPSOrientation, MessageDictType
 
 # Our utilities:
 from utils import tuples, numerics
@@ -148,7 +148,7 @@ def contract_tensor_network(
     direction:BlockSide,
     depth:ContractionDepth,
     bubblecon_trunc_dim:int,
-    print_progress:bool=True
+    allow_progressbar:bool=True
 )->tuple[
     MPS|complex|tuple,
     list[int],
@@ -161,13 +161,13 @@ def contract_tensor_network(
         direction (BlockSide): direction of contraction
         depth (ContractionDepth): how deep to contract
         bubblecon_trunc_dim (int): 
-        print_progress (bool, optional): Defaults to True.
+        allow_progressbar (bool, optional): Defaults to True.
 
     Returns:
         tuple[ MPS|complex|tuple, list[int], MPSOrientation, ]
     """
     ## Config:
-    bubblecon_config = BubbleConConfig()  # load global default config. can be changed for more control
+    bubblecon_global_config = BubbleConGlobalConfig()  # load global default config. can be changed for more control
 
     ## Derive or load Contraction Order:
     contraction_order = get_contraction_order(tn, direction, depth)
@@ -183,7 +183,11 @@ def contract_tensor_network(
     
     ## Choose bubblecon compression rule:
     D = tn.tensors[0].shape[-1]
-    compression_dict = bubblecon_config.bubblecon_compression(D)    
+    compression_dict = bubblecon_global_config.bubblecon_compression(D)    
+
+    ## Use progress bar?
+    if bubblecon_global_config.override_progress_bar is not None:
+        allow_progressbar = bubblecon_global_config.override_progress_bar
 
     ## Call main function:
     mps = bubblecon(
@@ -194,8 +198,8 @@ def contract_tensor_network(
         swallow_order=contraction_order, 
         D_trunc=bubblecon_trunc_dim,
         opt='high',
-        progress_bar=bubblecon_config.progress_bar and print_progress,
-        separate_exp=bubblecon_config.separate_exp,
+        progress_bar=allow_progressbar,
+        separate_exp=bubblecon_global_config.separate_exp,
         ket_tensors=tn.kets,
         compression=compression_dict
     )

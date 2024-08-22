@@ -2,13 +2,12 @@ import numpy as np
 import typing as typ
 from itertools import combinations
 from scipy.linalg import sqrtm
-import matplotlib.pyplot as plt
 # My modules:
 from physics.metrics.src.densitymats import DensityMatrix, CommonDensityMatrices
 from utils import assertions
 
 # Global Constants:
-IS_VALIDATE_CORRECT_METHOD = False
+IS_VALIDATE_CORRECT_METHOD = True
 EPSILON = 0.0001
 
 

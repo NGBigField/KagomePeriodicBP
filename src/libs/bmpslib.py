@@ -185,6 +185,7 @@ from scipy.sparse.linalg import eigs
 
 from numpy.linalg import norm, svd, qr
 from scipy.linalg import rq
+from quimb.linalg.rand_linalg import rsvd
 
 from numpy import zeros, ones, array, tensordot, sqrt, diag, dot, \
 	reshape, transpose, conj, eye, trace, floor, log10
@@ -605,10 +606,9 @@ class mps:
 	# optimal.
 	#
 
-	def left_canonical(self, maxD=None, eps=None):
+	def left_canonical(self, maxD=None, eps=None, svd_emthod:str="rsvd"):
 		if self.N<2:
-			return
-
+			return		
 
 		for i in range(self.N-1):
 
@@ -619,10 +619,10 @@ class mps:
 			M = self.A[i].reshape(D1*d, D2)
 				
 			try:
-				U,S,V = svd(M, full_matrices=False)
+				U,S,V = _perf_svd(M, svd_emthod)
 			except:
 				M = M + np.random.randn(*M.shape)*norm(M)*1e-12
-				U,S,V = svd(M, full_matrices=False)
+				U,S,V = _perf_svd(M, svd_emthod)
 
 
 
@@ -686,7 +686,7 @@ class mps:
 	#
 
 	def right_canonical(self, maxD=None, eps=None, i0=None,i1=None, \
-		nr_bulk = False):
+		nr_bulk = False, svd_emthod:str="rsvd"):
 			
 		if self.N<2:
 			return
@@ -737,10 +737,10 @@ class mps:
 				#
 				
 				try:
-					U,S,V = svd(M, full_matrices=False)
+					U,S,V = _perf_svd(M, svd_emthod)
 				except:
 					M = M + np.random.randn(*M.shape)*norm(M)*1e-12
-					U,S,V = svd(M, full_matrices=False)
+					U,S,V = _perf_svd(M, svd_emthod)
 				
 				if nr_bulk:
 					nrS = norm(S)
@@ -755,6 +755,7 @@ class mps:
 					S_eff = S[S>cutoff]
 				
 				myD = min(len(S_eff),maxD)
+				myD = _assert_int(myD)
 
 				err = sqrt(sum(S[myD:]**2)/sum(S**2))
 				
@@ -2863,10 +2864,52 @@ def add_two_MPSs(mpsA, alpha, mpsB, beta):
 	return mp
 		
 		
+def _assert_int(x:int|float) -> int:
+	int_version = int(x)	
+	assert int_version==x, f"{x} must be an integer!"
+	return int_version
 	
-	
-	
+
+def _perf_svd(m:np.ndarray, svd_emthod:str="rsvd", check_result:bool=False) -> tuple[np.ndarray, np.ndarray, np.ndarray]:		
+	if svd_emthod=="svd":
+		u, s, vh = svd(m, full_matrices=False)
+	elif svd_emthod=="rsvd":
+		eps_or_k = 1e-5
+		u, s, vh = rsvd(m, eps_or_k)
+	else:
+		raise ValueError(f"Not an expected case `svd_emthod=={svd_emthod!r}`")	
+
+	if check_result:
+		m1 = (u * s) @ vh
+		diff = np.sum(abs(m - m1))
+	return u, s, vh
 
 
 
+def _svd_test(
+	n:int=int(20)
+):
+	from time import perf_counter
+	m = np.random.rand(n, n) + 1j*np.random.rand(n, n)
 
+	for svd_emthod in ["svd", "rsvd"]:
+
+		print("") 
+		print(svd_emthod)
+
+		t1 = perf_counter()
+		u, s, vh = _perf_svd(m, svd_emthod)
+		t2 = perf_counter()
+
+		m1 = (u * s) @ vh
+		diff = abs(m - m1)
+		print(f"time={t2-t1}")
+		# print(diff)
+		print(f"diff={np.sum(diff)}")
+
+	print("Done.")
+
+
+if __name__ == "__main__":
+	_svd_test()
+	print("Done")

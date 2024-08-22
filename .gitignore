@@ -163,8 +163,9 @@ cython_debug/
 !/data/unit_cells/best/
 !/data/unit_cells/best/*
 ## Keep tnsu results:
-!/data/tnsu_results/
-!/data/tnsu_results/*
+!/data/simple_update_results/
+!/data/simple_update_results/*
+
 
 *.pkl
 *.mp4

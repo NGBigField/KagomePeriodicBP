@@ -1,12 +1,14 @@
-import _import_src  ## Needed to import src folders when scripts are called from an outside directory
+if __name__ == "__main__":
+    import _import_src  ## Needed to import src folders when scripts are called from an outside directory
 
 # Types in the code:
 from containers import Config, HamiltonianFuncAndInputs
-from unit_cell import UnitCell, get_from
+from unit_cell import UnitCell
+import unit_cell.get_from as get_unit_cell_from 
 
-from utils import strings, lists
-from typing import Iterable, TypeAlias
-_Bool : TypeAlias = bool|int
+from utils import strings, lists, processes
+from typing import Iterable, TypeAlias, Literal
+_Bool : TypeAlias = bool|Literal[0, 1]
 
 # Algos we test here:
 from algo.imaginary_time_evolution import full_ite
@@ -87,8 +89,7 @@ def _get_unit_cell(D:int, source:str) -> tuple[UnitCell, bool]:
 
         case "tnsu":
             print("Get unit_cell by simple-update:")
-            is_random = True
-            unit_cell, energy = get_from.simple_update(D=D)
+            unit_cell, energy = get_unit_cell_from.simple_update(D=D)
 
         case _:
             assert isinstance(source, str)
@@ -103,7 +104,7 @@ def _plot_field_over_time() -> None:
     from matplotlib import pyplot as plt
 
     ## Config:
-    n_per_dt = 200
+    n_per_dt = 500
     e_start = 3
     e_end   = 8
     time_steps = _get_time_steps(e_start=e_start, e_end=e_end, n_per_dt=n_per_dt)
@@ -139,16 +140,17 @@ def _plot_field_over_time() -> None:
 
 
 def main(
-    D = 2,
+    D = 3,
     N = 3,
-    chi_factor : int|float = 2,
-    live_plots:_Bool|Iterable[_Bool] = [0,0,0],   #type: ignore
-    progress_bar:bool=True,
+    chi_factor : int|float = 1.0,
+    live_plots:_Bool|Iterable[_Bool] = [0,0,0], 
+    progress_bar:Literal['all_active', 'all_disabled', 'only_main'] = 'all_active',
     results_filename:str|None = None,
     parallel:bool = False,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
-    damping:float|None = 0.0,
-    unit_cell_from:str = "random"
+    damping:float|None = 0.1,
+    unit_cell_from:Literal["random","last","best","tnsu"]|str = "best",
+    monitor_cpu_and_ram:bool = True
 )->tuple[float, str]:
 
     assert N>=2
@@ -156,7 +158,7 @@ def main(
     assert chi_factor>0
 
     if results_filename is None:
-        results_filename = strings.time_stamp()+"_"+strings.random(4)+f"_AFM_D={D}_N={N}"
+        results_filename = strings.time_stamp()+f"_AFM_D={D}_N={N}_"+strings.random(4)
 
     unit_cell, _radom_unit_cell = _get_unit_cell(D=D, source=unit_cell_from)
     unit_cell.set_filename(results_filename) 
@@ -171,47 +173,39 @@ def main(
     config.ite.interaction_hamiltonian = _get_hamiltonian(hamiltonian)
 
     # Chi factor:
-    config.chi = int(config.chi*chi_factor)
-    config.chi_bp = int(config.chi_bp*chi_factor)
+    config.chi = config.chi*chi_factor
+    config.chi_bp = config.chi_bp*chi_factor
 
-    config.bp.msg_diff_good_enough = 1e-7
+    config.bp.msg_diff_good_enough = 1e-6
     config.bp.msg_diff_terminate = 1e-14
     # config.bp.times_to_deem_failure_when_diff_increases = 3
     # config.bp.max_iterations = 50
     # config.bp.allowed_retries = 2
     config.iterative_process.change_config_for_measurements_func = _config_at_measurement
-    # config.iterative_process.start_segment_with_new_bp_message = True
-    # config.iterative_process.use_bp = True
-    # config.ite.random_edge_order = True
     config.ite.always_use_lowest_energy_state = True
     # config.ite.symmetric_second_order_trotterization = True
     config.ite.add_gaussian_noise_fraction = 1e-2
     # config.iterative_process.bp_every_edge = True
-    config.iterative_process.num_mode_repetitions_per_segment = 5
+    config.iterative_process.num_mode_repetitions_per_segment = 3
 
     ## time steps:
-    if D<4:
-        n_per_dt = 300
-        e_start = 4
-        e_end   = 7
+    if unit_cell_from == 'best':
+        e_start = 5
+        e_end   = 8
     else:
-        n_per_dt = 300
         e_start = 4
         e_end   = 7
-    # 
+    n_per_dt = 100
+    #    
     config.ite.time_steps = _get_time_steps(e_start, e_end, n_per_dt)
 
     if _radom_unit_cell:
         append_to_head = []
-        n_per_dt = 100
-        e_start = 2
-        e_end   = 2
-        append_to_head += _get_time_steps(e_start, e_end, n_per_dt) 
-        n_per_dt = 400
-        e_start = 3
-        e_end   = 3
-        append_to_head += _get_time_steps(e_start, e_end, n_per_dt)
+        append_to_head += _get_time_steps(2, 2, 50) 
+        append_to_head += _get_time_steps(3, 3, 100)
         config.ite.time_steps = append_to_head + config.ite.time_steps
+
+    config.monitoring_system.set_all(monitor_cpu_and_ram)
 
     ## Run:
     energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config, common_results_name=results_filename)

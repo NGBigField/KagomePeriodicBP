@@ -6,12 +6,16 @@
     "configurations": [
         {
             "name": "Python: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "justMyCode": true,
-            "pythonArgs": ["-Xfrozen_modules=off"]  //, "PYDEVD_DISABLE_FILE_VALIDATION=1"
+            "justMyCode": true
+            // "internalConsoleOptions": "openOnSessionStart"
+            // "env": {
+            //     "QT_QPA_PLATFORM_PLUGIN_PATH": "C:/Users/Nir/Documents/GitHub/KagomePeriodicBP/.conda/Library/plugins"
+            // }
+            // "pythonArgs": ["-Xfrozen_modules=off"]  //, "PYDEVD_DISABLE_FILE_VALIDATION=1"
         },
         {
             "name": "Python: Test Condor Worker",

@@ -13,13 +13,13 @@ def _get_last_log_file()->str:
 
 
 def main(
-    filename:str|None = None
+    filename:str|None = "2024.08.04_16.33.55_AFM_D=2_N=3_YYHK"
 ):
     ## Parse inputs:
     if len(argv)>=2 and argv[1] is not None:
         filename = argv[1]
 
-    if filename is None or (isinstance(filename, str) and filename=="last" ):
+    if filename is None or ( isinstance(filename, str) and filename=="last" ):
         filename = _get_last_log_file()
 
     ## Main call:

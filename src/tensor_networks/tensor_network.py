@@ -30,6 +30,7 @@ from _error_types import TensorNetworkError, LatticeError, DirectionError, Netwo
 from enums import NodeFunctionality, UpdateMode, UnitCellFlavor, MessageModel
 from containers.belief_propagation import MessageDictType, Message, MPSOrientation
 from containers.sizes_and_dimensions import TNDimensions
+from containers.imaginary_time_evolution import UpdateEdge
 
 # utilities used in our code:
 from utils import lists, tuples, numerics, indices, strings, arguments
@@ -53,6 +54,7 @@ from typing import Any, Final
 
 _T = TypeVar("_T")
 _FrozenSpecificNetworkType = TypeVar("_FrozenSpecificNetworkType", bound="_FrozenSpecificNetwork")
+_KagomeArbitraryTNType = TypeVar("_KagomeArbitraryTNType", bound="KagomeTNArbitrary")
 
 class TensorDims(NamedTuple):
     virtual  : int
@@ -131,11 +133,11 @@ class TensorNetwork(ABC):
     # ================================================= #
     #|                    Visuals                      |#
     # ================================================= #
-    def plot(self, detailed:bool=True)->None:
+    def plot(self, detailed:bool=True, axes=None, beautify=True)->None:
         from tensor_networks.visualizations import plot_network
         nodes = self.nodes
         edges = self.edges_dict
-        plot_network(nodes=nodes, edges=edges, detailed=detailed)
+        plot_network(nodes=nodes, edges=edges, detailed=detailed, axes=axes, beautify=beautify)
 
     # ================================================= #
     #|                   Get Nodes                     |#
@@ -303,6 +305,23 @@ class KagomeTensorNetwork(TensorNetwork, ABC):
     def get_center_triangle(self)->UpperTriangle:
         return self.lattice.get_center_triangle()
     
+    def all_node_pairs_in_lattice_by_edge_type(self, edge:UpdateEdge) -> Generator[tuple[TensorNode, TensorNode], None, None]:
+        nodes1 = self.get_nodes_by_cell_flavor(edge.first)
+        nodes2 = self.get_nodes_by_cell_flavor(edge.second)
+        for n1 in nodes1:
+            for n2 in nodes2:
+                # Are connected?
+                if not self.are_neighbors(n1, n2):
+                    continue
+                # Are in correct order?
+                common_edge = set(n1.edges).intersection(set(n2.edges)).pop()
+                n1_to_n2_direction = n1.directions[n1.edges.index(common_edge)]
+                if edge.first_to_second_direction() != n1_to_n2_direction:
+                    continue
+                # This is the correct edge:
+                yield n1, n2
+                
+    
     # ================================================= #
     #|                 Cache Control                   |#
     # ================================================= #
@@ -427,6 +446,22 @@ class KagomeTNArbitrary(KagomeTensorNetwork):
         if DEBUG_MODE: 
             new.validate()
         return new
+
+    # ================================================= #
+    #|                 Constructors                    |#
+    # ================================================= #
+    @classmethod
+    def random(cls:Type[_KagomeArbitraryTNType], dimensions:TNDimensions) -> _KagomeArbitraryTNType:
+        N = dimensions.big_lattice_size
+        D = dimensions.virtual_dim
+        d = dimensions.physical_dim
+        def _rand_tensor()->np.ndarray:
+            return np.random.normal(size=(d, D, D, D, D)) + 1j*np.random.normal(size=(d, D, D, D, D)) 
+        num_tensors = kagome.num_nodes_by_lattice_size(N)
+        tensors = [_rand_tensor() for i in range(num_tensors)]
+        new = cls(tensors)
+        return new
+
 
     # ================================================= #
     #|              Geometry Functions                 |#
@@ -686,6 +721,10 @@ class EdgeTN(_FrozenSpecificNetwork):
     num_core_tensors : Final[int] = 2
     num_env_tensors  : Final[int] = 6
 
+    def __init__(self, nodes: list[TensorNode], copy=True) -> None:
+        super().__init__(nodes, copy)
+        self._in_canonical_leg_order : bool = False
+
     # ================================================= #
     #|           nodes and their relations             |#
     # ================================================= #       
@@ -705,6 +744,7 @@ class EdgeTN(_FrozenSpecificNetwork):
     
     @property
     def open_mps_env(self)->list[np.ndarray]:
+        assert self._in_canonical_leg_order, "Run `self.rearrange_tensors_and_legs_into_canonical_order()` before asking for env"
         environment_nodes = self.nodes[2:]
         assert len(environment_nodes)==6
         environment_tensors = [physical_tensor_with_split_mid_leg(n) for n in environment_nodes]    # Open environment mps legs:        
@@ -751,6 +791,7 @@ class EdgeTN(_FrozenSpecificNetwork):
         tn = self.to_arbitrary_tn()
         tn, permutation_orders = _edge_tn_rearrange_tensors_and_legs_into_canonical_order(tn)
         self._nodes = tn.nodes
+        self._in_canonical_leg_order = True
         return permutation_orders
 
 

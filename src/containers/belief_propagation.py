@@ -10,6 +10,22 @@ from libs.bmpslib import mps as MPS
 from lattices.directions import BlockSide
 
 
+
+@dataclass
+class BPVisualsConfig(_ConfigClass):
+    update_plots_between_steps:bool=False
+    main_progress_bar:bool=True
+    bubblecon_progress_bar:bool=True
+
+    def __repr__(self) -> str:
+        return super().__repr__(level=2)
+    
+    def set_all_progress_bars(self, value:bool) -> None:
+        assert isinstance(value, bool)
+        for attr_nmae in ["main_progress_bar", "bubblecon_progress_bar"]:
+            self.__setattr__(attr_nmae, value)
+    
+
 @dataclass
 class BPConfig(_ConfigClass): 
     init_msg: MessageModel = MessageModel.RANDOM_QUANTUM
@@ -25,6 +41,8 @@ class BPConfig(_ConfigClass):
     # damping=0 will take 100% the new message while damping=1 will keep the old message.
     hermitize_msgs_when_finished : bool = True
     fix_msg_each_step : bool = True
+    # Visuals
+    visuals : BPVisualsConfig = field(default_factory=BPVisualsConfig)
 
     
     def __repr__(self) -> str:
