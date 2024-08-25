@@ -719,7 +719,13 @@ def _plot_health_figure_from_log(log_name:str) -> tuple[Figure, dict, dict]:
     return fig, axes, data
 
 
-def _plot_main_figure_from_log(log_name:str, legend:bool=True, _plot_at_update_update_energies:bool=False) -> tuple[Figure, dict, dict]: 
+def _plot_main_figure_from_log(
+    log_name:str, 
+    legend:bool=True, 
+    _plot_at_update_update_energies:bool=False,
+    _plot_reference_energy:bool=False,
+    _scatter_entanglement:bool=False
+) -> tuple[Figure, dict, dict]: 
 
     data = dict()
 
@@ -763,8 +769,15 @@ def _plot_main_figure_from_log(log_name:str, legend:bool=True, _plot_at_update_u
     axes : dict[str, Axes] = {axis._label : axis for axis in fig.get_axes()}
 
     ## Plot mean energies:    
+    if _plot_at_update_update_energies:
+        linestyle = "-"
+        color = 'tab:blue'
+    else:
+        linestyle = "--"
+        color = 'black'
+
     ax = axes['Energies']
-    ax.plot(mean_energies, color="tab:blue", label="mean energy", linewidth=3)
+    ax.plot(mean_energies, color=color, linestyle=linestyle, label="mean energy", linewidth=5)
     ax.grid()
     ax.set_ylabel("Energy")
 
@@ -776,33 +789,44 @@ def _plot_main_figure_from_log(log_name:str, legend:bool=True, _plot_at_update_u
 
     # Plot:
     energies_per_edge_all = []
-    for i in range(num_segments):
-        energies_per_edge = _scatter_values(ax, values_line=edge_energies_for_mean_strs.pop(0), i=i, style=energies_after_segment_style, label="energies per edge", is_first=is_first, value_func=value_func)
-        energies_per_edge_all.append(energies_per_edge)
+    if _plot_at_update_update_energies:
+        for i in range(num_segments):
+            energies_per_edge = _scatter_values(ax, values_line=edge_energies_for_mean_strs.pop(0), i=i, style=energies_after_segment_style, label="energies per edge", is_first=is_first, value_func=value_func)
+            energies_per_edge_all.append(energies_per_edge)
 
-        if _plot_at_update_update_energies:
             for j in range(num_mode_repetitions_per_segment):
                 index = i + j/num_mode_repetitions_per_segment
                 _scatter_values(ax, values_line=edge_energies_during_strs.pop(0), i=index, style=energies_at_update_style, label="energies at update", is_first=is_first, value_func=value_func)
                 is_first = False
-        is_first = False
+
+    else:
+        for i in range(num_segments):
+            energies_per_edge = _values_from_values_str_line(edge_energies_for_mean_strs.pop(0))
+            energies_per_edge_all.append(energies_per_edge)
+
+        x = list(range(1, num_segments+1))
+        for j in range(6):
+            y = [2*vec[j] for vec in energies_per_edge_all]
+            x, y = lists.force_same_length(x, y, method='truncate')
+            ax.plot(x, y, label=f"edge{j+1}")
 
     data["energies_per_edge"] = energies_per_edge_all
                 
     ## Plot reference energy:
-    if len(reference_energy_str)==0:
-        pass
-    elif len(reference_energy_str)>0:
-        reference_energy = reference_energy_str[0]
-        reference_energy = reference_energy.removeprefix(" is ")
-        reference_energy = reference_energy.removesuffix("\n")
-        reference_energy = float(reference_energy)
-        reference_plot = ax.axhline(reference_energy, linestyle="--", color="g", label="reference")
-    else:
-        raise NotImplementedError("Not a known case")
+    if _plot_reference_energy:
+        if len(reference_energy_str)==0:
+            pass
+        elif len(reference_energy_str)>0:
+            reference_energy = reference_energy_str[0]
+            reference_energy = reference_energy.removeprefix(" is ")
+            reference_energy = reference_energy.removesuffix("\n")
+            reference_energy = float(reference_energy)
+            reference_plot = ax.axhline(reference_energy, linestyle="--", color="g", label="reference")
+        else:
+            raise NotImplementedError("Not a known case")
 
     if legend:
-        ax.legend(loc='upper right')
+        ax.legend(loc='upper right', prop={'size': 6})
 
     ## Delta_t plot:
     ax = axes["delta_t"]
@@ -829,14 +853,28 @@ def _plot_main_figure_from_log(log_name:str, legend:bool=True, _plot_at_update_u
     ax.grid()
     ax.set_ylabel("Negativity")
     ax.set_xlabel("Iteration")
-    for i, line in enumerate(edge_negativities_strs):
-        _scatter_values(ax, line, i)
+    
+    entanglement_per_edge_all = []
+    if _scatter_entanglement:
+        for i, line in enumerate(edge_negativities_strs):
+            _scatter_values(ax, line, i)
+            
+    else:
+        for i, line in enumerate(edge_negativities_strs):
+            entanglement_per_edge = _values_from_values_str_line(line)
+            entanglement_per_edge_all.append(entanglement_per_edge)
+
+        x = list(range(1, num_segments+1))
+        for j in range(6):
+            y = [2*vec[j] for vec in entanglement_per_edge_all]
+            x, y = lists.force_same_length(x, y, method='truncate')
+            ax.plot(x, y, label=f"edge{j+1}")
 
 
     ## Plot Expectations:   
     ax = axes['expect'] 
     ax.grid()
-    ax.set_ylabel("Expectations")
+    ax.set_ylabel("Mean\nMagnetization")
     x, y, z = [], [], []
     for ind, line in enumerate(expectation_values_strs):
         _, line = line.split(sep="{")
