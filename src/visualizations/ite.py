@@ -719,7 +719,7 @@ def _plot_health_figure_from_log(log_name:str) -> tuple[Figure, dict, dict]:
     return fig, axes, data
 
 
-def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure, dict, dict]: 
+def _plot_main_figure_from_log(log_name:str, legend:bool=True, _plot_at_update_update_energies:bool=False) -> tuple[Figure, dict, dict]: 
 
     data = dict()
 
@@ -780,10 +780,12 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure
         energies_per_edge = _scatter_values(ax, values_line=edge_energies_for_mean_strs.pop(0), i=i, style=energies_after_segment_style, label="energies per edge", is_first=is_first, value_func=value_func)
         energies_per_edge_all.append(energies_per_edge)
 
-        for j in range(num_mode_repetitions_per_segment):
-            index = i + j/num_mode_repetitions_per_segment
-            _scatter_values(ax, values_line=edge_energies_during_strs.pop(0), i=index, style=energies_at_update_style, label="energies at update", is_first=is_first, value_func=value_func)
-            is_first = False
+        if _plot_at_update_update_energies:
+            for j in range(num_mode_repetitions_per_segment):
+                index = i + j/num_mode_repetitions_per_segment
+                _scatter_values(ax, values_line=edge_energies_during_strs.pop(0), i=index, style=energies_at_update_style, label="energies at update", is_first=is_first, value_func=value_func)
+                is_first = False
+        is_first = False
 
     data["energies_per_edge"] = energies_per_edge_all
                 
@@ -799,6 +801,8 @@ def _plot_main_figure_from_log(log_name:str, legend:bool = True) -> tuple[Figure
     else:
         raise NotImplementedError("Not a known case")
 
+    if legend:
+        ax.legend(loc='upper right')
 
     ## Delta_t plot:
     ax = axes["delta_t"]
