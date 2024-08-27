@@ -542,6 +542,7 @@ def plot_with_spread(
     y_vals:list[_Numeric]|None=None, 
     also_plot_max_min_dots:bool=True,
     axes:Axes|None=None,
+    disable_spread:bool=False,
     **plt_kwargs
 ) -> PlotWithSpreadReturnValue:
     ## Check inputs:
@@ -577,6 +578,9 @@ def plot_with_spread(
     lines = axes.plot(x_values, y_means, **plt_kwargs)
     color = lines[0].get_color()
     
+    if disable_spread:
+        return lines
+
     # Adding a shaded region to represent the spread (1 standard deviation here)
     y_means = np.array(y_means)
     y_stds = np.array(y_stds)

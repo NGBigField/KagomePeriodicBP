@@ -317,7 +317,8 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, w
             label = "Random"
 
         lines += visuals.plot_with_spread(x_vals=x_vals, y_vals=y_vals, axes=ax, also_plot_max_min_dots=False, 
-                                         linewidth=5, marker=marker, color=color, markersize=marker_size, label=label)
+                                         linewidth=5, marker=marker, color=color, markersize=marker_size, label=label,
+                                         disable_spread=True)
 
         return lines
     
@@ -379,6 +380,9 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, w
     elif what == 'error':
         ylabel = "abs "+y+" error"
 
+    if y == "fidelity" and what == "error":
+        ylabel = "1-Fidelity"
+
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     #
@@ -398,8 +402,8 @@ def _plot_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
 
     for x, y in [
         # ('time', 'z'), 
-        ('N', 'entanglement_entropy'), 
-        ('N', 'negativity'), 
+        # ('N', 'entanglement_entropy'), 
+        # ('N', 'negativity'), 
         ('N', 'fidelity'),
         # ('N', 'energy'),
     ]:
