@@ -150,7 +150,8 @@ def main(
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
     unit_cell_from:Literal["random","last","best","tnsu"]|str = "best",
-    monitor_cpu_and_ram:bool = True
+    monitor_cpu_and_ram:bool = False,
+    io : Literal['local', 'condor'] = 'local'
 )->tuple[float, str]:
 
     assert N>=2

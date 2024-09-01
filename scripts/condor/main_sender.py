@@ -76,7 +76,7 @@ def main(
         result_keys = DEFAULT_RESULT_KEYS_DICT[job_type]
 
     ## Define paths and names:
-    this_folder_path = pathlib.Path(__file__).parent.__str__()
+    this_folder_path = pathlib.Path(__file__).parent.__str__()  # This folder
     #
     worker_script_fullpath = this_folder_path+sep+"worker.py"
     results_fullpath       = results_dir_str+sep+result_file_name+".csv"
@@ -124,6 +124,8 @@ def main(
         dict_writer.writerow({field:field for field in result_keys})
         f.close()
 
+    ## Prepare IO data folder:
+
     ## Call condor:
     print(f"Calling condor with shared inputs:")
     print(f"    output_files_prefix={output_files_prefix}")
@@ -131,7 +133,6 @@ def main(
     print(f"    requestMemory={request_memory_gb}gb")
     # print(f"    requestMemory={request_memory_bytes}-bytes")
     print(f"    Arguments={Arguments}")
-
 
     if _local_test:
         from src import project_paths

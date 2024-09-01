@@ -97,7 +97,8 @@ def job(
         parallel=parallel, 
         progress_bar=progress_bar_in,
         hamiltonian=hamiltonian_str,
-        unit_cell_from=unit_cell_from
+        unit_cell_from=unit_cell_from,
+        io='condor'
     )
     
     # Expected outputs: 

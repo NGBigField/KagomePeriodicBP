@@ -8,7 +8,7 @@ directories:
   working_dir: /srv01/technion/ngutman/repos/KagomePeriodicBP/
   condor_executables_dir: /srv01/technion/ngutman/repos/KagomePeriodicBP/scripts/condor/CondorJobSender
   julia_path_remote: /Local/ph_keselman/julia-1.6.1/bin/julia
-  io_dir: /storage/ph_keselman/ngutman/io/
+  io_dir: /storage/ph_keselman/ngutman/data/
 username: ngutman
 parameters:
   universe: vanilla
