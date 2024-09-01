@@ -1,3 +1,12 @@
+if __name__ == "__main__":
+	import pathlib, sys
+	sys.path.append(
+		pathlib.Path(__file__).parent.parent.__str__()
+	)
+	sys.path.append(
+		pathlib.Path(__file__).parent.parent.parent.__str__()
+	)
+
 from typing import (
     List,
     TypeVar,
@@ -7,6 +16,7 @@ from typing import (
     TypeGuard,
     Generator,
     Callable,
+    Literal
 )
 
 from copy import deepcopy
@@ -358,8 +368,30 @@ def cycle_items(lis:list[_T], k:int, copy:bool=True)->list[_T]:
 
     return lis
 
+
+def _force_same_length_first_bigger(long:list, short:list, method:Literal['extend', 'truncate'])->tuple[list, list]:
+    if method == 'truncate':
+        long = long[:len(short)]
+    elif method == 'extend':
+        short = repeat_list(short, num_items=len(long))
+    return long, short
+
+
+def force_same_length(l1:list, l2:list, method:Literal['extend', 'truncate']='truncate')->tuple[list, list]:
+    if len(l1)==len(l2):
+        pass
+    elif len(l1) > len(l2):
+        l1, l2 = _force_same_length_first_bigger(l1, l2, method)
+    elif len(l1) < len(l2):
+        l2, l1 = _force_same_length_first_bigger(l2, l1, method)
+    return l1, l2
+
 ## Test:
 if __name__ == "__main__":
-    l = 10*[1] + 20*[2] + 30*[3] + 2*[4] 
-    for item, num_repetition in repeated_items():
-        print(f"[{item}]*{num_repetition}")
+    l1 = [1, 2, 3]
+    l2 = [1, 2, 3, 4, 5]
+    print('truncate:')
+    print(force_same_length(l1, l2, 'truncate'))
+    print('extend:')
+    print(force_same_length(l1, l2, 'extend'))
+    print("Done.")

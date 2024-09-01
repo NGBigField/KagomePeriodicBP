@@ -317,7 +317,8 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, w
             label = "Random"
 
         lines += visuals.plot_with_spread(x_vals=x_vals, y_vals=y_vals, axes=ax, also_plot_max_min_dots=False, 
-                                         linewidth=3, marker=marker, color=color, markersize=marker_size, label=label)
+                                         linewidth=5, marker=marker, color=color, markersize=marker_size, label=label,
+                                         disable_spread=True)
 
         return lines
     
@@ -379,6 +380,9 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, w
     elif what == 'error':
         ylabel = "abs "+y+" error"
 
+    if y == "fidelity" and what == "error":
+        ylabel = "1-Fidelity"
+
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     #
@@ -397,16 +401,17 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, w
 def _plot_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
 
     for x, y in [
-        ('time', 'z'), 
-        ('N', 'entanglement_entropy'), 
-        ('N', 'negativity'), 
+        # ('time', 'z'), 
+        # ('N', 'entanglement_entropy'), 
+        # ('N', 'negativity'), 
         ('N', 'fidelity'),
-        ('N', 'energy'),
+        # ('N', 'energy'),
     ]:
         print(f"x={x!r} ; y={y!r}")
-        ax =_plot_from_table_per_D_per_x_y(D, table, x, y, 'true')
-        ax =_plot_from_table_per_D_per_x_y(D, table, x, y, 'error')
-        ax =_plot_from_table_per_D_per_x_y(D, table, x, y, 'error', yscale='log')
+        ax1 =_plot_from_table_per_D_per_x_y(D, table, x, y, 'true')
+        # ax2 =_plot_from_table_per_D_per_x_y(D, table, x, y, 'error')
+        ax3 =_plot_from_table_per_D_per_x_y(D, table, x, y, 'error', yscale='log')
+        print("")
 
     print("Done")
 
@@ -508,7 +513,7 @@ def get_inf_exact_results(D:int|list[int]=2) -> dict|list[dict]:
 
 def main_test():
     # results = get_inf_exact_results([2, 3]); print(results)
-    test_bp_convergence_all_runs([2, 3])
+    # test_bp_convergence_all_runs([2, 3])
     plot_bp_convergence_results()
 
     print("Done.")
