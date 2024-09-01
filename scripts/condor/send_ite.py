@@ -9,6 +9,49 @@ from sys import argv
 RESULT_KEYS = ["seed","D", "N", "chi", "energy", "parallel", "method", "path"]
 
 
+def _check_given_dimensions() -> dict[str, int]|None:
+    NUM_EXPECTED_ARGS = 3
+
+    ## Check function call:
+    if len(argv) != NUM_EXPECTED_ARGS:
+        return None
+
+    ## Parse args:
+    print(f"The {NUM_EXPECTED_ARGS} arguments are:")
+
+    i = 0  # 0
+    this_func_name = argv[i]
+    print(f"    {i}: this_func_name={this_func_name!r}")
+
+    i += 1
+    D = int(argv[i])
+    print(f"    {i}: D={D!r}")
+
+    i += 1  # 2
+    N = int(argv[i])
+    print(f"    {i}: N={N}")
+
+    vals = {}
+    vals['N'] = [N]
+    vals['D'] = [D]
+
+    return vals
+
+
+def _choose_requested_memory(D:int) -> int:
+    ## Compute needed memory
+    match D:
+        case 1:     raise ValueError("No ITE for D=1")
+        case 2:     request_memory_gb = 1
+        case 3:     request_memory_gb = 1
+        case 4:     request_memory_gb = 4
+        case 5:     request_memory_gb = 6 
+        case 6:     request_memory_gb = 8
+        case 7:     request_memory_gb = 16
+        case _:     request_memory_gb = 64
+
+    return request_memory_gb
+
 
 def job(
     # Values from sender:
@@ -71,61 +114,15 @@ def job(
     return results
 
 
-
-def _check_given_dimensions() -> dict[str, int]|None:
-    NUM_EXPECTED_ARGS = 3
-
-    ## Check function call:
-    if len(argv) != NUM_EXPECTED_ARGS:
-        return None
-
-    ## Parse args:
-    print(f"The {NUM_EXPECTED_ARGS} arguments are:")
-
-    i = 0  # 0
-    this_func_name = argv[i]
-    print(f"    {i}: this_func_name={this_func_name!r}")
-
-    i += 1
-    D = int(argv[i])
-    print(f"    {i}: D={D!r}")
-
-    i += 1  # 2
-    N = int(argv[i])
-    print(f"    {i}: N={N}")
-
-    vals = {}
-    vals['N'] = [N]
-    vals['D'] = [D]
-
-    return vals
-
-
-def _choose_requested_memory(D:int) -> int:
-    ## Compute needed memory
-    match D:
-        case 1:     raise ValueError("No ITE for D=1")
-        case 2:     request_memory_gb = 1
-        case 3:     request_memory_gb = 1
-        case 4:     request_memory_gb = 4
-        case 5:     request_memory_gb = 6 
-        case 6:     request_memory_gb = 8
-        case 7:     request_memory_gb = 16
-        case _:     request_memory_gb = 64
-
-    return request_memory_gb
-
-
-
 def sender(
     request_memory_gb:int = 8
 ) -> None:
     vals = {}
     vals['D'] = [2, 3]
-    vals['N'] = list(range(3, 6))
+    vals['N'] = list(range(2, 6))
     vals['chi'] = [1, 2, 3]
     vals['method'] = [1, 3]
-    vals['seed'] = list(range(5))
+    vals['seed'] = list(range(3))
     vals['parallel'] = [0]
     vals['control'] = [0, 1]
 
@@ -142,7 +139,7 @@ def sender(
         request_memory_gb=request_memory_gb,
         vals=vals,
         result_keys=RESULT_KEYS,
-        _local_test=False
+        _local_test=True
     )
 
 if __name__ == "__main__":    
