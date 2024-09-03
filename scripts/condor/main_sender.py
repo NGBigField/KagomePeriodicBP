@@ -25,7 +25,7 @@ import time
 import project_paths
 
 sep = os.sep
-_results_dir = project_paths.data/"condor"
+_results_dir = project_paths.condor_paths['io_dir']/'data'/'condor'
 results_dir_str : str = _results_dir.__str__()
 if not os.path.exists(results_dir_str):
     os.makedirs(results_dir_str)

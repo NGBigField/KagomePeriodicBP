@@ -9,7 +9,7 @@ from sys import argv
 RESULT_KEYS = ["seed","D", "N", "chi", "energy", "parallel", "method", "path"]
 
 
-def _check_given_dimensions() -> dict[str, int]|None:
+def _parse_given_inputs() -> dict[str, int]|None:
     NUM_EXPECTED_ARGS = 3
 
     ## Check function call:
@@ -85,10 +85,15 @@ def job(
     else:                       progress_bar_in = 'all_disabled'
 
     ## Additional control:
-    if control == 0:    hamiltonian_str = "AFM"
-    elif control == 1:  hamiltonian_str = "AFM-T"
+    if abs(control) == 1:    hamiltonian_str = "AFM"
+    elif abs(control) == 2:  hamiltonian_str = "AFM-T"
     else:
         raise ValueError(f"Invalid control value {control!r}")
+    #
+    if control>0:
+        messages_init = 'random'
+    else: 
+        messages_init = 'uniform'
 
     ## Run:
     energy, unit_cell_file_path = run_ite(
@@ -98,7 +103,8 @@ def job(
         progress_bar=progress_bar_in,
         hamiltonian=hamiltonian_str,
         unit_cell_from=unit_cell_from,
-        io='condor'
+        io='condor',
+        messages_init=messages_init
     )
     
     # Expected outputs: 
@@ -119,15 +125,15 @@ def sender(
     request_memory_gb:int = 8
 ) -> None:
     vals = {}
-    vals['D'] = [2, 3]
+    vals['D'] = [2, 3, 4]
     vals['N'] = list(range(2, 6))
     vals['chi'] = [1, 2, 3]
     vals['method'] = [1, 3]
-    vals['seed'] = list(range(3))
+    vals['seed'] = list(range(2))
     vals['parallel'] = [0]
-    vals['control'] = [0, 1]
+    vals['control'] = [-2, -1, 1, 2]
 
-    user_input = _check_given_dimensions()
+    user_input = _parse_given_inputs()
     if user_input is not None:
         pass_values_from_dict1_to_dict2_on_matching_keys(user_input, vals)
 
@@ -140,7 +146,7 @@ def sender(
         request_memory_gb=request_memory_gb,
         vals=vals,
         result_keys=RESULT_KEYS,
-        _local_test=True
+        _local_test=False
     )
 
 if __name__ == "__main__":    

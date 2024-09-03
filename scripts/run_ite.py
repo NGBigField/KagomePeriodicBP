@@ -5,6 +5,7 @@ if __name__ == "__main__":
 from containers import Config, HamiltonianFuncAndInputs
 from unit_cell import UnitCell
 import unit_cell.get_from as get_unit_cell_from 
+import project_paths
 
 from utils import strings, lists, processes
 from typing import Iterable, TypeAlias, Literal
@@ -20,20 +21,8 @@ d = 2
 
 
 def _get_condor_io_paths()->tuple[str, str]:
-    import project_paths
-    import yaml
-    from pathlib import Path
-
-    condor_config_path = project_paths.scripts / "condor" / "configurations.yml"
-
-    with open(str(condor_config_path), 'r') as f:
-        data = yaml.safe_load(f)
-        
-    io_dir : Path = Path(data['directories']['io_dir'])
-    data_path = io_dir / "data"
-    logs_path = io_dir / "logs" 
-    data_str = data_path.__str__()
-    logs_str = logs_path.__str__()
+    logs_str = str( project_paths.condor_paths['io_dir'] / "logs" )
+    data_str = str( project_paths.condor_paths['io_dir'] / "data" )
     return data_str, logs_str
 
 
@@ -247,7 +236,7 @@ def main(
 
     if _radom_unit_cell:
         append_to_head = []
-        append_to_head += _get_time_steps(2, 2, 50) 
+        append_to_head += _get_time_steps(2, 2,  50) 
         append_to_head += _get_time_steps(3, 3, 100)
         config.ite.time_steps = append_to_head + config.ite.time_steps
 
