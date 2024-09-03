@@ -1,6 +1,8 @@
+from dataclasses import dataclass
 from containers._meta import _ConfigClass
 
 
+@dataclass
 class MonitoringSystemConfig(_ConfigClass):
     monitor_cpu: bool = False
     monitor_ram: bool = False

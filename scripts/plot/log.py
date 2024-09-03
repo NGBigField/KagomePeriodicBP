@@ -8,7 +8,7 @@ import os
 
 def _get_last_log_file()->str:
     ## File search:
-    return files.get_last_file_in_folder(logs.LOGS_FOLDER)
+    return files.get_last_file_in_folder(logs.DEFAULT_LOGS_FOLDER)
 
 
 

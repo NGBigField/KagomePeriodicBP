@@ -58,7 +58,7 @@ def _common_logger_prints(logger:logs.Logger, config:Config, ite_tracker:ITEProg
     logger_method = logger.debug
     # Print basic info
     logger_method(config)
-    logger_method(f"ITE-Tracker saved at {ite_tracker.full_path!r}")
+    logger_method(f"ITE-Tracker saved at {ite_tracker.fullpath!r}")
     # Print where the logger is saved:
     for handler in logger.handlers:
         if isinstance(handler, logs.logging.FileHandler):

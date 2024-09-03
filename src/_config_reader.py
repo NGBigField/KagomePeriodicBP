@@ -1,8 +1,3 @@
-__all__ = [
-    "ALLOW_VISUALS",
-    "DEBUG_MODE"
-]
-
 import json
 import project_paths
 

@@ -12,10 +12,10 @@ from dataclasses import dataclass, is_dataclass
 from utils import iterations
 import sys
 import numpy as np
-
+from types import ModuleType
 
 def _is_simple_native_python_type(obj)->bool:
-    return isinstance(obj, (str, int, float, bool, complex, np.ndarray))
+    return isinstance(obj, (str, int, float, bool, complex, np.ndarray, ModuleType))
 
 
 def get_object_size(obj, visited_objects:set|None=None)->int:

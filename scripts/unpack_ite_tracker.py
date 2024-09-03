@@ -11,7 +11,7 @@ def main(
     filename:str = "2024.04.18_15.49.57_006_f=0.8999999999999995"
 )->tuple[UnitCell, Config]:
     
-    ite_tracker = ITEProgressTracker.load(file_name=filename)
+    ite_tracker = ITEProgressTracker.load(filename=filename)
     config = ite_tracker.config
     unit_cell = ite_tracker.last_unit_cell
 

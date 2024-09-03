@@ -421,7 +421,7 @@ def _get_data_from_csvs(filename:str|None) -> csvs.TableByKey:
         fullpath = saveload.derive_fullpath(filename+".csv", sub_folder="results")
         table = csvs.TableByKey(fullpath)
     elif filename is None:
-        folder_fullpath = saveload.DATA_FOLDER + saveload.PATH_SEP + "results"
+        folder_fullpath = saveload.DEFAULT_DATA_FOLDER + saveload.PATH_SEP + "results"
         table = csvs.TableByKey()
         for fullpath in files.get_all_files_fullpath_in_folder(folder_fullpath):
 

@@ -53,6 +53,9 @@ from algo.belief_propagation import robust_belief_propagation, belief_propagatio
 from algo.measurements import measure_energies_and_observables_together, mean_expectation_values, MeasurementsOnUnitCell
 from algo.tn_reduction import reduce_tn
 
+# For efficient cached search:
+from functools import lru_cache
+
 
 class SegmentResults(NamedTuple):
     unit_cell : UnitCell 
@@ -96,6 +99,32 @@ def _deal_edge_order(config:Config, delta_t:float)->UpdateEdgesOrder:
         
     return edge_order
 
+
+_crnt_best_energy_cache : dict[int, float] = {}
+
+
+def _get_crnt_best_energy(D:int) -> float:
+    # Use cache:
+    if D in _crnt_best_energy_cache:
+        return _crnt_best_energy_cache[D]
+    # Get from memory
+    data = BestUnitCellData.load(D=D, none_if_not_exist=True)
+    if data is None:
+        mean_energy = np.inf
+    else:    
+        assert data.D == D
+        mean_energy = data.mean_energy
+    # Update cache:
+    _crnt_best_energy_cache[D] = mean_energy
+    # Return:
+    return mean_energy
+
+
+def _set_crnt_best_energy(D:int, mean_energy, unit_cell) -> None:
+    crnt_data = BestUnitCellData(unit_cell=unit_cell, mean_energy=mean_energy, D=D)
+    crnt_data.save()
+    # Update cache:
+    _crnt_best_energy_cache[D] = mean_energy
 
 def _change_config_for_measurements_if_applicable(
     config:Config, messages:MessageDictType|None
@@ -144,7 +173,7 @@ def _initial_inputs(
 
     # Logger:
     if logger is None:
-        logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=KEEP_LOGS, filename=common_results_name)
+        logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=KEEP_LOGS, filename=common_results_name, folder=config.io.logs.fullpath)
     elif not isinstance(logger, logs.Logger):
         raise TypeError(f"Not an expected type for input 'logger' of type {type(logger)!r}")
     
@@ -153,7 +182,7 @@ def _initial_inputs(
     step_stats = ITESegmentStats()  # initial step stats for the first iteration. used for randomized mode order
 
     ## Init tracking lists and plots:
-    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config,filename=common_results_name)
+    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config, filename=common_results_name)
     plots = ITEPlots(active=config.visuals.live_plots, config=config)
 
     ## Monitor system performance:
@@ -382,12 +411,9 @@ def _post_segment_measurements_checks_and_visuals(
 
     ## Which unit cell has minimal energy ever:
     D = config.dims.virtual_dim
-    best_data = BestUnitCellData.load(D=D)
-    crnt_data = BestUnitCellData(unit_cell=unit_cell, mean_energy=mean_energy, D=D)
-    if best_data is None:  # no best unit_cell is stored
-        crnt_data.save()
-    elif crnt_data.is_better_than(best_data):
-        crnt_data.save()
+    crnt_best_energy = _get_crnt_best_energy(D)
+    if mean_energy < crnt_best_energy:
+        _set_crnt_best_energy(D, mean_energy, unit_cell)
 
     return should_break, mean_energy, unit_cell, messages, best_results
 

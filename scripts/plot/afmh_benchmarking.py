@@ -69,8 +69,8 @@ def _robust_energy_measurement(unit_cell:UnitCell) -> MeasurementsOnUnitCell:
 def _collect_best_results(measure_again:bool=False):
     Ds = []
     energies = []
-    for fullpath in files.get_all_files_fullpath_in_folder(BestUnitCellData._folder_fullpath()):
-        data : BestUnitCellData = saveload.save_or_load_with_fullpath(fullpath, saveload.Modes.Read)
+    for fullpath in files.get_all_files_fullpath_in_folder(BestUnitCellData._default_folder_fullpath()):
+        data : BestUnitCellData = saveload._common_save_or_load_with_fullpath(fullpath, saveload.Modes.Read)
         energy_at_run = data.mean_energy
         D = data.D
         unit_cell = data.unit_cell
