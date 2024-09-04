@@ -157,13 +157,13 @@ def _plot_field_over_time() -> None:
 ## ==================================================== ##
 
 def main(
-    D = 3,
-    N = 3,
-    chi_factor : int|float = 1.5,
+    D = 2,
+    N = 2,
+    chi_factor : int|float = 1,
     live_plots:_Bool|Iterable[_Bool] = False, 
     progress_bar:Literal['all_active', 'all_disabled', 'only_main'] = 'all_active',
     results_filename:str|None = None,
-    parallel:bool = True,
+    parallel:bool = False,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
     unit_cell_from:Literal["random", "last", "best", "tnsu"] = "best",
@@ -196,9 +196,9 @@ def main(
     config.bp.msg_diff_terminate = 1e-6 #  1e-14
     # config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.ite.always_use_lowest_energy_state = True
-    config.ite.symmetric_second_order_trotterization = False
-    config.ite.add_gaussian_noise_fraction = 1e-2
-    config.iterative_process.num_mode_repetitions_per_segment = 1 #3
+    config.ite.symmetric_second_order_trotterization = True
+    config.ite.add_gaussian_noise_fraction = 1e-1
+    config.iterative_process.num_mode_repetitions_per_segment = 3
 
     MessageModel = config.BPConfig.init_msg.__class__
     if messages_init == 'random':
@@ -234,19 +234,13 @@ def main(
 
     ## time steps:
     if unit_cell_from == 'best':
-        e_start = 5
-        e_end   = 8
+        config.ite.time_steps = _get_time_steps(4, 8, 100)
     else:
-        e_start = 4
-        e_end   = 7
-    n_per_dt = 100
-    #    
-    config.ite.time_steps = _get_time_steps(e_start, e_end, n_per_dt)
+        config.ite.time_steps = _get_time_steps(3, 7, 100)    
 
     if _radom_unit_cell:
         append_to_head = []
         append_to_head += _get_time_steps(2, 2,  50) 
-        append_to_head += _get_time_steps(3, 3, 100)
         config.ite.time_steps = append_to_head + config.ite.time_steps
 
     ## Run:

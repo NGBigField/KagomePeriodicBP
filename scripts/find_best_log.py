@@ -3,6 +3,7 @@ import _import_src
 from utils import files, logs, prints
 import project_paths
 from dataclasses import dataclass
+from typing import Literal
 
 foldersep = files.foldersep
 DEFAULT_LOG_FOLDER = project_paths.logs.__str__()
@@ -21,15 +22,20 @@ def _parse_strings(D_str:list[str], energies_str:list[str]) -> tuple[int, list[f
 
 
 def main(
-    logs_location:str=DEFAULT_LOG_FOLDER
+    logs_location : Literal['condor', 'local'] = 'local'
 ):
+    if logs_location == 'local':
+        folder_full_path = str(project_paths.logs)
+    elif logs_location == 'condor':
+        folder_full_path = str(project_paths.condor_paths['io_dir']/'logs')
     
     best_logs : dict[int, _LogData] = {}
-    all_logs = files.get_all_file_names_in_folder(folder_full_path=logs_location)
+    all_logs = files.get_all_file_names_in_folder(folder_full_path=folder_full_path)
 
     for filename in prints.ProgressBar(all_logs):
+        assert isinstance(filename, str)
         # Get data:
-        fullpath = logs_location+foldersep+filename
+        fullpath = folder_full_path+foldersep+filename
         D, energies = logs.search_words_in_log(fullpath, words=["virtual_dim:", "Mean energy after segment ="])
 
         # Parse data:
