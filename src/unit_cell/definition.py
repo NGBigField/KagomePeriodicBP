@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, fields
-from typing import Generator, Literal
+from typing import Generator, Literal, TypeAlias
 from numpy import ndarray as np_ndarray
 from enums import UnitCellFlavor
 import numpy as np
@@ -346,24 +346,54 @@ class BestUnitCellData:
         # Init output:
         all_filenames : list[str] = []
         ## Iterate over all matching files:
-        file_names = files.get_all_file_names_in_folder(BEST_UNIT_CELL_FOLDER_FULLPATH)
-        for file_name in file_names:
-            dim_str, *_ = file_name.split(" ") 
-            _, dim_str = dim_str.split("=") 
-            if int(dim_str) == D:
-                all_filenames.append(file_name)
+        filenames = files.get_all_file_names_in_folder(BEST_UNIT_CELL_FOLDER_FULLPATH)
+        for filename in filenames:
+            crnt_D, _ = BestUnitCellData._parse_values_from_filename(filename)
+            if crnt_D == D:
+                all_filenames.append(filename)
         ## Sort?
         if sort_best_first:
-            def energy_by_name(file_name:str) -> float:
-                *_, energy_str = file_name.split(" ") 
-                _, energy_str = energy_str.split("=") 
-                if energy_str[-4:] == '.dat':
-                    energy_str = energy_str[:-4]
-                energy = float(energy_str)
+            def energy_by_name(_filename:str) -> float:
+                _, energy = BestUnitCellData._parse_values_from_filename(_filename)
                 return energy
             all_filenames.sort(key=energy_by_name)
         ## Return:
         return all_filenames
+    
+    @staticmethod
+    def all_best_results() -> list["BestUnitCellData"]:
+        ## Keep unique Ds:
+        unique_Ds : set[int] = set()
+        ## Iterate over all files:
+        filenames = files.get_all_file_names_in_folder(BEST_UNIT_CELL_FOLDER_FULLPATH)
+        for filename in filenames:
+            D, _ = BestUnitCellData._parse_values_from_filename(filename)
+            unique_Ds.add(D)
+        ## keep only best results:
+        res : list["BestUnitCellData"] = []
+        # find best per D:
+        Ds = list(unique_Ds)
+        Ds.sort()
+        for D in Ds:
+            data = BestUnitCellData.load(D, none_if_not_exist=False)
+            assert data is not None
+            assert isinstance(data, BestUnitCellData)
+            res.append(data)
+        # return:
+        return res
+
+    @staticmethod
+    def _parse_values_from_filename(filename) -> tuple[int, float]:
+        # Parse strings:
+        dim_str, energy_str = filename.split(" ") 
+        _, dim_str = dim_str.split("=") 
+        _, energy_str = energy_str.split("=") 
+        if energy_str[-4:] == '.dat':
+            energy_str = energy_str[:-4]
+        # Get values:
+        D = int(dim_str)
+        energy = float(energy_str)
+        return D, energy
 
     def _canonical_file_name(self) -> str:
         return f"D={self.D} energy={self.mean_energy}.dat"

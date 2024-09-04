@@ -43,7 +43,7 @@ def _choose_requested_memory(D:int) -> int:
     match D:
         case 1:     raise ValueError("No ITE for D=1")
         case 2:     request_memory_gb = 1
-        case 3:     request_memory_gb = 1
+        case 3:     request_memory_gb = 2
         case 4:     request_memory_gb = 4
         case 5:     request_memory_gb = 6 
         case 6:     request_memory_gb = 8
@@ -138,7 +138,8 @@ def sender(
         pass_values_from_dict1_to_dict2_on_matching_keys(user_input, vals)
 
     if len(vals['D'])==1:
-        request_memory_gb = _choose_requested_memory(vals['D'][0])
+        D = vals['D'][0]
+        request_memory_gb = _choose_requested_memory(D)
 
     main_sender(
         job_type="ite_afm",

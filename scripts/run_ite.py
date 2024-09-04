@@ -147,19 +147,28 @@ def _plot_field_over_time() -> None:
     print("Done.")
 
 
+
+
+
+
+
+## ==================================================== ##
+#                         main                           #
+## ==================================================== ##
+
 def main(
-    D = 2,
-    N = 2,
-    chi_factor : int|float = 1.0,
+    D = 3,
+    N = 3,
+    chi_factor : int|float = 1.5,
     live_plots:_Bool|Iterable[_Bool] = False, 
     progress_bar:Literal['all_active', 'all_disabled', 'only_main'] = 'all_active',
     results_filename:str|None = None,
-    parallel:bool = False,
+    parallel:bool = True,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
     unit_cell_from:Literal["random", "last", "best", "tnsu"] = "best",
     monitor_cpu_and_ram:bool = False,
-    io : Literal['local', 'condor'] = 'condor',
+    io : Literal['local', 'condor'] = 'local',
     messages_init : Literal['random', 'uniform'] = 'uniform'
 )->tuple[float, str]:
 
