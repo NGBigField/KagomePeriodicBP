@@ -162,7 +162,7 @@ def get_logger(
 
 def search_words_in_log(
     filename_or_fullpath:str,
-    words:Iterable[str],
+    *words:str,
     max_line:int = np.iinfo(np.int64).max
 )->tuple[list[str], ...]:
     ## Fullpath:

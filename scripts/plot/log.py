@@ -13,7 +13,7 @@ def _get_last_log_file()->str:
 
 
 def main(
-    filename:str|None = "from zero to hero - 1"
+    filename:str|None = "2024.09.03_18.58.39_AFM_D=2_N=2_JHHW"
 ):
     ## Parse inputs:
     if len(argv)>=2 and argv[1] is not None:

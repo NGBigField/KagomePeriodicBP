@@ -21,7 +21,8 @@ from utils import lists, logs, strings, prints
 EPSILON = 1e-5
 
 def _close_to(x:float, y:float) -> bool:
-    return abs(x-y)<EPSILON
+    relation = abs(x-y)/x
+    return relation < EPSILON
 
 def formatted_delta_t_str(delta_t:float) -> str:
     ## Try exponent notation:

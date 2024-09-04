@@ -52,7 +52,7 @@ NEW_TRACK_POINT_THRESHOLD = 0.02
 PLOT_ENTANGLEMENT = True
 PLOT_COMPLEXITY = False
 
-CONFIG_NUM_HEADER_LINES = 54
+CONFIG_NUM_HEADER_LINES = 65
 
 
 @dataclass
@@ -692,7 +692,7 @@ def _plot_per_segment_health_common(ax:Axes, strs:list[str], style:visual_consta
 def _plot_health_figure_from_log(log_name:str) -> tuple[Figure, dict, dict]: 
     ## Get matching words:
     hermicity_strs, tensor_distance_strs = logs.search_words_in_log(log_name, 
-        ("Hermicity of environment=", "Tensor update distance") 
+        "Hermicity of environment=", "Tensor update distance" 
     )
     ## Prepare plots        
     fig = plt.figure(figsize=(4, 4))
@@ -729,11 +729,15 @@ def _plot_main_figure_from_log(
 
     data = dict()
 
+    reference_energy_str, num_mode_repetitions_per_segment_str = logs.search_words_in_log(log_name, 
+        "Hamiltonian's reference energy", "num_mode_repetitions_per_segment", max_line=CONFIG_NUM_HEADER_LINES
+    )
+
     ## Get matching words:
-    edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, \
-        reference_energy_str, segment_data_str, delta_t_strs, edge_negativities_strs, expectation_values_strs = logs.search_words_in_log(log_name, 
-        ("Edge-Energies after each update=", "Edge-Energies after segment =   ", " Mean energy after segment", "num_mode_repetitions_per_segment",\
-          "Hamiltonian's reference energy", "segment:", "delta_t", "Edge-Negativities", "Expectation-Values") 
+    edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, \
+        segment_data_str, delta_t_strs, edge_negativities_strs, expectation_values_strs = logs.search_words_in_log(log_name, 
+        "Edge-Energies after each update=", "Edge-Energies after segment =   ", " Mean energy after segment", \
+          "segment:", "delta_t", "Edge-Negativities", "Expectation-Values"
     )
 
     num_segments = len(mean_energies_strs)
@@ -1048,7 +1052,7 @@ def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], i
 
     ## Derive from log:
     d_str, D_str, N_str = logs.search_words_in_log(log_name, 
-        ("physical_dim:", "virtual_dim:", "big_lattice_size:"),
+        "physical_dim:", "virtual_dim:", "big_lattice_size:",
         max_line=CONFIG_NUM_HEADER_LINES
     )
     d = int(d_str[0])
