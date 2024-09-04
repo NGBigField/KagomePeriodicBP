@@ -55,6 +55,11 @@ class _LimitedLengthList(List[_T]):
     def __len__(self)->int:
         return len(self._list)
 
+def _standard_name(name:str) -> str:
+    ext = name[-4:]
+    if ext != ".dat":
+        name += ".dat"
+    return name
 
 class ITEProgressTracker():
     __slots__ = "config", "last_iter", "fullpath", "delta_ts", "energies", "expectation_values", "unit_cells", "messages", "stats", "error_counters"
@@ -69,7 +74,7 @@ class ITEProgressTracker():
         # Fresh variables:
         self.last_iter : int = 0
         self.error_counters : dict[type, int] = {}
-        self.fullpath : str = folder_path + saveload.PATH_SEP + file_name
+        self.fullpath : str = _standard_name(folder_path + saveload.PATH_SEP + file_name)
         # Lists memory:
         self.delta_ts           : _LimitedLengthList[float]             = _LimitedLengthList[float](mem_length) 
         self.energies           : _LimitedLengthList[float]             = _LimitedLengthList[float](mem_length)     

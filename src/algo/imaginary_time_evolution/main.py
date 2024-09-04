@@ -1,15 +1,3 @@
-# For allowing tests and scripts to run while debugging this module
-if __name__ == "__main__":
-    import sys, pathlib
-    sys.path.append(
-        pathlib.Path(__file__).parent.parent.parent.__str__()
-    )
-    from project_paths import add_src, add_base, add_scripts
-    add_src()
-    add_base()
-    add_scripts()
-
-
 # Get Global-Config:
 from _config_reader import DEBUG_MODE, KEEP_LOGS, ALLOW_VISUALS
 
@@ -34,7 +22,7 @@ import numpy as np
 from numpy.linalg import norm
 
 # Import our shared utilities
-from utils import lists, logs, decorators, prints, visuals, strings, processes
+from utils import lists, logs, decorators, prints, visuals, strings, processes, saveload
 
 # For copying config:
 from copy import deepcopy
@@ -66,6 +54,22 @@ class SegmentResults(NamedTuple):
     def is_better_than(self, other:"SegmentResults")->bool:
         return self.energy < other.energy 
 
+
+def _start_process_monitoring_with_log(config:Config, common_results_name:str) -> None:
+    ## Derive log path:
+    monitor_logs_folder = config.io.logs.subfolder('monitor_process')
+    saveload.force_folder_exists(monitor_logs_folder)
+    log_fullpath = monitor_logs_folder + saveload.PATH_SEP + common_results_name + ".log"
+    ## write config now:
+    with open(log_fullpath, 'a') as f:
+        print(config, file=f)
+        print("\n"*2, file=f)
+    ## Write process performance over time using a subprocess:
+    processes.monitor_crnt_process(
+        track_cpu=config.monitoring_system.monitor_cpu,
+        track_ram=config.monitoring_system.monitor_ram,
+        print_out=log_fullpath
+    )
 
 def _deal_edge_order(config:Config, delta_t:float)->UpdateEdgesOrder:
     
@@ -187,10 +191,7 @@ def _initial_inputs(
 
     ## Monitor system performance:
     if config.monitoring_system.monitor_cpu or config.monitoring_system.monitor_ram:
-        processes.monitor_crnt_process(
-            track_cpu=config.monitoring_system.monitor_cpu,
-            track_ram=config.monitoring_system.monitor_ram
-        )
+        _start_process_monitoring_with_log(config, common_results_name)
 
     return config, unit_cell, logger, messages, step_stats, ite_tracker, plots
 

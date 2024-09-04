@@ -15,7 +15,7 @@ import time
 from typing import TextIO
 import threading 
 
-from typing import TypedDict, TypeGuard
+from typing import TypedDict, TypeGuard, TypeAlias, Literal
 
 try:  ## Depend on python version
     from typing import Unpack, NotRequired, Required
@@ -24,19 +24,25 @@ except ImportError:
     from typing import Optional as Required
     from typing import Optional as Unpack
 
+
+FileOrIO : TypeAlias = TextIO|str
+
+
 class MonitorProcessKwargs(TypedDict):
-    track_cpu:           NotRequired[bool]
-    track_ram:           NotRequired[bool]
-    cpu_interval_time:   NotRequired[float]
-    sleep_time_interval: NotRequired[float]
-    print_out:           NotRequired[TextIO]
+    track_cpu:                  NotRequired[bool]
+    track_ram:                  NotRequired[bool]
+    print_only_max:             NotRequired[bool]
+    cpu_interval_time:          NotRequired[float]
+    sleep_time_interval:        NotRequired[float]
+    print_out:                  NotRequired[FileOrIO]
 
 class _MonitorProcessKwargsFilled(TypedDict):
-    track_cpu:           Required[bool]
-    track_ram:           Required[bool]
-    cpu_interval_time:   Required[float]
-    sleep_time_interval: Required[float]
-    print_out:           Required[TextIO]
+    track_cpu:                  Required[bool]
+    track_ram:                  Required[bool]
+    print_only_max:             Required[bool]
+    cpu_interval_time:          Required[float]
+    sleep_time_interval:        Required[float]
+    print_out:                  Required[FileOrIO]
 
 def fill_defaults(kwargs:MonitorProcessKwargs) -> TypeGuard[_MonitorProcessKwargsFilled]:
     for key, default_value in _monitor_process_kwargs_defaults.items():
@@ -47,53 +53,83 @@ def fill_defaults(kwargs:MonitorProcessKwargs) -> TypeGuard[_MonitorProcessKwarg
 _monitor_process_kwargs_defaults = MonitorProcessKwargs(
     track_cpu=True,
     track_ram=True,
+    print_only_max=False,
     cpu_interval_time=1,
     sleep_time_interval=15,
     print_out=sys.stdout
 )
 
 
-
-def _results_str(max_memory, max_cpu, **kwargs:Unpack[_MonitorProcessKwargsFilled]) -> str:
+def _colored_output_str(mem, cpu, what:str, colored:bool, **kwargs:Unpack[_MonitorProcessKwargsFilled]) -> str:
+    #
+    def _add_color(_s:str, _color) -> str:
+        if colored:
+            return add_color(_s, _color)
+        else:
+            return _s
+    #
     s = ""
     if kwargs['track_ram']:
-        s += add_color(f"max_memory", PrintColors.CYAN) +f" = "+ add_color(f"{max_memory!r}", PrintColors.RED) +"[GB]\n"
+        s += _add_color(what+"-mem", PrintColors.CYAN) +f" = "+ _add_color(f"{mem!r}", PrintColors.RED) +"[GB]\n"
     if kwargs['track_cpu']:
-        s += add_color(f"max_cpu   ", PrintColors.CYAN) +f" = "+ add_color(f"{max_cpu!r}"   , PrintColors.RED) +"[%]\n\n\n\n"
+        s += _add_color(what+"-cpu", PrintColors.CYAN) +f" = "+ _add_color(f"{cpu!r}", PrintColors.RED) +"[%]\n"
     return s
 
-def _update_state(max_memory, max_cpu, **kwargs:Unpack[_MonitorProcessKwargsFilled]):
-    out = kwargs['print_out']
-    s = _results_str(max_memory, max_cpu, **kwargs)
-    print(s, file=out)
+
+def _update_state(mem, cpu, what:Literal['crnt', 'max'], **kwargs:Unpack[_MonitorProcessKwargsFilled]) -> None:
+    print_out = kwargs['print_out']
+    if hasattr(print_out, 'read') and hasattr(print_out, 'write'):
+        s = _colored_output_str(mem, cpu, what, colored=True, **kwargs)
+        print(s, file=print_out)  #type: ignore
+    elif isinstance(print_out, str):
+        s = _colored_output_str(mem, cpu, what, colored=False, **kwargs)
+        with open(print_out, 'a') as f:
+            print(s, file=f)
+    else:
+        raise TypeError("Not an expected type.")
+    
 
 
 def _thread_job(process:psutil.Process, **kwargs:Unpack[_MonitorProcessKwargsFilled]) -> None:
-
+    # init values:
     max_memory = 0
     max_cpu = 0
 
     while process.is_running():
-        ## Get memory and cpu
-        memory_info = process.memory_info()
-        crnt_memory = memory_info.rss / (1024 ** 3)   # Convert bytes to GB
-        crnt_cpu = process.cpu_percent(interval=kwargs["cpu_interval_time"])
-
-        ## Follow max value:
-        if kwargs["track_ram"] and crnt_memory > max_memory:
-            max_memory = crnt_memory
-            _update_state(max_memory, max_cpu, **kwargs)
-        
-        if kwargs['track_cpu'] and crnt_cpu > max_cpu:
-            max_cpu = crnt_cpu
-            _update_state(max_memory, max_cpu, **kwargs)
-
         # SLeep:
-        time.sleep(kwargs["sleep_time_interval"])  # Adjust sleep time as needed
+        time.sleep(kwargs["sleep_time_interval"]) 
+
+        # init values:
+        new_max : bool = False
+        crnt_memory = 0
+        crnt_cpu = 0
+
+        ## Compute and track:
+        if kwargs["track_ram"]:
+            # Compute:
+            memory_info = process.memory_info()
+            crnt_memory = memory_info.rss / (1024 ** 3)   # Convert bytes to GB
+            # track:
+            if crnt_memory > max_memory:
+                max_memory = crnt_memory
+                new_max = True
+        
+        if kwargs['track_cpu']:
+            # Compute:
+            crnt_cpu = process.cpu_percent(interval=kwargs["cpu_interval_time"])
+            # track:
+            if crnt_cpu > max_cpu:
+                max_cpu = crnt_cpu
+                new_max = True
+
+        ## Print always?:
+        if kwargs["print_only_max"] and new_max:
+            _update_state(max_memory, max_cpu, 'max', **kwargs)
+        else:
+            _update_state(crnt_memory, crnt_cpu, 'crnt', **kwargs)
 
     ## end:
-    s = _results_str(max_memory, max_cpu, **kwargs)
-    print(s)
+    _update_state(max_memory, max_cpu, 'max', **kwargs)
     return 
 
 
@@ -119,7 +155,7 @@ def monitor_process(process:psutil.Process, **kwargs:Unpack[MonitorProcessKwargs
 
 
 def _test(max_ram_gb:int=4):
-    res = monitor_crnt_process()
+    res = monitor_crnt_process(sleep_time_interval=5)
     from utils import sizes
     for r in range(max_ram_gb):
         print(f"requested Ram = {r}[GB]")

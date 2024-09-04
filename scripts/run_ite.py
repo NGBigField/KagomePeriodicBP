@@ -167,7 +167,7 @@ def main(
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
     unit_cell_from:Literal["random", "last", "best", "tnsu"] = "best",
-    monitor_cpu_and_ram:bool = False,
+    monitor_cpu_and_ram:bool = True,
     io : Literal['local', 'condor'] = 'local',
     messages_init : Literal['random', 'uniform'] = 'uniform'
 )->tuple[float, str]:
