@@ -46,7 +46,7 @@ def _choose_requested_memory(D:int) -> int:
         case 3:     request_memory_gb = 1
         case 4:     request_memory_gb = 2
         case 5:     request_memory_gb = 6 
-        case 6:     request_memory_gb = 8
+        case 6:     request_memory_gb = 35
         case 7:     request_memory_gb = 16
         case _:     request_memory_gb = 64
 
@@ -125,11 +125,11 @@ def sender(
     request_memory_gb:int = 8
 ) -> None:
     vals = {}
-    vals['D'] = [2, 3, 4]
+    vals['D'] = [2, 3]
     vals['N'] = list(range(2, 6))
     vals['chi'] = [1, 2, 3]
     vals['method'] = [1, 3]
-    vals['seed'] = list(range(2))
+    vals['seed'] = list(range(3))
     vals['parallel'] = [0]
     vals['control'] = [-2, -1, 1, 2]
 
