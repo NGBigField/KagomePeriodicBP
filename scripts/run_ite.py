@@ -192,8 +192,8 @@ def main(
     config.chi = config.chi*chi_factor
     config.chi_bp = config.chi_bp*chi_factor
 
-    config.bp.msg_diff_good_enough = 1e-5
-    config.bp.msg_diff_terminate = 1e-6 #  1e-14
+    config.bp.msg_diff_good_enough = 1e-6
+    config.bp.msg_diff_terminate = 1e-13
     # config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.ite.always_use_lowest_energy_state = True
     config.ite.symmetric_second_order_trotterization = True
@@ -234,14 +234,14 @@ def main(
 
     ## time steps:
     if unit_cell_from == 'best':
-        config.ite.time_steps = _get_time_steps(4, 8, 100)
+        config.ite.time_steps = _get_time_steps(4, 8, 200)
     else:
-        config.ite.time_steps = _get_time_steps(3, 7, 100)    
+        config.ite.time_steps = _get_time_steps(2, 8, 100)    
 
-    if _radom_unit_cell:
-        append_to_head = []
-        append_to_head += _get_time_steps(2, 2,  50) 
-        config.ite.time_steps = append_to_head + config.ite.time_steps
+    # if _radom_unit_cell:
+    #     append_to_head = []
+    #     append_to_head += _get_time_steps(2, 2,  50) 
+    #     config.ite.time_steps = append_to_head + config.ite.time_steps
 
     ## Run:
     energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config, common_results_name=results_filename)
