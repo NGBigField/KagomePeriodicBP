@@ -258,6 +258,19 @@ class ITESegmentStats(Stats):
         self.ite_per_mode_stats = list()  # Avoid python's infamous immutable lists problem
 
 
+EPSILON = 1e-5
+def _close_to(x:float, y:float) -> bool:
+    relation = abs(x-y)/x
+    return relation < EPSILON
+
+def _formatted_delta_t_str(delta_t:float) -> str:
+    ## Try exponent notation:
+    for e in range(1, 20):
+        for sign in [-1, +1]:
+            val = 10**(sign*e)
+            if _close_to(val, delta_t):
+                return f"{val}"
+
 def _time_steps_str(time_steps:list[float])->str:
     s = ""
     last = None
@@ -267,10 +280,12 @@ def _time_steps_str(time_steps:list[float])->str:
             counter+=1
         else:
             if last is not None:
-                s += "["+f"{last}"+"]*"+f"{counter} + "
+                s += "["+_formatted_delta_t_str(last)+"]*"+f"{counter} + "
             last = dt
-            counter = 1    
-    s += "["+f"{last}"+"]*"+f"{counter}"
+            counter = 1  
+
+    assert last is not None  
+    s += "["+_formatted_delta_t_str(last)+"]*"+f"{counter}"
     return s
 
 

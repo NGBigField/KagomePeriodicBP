@@ -193,6 +193,13 @@ def search_words_in_log(
                     proceeding_str = line[index_after_word:]
                     res[word_index].append(proceeding_str)
 
-    return tuple(res)
+    ## Return tuple of lists, if many search words, else a single list:
+    if len(res)>1:
+        return tuple(res)
+    elif len(res)==1:
+        return res[0]  #type: ignore
+    else:
+        raise ValueError("This is not expected")
+
 
     
