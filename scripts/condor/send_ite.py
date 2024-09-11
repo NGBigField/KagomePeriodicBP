@@ -42,12 +42,12 @@ def _choose_requested_memory(D:int) -> int:
     ## Compute needed memory
     match D:
         case 1:     raise ValueError("No ITE for D=1")
-        case 2:     request_memory_gb = 1
-        case 3:     request_memory_gb = 1
-        case 4:     request_memory_gb = 2
-        case 5:     request_memory_gb = 6 
-        case 6:     request_memory_gb = 35
-        case 7:     request_memory_gb = 16
+        case 2:     request_memory_gb = 2
+        case 3:     request_memory_gb = 4
+        case 4:     request_memory_gb = 16
+        case 5:     request_memory_gb = 32
+        case 6:     request_memory_gb = 40
+        case 7:     request_memory_gb = 50
         case _:     request_memory_gb = 64
 
     return request_memory_gb
