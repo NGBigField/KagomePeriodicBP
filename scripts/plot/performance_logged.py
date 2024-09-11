@@ -150,7 +150,7 @@ def _plot_data(logs_data:list[_LogData]):
             values = data.__getattribute__(key)
             time_vec = [i*T_SAMPLE for i, _ in enumerate(values)]
             # Smooth values
-            max_values = signal_processing.max_or_min_filter(values, 10, 'max')
+            max_values = signal_processing.max_or_min_filter(values, 100, 'max')
 
             # LabeL:
             label = f"{N}"
@@ -164,23 +164,23 @@ def _plot_data(logs_data:list[_LogData]):
     for axes in axes_dict.values():
         for ax in axes.values():
             ax.legend()
+        fig = ax.figure.tight_layout()
     visuals.draw_now()
+
     return axes_dict
 
 
 def main(
     logs_location: Literal['condor', 'local'] = 'local'
 ):
-    import scipy
     folder_fullpath = _derive_folder_fullpath(logs_location)
     logs_data = _gather_log_data(folder_fullpath)
-    _plot_data(logs_data)
+    saveload.save(logs_data, "logs_data")
+    axes = _plot_data(logs_data)
 
     # Done:
     print("Done.")
 
 
 if __name__ == "__main__":
-    logs_data = saveload.load("logs_data")
-    _plot_data(logs_data)
     main()
