@@ -13,7 +13,7 @@ if __name__ == "__main__":
 import numpy as np
 
 # for type hints:
-from typing import Optional, Any, List, Tuple, Callable, TypeVar, Generator, TypeAlias, ParamSpec, NamedTuple, overload
+from typing import Optional, Any, List, Tuple, Callable, TypeVar, Generator, TypeAlias, ParamSpec, NamedTuple, overload, cast, TYPE_CHECKING
 
 from _config_reader import ALLOW_VISUALS
 
@@ -41,11 +41,18 @@ if ALLOW_VISUALS:    #pylint: disable=condition-expression-used-as-statement
     except:
         pass
 
-
 else:
-    Line2D = None
     plt = None
+    Line2D = None
     ImageClip, concatenate_videoclips = None, None
+
+
+# If type checking, cast back to the expected types
+if TYPE_CHECKING:
+    plt = cast('matplotlib.pyplot', plt)
+    Line2D = cast('matplotlib.lines.Line2D', Line2D)
+    ImageClip = cast('moviepy.editor.ImageClip', ImageClip)
+    concatenate_videoclips = cast('moviepy.editor.concatenate_videoclips', concatenate_videoclips)
 
 
 # For OOP:
@@ -110,6 +117,10 @@ def refresh():
         plt.pause(0.0001)
 
 
+def check_label_given(ax:Axes, label:str):
+    return any(line.get_label() == label for line in ax.get_lines())
+
+
 def get_saved_figures_folder()->Path:
     folder = Path().cwd().joinpath('figures')
     if not folder.is_dir():
@@ -172,6 +183,11 @@ def _find_axes_in_inputs(*args, **kwargs):
             return x
     else:
         return None
+
+def new_fig() -> tuple[Figure, Axes]:
+    fig, (ax) = plt.subplots(nrows=1, ncols=1) 
+    return fig, ax
+
 
 def close_all():
     plt.close('all')
