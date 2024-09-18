@@ -13,7 +13,7 @@ def _get_last_log_file()->str:
 
 
 def main(
-    filename:str|None = "2024.09.03_19.00.09_AFM_D=5_N=2_BYDO"
+    filename:str|None = "all"
 ):
     ## Parse inputs:
     if len(argv)>=2 and argv[1] is not None:
@@ -22,8 +22,16 @@ def main(
     if filename is None or ( isinstance(filename, str) and filename=="last" ):
         filename = _get_last_log_file()
 
-    ## Main call:
-    plot_from_log(filename, save=True)
+    if filename == "all":
+        filenames = files.get_all_file_names_in_folder(logs.DEFAULT_LOGS_FOLDER)
+        for filename in filenames:
+            plot_from_log(filename, save=True)
+        return
+
+    else:
+
+        ## Main call:
+        plot_from_log(filename, save=True)
 
     # Done:
     print("Done.")
