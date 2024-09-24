@@ -59,7 +59,7 @@ def _robust_energy_measurement(unit_cell:UnitCell) -> MeasurementsOnUnitCell:
     d, D = unit_cell.derive_dimensions()
     config = Config.derive_from_dimensions(D)
     config.bp.msg_diff_terminate = 1e-12
-    config.chi_bp = 2*D**2 + 10
+    config.chi_bp =   D**2 + 10
     config.chi    = 2*D**2 + 20
 
     ## Run:
@@ -145,7 +145,7 @@ def _create_csv(Ds, SUs, VUs, Ds_2, energies) -> None:
 
 
 def main(
-    measure_again:bool = False
+    measure_again:bool = True
 ):
     ## Collect reference results
     Ds, SUs, VUs = _collect_references()
@@ -155,13 +155,17 @@ def main(
     line2 = _plot_line(Ds, VUs, linestyle=":", label="variational-update", linewidth=3, alpha=0.8)
 
     ## collet my results:
-    Ds_2, energies = _collect_best_results(measure_again=measure_again)
-    line3 = _plot_line(Ds_2, energies, marker="*", markersize=15, linestyle="", label="BlockBP")
+    Ds_2, energies_at_run = _collect_best_results(measure_again=False)
+    line3 = _plot_line(Ds_2, energies_at_run, marker="*", markersize=15, linestyle="", label="BlockBP")
+    if measure_again:
+        Ds_2, energies_at_test = _collect_best_results(measure_again=True)
+        line4 = _plot_line(Ds_2, energies_at_test, marker="^", markersize=15, linestyle="", label="BlockBP-at-test")
 
     ## colors:
     line1.set_color("tab:green")
     line2.set_color("tab:blue")
     line3.set_color("tab:red")
+    line3.set_color("tab:purple")
 
     ## Pretty and labels:
     ax = line1.axes

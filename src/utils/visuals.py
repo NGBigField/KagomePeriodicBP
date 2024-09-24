@@ -29,6 +29,9 @@ if ALLOW_VISUALS:    #pylint: disable=condition-expression-used-as-statement
     from matplotlib.text import Text
     import matplotlib as mpl
 
+    from matplotlib.ticker import ScalarFormatter
+
+
     # For videos:
     try:
         from moviepy.editor import ImageClip, concatenate_videoclips
@@ -238,6 +241,12 @@ def color_gradient(num_colors:int):
     for i in range(num_colors):
         rgb = colorsys.hsv_to_rgb(i / num_colors, 1.0, 1.0)
         yield rgb
+
+
+def matplotlib_fix_y_axis_offset(ax:Axes) -> None:
+    ax.yaxis.set_major_formatter(ScalarFormatter(useOffset=False))
+
+
 
 # ============================================================================ #
 #|                                Classes                                     |#
