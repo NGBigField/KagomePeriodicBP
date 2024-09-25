@@ -117,6 +117,7 @@ def _new_sub_figures(
     if separate_figures:
         for D in Ds:
             fig, ax = plt.subplots()
+            ax.set_title(f"D={D}")            
             axes_dict[D] = ax
 
     else:
@@ -130,13 +131,21 @@ def _new_sub_figures(
 
         for D, ax in zip(Ds, axes):
             ax : plt.Axes
-            ax.set_title(f"D={D}")
-            
+            ax.set_title(f"D={D}")            
             axes_dict[D] = ax
 
         fig.tight_layout()
 
     return fig, axes_dict
+
+
+def _add_titles(separate_figures:bool, title_text:str, fig:visuals.Figure, axes:visuals.Axes) -> None:
+    if separate_figures:
+        for ax in axes.values():
+            crnt_text = ax.title.get_text()
+            ax.title.set_text(title_text+"\n"+crnt_text)
+    else:
+        fig.suptitle(title_text)
 
 
 def _plot_data(
@@ -151,16 +160,14 @@ def _plot_data(
 
     ## Prepare plots::
     cpu_fig, cpu_axes = _new_sub_figures(Ds, separate_figures)
-    if not separate_figures:
-        cpu_fig.suptitle("CPU utilization")
+    _add_titles(separate_figures, "CPU utilization", cpu_fig, cpu_axes)
     for i, ax in enumerate(cpu_axes.values()):
         ax.set_xlabel("time [sec]")
         if i==0:
             ax.set_ylabel("cpu[%]")
 
     mem_fig, mem_axes = _new_sub_figures(Ds, separate_figures)
-    if not separate_figures:
-        mem_fig.suptitle("RAM Memory Usage")
+    _add_titles(separate_figures, "RAM Memory Usage", mem_fig, mem_axes)
     for i, ax in enumerate(mem_axes.values()):
         ax.set_xlabel("time [sec]")
         if i==0:
@@ -204,12 +211,16 @@ def _plot_data(
 
 
 def main(
+    load:bool=True,
     logs_location: Literal['condor', 'local'] = 'local',
-    limited_number_of_logs:int|None = 150
+    limited_number_of_logs:int|None = None
 ):
-    folder_fullpath = _derive_folder_fullpath(logs_location)
-    logs_data = _gather_log_data(folder_fullpath, limited_number_of_logs)
-    saveload.save(logs_data, "logs_data")
+    if load:
+        logs_data = saveload.load("logs_data")
+    else:
+        folder_fullpath = _derive_folder_fullpath(logs_location)
+        logs_data = _gather_log_data(folder_fullpath, limited_number_of_logs)
+        saveload.save(logs_data, "logs_data")
 
     axes2 = _plot_data(logs_data, separate_figures=True)
     axes1 = _plot_data(logs_data, separate_figures=False)
