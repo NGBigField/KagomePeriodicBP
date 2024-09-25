@@ -145,7 +145,7 @@ def _create_csv(Ds, SUs, VUs, Ds_2, energies) -> None:
 
 
 def main(
-    measure_again:bool = True
+    measure_again:bool = False
 ):
     ## Collect reference results
     Ds, SUs, VUs = _collect_references()
@@ -165,7 +165,8 @@ def main(
     line1.set_color("tab:green")
     line2.set_color("tab:blue")
     line3.set_color("tab:red")
-    line3.set_color("tab:purple")
+    if measure_again:
+        line4.set_color("tab:purple")
 
     ## Pretty and labels:
     ax = line1.axes
@@ -179,7 +180,7 @@ def main(
     visuals.draw_now()
 
     ## add csv:
-    _create_csv(Ds, SUs, VUs, Ds_2, energies)
+    _create_csv(Ds, SUs, VUs, Ds_2, energies_at_run)
 
     print("Done.")
     

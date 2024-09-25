@@ -4,11 +4,13 @@ import _import_src  ## Needed to import src folders when scripts are called from
 from utils import logs, visuals, files, prints, saveload, signal_processing
 import project_paths
 
+
 from typing import Literal
 import os, pathlib
 from dataclasses import dataclass
 
 from matplotlib import pyplot as plt
+import numpy as np
 
 
 class _ValidError(Exception): ...
@@ -80,11 +82,19 @@ def _get_log_data(log_fullpath:str) -> _LogData:
 
     return log_data
 
-def _gather_log_data(folder_fullpath:str) -> list[_LogData]:
+def _gather_log_data(
+    folder_fullpath:str,
+    limited_number_of_logs:int|None
+) -> list[_LogData]:
     ## Init results collections:
     logs_data : list[_LogData] = []
     ## Iterate and get data per log:
     all_logs = files.get_all_files_fullpath_in_folder(folder_full_path=folder_fullpath)
+
+    if limited_number_of_logs is not None:
+        assert isinstance(limited_number_of_logs, int)
+        all_logs = all_logs[:limited_number_of_logs]
+
     for log_fullpath in prints.ProgressBar(all_logs):
         assert isinstance(log_fullpath, str)
 
@@ -97,21 +107,42 @@ def _gather_log_data(folder_fullpath:str) -> list[_LogData]:
     return logs_data
 
 
-def _new_sub_figures(Ds:list[int]) -> tuple[visuals.Figure, dict[int, visuals.Axes]]:
-    fig, axes = plt.subplots(1, len(Ds))
-    fig.set_figwidth(fig.get_figwidth()*2)
+def _new_sub_figures(
+    Ds:list[int],
+    separate_figures:bool
+) -> tuple[visuals.Figure, dict[int, visuals.Axes]]:
+    
     axes_dict = {}
-    for D, ax in zip(Ds, axes):
-        ax : plt.Axes
-        ax.set_title(f"D={D}")
-        
-        axes_dict[D] = ax
-    fig.tight_layout()
+
+    if separate_figures:
+        for D in Ds:
+            fig, ax = plt.subplots()
+            axes_dict[D] = ax
+
+    else:
+        fig, axes = plt.subplots(1, len(Ds))
+        fig.set_figwidth(fig.get_figwidth()*2)
+
+        if isinstance(axes, np.ndarray):
+            pass
+        else:
+            axes = [axes]
+
+        for D, ax in zip(Ds, axes):
+            ax : plt.Axes
+            ax.set_title(f"D={D}")
+            
+            axes_dict[D] = ax
+
+        fig.tight_layout()
 
     return fig, axes_dict
 
 
-def _plot_data(logs_data:list[_LogData]):
+def _plot_data(
+    logs_data:list[_LogData],
+    separate_figures:bool
+):
 
     ## Gather hyper-data:
     Ds = list({data.D for data in logs_data})
@@ -119,15 +150,17 @@ def _plot_data(logs_data:list[_LogData]):
     colors = list(visuals.distinct_colors(len(Ns)))
 
     ## Prepare plots::
-    cpu_fig, cpu_axes = _new_sub_figures(Ds)
-    cpu_fig.suptitle("CPU utilization")
+    cpu_fig, cpu_axes = _new_sub_figures(Ds, separate_figures)
+    if not separate_figures:
+        cpu_fig.suptitle("CPU utilization")
     for i, ax in enumerate(cpu_axes.values()):
         ax.set_xlabel("time [sec]")
         if i==0:
             ax.set_ylabel("cpu[%]")
 
-    mem_fig, mem_axes = _new_sub_figures(Ds)
-    mem_fig.suptitle("RAM Memory Usage")
+    mem_fig, mem_axes = _new_sub_figures(Ds, separate_figures)
+    if not separate_figures:
+        mem_fig.suptitle("RAM Memory Usage")
     for i, ax in enumerate(mem_axes.values()):
         ax.set_xlabel("time [sec]")
         if i==0:
@@ -171,12 +204,15 @@ def _plot_data(logs_data:list[_LogData]):
 
 
 def main(
-    logs_location: Literal['condor', 'local'] = 'local'
+    logs_location: Literal['condor', 'local'] = 'local',
+    limited_number_of_logs:int|None = 150
 ):
     folder_fullpath = _derive_folder_fullpath(logs_location)
-    logs_data = _gather_log_data(folder_fullpath)
+    logs_data = _gather_log_data(folder_fullpath, limited_number_of_logs)
     saveload.save(logs_data, "logs_data")
-    axes = _plot_data(logs_data)
+
+    axes2 = _plot_data(logs_data, separate_figures=True)
+    axes1 = _plot_data(logs_data, separate_figures=False)
 
     # Done:
     print("Done.")
