@@ -1115,7 +1115,7 @@ def plot_from_log(
     # log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3 - short",  # short
     save:bool = True,
     plot_health_figure:bool = False,
-    capture_lattice_movie:bool = True
+    capture_lattice_movie:bool = False
 ):
     
     _print_log_header(log_name)

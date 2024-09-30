@@ -1,5 +1,8 @@
 import _import_src
 
+import argparse
+import sys
+
 from utils import files, logs, prints
 import project_paths
 from dataclasses import dataclass
@@ -43,9 +46,27 @@ def _get_log_data(folder_full_path:str, filename:str) -> _LogData:
     return _LogData(D=D, best_energy=best_energy, filename=filename)
 
 
+def parse_args():
+    if sys.gettrace() is not None:
+        # Running in a debugger
+        return argparse.Namespace(logs_location='local')
+    
+    parser = argparse.ArgumentParser(description="Process log files.")
+    parser.add_argument(
+        'logs_location',
+        type=str,
+        choices=['local', 'condor'],
+        default='local',
+        nargs='?',
+        help="Specify the location of the logs: 'local' or 'condor'. Default is 'local'."
+    )
+    return parser.parse_args()
+
+
 def main(
     logs_location : Literal['condor', 'local'] = 'local'
 ):
+
     if logs_location == 'local':
         folder_full_path = str(project_paths.logs)
     elif logs_location == 'condor':
@@ -79,4 +100,10 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        args = parse_args()
+        logs_location = args.logs_location
+    except argparse.ArgumentError as e:
+        print(f"Error: {e}")
+        print("Please specify 'local' or 'condor' as the logs location.")
+    main(logs_location=logs_location)

@@ -157,8 +157,8 @@ def _plot_field_over_time() -> None:
 ## ==================================================== ##
 
 def main(
-    D = 2,
-    N = 2,
+    D = 3,
+    N = 3,
     chi_factor : int|float = 1,
     live_plots:_Bool|Iterable[_Bool] = False, 
     progress_bar:Literal['all_active', 'all_disabled', 'only_main'] = 'all_active',
