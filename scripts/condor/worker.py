@@ -172,19 +172,20 @@ def _parse_list_of_strings(s:str)->list[str]:
     return items
 
 
-def _auto_timed_compute_with_random_mat_by_ram(ram_gb:int, stop_event:threading.Event, starting_sleep_time:float|int=60):
+def _auto_timed_compute_with_random_mat_by_ram(ram_gb:int, stop_event:threading.Event, starting_sleep_time:float|int=60, check_every_seconds:int=10):
     ## In cases were this is redundant, exit:
     if SAFETY_BUFFER_FRACTION is None:
         return
 
-    sleep_time = int(np.ceil(starting_sleep_time))
+    sleep_time = max(1, int(np.ceil(starting_sleep_time))) 
     while not stop_event.is_set():
         # Do task:
         _compute_with_random_mat_by_ram(ram_gb)
 
-        # wait time, but check for exit message each second:
-        for _ in range(sleep_time):
-            sleep(1)
+        # wait time, but check for exit message each two seconds:
+        num_sleeps = sleep_time // check_every_seconds
+        for _ in range(num_sleeps):
+            sleep(check_every_seconds)
             if stop_event.is_set():
                 return
             

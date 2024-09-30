@@ -167,7 +167,7 @@ def main(
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
     unit_cell_from:Literal["random", "last", "best", "tnsu"] = "best",
-    monitor_cpu_and_ram:bool = True,
+    monitor_cpu_and_ram:bool = False,
     io : Literal['local', 'condor'] = 'local',
     messages_init : Literal['random', 'uniform'] = 'uniform'
 )->tuple[float, str]:
@@ -197,8 +197,9 @@ def main(
     # config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.ite.always_use_lowest_energy_state = True
     config.ite.symmetric_second_order_trotterization = True
-    config.ite.add_gaussian_noise_fraction = 1e-1
-    config.iterative_process.num_mode_repetitions_per_segment = 3
+    config.ite.add_gaussian_noise_fraction = 1e-0
+    config.ite.random_edge_order = False
+    config.iterative_process.num_mode_repetitions_per_segment = 5
 
     MessageModel = config.BPConfig.init_msg.__class__
     if messages_init == 'random':

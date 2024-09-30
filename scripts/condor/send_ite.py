@@ -10,14 +10,16 @@ RESULT_KEYS = ["seed","D", "N", "chi", "energy", "parallel", "method", "path"]
 
 
 def _parse_given_inputs() -> dict[str, int]|None:
-    NUM_EXPECTED_ARGS = 3
+    NUM_EXPECTED_ARGS = {2, 3}
 
     ## Check function call:
-    if len(argv) != NUM_EXPECTED_ARGS:
+    if len(argv) not in NUM_EXPECTED_ARGS:
         return None
 
+    vals = {}
+
     ## Parse args:
-    print(f"The {NUM_EXPECTED_ARGS} arguments are:")
+    print(f"The {len(argv)} arguments are:")
 
     i = 0  # 0
     this_func_name = argv[i]
@@ -26,14 +28,14 @@ def _parse_given_inputs() -> dict[str, int]|None:
     i += 1
     D = int(argv[i])
     print(f"    {i}: D={D!r}")
+    vals['D'] = [D]
 
     i += 1  # 2
-    N = int(argv[i])
-    print(f"    {i}: N={N}")
+    if i + 1 <= len(argv): 
+        N = int(argv[i])
+        print(f"    {i}: N={N}")
+        vals['N'] = [N]
 
-    vals = {}
-    vals['N'] = [N]
-    vals['D'] = [D]
 
     return vals
 
@@ -43,10 +45,10 @@ def _choose_requested_memory(D:int) -> int:
     match D:
         case 1:     raise ValueError("No ITE for D=1")
         case 2:     request_memory_gb = 2
-        case 3:     request_memory_gb = 4
-        case 4:     request_memory_gb = 16
-        case 5:     request_memory_gb = 32
-        case 6:     request_memory_gb = 40
+        case 3:     request_memory_gb = 2
+        case 4:     request_memory_gb = 4
+        case 5:     request_memory_gb = 6
+        case 6:     request_memory_gb = 8
         case 7:     request_memory_gb = 50
         case _:     request_memory_gb = 64
 
@@ -124,28 +126,28 @@ def job(
 def sender(
     request_memory_gb:int = 8
 ) -> None:
-    vals = {}
-    vals['D'] = [2, 3]
-    vals['N'] = list(range(2, 6))
-    vals['chi'] = [1, 2, 3]
-    vals['method'] = [1, 3]
-    vals['seed'] = list(range(3))
-    vals['parallel'] = [0]
-    vals['control'] = [-2, -1, 1, 2]
+    default_vals = {}
+    default_vals['D'] = [2, 3]
+    default_vals['N'] = list(range(2, 6))
+    default_vals['chi'] = [1, 2, 3]
+    default_vals['method'] = [1, 3]
+    default_vals['seed'] = list(range(3))
+    default_vals['parallel'] = [0]
+    default_vals['control'] = [-2, -1, 1, 2]
 
     user_input = _parse_given_inputs()
     if user_input is not None:
-        pass_values_from_dict1_to_dict2_on_matching_keys(user_input, vals)
+        pass_values_from_dict1_to_dict2_on_matching_keys(user_input, default_vals)
 
-    if len(vals['D'])==1:
-        D = vals['D'][0]
+    if len(default_vals['D'])==1:
+        D = default_vals['D'][0]
         request_memory_gb = _choose_requested_memory(D)
 
     main_sender(
         job_type="ite_afm",
         request_cpus=4,
         request_memory_gb=request_memory_gb,
-        vals=vals,
+        vals=default_vals,
         result_keys=RESULT_KEYS,
         _local_test=False
     )
