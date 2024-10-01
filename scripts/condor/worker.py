@@ -31,7 +31,7 @@ import numpy as np
 from utils import sizes
 
 
-NUM_EXPECTED_ARGS = 11
+NUM_EXPECTED_ARGS = 14
 SAFETY_BUFFER_FRACTION : Final[float|None] = 0.2  # safety buffer (adjust based on needs)
 
 # A main function to parse inputs:
@@ -42,7 +42,7 @@ def main():
     ## Check function call:
     # assert len(argv)==NUM_EXPECTED_ARGS, f"Expected {NUM_EXPECTED_ARGS} arguments. Got {len(argv)}."
     if len(argv)!=NUM_EXPECTED_ARGS: 
-        f"Expected {NUM_EXPECTED_ARGS} arguments. Got {len(argv)}."
+        print(f"Expected {NUM_EXPECTED_ARGS} arguments. Got {len(argv)}.")
 
     ## Parse args:
     print(f"The {len(argv)} arguments are:")
@@ -93,6 +93,14 @@ def main():
     print(f"{i}: control={control}")
 
     i += 1  # 11
+    noise_initial = float(argv[i])
+    print(f"{i}: noise_initial={noise_initial}")
+
+    i += 1  # 12
+    noise_per_segment = float(argv[i])
+    print(f"{i}: noise_per_segment={noise_per_segment}")
+
+    i += 1  # 13
     result_keys = _parse_list_of_strings(argv[i])
     print(f"{i}: result_keys={result_keys}")
 
@@ -114,7 +122,8 @@ def main():
             case "bp":
                 results = send_bp.job(D=D, N=N, chi=chi, method=method, parallel=parallel)
             case "ite_afm":
-                results = send_ite.job(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel, progress_bar=True, control=control)
+                results = send_ite.job(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel,
+                                        progress_bar=True, noise_initial=noise_initial, noise_per_segment=noise_per_segment, control=control)
             case _:
                 raise ValueError(f"Not an expected job_type={job_type!r}")
     except Exception as e:

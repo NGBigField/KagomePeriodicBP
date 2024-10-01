@@ -42,13 +42,15 @@ DEFAULT_RESULT_KEYS_DICT = dict(
 DEFAULT_VALS = {}
 DEFAULT_VALS['D'] = [2]
 DEFAULT_VALS['N'] = [2] # list(range(3, 6))
-DEFAULT_VALS['chi'] = [0.7, 1, 1.5, 2]
-DEFAULT_VALS['method'] = [1, 2, 3]
+DEFAULT_VALS['chi'] = [1, 1.5, 2]
+DEFAULT_VALS['method'] = [1, 3]
 DEFAULT_VALS['seed'] = list(range(3))
 DEFAULT_VALS['parallel'] = [0]
+DEFAULT_VALS['noise_initial'] = [1e-3, 1e-2, 1e-1, 0]
+DEFAULT_VALS['noise_per_segment'] = [1e-3, 1e-2, 1e-1, 0, 1e1]
 DEFAULT_VALS['control'] = [1, 0]
 
-Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(parallel) $(control) $(result_keys)'
+Arguments = '$(outfile) $(job_type) $(req_mem_gb) $(seed) $(method) $(D) $(N) $(chi) $(parallel) $(control) $(noise_initial) $(noise_per_segment) $(result_keys)'
 JobType : TypeAlias = Literal["ite_afm", "bp", "parallel_timings"]
 
 
@@ -90,7 +92,8 @@ def main(
     ## Define job params:
     req_ram_mem_gb = f"{request_memory_gb}"
     job_params_dicts : list[dict] = []
-    for N, D, method, seed, chi, parallel, control in product(vals['N'], vals['D'], vals['method'], vals['seed'], vals['chi'], vals['parallel'], vals['control'] ):
+    for N, D, method, seed, chi, parallel, noise_initial, noise_per_segment, control in \
+            product(vals['N'], vals['D'], vals['method'], vals['seed'], vals['chi'], vals['parallel'], vals['noise_initial'], vals['noise_per_segment'],  vals['control'] ):
         # To strings:
         N = f"{N}"
         D = f"{D}"
@@ -98,20 +101,24 @@ def main(
         seed = f"{seed}"
         chi = f"{chi}"
         parallel = f"{parallel}"
+        noise_initial = f"{noise_initial}"
+        noise_per_segment = f"{noise_per_segment}"
         control = f"{control}"
 
         job_params_dicts.append( {
-            "outfile"       : results_fullpath,                 # outfile
-            "job_type"      : job_type,                         # job_type
-            "req_mem_gb"    : req_ram_mem_gb,                   # req_ram_mem_gb
-            "seed"          : seed,                             # seed
-            "method"        : method,                           # method
-            "D"             : D,                                # D
-            "N"             : N,                                # N
-            "chi"           : chi,                              # chi
-            "parallel"      : parallel,                         # parallel
-            "control"       : control,                          # control
-            "result_keys"   : _encode_list_as_str(result_keys)  # result_keys
+            "outfile"           : results_fullpath,                 # outfile
+            "job_type"          : job_type,                         # job_type
+            "req_mem_gb"        : req_ram_mem_gb,                   # req_ram_mem_gb
+            "seed"              : seed,                             # seed
+            "method"            : method,                           # method
+            "D"                 : D,                                # D
+            "N"                 : N,                                # N
+            "chi"               : chi,                              # chi
+            "parallel"          : parallel,                         # parallel
+            "noise_initial"     : noise_initial,                    # noise_initial
+            "noise_per_segment" : noise_per_segment,                # noise_per_segment
+            "control"           : control,                          # control
+            "result_keys"       : _encode_list_as_str(result_keys)  # result_keys
         })
 
     ## Print:

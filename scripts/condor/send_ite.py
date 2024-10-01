@@ -64,6 +64,8 @@ def job(
     method : int = 1,
     parallel : int = 0,
     control : int = 0,
+    noise_initial : float = 0,
+    noise_per_segment : float = 0,
     # Default values:
     progress_bar : bool = True,
 ) -> dict:
@@ -106,7 +108,9 @@ def job(
         hamiltonian=hamiltonian_str,
         unit_cell_from=unit_cell_from,
         io='condor',
-        messages_init=messages_init
+        messages_init=messages_init,
+        noise_initial=noise_initial,
+        noise_per_segment=noise_per_segment
     )
     
     # Expected outputs: 
@@ -128,11 +132,13 @@ def sender(
 ) -> None:
     default_vals = {}
     default_vals['D'] = [2, 3]
-    default_vals['N'] = list(range(2, 6))
+    default_vals['N'] = list(range(2, 5))
     default_vals['chi'] = [1, 2, 3]
-    default_vals['method'] = [1, 3]
-    default_vals['seed'] = list(range(3))
+    default_vals['method'] = [1]
+    default_vals['seed'] = list(range(1))
     default_vals['parallel'] = [0]
+    default_vals['noise_initial'] = [1e-3, 1e-2, 1e-1, 1, 0]
+    default_vals['noise_per_segment'] = [1e-3, 1e-2, 1e-1, 0, 1e1]
     default_vals['control'] = [-2, -1, 1, 2]
 
     user_input = _parse_given_inputs()
