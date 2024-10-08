@@ -512,9 +512,9 @@ def get_inf_exact_results(D:int|list[int]=2) -> dict|list[dict]:
 
 
 def main_test():
-    # results = get_inf_exact_results([2, 3]); print(results)
+    results = get_inf_exact_results([2, 3]); print(results)
     # test_bp_convergence_all_runs([2, 3])
-    plot_bp_convergence_results()
+    # plot_bp_convergence_results()
 
     print("Done.")
 
