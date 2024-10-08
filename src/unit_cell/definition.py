@@ -1,15 +1,25 @@
 from dataclasses import dataclass, field, fields
-from typing import Generator, Literal
+from typing import Generator, Literal, TypeAlias
 from numpy import ndarray as np_ndarray
 from enums import UnitCellFlavor
 import numpy as np
 from physics.metrics.distance import tensor_distance
+import os
 
 from utils import saveload, strings, iterations, files, assertions
 
+
 UNIT_CELL_SUBFOLDER_NAME = "unit_cells"
-UNIT_CELL_FOLDER_FULLPATH = saveload.DATA_FOLDER + saveload.PATH_SEP + UNIT_CELL_SUBFOLDER_NAME
-BEST_UNIT_CELL_FOLDER_FULLPATH = UNIT_CELL_FOLDER_FULLPATH + saveload.PATH_SEP + "best"
+UNIT_CELL_FOLDER_FULLPATH : str
+BEST_UNIT_CELL_FOLDER_FULLPATH : str
+
+def _set_paths() -> None:
+    global BEST_UNIT_CELL_FOLDER_FULLPATH, UNIT_CELL_FOLDER_FULLPATH
+    UNIT_CELL_FOLDER_FULLPATH = saveload.DEFAULT_DATA_FOLDER + os.sep + UNIT_CELL_SUBFOLDER_NAME
+    BEST_UNIT_CELL_FOLDER_FULLPATH = UNIT_CELL_FOLDER_FULLPATH + os.sep + "best"
+
+_set_paths()
+
 
 @dataclass
 class UnitCell: 
@@ -106,21 +116,30 @@ class UnitCell:
              C = tensor.copy()
         )
     
-    def save(self, file_name:str|None=None) -> str:
+    def save(self, file_name:str|None=None, folder:str|None=None) -> str:
+        if folder is None:
+            folder = UNIT_CELL_FOLDER_FULLPATH
         file_name = self._derive_file_name(file_name)
-        return saveload.save(self, name=file_name, sub_folder=UNIT_CELL_SUBFOLDER_NAME)
+        fullpath = folder + os.sep + file_name
+        return saveload.save_or_load_with_fullpath(fullpath, 'save', self)
 
     @staticmethod
-    def load(file_name:str, if_exist:bool=False)->"UnitCell":
-        if file_name=="last":
-            file_name = files.get_last_file_in_folder(UNIT_CELL_FOLDER_FULLPATH)
-        return saveload.load(file_name, sub_folder=UNIT_CELL_SUBFOLDER_NAME, none_if_not_exist=if_exist)
+    def load(file_name:str, folder:str|None=None, none_if_not_exist:bool=True)->"UnitCell":
+        if folder is None:
+            folder = UNIT_CELL_FOLDER_FULLPATH
+        try:
+            if file_name=="last":
+                file_name = files.get_last_file_in_folder(folder)
+            fullpath = folder + os.sep + file_name
+            return saveload.save_or_load_with_fullpath(fullpath, 'load')
+        except FileNotFoundError:
+            return None  #type: ignore
     
     @staticmethod
     def load_best(D:int, none_if_not_exist:bool=True) -> "UnitCell":
         data = BestUnitCellData.load(D=D, none_if_not_exist=none_if_not_exist)
         if data is None and none_if_not_exist:
-            return None
+            return None  #type: ignore
         assert data.D == D
         return data.unit_cell        
     
@@ -171,13 +190,17 @@ class UnitCell:
     def _derive_file_name(self, given_name:str|None)->str:
         if given_name is not None:
             assert isinstance(given_name, str)
-            return given_name
+            name = given_name
         
-        if self._file_name is not None:
+        elif self._file_name is not None:
             assert isinstance(self._file_name, str)
-            return self._file_name
+            name = self._file_name
 
-        return strings.time_stamp()
+        else:
+            name = strings.time_stamp()
+
+        name += ".dat"
+        return name
     
     def derive_dimensions(self) -> tuple[int, int]:
         d = self.A.shape[0]
@@ -276,8 +299,6 @@ def _random_tensor(d:int, D:int)->np.ndarray:
     return t
 
 
-BEST_UNIT_CELL_DATA_FOLDER_NAME = UNIT_CELL_SUBFOLDER_NAME + saveload.PATH_SEP + "best"
-
 @dataclass
 class BestUnitCellData:
     unit_cell : UnitCell
@@ -288,45 +309,104 @@ class BestUnitCellData:
         return self.mean_energy < other.mean_energy
 
     @staticmethod
-    def load(D:int, none_if_not_exist:bool=True) -> "BestUnitCellData":
-        BestUnitCellData.force_folder_exist()
-        for file_name in BestUnitCellData._all_files_with_D(D=D):
-            return saveload.load(file_name, sub_folder=BEST_UNIT_CELL_DATA_FOLDER_NAME)
-        if none_if_not_exist:
+    def load(D:int, folder:str|None=None, none_if_not_exist:bool=True) -> "BestUnitCellData":
+        folder = BestUnitCellData._default_folder_fullpath_if_non_given(folder)
+        BestUnitCellData.force_folder_exist(folder)
+        #
+        _all_files_with_D = BestUnitCellData._all_files_with_D(D=D, sort_best_first=True)
+        if len(_all_files_with_D)>0:
+            file_name = _all_files_with_D[0]
+            fullpath = folder + os.sep + file_name
+            return saveload.save_or_load_with_fullpath(fullpath, 'load')
+        elif none_if_not_exist:
             return None  #type: ignore
         else:
             raise FileExistsError(f"No saved file for best unit_cell with D={D}")
         
-    def save(self) -> str:
-        BestUnitCellData.force_folder_exist()
-        BestUnitCellData._remove_all_with_D(D=self.D)
+    def save(self, folder:str|None=None, remove_old:bool=False) -> str:
+        folder = BestUnitCellData._default_folder_fullpath_if_non_given(folder)
+        BestUnitCellData.force_folder_exist(folder)
+        #
+        if remove_old:
+            BestUnitCellData._remove_all_with_D(D=self.D, folder=folder)
         file_name = self._canonical_file_name()
-        return saveload.save(self, file_name, sub_folder=BEST_UNIT_CELL_DATA_FOLDER_NAME)
+        fullpath = folder + os.sep + file_name
+        #
+        return saveload.save_or_load_with_fullpath(fullpath, 'save', self)
+    
     
     @staticmethod
-    def _folder_fullpath() -> str:
-        return BEST_UNIT_CELL_FOLDER_FULLPATH
+    def _default_folder_fullpath_if_non_given(folder:str|None) -> str:
+        if folder is None:
+            folder = BEST_UNIT_CELL_FOLDER_FULLPATH
+        return folder
 
     @staticmethod
-    def _all_files_with_D(D:int) -> Generator[str, None, None]:
-        file_names = files.get_all_file_names_in_folder(BEST_UNIT_CELL_FOLDER_FULLPATH)
-        for file_name in file_names:
-            dim_str, *_ = file_name.split(" ") 
-            _, dim_str = dim_str.split("=") 
-            if int(dim_str) == D:
-                yield file_name
+    def _all_files_with_D(D:int, sort_best_first:bool=True) -> list[str, None, None]:
+        # Init output:
+        all_filenames : list[str] = []
+        ## Iterate over all matching files:
+        filenames = files.get_all_file_names_in_folder(BEST_UNIT_CELL_FOLDER_FULLPATH)
+        for filename in filenames:
+            crnt_D, _ = BestUnitCellData._parse_values_from_filename(filename)
+            if crnt_D == D:
+                all_filenames.append(filename)
+        ## Sort?
+        if sort_best_first:
+            def energy_by_name(_filename:str) -> float:
+                _, energy = BestUnitCellData._parse_values_from_filename(_filename)
+                return energy
+            all_filenames.sort(key=energy_by_name)
+        ## Return:
+        return all_filenames
+    
+    @staticmethod
+    def all_best_results() -> list["BestUnitCellData"]:
+        ## Keep unique Ds:
+        unique_Ds : set[int] = set()
+        ## Iterate over all files:
+        filenames = files.get_all_file_names_in_folder(BEST_UNIT_CELL_FOLDER_FULLPATH)
+        for filename in filenames:
+            D, _ = BestUnitCellData._parse_values_from_filename(filename)
+            unique_Ds.add(D)
+        ## keep only best results:
+        res : list["BestUnitCellData"] = []
+        # find best per D:
+        Ds = list(unique_Ds)
+        Ds.sort()
+        for D in Ds:
+            data = BestUnitCellData.load(D, none_if_not_exist=False)
+            assert data is not None
+            assert isinstance(data, BestUnitCellData)
+            res.append(data)
+        # return:
+        return res
+
+    @staticmethod
+    def _parse_values_from_filename(filename) -> tuple[int, float]:
+        # Parse strings:
+        dim_str, energy_str = filename.split(" ") 
+        _, dim_str = dim_str.split("=") 
+        _, energy_str = energy_str.split("=") 
+        if energy_str[-4:] == '.dat':
+            energy_str = energy_str[:-4]
+        # Get values:
+        D = int(dim_str)
+        energy = float(energy_str)
+        return D, energy
 
     def _canonical_file_name(self) -> str:
-        return f"D={self.D} energy={self.mean_energy}"
+        return f"D={self.D} energy={self.mean_energy}.dat"
     
     @staticmethod
-    def _remove_all_with_D(D:int) -> None:
+    def _remove_all_with_D(D:int, folder:str) -> None:
         for file_name in BestUnitCellData._all_files_with_D(D=D):
-            saveload.delete(file_name, sub_folder=BEST_UNIT_CELL_DATA_FOLDER_NAME)
+            fullpath = folder + os.sep + file_name
+            os.remove(fullpath)
     
     @staticmethod
-    def force_folder_exist() -> None:
-        saveload.force_folder_exists(BEST_UNIT_CELL_FOLDER_FULLPATH)
+    def force_folder_exist(folder:str) -> None:
+        saveload.force_folder_exists(folder)
 
 
 def _permute_physical_tensor(t:np.ndarray, permutation:list[int]) -> np.ndarray:

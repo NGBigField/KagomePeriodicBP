@@ -5,9 +5,10 @@ directories:
   std_output_dir: /storage/ph_keselman/ngutman/stdout/
   log_dir: /storage/ph_keselman/ngutman/condor_logs/
   storage_dir_ATLAS: /storage/ph_keselman/ngutman/condor_tests/
-  working_dir: /srv01/technion/ngutman/repos/QuantumInfo/
-  condor_executables_dir: /srv01/technion/ngutman/repos/QuantumInfo/src/scripts/condor/CondorJobSender
+  working_dir: /srv01/technion/ngutman/repos/KagomePeriodicBP/
+  condor_executables_dir: /srv01/technion/ngutman/repos/KagomePeriodicBP/scripts/condor/CondorJobSender
   julia_path_remote: /Local/ph_keselman/julia-1.6.1/bin/julia
+  io_dir: /storage/ph_keselman/ngutman/
 username: ngutman
 parameters:
   universe: vanilla

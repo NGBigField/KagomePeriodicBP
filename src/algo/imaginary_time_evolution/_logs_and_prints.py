@@ -21,7 +21,8 @@ from utils import lists, logs, strings, prints
 EPSILON = 1e-5
 
 def _close_to(x:float, y:float) -> bool:
-    return abs(x-y)<EPSILON
+    relation = abs(x-y)/x
+    return relation < EPSILON
 
 def formatted_delta_t_str(delta_t:float) -> str:
     ## Try exponent notation:
@@ -58,7 +59,7 @@ def _common_logger_prints(logger:logs.Logger, config:Config, ite_tracker:ITEProg
     logger_method = logger.debug
     # Print basic info
     logger_method(config)
-    logger_method(f"ITE-Tracker saved at {ite_tracker.full_path!r}")
+    logger_method(f"ITE-Tracker saved at {ite_tracker.fullpath!r}")
     # Print where the logger is saved:
     for handler in logger.handlers:
         if isinstance(handler, logs.logging.FileHandler):

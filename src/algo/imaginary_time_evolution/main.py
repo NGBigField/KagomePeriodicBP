@@ -1,15 +1,3 @@
-# For allowing tests and scripts to run while debugging this module
-if __name__ == "__main__":
-    import sys, pathlib
-    sys.path.append(
-        pathlib.Path(__file__).parent.parent.parent.__str__()
-    )
-    from project_paths import add_src, add_base, add_scripts
-    add_src()
-    add_base()
-    add_scripts()
-
-
 # Get Global-Config:
 from _config_reader import DEBUG_MODE, KEEP_LOGS, ALLOW_VISUALS
 
@@ -34,7 +22,7 @@ import numpy as np
 from numpy.linalg import norm
 
 # Import our shared utilities
-from utils import lists, logs, decorators, prints, visuals, strings, processes
+from utils import lists, logs, decorators, prints, visuals, strings, processes, saveload
 
 # For copying config:
 from copy import deepcopy
@@ -53,6 +41,9 @@ from algo.belief_propagation import robust_belief_propagation, belief_propagatio
 from algo.measurements import measure_energies_and_observables_together, mean_expectation_values, MeasurementsOnUnitCell
 from algo.tn_reduction import reduce_tn
 
+# For efficient cached search:
+from functools import lru_cache
+
 
 class SegmentResults(NamedTuple):
     unit_cell : UnitCell 
@@ -63,6 +54,22 @@ class SegmentResults(NamedTuple):
     def is_better_than(self, other:"SegmentResults")->bool:
         return self.energy < other.energy 
 
+
+def _start_process_monitoring_with_log(config:Config, common_results_name:str) -> None:
+    ## Derive log path:
+    monitor_logs_folder = config.io.logs.subfolder('monitor_process')
+    saveload.force_folder_exists(monitor_logs_folder)
+    log_fullpath = monitor_logs_folder + saveload.PATH_SEP + common_results_name + ".log"
+    ## write config now:
+    with open(log_fullpath, 'a') as f:
+        print(config, file=f)
+        print("\n"*2, file=f)
+    ## Write process performance over time using a subprocess:
+    processes.monitor_crnt_process(
+        track_cpu=config.monitoring_system.monitor_cpu,
+        track_ram=config.monitoring_system.monitor_ram,
+        print_out=log_fullpath
+    )
 
 def _deal_edge_order(config:Config, delta_t:float)->UpdateEdgesOrder:
     
@@ -96,6 +103,32 @@ def _deal_edge_order(config:Config, delta_t:float)->UpdateEdgesOrder:
         
     return edge_order
 
+
+_crnt_best_energy_cache : dict[int, float] = {}
+
+
+def _get_crnt_best_energy(D:int) -> float:
+    # Use cache:
+    if D in _crnt_best_energy_cache:
+        return _crnt_best_energy_cache[D]
+    # Get from memory
+    data = BestUnitCellData.load(D=D, none_if_not_exist=True)
+    if data is None:
+        mean_energy = np.inf
+    else:    
+        assert data.D == D
+        mean_energy = data.mean_energy
+    # Update cache:
+    _crnt_best_energy_cache[D] = mean_energy
+    # Return:
+    return mean_energy
+
+
+def _set_crnt_best_energy(D:int, mean_energy, unit_cell) -> None:
+    crnt_data = BestUnitCellData(unit_cell=unit_cell, mean_energy=mean_energy, D=D)
+    crnt_data.save()
+    # Update cache:
+    _crnt_best_energy_cache[D] = mean_energy
 
 def _change_config_for_measurements_if_applicable(
     config:Config, messages:MessageDictType|None
@@ -144,7 +177,7 @@ def _initial_inputs(
 
     # Logger:
     if logger is None:
-        logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=KEEP_LOGS, filename=common_results_name)
+        logger = logs.get_logger(verbose=config.visuals.verbose, write_to_file=KEEP_LOGS, filename=common_results_name, folder=config.io.logs.fullpath)
     elif not isinstance(logger, logs.Logger):
         raise TypeError(f"Not an expected type for input 'logger' of type {type(logger)!r}")
     
@@ -153,15 +186,12 @@ def _initial_inputs(
     step_stats = ITESegmentStats()  # initial step stats for the first iteration. used for randomized mode order
 
     ## Init tracking lists and plots:
-    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config,filename=common_results_name)
+    ite_tracker = ITEProgressTracker(unit_cell=unit_cell, messages=messages, config=config, filename=common_results_name)
     plots = ITEPlots(active=config.visuals.live_plots, config=config)
 
     ## Monitor system performance:
     if config.monitoring_system.monitor_cpu or config.monitoring_system.monitor_ram:
-        processes.monitor_crnt_process(
-            track_cpu=config.monitoring_system.monitor_cpu,
-            track_ram=config.monitoring_system.monitor_ram
-        )
+        _start_process_monitoring_with_log(config, common_results_name)
 
     return config, unit_cell, logger, messages, step_stats, ite_tracker, plots
 
@@ -382,12 +412,9 @@ def _post_segment_measurements_checks_and_visuals(
 
     ## Which unit cell has minimal energy ever:
     D = config.dims.virtual_dim
-    best_data = BestUnitCellData.load(D=D)
-    crnt_data = BestUnitCellData(unit_cell=unit_cell, mean_energy=mean_energy, D=D)
-    if best_data is None:  # no best unit_cell is stored
-        crnt_data.save()
-    elif crnt_data.is_better_than(best_data):
-        crnt_data.save()
+    crnt_best_energy = _get_crnt_best_energy(D)
+    if mean_energy < crnt_best_energy:
+        _set_crnt_best_energy(D, mean_energy, unit_cell)
 
     return should_break, mean_energy, unit_cell, messages, best_results
 
@@ -708,7 +735,7 @@ def full_ite(
         except Exception as e:
             _log_and_print_finish_message(logger, config, ite_tracker, plots)  # Print and log valuable information: 
             raise e
-    
+        
     ## finish:
     prog_bar.clear()
     _log_and_print_finish_message(logger, config, ite_tracker, plots)  # Print and log valuable information: 

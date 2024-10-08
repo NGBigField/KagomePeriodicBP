@@ -25,7 +25,7 @@ DEFAULT_DATE_TIME_FORMAT : Final = "%H:%M:%S" # "%Y-%m-%d %H:%M:%S"
 
 # File system:
 PATH_SEP = os.sep
-LOGS_FOLDER = logs_path.__str__()
+DEFAULT_LOGS_FOLDER = logs_path.__str__()
 
 
 class LoggerLevels(Enum):
@@ -54,9 +54,9 @@ def _force_log_file_extension(filename:str)->str:
         filename += ".log"
     return filename
 
-def _get_fullpath(filename:str)->str:
-    saveload.force_folder_exists(LOGS_FOLDER)
-    fullpath = LOGS_FOLDER+PATH_SEP+filename
+def _get_fullpath(filename:str, folder_path:str)->str:
+    saveload.force_folder_exists(folder_path)
+    fullpath = folder_path+PATH_SEP+filename
     return fullpath
 
 # ============================================================================ #
@@ -117,7 +117,8 @@ def inactive_logger()->FakeLogger:
 def get_logger(
     verbose:bool=False,
     write_to_file:bool=True,
-    filename:str|None=None
+    filename:str|None=None,
+    folder:str=DEFAULT_LOGS_FOLDER
     )->Logger:
 
     # Define default arguments:
@@ -146,7 +147,7 @@ def get_logger(
     if write_to_file:
         # Path:
         filename = _force_log_file_extension(filename)
-        fullpath = _get_fullpath(filename)
+        fullpath = _get_fullpath(filename, folder)
         # Formatting:
         f_formatter = _MyFileFormatter(fmt=DEFAULT_PRINT_FORMAT, datefmt=DEFAULT_DATE_TIME_FORMAT)
         f_handler = logging.FileHandler(fullpath)
@@ -161,7 +162,7 @@ def get_logger(
 
 def search_words_in_log(
     filename_or_fullpath:str,
-    words:Iterable[str],
+    *words:str,
     max_line:int = np.iinfo(np.int64).max
 )->tuple[list[str], ...]:
     ## Fullpath:
@@ -192,6 +193,13 @@ def search_words_in_log(
                     proceeding_str = line[index_after_word:]
                     res[word_index].append(proceeding_str)
 
-    return tuple(res)
+    ## Return tuple of lists, if many search words, else a single list:
+    if len(res)>1:
+        return tuple(res)
+    elif len(res)==1:
+        return res[0]  #type: ignore
+    else:
+        raise ValueError("This is not expected")
+
 
     

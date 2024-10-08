@@ -52,7 +52,7 @@ NEW_TRACK_POINT_THRESHOLD = 0.02
 PLOT_ENTANGLEMENT = True
 PLOT_COMPLEXITY = False
 
-CONFIG_NUM_HEADER_LINES = 54
+CONFIG_NUM_HEADER_LINES = 65
 
 
 @dataclass
@@ -62,42 +62,38 @@ class COLORS:
     space_complexity = "tab:red"
 
 
-def get_color_in_warm_to_cold_range(value, min_, max_):
-    # Normalize the value of e to range from 0 to 1
-    normalized = (value - min_) / (max_ - min_)
-    
-    # Define RGB for blue, white, and red
+def get_color_in_warm_to_cold_range(value, min_, max_, center_zero=False) -> tuple[float, float, float]:
+    # Define colors
     blue = (0, 0, 1)
     white = (1, 1, 1)
     red = (1, 0, 0)
     
-    if normalized < 0.5:
-        # Interpolate between blue and white
-        # Scale normalized to range from 0 to 1 within this segment
-        scale = normalized / 0.5
-        r = blue[0] * (1 - scale) + white[0] * scale
-        g = blue[1] * (1 - scale) + white[1] * scale
-        b = blue[2] * (1 - scale) + white[2] * scale
-    else:
-        # Interpolate between white and red
-        # Adjust normalized to range from 0 to 1 within this segment
-        scale = (normalized - 0.5) / 0.5
-        r = white[0] * (1 - scale) + red[0] * scale
-        g = white[1] * (1 - scale) + red[1] * scale
-        b = white[2] * (1 - scale) + red[2] * scale
     
-    return (r, g, b)
+    def interpolate_color_component(component1, component2, normalized):
+        return component1 * (1 - normalized) + component2 * normalized
+
+    def scale_color(value, color1, color2, min_val, max_val):
+        normalized = (value - min_val) / (max_val - min_val)
+        return tuple(interpolate_color_component(color1[i], color2[i], normalized) for i in range(3))
+    
+    if center_zero:
+        if value < 0:
+            return scale_color(value, blue, white, min_, 0)
+        else:
+            return scale_color(value, white, red, 0, max_)
+    else:
+        return scale_color(value, blue, red, min_, max_)
 
 
-def plot_color_bar(ax_main:Axes, min_:float, max_:float, num_steps=100) -> Axes:
+def plot_color_bar(ax_main:Axes, min_:float, max_:float, num_steps:int=100, center_zero:bool=False) -> Axes:
     from matplotlib import gridspec
 
-    # Generate values
+    ## Generate values    
     values = np.linspace(min_, max_, num_steps)
     
     # Map values to colors
-    colors = [get_color_in_warm_to_cold_range(val, min_, max_) for val in values]
-    
+    colors = [get_color_in_warm_to_cold_range(val, min_, max_, center_zero) for val in values]
+
     # Create gridspec layout on existing figure
     gs = gridspec.GridSpec(1, 2, width_ratios=[40, 0.2], figure=ax_main.figure)
     
@@ -109,8 +105,18 @@ def plot_color_bar(ax_main:Axes, min_:float, max_:float, num_steps=100) -> Axes:
         ax_color_bar.axhline(i, color=color, linewidth=4)  # linewidth controls the thickness of bars
     
     # Set the y-ticks to show min, max, and mid values
-    ax_color_bar.set_yticks([0, num_steps // 2, num_steps - 1])
-    ax_color_bar.set_yticklabels([min_, (min_ + max_) / 2, max_])
+    def format_tick_label(value):
+        return f"{value:.4f}"
+
+    if center_zero:
+        # Find the index where the value is closest to 0.0
+        mid_tick = np.argmin(np.abs(values))
+        ax_color_bar.set_yticks([0, mid_tick, num_steps - 1])
+        ax_color_bar.set_yticklabels([format_tick_label(min_), "0.00", format_tick_label(max_)])
+    else:
+        ax_color_bar.set_yticks([0, num_steps // 2, num_steps - 1])
+        ax_color_bar.set_yticklabels([format_tick_label(min_), format_tick_label((min_ + max_) / 2), format_tick_label(max_)])
+    
     
     # Remove x-ticks as they are not necessary
     ax_color_bar.set_xticks([])
@@ -122,9 +128,8 @@ def plot_color_bar(ax_main:Axes, min_:float, max_:float, num_steps=100) -> Axes:
     # ax_color_bar.set_title('Color Scale')
 
     pos = ax_color_bar.get_position()
-    pos.xmin
     # [l, b, width, height]
-    ax_color_bar.set_position([pos.xmin-0.03, pos.ymin, pos.width, pos.height])  #type: ignore
+    ax_color_bar.set_position([pos.xmin-0.01, pos.ymin, pos.width, pos.height])  
 
     return ax_color_bar
 
@@ -692,7 +697,7 @@ def _plot_per_segment_health_common(ax:Axes, strs:list[str], style:visual_consta
 def _plot_health_figure_from_log(log_name:str) -> tuple[Figure, dict, dict]: 
     ## Get matching words:
     hermicity_strs, tensor_distance_strs = logs.search_words_in_log(log_name, 
-        ("Hermicity of environment=", "Tensor update distance") 
+        "Hermicity of environment=", "Tensor update distance" 
     )
     ## Prepare plots        
     fig = plt.figure(figsize=(4, 4))
@@ -729,11 +734,15 @@ def _plot_main_figure_from_log(
 
     data = dict()
 
+    reference_energy_str, num_mode_repetitions_per_segment_str = logs.search_words_in_log(log_name, 
+        "Hamiltonian's reference energy", "num_mode_repetitions_per_segment", max_line=CONFIG_NUM_HEADER_LINES
+    )
+
     ## Get matching words:
-    edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, num_mode_repetitions_per_segment_str, \
-        reference_energy_str, segment_data_str, delta_t_strs, edge_negativities_strs, expectation_values_strs = logs.search_words_in_log(log_name, 
-        ("Edge-Energies after each update=", "Edge-Energies after segment =   ", " Mean energy after segment", "num_mode_repetitions_per_segment",\
-          "Hamiltonian's reference energy", "segment:", "delta_t", "Edge-Negativities", "Expectation-Values") 
+    edge_energies_during_strs, edge_energies_for_mean_strs, mean_energies_strs, \
+        segment_data_str, delta_t_strs, edge_negativities_strs, expectation_values_strs = logs.search_words_in_log(log_name, 
+        "Edge-Energies after each update=", "Edge-Energies after segment =   ", " Mean energy after segment", \
+          "segment:", "delta_t", "Edge-Negativities", "Expectation-Values"
     )
 
     num_segments = len(mean_energies_strs)
@@ -1048,7 +1057,7 @@ def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], i
 
     ## Derive from log:
     d_str, D_str, N_str = logs.search_words_in_log(log_name, 
-        ("physical_dim:", "virtual_dim:", "big_lattice_size:"),
+        "physical_dim:", "virtual_dim:", "big_lattice_size:",
         max_line=CONFIG_NUM_HEADER_LINES
     )
     d = int(d_str[0])
@@ -1067,11 +1076,12 @@ def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], i
             e_min = min(e_min, energy)
             e_max = max(e_max, energy)
 
+    ## Define the color bar and the color function:
+    center_zero = True
     def energy_color_scale_function(energy) -> tuple[float, float, float]:
-        return get_color_in_warm_to_cold_range(energy, e_min, e_max)
-
-    ## Plot color bar:
-    ax_color_bar = plot_color_bar(kagome_ax, e_min, e_max, num_steps=1000)
+        return get_color_in_warm_to_cold_range(energy, e_min, e_max, center_zero=center_zero)
+    # Plot color bar:
+    ax_color_bar = plot_color_bar(kagome_ax, e_min, e_max, num_steps=1000, center_zero=center_zero)
 
     ## Iterative Plotting:
     wanted_movie_time = 30  # [sec]
@@ -1088,7 +1098,7 @@ def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], i
         _clear_plotted_lines(plotted_lines)
         plotted_lines = _update_figure_per_delta_t(i_delta_t, delta_t, fig, kagome_tn, kagome_ax, ite_data, ite_axes, energy_color_scale_function)
         if is_first:
-            movie.capture(fig, duration=10)
+            movie.capture(fig, duration=2)
         else:
             movie.capture(fig, duration=1)
         visuals.draw_now()
@@ -1100,8 +1110,8 @@ def _capture_network_movie(log_name:str, fig:Figure, ite_axes:dict[str, Axes], i
 
 
 def plot_from_log(
-    # log_name:str = "2024.07.28_08.59.04_RCWB_AFM_D=2_N=4 - good",  # Best log so far
-    log_name:str = "from zero to hero - 1",  # Best log so far
+    log_name:str = "log - from zero to hero - best",  # Best log so far
+    # log_name:str = "05 - swigily log",  # Best log so far
     # log_name:str = "2024.07.25_10.19.34_MJSA_AFM_D=2_N=3 - short",  # short
     save:bool = True,
     plot_health_figure:bool = False,

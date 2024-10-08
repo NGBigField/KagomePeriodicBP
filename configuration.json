@@ -9,5 +9,5 @@
     "parallel_method" : {
         "_comment" : "can be 'multiprocessing_pool'/'multithreading'/'mpi'",
         "value" :  "multithreading"
-    } 
+    }
 }

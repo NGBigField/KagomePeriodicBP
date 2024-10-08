@@ -8,9 +8,8 @@ from _error_types import ITEError
 from .imaginary_time_evolution import ITESegmentStats
 
 
-SUB_FOLDER : Final[str] = "ite_trackers"
+SUB_FOLDER_NAME : Final[str] = "ite_trackers"
 _T = TypeVar("_T")
-
                         
 _TrackerStepOutputs : TypeAlias = tuple[
     float,              # delta_t
@@ -56,19 +55,26 @@ class _LimitedLengthList(List[_T]):
     def __len__(self)->int:
         return len(self._list)
 
+def _standard_name(name:str) -> str:
+    ext = name[-4:]
+    if ext != ".dat":
+        name += ".dat"
+    return name
 
 class ITEProgressTracker():
-    __slots__ = "config", "last_iter", "file_name", "delta_ts", "energies", "expectation_values", "unit_cells", "messages", "stats", "error_counters"
+    __slots__ = "config", "last_iter", "fullpath", "delta_ts", "energies", "expectation_values", "unit_cells", "messages", "stats", "error_counters"
 
     def __init__(self, unit_cell:UnitCell, messages:dict|None, config:Any, filename:str|None=None):
         # Derive:
-        mem_length=config.iterative_process.num_total_errors_threshold
+        mem_length = config.iterative_process.num_total_errors_threshold
+        file_name = filename if filename is not None else "ite-tracker_"+strings.time_stamp()+" "+strings.random(5)
+        folder_path = config.io.data.subfolder("ite_trackers")
         # From input:
         self.config = config
         # Fresh variables:
         self.last_iter : int = 0
         self.error_counters : dict[type, int] = {}
-        self.file_name : str = filename if filename is not None else "ite-tracker_"+strings.time_stamp()+" "+strings.random(5)
+        self.fullpath : str = _standard_name(folder_path + saveload.PATH_SEP + file_name)
         # Lists memory:
         self.delta_ts           : _LimitedLengthList[float]             = _LimitedLengthList[float](mem_length) 
         self.energies           : _LimitedLengthList[float]             = _LimitedLengthList[float](mem_length)     
@@ -84,14 +90,6 @@ class ITEProgressTracker():
         self.unit_cells.append(unit_cell)       #type: ignore
         self.messages.append(messages)          #type: ignore
         self.stats.append(None)                 #type: ignore
-
-    @property
-    def memory_usage(self)->int:
-        return saveload.get_size(self.file_name, sub_folder=SUB_FOLDER)        
-    
-    @property
-    def full_path(self) -> str:
-        return saveload.derive_fullpath(name=self.file_name, sub_folder=SUB_FOLDER)
 
     @property
     def last_unit_cell(self) ->UnitCell:
@@ -165,15 +163,17 @@ class ITEProgressTracker():
 
 
     @staticmethod
-    def load(file_name)->"ITEProgressTracker":
-        ite_tracker = saveload.load(file_name, sub_folder=SUB_FOLDER, none_if_not_exist=True)        
+    def load(filename, folder:str|None=None)->"ITEProgressTracker":
+        if folder is None:
+            ite_tracker = saveload.load(filename, sub_folder=SUB_FOLDER_NAME, none_if_not_exist=True)        
+        else:
+            fullpath = folder + saveload.PATH_SEP + filename
+            mode = saveload.Modes.Read
+            ite_tracker = saveload.save_or_load_with_fullpath(fullpath, 'load')
         return ite_tracker
 
     def save(self)->str:
-        # Save:
-        filename : str = self.file_name
-        sub_folder : str = SUB_FOLDER
-        return saveload.save(self, name=filename, sub_folder=sub_folder)        
+        return saveload.save_or_load_with_fullpath(self.fullpath, 'save', self)
 
     def plot(self, live_plot:bool=False)->None:
         # Specific plotting imports:

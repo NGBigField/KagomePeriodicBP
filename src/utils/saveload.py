@@ -34,7 +34,7 @@ elif SAVE_FILES_WITH == "dill":
 #|                                  Constants                                         |#
 # ==================================================================================== #
 PATH_SEP = os.sep
-DATA_FOLDER = project_paths.data.__str__()
+DEFAULT_DATA_FOLDER = project_paths.data.__str__()
 DATA_EXTENSION = "dat"
 LOG_EXTENSION = "log"
 
@@ -66,11 +66,11 @@ class Modes():
 # ==================================================================================== #
 #|                               Inner Functions                                      |#
 # ==================================================================================== #
-def derive_fullpath(name:str, sub_folder:Optional[str]=None, typ:Literal['data', 'log']='data') -> str:
+def derive_fullpath(name:str, sub_folder:Optional[str]=None, typ:Literal['data', 'log']='data', data_path:str=DEFAULT_DATA_FOLDER) -> str:
     # Complete missing inputs:
     sub_folder = arguments.default_value(sub_folder, "")
     name = _common_name(name, typ)
-    folder = DATA_FOLDER+PATH_SEP+sub_folder
+    folder = data_path+PATH_SEP+sub_folder
     force_folder_exists(folder)
     fullpath = folder+PATH_SEP+name
     return fullpath
@@ -103,10 +103,10 @@ def _default_load_catch_other_load(file) -> Any:
     except Exception as e:
         # Try the other type:
         if SAVE_FILES_WITH == "pickle":
-            import dill as crnt_pickle   # A common alias to simplify things
+            import dill as other_pickle   # A common alias to simplify things
         elif SAVE_FILES_WITH == "dill":
-            import pickle as crnt_pickle
-        data = crnt_pickle.load(file)
+            import pickle as other_pickle
+        data = other_pickle.load(file)
         
     return data
 
@@ -130,8 +130,8 @@ def exist(name:str, sub_folder:Optional[str]=None) -> bool:
     return os.path.exists(fullpath)
 
 
-def all_saved_data() -> Generator[Tuple[str, Any], None, None]:
-    for path, subdirs, files in os.walk(DATA_FOLDER):
+def all_saved_data(data_path:str=DEFAULT_DATA_FOLDER) -> Generator[Tuple[str, Any], None, None]:
+    for path, subdirs, files in os.walk(data_path):
         for name in files:
             fullpath = path + PATH_SEP + name
             file = _open(fullpath, Modes.Read.str())
@@ -139,13 +139,35 @@ def all_saved_data() -> Generator[Tuple[str, Any], None, None]:
             yield name, data
 
 
-def save_or_load_with_fullpath(fullpath:str, mode:Type[_Mode], var:Any|None=None) -> Any:
+
+def save_or_load_with_fullpath(fullpath:str|Path, mode:Literal['save', 'load'], var:Any|None=None) -> Any:
+    ## Derive basic path relations:
+    if isinstance(fullpath, str):
+        parent = Path(fullpath).parent
+    elif isinstance(fullpath, Path):
+        parent = fullpath.parent
+        fullpath = fullpath.__str__()
+    else: 
+        raise TypeError("Not an expected type")
+
+    ## Return appropriate value with common function:
+    match mode:
+        case 'load':
+            return _common_save_or_load_with_fullpath(fullpath, Modes.Read)
+        case 'save':
+            force_folder_exists(parent.__str__())
+            return _common_save_or_load_with_fullpath(fullpath, Modes.Write, var)
+
+
+
+def _common_save_or_load_with_fullpath(fullpath:str, mode:Type[_Mode], var:Any|None=None) -> Any:
     file = _open(fullpath=fullpath, mode=mode.str())    
     match mode:
         case Modes.Write:
             return pickle.dump(var, file)
         case Modes.Read: 
-            return _default_load_catch_other_load(file)
+            assert var is None
+            return pickle.load(file)
         case _:
             raise ValueError("Not matching an existing case")
 
@@ -157,7 +179,7 @@ def save(var:Any, name:Optional[str]=None, sub_folder:Optional[str]=None, if_not
     # fullpath:
     fullpath = derive_fullpath(name, sub_folder)
     # Common save or load:
-    save_or_load_with_fullpath(fullpath, mode=Modes.Write, var=var)
+    _common_save_or_load_with_fullpath(fullpath, mode=Modes.Write, var=var)
     # print:
     if print_:
         print(f"Saved file of type {type(var)!r} in path {fullpath!r}")
@@ -170,7 +192,7 @@ def load(name:str, sub_folder:Optional[str]=None, none_if_not_exist:bool=False) 
     # fullpath:
     fullpath = derive_fullpath(name, sub_folder)
     # Common save or load:
-    data = save_or_load_with_fullpath(fullpath, mode=Modes.Read)
+    data = _common_save_or_load_with_fullpath(fullpath, mode=Modes.Read)
     # Load:
     return data
 
@@ -191,8 +213,8 @@ def get_size(name:str, sub_folder:Optional[str]=None, if_exist:bool=False) -> in
     # get size
     return os.path.getsize(fullpath)
 
-def force_subfolder_exists(folder_name:str) -> None:
-    folder_path = DATA_FOLDER + PATH_SEP + folder_name
+def force_subfolder_exists(folder_name:str, data_path:str=DEFAULT_DATA_FOLDER) -> None:
+    folder_path = data_path + PATH_SEP + folder_name
     force_folder_exists(folder_path)
 
 

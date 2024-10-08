@@ -5,6 +5,7 @@ from containers.sizes_and_dimensions import TNDimensions
 from containers.imaginary_time_evolution import ITEConfig, IterativeProcessConfig
 from containers.visuals import VisualsConfig
 from containers.performance import MonitoringSystemConfig
+from containers.io import IOConfig
 from containers._meta import _ConfigClass
 from utils import prints, sizes
 from copy import deepcopy
@@ -33,17 +34,17 @@ class Config(_StoreConfigClasses, _ConfigClass):
     visuals : VisualsConfig                     = field(default_factory=VisualsConfig)
     contraction : BubbleconContractionConfig    = field(default_factory=BubbleconContractionConfig)  
     monitoring_system : MonitoringSystemConfig  = field(default_factory=MonitoringSystemConfig)  
+    io : IOConfig                               = field(default_factory=IOConfig)  
 
     @staticmethod
     def derive_from_dimensions(D:int)->"Config":
         config = Config()
-        config.bp=BPConfig(trunc_dim=2*D**2)
         config.dims=TNDimensions(virtual_dim=D)
+        config.bp=BPConfig(trunc_dim=2*D**2)
         config.contraction=BubbleconContractionConfig(trunc_dim=2*D**2+10)
         # if D>3:
         #     config.bp.trunc_dim = D**2
         #     config.trunc_dim = 2*D**2
-
         return config
 
     @property

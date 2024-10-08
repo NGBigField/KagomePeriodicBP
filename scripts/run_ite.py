@@ -5,6 +5,7 @@ if __name__ == "__main__":
 from containers import Config, HamiltonianFuncAndInputs
 from unit_cell import UnitCell
 import unit_cell.get_from as get_unit_cell_from 
+import project_paths
 
 from utils import strings, lists, processes
 from typing import Iterable, TypeAlias, Literal
@@ -17,6 +18,12 @@ from physics import hamiltonians
 import numpy as np
 
 d = 2
+
+
+def _get_condor_io_paths()->tuple[str, str]:
+    logs_str = str( project_paths.condor_paths['io_dir'] / "logs" )
+    data_str = str( project_paths.condor_paths['io_dir'] / "data" )
+    return data_str, logs_str
 
 
 crnt_force_value = 1e-2
@@ -68,7 +75,7 @@ def _get_hamiltonian(hamiltonian:str) -> HamiltonianFuncAndInputs:
     return out  #type: ignore
         
 
-def _get_unit_cell(D:int, source:str) -> tuple[UnitCell, bool]:
+def _get_unit_cell(D:int, source:Literal["random", "last", "best", "tnsu"], config:Config) -> tuple[UnitCell, bool]:
     is_random = False
 
     match source:
@@ -84,10 +91,11 @@ def _get_unit_cell(D:int, source:str) -> tuple[UnitCell, bool]:
         case "best":
             unit_cell = UnitCell.load_best(D=D)
             if unit_cell is None:
-                return _get_unit_cell(D=D, source="tnsu")
+                return _get_unit_cell(D=D, source="random", config=config)
             print("Got unit_cell as the previous best.")
 
         case "tnsu":
+            raise NotImplementedError("Not yet.")
             print("Get unit_cell by simple-update:")
             unit_cell, energy = get_unit_cell_from.simple_update(D=D)
 
@@ -118,8 +126,8 @@ def _plot_field_over_time() -> None:
 
     ## Plot:
     lines = plt.plot(values, linewidth=4)
-    ax1 : plt.Axes = lines[0].axes
-    ax2 : plt.Axes = ax1.twinx()
+    ax1 : plt.Axes = lines[0].axes  #type: ignore
+    ax2 : plt.Axes = ax1.twinx()    #type: ignore
     ax1.set_yscale('log')
     ax2.set_yscale('log')
     ax2.plot(time_steps, linewidth=2)
@@ -139,18 +147,31 @@ def _plot_field_over_time() -> None:
     print("Done.")
 
 
+
+
+
+
+
+## ==================================================== ##
+#                         main                           #
+## ==================================================== ##
+
 def main(
     D = 3,
     N = 3,
-    chi_factor : int|float = 1.0,
-    live_plots:_Bool|Iterable[_Bool] = [0,0,0], 
+    chi_factor : int|float = 1,
+    live_plots:_Bool|Iterable[_Bool] = False, 
     progress_bar:Literal['all_active', 'all_disabled', 'only_main'] = 'all_active',
     results_filename:str|None = None,
     parallel:bool = False,
     hamiltonian:str = "AFM",  # Anti-Ferro-Magnetic or Ferro-Magnetic
     damping:float|None = 0.1,
-    unit_cell_from:Literal["random","last","best","tnsu"]|str = "best",
-    monitor_cpu_and_ram:bool = True
+    unit_cell_from:Literal["random", "last", "best", "tnsu"] = "best",
+    monitor_cpu_and_ram:bool = False,
+    io : Literal['local', 'condor'] = 'local',
+    messages_init : Literal['random', 'uniform'] = 'uniform',
+    noise_initial : float = 0,
+    noise_per_segment : float = 0
 )->tuple[float, str]:
 
     assert N>=2
@@ -159,9 +180,6 @@ def main(
 
     if results_filename is None:
         results_filename = strings.time_stamp()+f"_AFM_D={D}_N={N}_"+strings.random(4)
-
-    unit_cell, _radom_unit_cell = _get_unit_cell(D=D, source=unit_cell_from)
-    unit_cell.set_filename(results_filename) 
 
     ## Config:
     config = Config.derive_from_dimensions(D)
@@ -176,36 +194,59 @@ def main(
     config.chi = config.chi*chi_factor
     config.chi_bp = config.chi_bp*chi_factor
 
-    config.bp.msg_diff_good_enough = 1e-6
-    config.bp.msg_diff_terminate = 1e-14
-    # config.bp.times_to_deem_failure_when_diff_increases = 3
-    # config.bp.max_iterations = 50
-    # config.bp.allowed_retries = 2
-    config.iterative_process.change_config_for_measurements_func = _config_at_measurement
+    config.bp.msg_diff_good_enough = 1e-5
+    config.bp.msg_diff_terminate = 1e-6
+    # config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.ite.always_use_lowest_energy_state = True
-    # config.ite.symmetric_second_order_trotterization = True
-    config.ite.add_gaussian_noise_fraction = 1e-2
-    # config.iterative_process.bp_every_edge = True
-    config.iterative_process.num_mode_repetitions_per_segment = 3
+    config.ite.symmetric_second_order_trotterization = True
+    config.ite.add_gaussian_noise_fraction = noise_per_segment
+    config.ite.random_edge_order = False
+    config.iterative_process.num_mode_repetitions_per_segment = 5
+
+    MessageModel = config.BPConfig.init_msg.__class__
+    if messages_init == 'random':
+        config.BPConfig.init_msg = MessageModel('RQ')
+    elif messages_init == 'uniform':
+        config.BPConfig.init_msg = MessageModel('UQ')
+    else:
+        raise ValueError("Not expected.")
+
+    # Monitor:
+    config.monitoring_system.set_all(monitor_cpu_and_ram)
+
+    # IO:
+    if io == 'local':
+        pass
+    elif io == 'condor':
+        condor_io_data, condor_io_logs = _get_condor_io_paths()
+        config.io.data.fullpath = condor_io_data
+        config.io.logs.fullpath = condor_io_logs
+    else:
+        raise ValueError(f"Not an expected input for io = {io!r}")
+
+    # Change unit-cell folders global pointers:
+    if io == 'condor':
+        from utils import saveload
+        from unit_cell.definition import _set_paths
+        saveload.DEFAULT_DATA_FOLDER = config.io.data.fullpath
+        _set_paths()
+
+    ## Unit-cell:
+    unit_cell, _radom_unit_cell = _get_unit_cell(D=D, source=unit_cell_from, config=config)
+    unit_cell.set_filename(results_filename)     
+    if noise_initial>0:
+        unit_cell.add_noise(noise_initial)
 
     ## time steps:
     if unit_cell_from == 'best':
-        e_start = 5
-        e_end   = 8
+        config.ite.time_steps = _get_time_steps(4, 8, 200)
     else:
-        e_start = 4
-        e_end   = 7
-    n_per_dt = 100
-    #    
-    config.ite.time_steps = _get_time_steps(e_start, e_end, n_per_dt)
+        config.ite.time_steps = _get_time_steps(2, 8, 100)    
 
-    if _radom_unit_cell:
-        append_to_head = []
-        append_to_head += _get_time_steps(2, 2, 50) 
-        append_to_head += _get_time_steps(3, 3, 100)
-        config.ite.time_steps = append_to_head + config.ite.time_steps
-
-    config.monitoring_system.set_all(monitor_cpu_and_ram)
+    # if _radom_unit_cell:
+    #     append_to_head = []
+    #     append_to_head += _get_time_steps(2, 2,  50) 
+    #     config.ite.time_steps = append_to_head + config.ite.time_steps
 
     ## Run:
     energy, unit_cell_out, ite_tracker, logger = full_ite(unit_cell, config=config, common_results_name=results_filename)

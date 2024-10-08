@@ -345,7 +345,7 @@ def calc_measurements_on_unit_cell(
 
 def run_converged_measurement_test(
     unit_cell:UnitCell, 
-    sizes:Iterable[int]=range(2,4),
+    sizes:Iterable[int]=range(2, 5),
     config:Config|None=None,
     progress_bar:bool=True,
     plot:bool=True
@@ -397,11 +397,19 @@ def run_converged_measurement_test(
     ## Get the converged measurement:
     print(energies)
     if plot:
-        from matplotlib import pyplot as plt
-        from utils import visuals
-        plt.subplot(1,1,1)
-        plt.plot(Ns, energies)
-        visuals.draw_now()
+        try: 
+            from matplotlib import pyplot as plt
+            from utils import visuals
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            ax.plot(Ns, energies, linewidth=5)
+            ax.set_xlabel("N")
+            ax.set_ylabel("energies")
+            ax.set_title(f"Measurements on D={D}")
+            visuals.matplotlib_fix_y_axis_offset(ax)
+        except:
+            pass
+        
     measurements = results[-1][1]
 
     ## Return

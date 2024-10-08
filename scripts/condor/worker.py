@@ -15,6 +15,7 @@ from typing import Any, Generator, Final
 import threading
 
 from src.utils import errors
+from src.utils.prints import ProgressBar
 
 # Import the possible job types:
 from scripts.condor import send_parallel_timing 
@@ -30,8 +31,8 @@ import numpy as np
 from utils import sizes
 
 
-NUM_EXPECTED_ARGS = 11
-SAFETY_BUFFER_FRACTION : Final[float|None] = None  # safety buffer (adjust based on needs)
+NUM_EXPECTED_ARGS = 14
+SAFETY_BUFFER_FRACTION : Final[float|None] = 0.2  # safety buffer (adjust based on needs)
 
 # A main function to parse inputs:
 def main():
@@ -41,7 +42,7 @@ def main():
     ## Check function call:
     # assert len(argv)==NUM_EXPECTED_ARGS, f"Expected {NUM_EXPECTED_ARGS} arguments. Got {len(argv)}."
     if len(argv)!=NUM_EXPECTED_ARGS: 
-        f"Expected {NUM_EXPECTED_ARGS} arguments. Got {len(argv)}."
+        print(f"Expected {NUM_EXPECTED_ARGS} arguments. Got {len(argv)}.")
 
     ## Parse args:
     print(f"The {len(argv)} arguments are:")
@@ -55,7 +56,8 @@ def main():
     print(f"{i}: output_file={output_file!r}")
 
     i += 1  # 2
-    job_type : JobType= argv[i]
+    job_type = argv[i]
+    assert job_type in JobType.__args__, f"job_type={job_type!r} is not in {JobType.__args__}"
     print(f"{i}: job_type={job_type}")
 
     i += 1  # 3
@@ -91,6 +93,14 @@ def main():
     print(f"{i}: control={control}")
 
     i += 1  # 11
+    noise_initial = float(argv[i])
+    print(f"{i}: noise_initial={noise_initial}")
+
+    i += 1  # 12
+    noise_per_segment = float(argv[i])
+    print(f"{i}: noise_per_segment={noise_per_segment}")
+
+    i += 1  # 13
     result_keys = _parse_list_of_strings(argv[i])
     print(f"{i}: result_keys={result_keys}")
 
@@ -112,7 +122,8 @@ def main():
             case "bp":
                 results = send_bp.job(D=D, N=N, chi=chi, method=method, parallel=parallel)
             case "ite_afm":
-                results = send_ite.job(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel, progress_bar=not active_thread, control=control)
+                results = send_ite.job(D=D, N=N, chi_factor=chi, seed=seed, method=method, parallel=parallel,
+                                        progress_bar=True, noise_initial=noise_initial, noise_per_segment=noise_per_segment, control=control)
             case _:
                 raise ValueError(f"Not an expected job_type={job_type!r}")
     except Exception as e:
@@ -170,19 +181,20 @@ def _parse_list_of_strings(s:str)->list[str]:
     return items
 
 
-def _auto_timed_compute_with_random_mat_by_ram(ram_gb:int, stop_event:threading.Event, starting_sleep_time:float|int=60):
+def _auto_timed_compute_with_random_mat_by_ram(ram_gb:int, stop_event:threading.Event, starting_sleep_time:float|int=60, check_every_seconds:int=10):
     ## In cases were this is redundant, exit:
     if SAFETY_BUFFER_FRACTION is None:
         return
 
-    sleep_time = starting_sleep_time
+    sleep_time = max(1, int(np.ceil(starting_sleep_time))) 
     while not stop_event.is_set():
         # Do task:
         _compute_with_random_mat_by_ram(ram_gb)
 
-        # wait time, but check for exit message each second:
-        for _ in range(sleep_time):
-            sleep(1)
+        # wait time, but check for exit message each two seconds:
+        num_sleeps = sleep_time // check_every_seconds
+        for _ in range(num_sleeps):
+            sleep(check_every_seconds)
             if stop_event.is_set():
                 return
             
@@ -190,12 +202,13 @@ def _auto_timed_compute_with_random_mat_by_ram(ram_gb:int, stop_event:threading.
         sleep_time *= 2
 
 
-def _compute_with_random_mat_by_ram(ram_gb, num_growing_sizes:int=3, computation_repetitions:int=3, progress_bar:bool=False, sleep_time:float|int=0.1):
+def _compute_with_random_mat_by_ram(ram_gb, num_growing_sizes:int=3, computation_repetitions:int=3, progress_bar:bool=False, _print:bool=False, sleep_time:float|int=0.1):
 
 
     # Calculate element count and data type based on target size
     target_final_size = ram_gb*SAFETY_BUFFER_FRACTION
-    print(f"Writing trash memory of up to {target_final_size}gb")
+    if _print:
+        print(f"Writing trash memory of up to {target_final_size}gb")
 
     if num_growing_sizes>1:
         sizes_gb = np.linspace(1e-9, target_final_size, num_growing_sizes)
@@ -203,8 +216,7 @@ def _compute_with_random_mat_by_ram(ram_gb, num_growing_sizes:int=3, computation
         sizes_gb = [target_final_size]
         progress_bar = False
 
-    if progress_bar:
-        from src.utils.prints import ProgressBar
+    if progress_bar:        
         prog_bar = ProgressBar(expected_end=num_growing_sizes)
 
     for i, crnt_size in enumerate(sizes_gb):
@@ -217,7 +229,8 @@ def _compute_with_random_mat_by_ram(ram_gb, num_growing_sizes:int=3, computation
     
     if progress_bar:
         prog_bar.clear()
-    print("    Done writing trash memory")
+    if _print:
+        print("    Done writing trash memory")
 
 
 if __name__ == "__main__":

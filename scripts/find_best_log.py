@@ -1,11 +1,21 @@
 import _import_src
 
+import argparse
+import sys
+
 from utils import files, logs, prints
 import project_paths
 from dataclasses import dataclass
+from typing import Literal
 
 foldersep = files.foldersep
 DEFAULT_LOG_FOLDER = project_paths.logs.__str__()
+
+CONFIG_NUM_HEADER_LINES = 65
+
+
+class _ValidError(Exception): ...
+
 
 @dataclass
 class _LogData:
@@ -20,27 +30,59 @@ def _parse_strings(D_str:list[str], energies_str:list[str]) -> tuple[int, list[f
     return D, energies
 
 
+def _get_log_data(folder_full_path:str, filename:str) -> _LogData:
+    # Get data:
+    fullpath = folder_full_path+foldersep+filename
+    D = logs.search_words_in_log(fullpath, "virtual_dim:", max_line=CONFIG_NUM_HEADER_LINES)
+    energies = logs.search_words_in_log(fullpath, "Mean energy after segment =")
+
+    # Parse data:
+    try:
+        D, energies = _parse_strings(D, energies)
+        best_energy = min(energies)
+    except (ValueError, IndexError) as e:
+        raise _ValidError(e)
+
+    return _LogData(D=D, best_energy=best_energy, filename=filename)
+
+
+def parse_args():
+    if sys.gettrace() is not None:
+        # Running in a debugger
+        return argparse.Namespace(logs_location='local')
+    
+    parser = argparse.ArgumentParser(description="Process log files.")
+    parser.add_argument(
+        'logs_location',
+        type=str,
+        choices=['local', 'condor'],
+        default='local',
+        nargs='?',
+        help="Specify the location of the logs: 'local' or 'condor'. Default is 'local'."
+    )
+    return parser.parse_args()
+
+
 def main(
-    logs_location:str=DEFAULT_LOG_FOLDER
+    logs_location : Literal['condor', 'local'] = 'local'
 ):
+
+    if logs_location == 'local':
+        folder_full_path = str(project_paths.logs)
+    elif logs_location == 'condor':
+        folder_full_path = str(project_paths.condor_paths['io_dir']/'logs')
     
     best_logs : dict[int, _LogData] = {}
-    all_logs = files.get_all_file_names_in_folder(folder_full_path=logs_location)
+    all_logs = files.get_all_file_names_in_folder(folder_full_path=folder_full_path)
 
     for filename in prints.ProgressBar(all_logs):
-        # Get data:
-        fullpath = logs_location+foldersep+filename
-        D, energies = logs.search_words_in_log(fullpath, words=["virtual_dim:", "Mean energy after segment ="])
+        assert isinstance(filename, str)
 
-        # Parse data:
         try:
-            D, energies = _parse_strings(D, energies)
-            best_energy = min(energies)
-        except (ValueError, IndexError) as e:
+            this_data = _get_log_data(folder_full_path, filename)
+        except _ValidError:
             continue
-
-        this_data = _LogData(D=D, best_energy=best_energy, filename=filename)
-
+        D = this_data.D
 
         # is best?
         if D in best_logs:
@@ -58,4 +100,10 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        args = parse_args()
+        logs_location = args.logs_location
+    except argparse.ArgumentError as e:
+        print(f"Error: {e}")
+        print("Please specify 'local' or 'condor' as the logs location.")
+    main(logs_location=logs_location)

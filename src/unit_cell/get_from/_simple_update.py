@@ -318,7 +318,7 @@ def _kagome_afh_peps_ground_state_search(
     """
 
     ## Basic params and inputs:
-    dir_path: str = saveload.DATA_FOLDER + saveload.PATH_SEP + DATA_SUBFOLDER
+    dir_path: str = saveload.DEFAULT_DATA_FOLDER + saveload.PATH_SEP + DATA_SUBFOLDER
     h_k: float = 0.
 
     np.random.seed()
