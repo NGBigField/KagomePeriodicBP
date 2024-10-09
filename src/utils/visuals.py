@@ -120,6 +120,13 @@ def refresh():
         plt.pause(0.0001)
 
 
+def find_line_with_label(ax:Axes, label:str) -> Optional[Line2D]:
+    for line in ax.get_lines():
+        if line.get_label() == label:
+            return line
+    return None
+
+
 def check_label_given(ax:Axes, label:str):
     return any(line.get_label() == label for line in ax.get_lines())
 

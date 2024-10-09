@@ -145,7 +145,7 @@ def _create_csv(Ds, SUs, VUs, Ds_2, energies) -> None:
 
 
 def main(
-    measure_again:bool = True
+    measure_again:bool = False
 ):
     ## Collect reference results
     Ds, SUs, VUs = _collect_references()

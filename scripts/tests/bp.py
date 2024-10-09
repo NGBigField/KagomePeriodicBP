@@ -50,8 +50,8 @@ mode = UpdateMode.A
 update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 d=2
 
-EXACT_CHI = 200
-EXACT_N = 10
+EXACT_CHI = 30
+EXACT_N = 5
 
 
 class CSVRowData(NamedTuple):
@@ -82,6 +82,7 @@ class ComparisonResultsType(NamedTuple):
     unit_cell : UnitCell
     negativity : float
     entanglement_entropy : float
+    time : float
 
 
 
@@ -116,19 +117,28 @@ def _per_D_N_single_test(
     ## Define contraction precision and other config adjustments:
     match method:
         case "exact":
-            config.chi = EXACT_CHI
+            config.chi = 2*EXACT_CHI
+            config.chi_bp = EXACT_CHI
         case "bp":
-            config.set_parallel(parallel)
+            # config.set_parallel(parallel)
+            pass
 
+    
     ## Get environment:
+    t_start = perf_counter()
     match method:   #["random", "exact","bp"]
-        case "random"|"exact":
+        case "random":
             tn.connect_uniform_messages()
-        case "bp":
+        case "bp"|"exact":
             belief_propagation(tn, None, config.bp)
             
+    t1 = perf_counter() - t_start
+    if parallel and method=="bp":
+        t1 /= 6
+
 
     ## Contract to edge:
+    t_start = perf_counter()
     edge_tn = reduce_tn(
         tn, EdgeTN, config.contraction, 
         mode=mode, edge_tuple=update_edge
@@ -154,7 +164,12 @@ def _per_D_N_single_test(
         rho_exact = TenQI.op_to_mat(rho_exact)
         fidelity_ = 1-fidelity(rho_now, rho_exact)
 
-    return ComparisonResultsType(edge_tn, z, energy, fidelity_, unit_cell, negativity, entanglement_entropy_)
+    
+    t2 = perf_counter() - t_start
+
+    time = t1 + t2
+
+    return ComparisonResultsType(edge_tn, z, energy, fidelity_, unit_cell, negativity, entanglement_entropy_, time)
 
 
 def _get_full_converges_run_plots(
@@ -201,15 +216,15 @@ def test_bp_convergence_all_runs(
 
     ##  Params:
     methods_and_Ns:dict[str, list[int]] = dict(
-        random = list(range(2, 7)),
-        bp     = [2, 3, 4]
+        bp     = [2, 3],
+        random = list(range(2, 7))
     ) 
 
     ## config:
     config = Config.derive_from_dimensions(D)
-    config.chi    = 3*D**2 + 10
-    config.chi_bp = 2*D**2 + 10
-    config.bp.msg_diff_terminate = 1e-14
+    config.chi    = 2*D**2 + 10
+    config.chi_bp =   D**2 + 10
+    config.bp.msg_diff_terminate = 1e-7
     config.bp.max_iterations = 50
     config.bp.visuals.set_all_progress_bars(False)
 
@@ -246,9 +261,12 @@ def test_bp_convergence_all_runs(
                 errors.print_traceback(e)
                 break
             _t2 = perf_counter()
-            time = _t2 - _t1
+            real_time = _t2 - _t1
+            print(real_time)
+
 
             ## plot:
+            time = res.time
             if live_plots is not None:
                 plt_kwargs = _get_plt_kwargs(method)
                 p_values.append(plot_kwargs=plt_kwargs ,**{ method : (N, z)}, draw_now_=live_plots)
@@ -258,7 +276,7 @@ def test_bp_convergence_all_runs(
                 )
 
             # csv:
-            row_data = CSVRowData(D, N, method, time, res.energy, res.z, res.fidelity, res.negativity, res.entanglement_entropy)
+            row_data = CSVRowData(D, N, method, res.time, res.energy, res.z, res.fidelity, res.negativity, res.entanglement_entropy)
             csv.append(row_data.row())
 
     # plot_values.axis.set_ylim(bottom=1e-8*2)
@@ -398,7 +416,38 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, w
     return ax
 
 
-def _plot_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
+def _plot_timing_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
+
+    ## Get data:
+    tables : dict[str, csvs._TableByOrder] = dict()
+    tables["bp"]     = table.get_matching_table_elements(D=D, method="bp")
+    tables["random"] = table.get_matching_table_elements(D=D, method="random")
+
+    ## Prepare plots:
+    ax = _new_axes()
+    ax.set_xscale('log')
+    ax.set_xlabel("Infidelity (1-Fidelity)")
+    ax.set_ylabel("Time [sec]")
+
+    ## Iterate over data:
+    for key, t in tables.items():
+        x = t['fidelity']
+        y = t['time']
+        
+        if (prev_line := visuals.find_line_with_label(ax, key)) is None:
+            lines = ax.plot(x, y, linestyle="", marker="o", label=key)
+        else:
+            color = prev_line.get_color()
+            lines = ax.plot(x, y, linestyle="", marker="o", color=color)
+
+        
+
+    ax.legend()
+    visuals.save_figure(ax.figure, file_name=strings.time_stamp())
+
+
+
+def _plot_results_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
 
     for x, y in [
         # ('time', 'z'), 
@@ -444,6 +493,33 @@ def _get_data_from_csvs(filename:str|None) -> csvs.TableByKey:
     return table
 
 
+def plot_time_results(
+    filename:str|None = None,
+    D:list[int]|None=None
+) -> None:
+    
+    ## Get Data:
+    table = _get_data_from_csvs(filename)
+    print(table)
+
+    if D is None:
+        Ds = table.unique_values('D')
+    elif isinstance(D, list):
+        assert isinstance(D[0], int)
+        Ds = D
+    elif isinstance(D, int):
+        Ds = [D]
+    else:
+        raise TypeError("D must be int or list of ints or None")
+
+    ## Get lists and plot:
+    for D_ in Ds:
+        print(f"D={D_}")
+        _plot_timing_from_table_per_D(D_, table)
+
+    ## Finish:
+    print("Done printing for all Ds")
+
 
 def plot_bp_convergence_results(
     filename:str|None = None,
@@ -464,7 +540,7 @@ def plot_bp_convergence_results(
     ## Get lists and plot:
     for D_ in Ds:
         print(f"D={D_}")
-        _plot_from_table_per_D(D_, table)
+        _plot_results_from_table_per_D(D_, table)
 
     ## Finish:
     print("Done printing for all Ds")
@@ -489,6 +565,7 @@ def _calc_inf_exact_results(D:int) -> dict:
     
 
 ResultsSubFolderName = "results"
+
 @overload
 def get_inf_exact_results(D:int) -> dict: ...
 @overload
@@ -511,10 +588,11 @@ def get_inf_exact_results(D:int|list[int]=2) -> dict|list[dict]:
     return results
 
 
-def main_test():
-    results = get_inf_exact_results([2, 3]); print(results)
-    # test_bp_convergence_all_runs([2, 3])
+def main_test(D:int|list[int]=3) -> None:
+    results = get_inf_exact_results(D); print(results)
+    test_bp_convergence_all_runs(D)
     # plot_bp_convergence_results()
+    plot_time_results(D=D)
 
     print("Done.")
 

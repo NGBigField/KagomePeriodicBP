@@ -196,7 +196,7 @@ def main(
 
     config.bp.msg_diff_good_enough = 1e-5
     config.bp.msg_diff_terminate = 1e-6
-    # config.iterative_process.change_config_for_measurements_func = _config_at_measurement
+    config.iterative_process.change_config_for_measurements_func = _config_at_measurement
     config.ite.always_use_lowest_energy_state = True
     config.ite.symmetric_second_order_trotterization = True
     config.ite.add_gaussian_noise_fraction = noise_per_segment
