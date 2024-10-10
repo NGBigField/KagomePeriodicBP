@@ -138,7 +138,7 @@ def get_saved_figures_folder()->Path:
     return folder
 
 
-def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None, extensions:list[str]=["png", "svg"]) -> None:
+def save_figure(fig:Optional[Figure]=None, file_name:Optional[str]=None, extensions:list[str]=["png", "pdf"]) -> None:
     # Figure:
     if fig is None:
         fig = plt.gcf()
