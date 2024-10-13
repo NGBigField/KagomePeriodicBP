@@ -50,8 +50,9 @@ mode = UpdateMode.A
 update_edge = UpdateEdge(UnitCellFlavor.A, UnitCellFlavor.B)
 d=2
 
-EXACT_CHI = 200
-EXACT_N = 10
+EXACT_CHI = 40
+EXACT_N = 7
+EXACT_UNIT_CELL = "random"  # "random"\"best"
 
 
 class CSVRowData(NamedTuple):
@@ -82,6 +83,7 @@ class ComparisonResultsType(NamedTuple):
     unit_cell : UnitCell
     negativity : float
     entanglement_entropy : float
+    time : float
 
 
 
@@ -105,7 +107,12 @@ def _per_D_N_single_test(
     this_is_exact_run = 'exact_run' in kwargs and kwargs['exact_run']==True
 
     if this_is_exact_run:
-        unit_cell = UnitCell.load_best(D)
+        if EXACT_UNIT_CELL == "best":
+            unit_cell = UnitCell.load_best(D)
+        elif EXACT_UNIT_CELL == "random":
+            unit_cell = UnitCell.random(2, D)
+        else:
+            raise ValueError("EXACT_UNIT_CELL must be 'best' or 'random'")
     else:
         exact = get_inf_exact_results(D)
         unit_cell = exact['unit_cell']
@@ -116,19 +123,27 @@ def _per_D_N_single_test(
     ## Define contraction precision and other config adjustments:
     match method:
         case "exact":
-            config.chi = EXACT_CHI
+            config.chi = 2*EXACT_CHI + 10
+            config.chi_bp = EXACT_CHI 
+            config.bp.msg_diff_terminate = 1e-14
         case "bp":
-            config.set_parallel(parallel)
+            # config.set_parallel(parallel)
+            pass
 
+    
     ## Get environment:
+    t_start = perf_counter()
     match method:   #["random", "exact","bp"]
-        case "random"|"exact":
+        case "random":
             tn.connect_uniform_messages()
-        case "bp":
+        case "bp"|"exact":
             belief_propagation(tn, None, config.bp)
             
+    t1 = perf_counter() - t_start
+
 
     ## Contract to edge:
+    t_start = perf_counter()
     edge_tn = reduce_tn(
         tn, EdgeTN, config.contraction, 
         mode=mode, edge_tuple=update_edge
@@ -154,7 +169,12 @@ def _per_D_N_single_test(
         rho_exact = TenQI.op_to_mat(rho_exact)
         fidelity_ = 1-fidelity(rho_now, rho_exact)
 
-    return ComparisonResultsType(edge_tn, z, energy, fidelity_, unit_cell, negativity, entanglement_entropy_)
+    
+    t2 = perf_counter() - t_start
+
+    time = t1 + t2
+
+    return ComparisonResultsType(edge_tn, z, energy, fidelity_, unit_cell, negativity, entanglement_entropy_, time)
 
 
 def _get_full_converges_run_plots(
@@ -190,6 +210,7 @@ def test_bp_convergence_all_runs(
     combined_figure:bool = False,
     parallel:bool = True,
     live_plots:bool|None = None,  # True: live, False: at end, None: no plots
+    repetitions:int = 3
 ) -> None:
     
     if isinstance(D, list):
@@ -201,16 +222,16 @@ def test_bp_convergence_all_runs(
 
     ##  Params:
     methods_and_Ns:dict[str, list[int]] = dict(
-        random = list(range(2, 7)),
-        bp     = [2, 3, 4]
+        bp     = [2],
+        random = list(range(2, 5))
     ) 
 
     ## config:
     config = Config.derive_from_dimensions(D)
-    config.chi    = 3*D**2 + 10
-    config.chi_bp = 2*D**2 + 10
-    config.bp.msg_diff_terminate = 1e-14
-    config.bp.max_iterations = 50
+    config.chi    = 2*D**2 + 20
+    config.chi_bp =   D**2 
+    config.bp.msg_diff_terminate = 1e-6
+    config.bp.max_iterations = 8
     config.bp.visuals.set_all_progress_bars(False)
 
     # exact_config = config.copy()
@@ -229,37 +250,42 @@ def test_bp_convergence_all_runs(
         )
 
 
-    for method, Ns in methods_and_Ns.items(): 
-        print(f"method={method}")
-        
-        for N in Ns:
-            print(f"  N={N}")
-            sleep(0.1)
+    for _ in range(repetitions):
 
-            ## Get results:
-            _t1 = perf_counter()
-            try:
-                res = _per_D_N_single_test(
-                    D, N, method, config, parallel
-                )
-            except Exception as e:
-                errors.print_traceback(e)
-                break
-            _t2 = perf_counter()
-            time = _t2 - _t1
+        for method, Ns in methods_and_Ns.items(): 
+            print(f"method={method}")
+            
+            for N in Ns:
+                print(f"  N={N}")
+                sleep(0.1)
 
-            ## plot:
-            if live_plots is not None:
-                plt_kwargs = _get_plt_kwargs(method)
-                p_values.append(plot_kwargs=plt_kwargs ,**{ method : (N, z)}, draw_now_=live_plots)
-                p_times.append( plot_kwargs=plt_kwargs ,**{ method : (N, time)}, draw_now_=live_plots)
-                p_values_vs_times.append( 
-                                plot_kwargs=plt_kwargs ,**{ method : (time, z)}, draw_now_=live_plots
-                )
+                ## Get results:
+                try:
+                    res = _per_D_N_single_test(
+                        D, N, method, config, parallel
+                    )
+                except Exception as e:
+                    errors.print_traceback(e)
+                    break
+                time = res.time
+                fidelity = res.fidelity
 
-            # csv:
-            row_data = CSVRowData(D, N, method, time, res.energy, res.z, res.fidelity, res.negativity, res.entanglement_entropy)
-            csv.append(row_data.row())
+                ## Print
+                print(f"    time     = {time}")
+                print(f"    fidelity = {fidelity}")
+
+                ## plot:
+                if live_plots is not None:
+                    plt_kwargs = _get_plt_kwargs(method)
+                    p_values.append(plot_kwargs=plt_kwargs ,**{ method : (N, z)}, draw_now_=live_plots)
+                    p_times.append( plot_kwargs=plt_kwargs ,**{ method : (N, time)}, draw_now_=live_plots)
+                    p_values_vs_times.append( 
+                                    plot_kwargs=plt_kwargs ,**{ method : (time, z)}, draw_now_=live_plots
+                    )
+
+                # csv:
+                row_data = CSVRowData(D, N, method, res.time, res.energy, res.z, res.fidelity, res.negativity, res.entanglement_entropy)
+                csv.append(row_data.row())
 
     # plot_values.axis.set_ylim(bottom=1e-8*2)
     if live_plots is not None:
@@ -280,6 +306,13 @@ def _new_axes() -> Axes:
     ax = fig.add_subplot(1, 1, 1)
     return ax
 
+def _method_color(method:str) -> str:
+    match method:
+        case 'bp':      return "tab:blue"
+        case 'random':  return "tab:orange"
+        case 'exact':   return "k"
+        case _:
+            raise ValueError("")
 
 def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, what:Literal['true', 'error'], yscale:Literal['linear', 'log']="linear") -> Axes:
     ## Prepare plots:
@@ -330,13 +363,6 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, w
             case _:
                 raise ValueError("")
 
-    def _method_color(method:str) -> str:
-        match method:
-            case 'bp':      return "tab:blue"
-            case 'random':  return "tab:orange"
-            case 'exact':   return "k"
-            case _:
-                raise ValueError("")
 
     def _x_values(data) -> list[float]|list[int]:
         if x == "N":
@@ -398,7 +424,42 @@ def _plot_from_table_per_D_per_x_y(D:int, table:csvs.TableByKey, x:str, y:str, w
     return ax
 
 
-def _plot_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
+def _plot_timing_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
+
+    ## Get data:
+    tables : dict[str, csvs._TableByOrder] = dict()
+    tables["random"] = table.get_matching_table_elements(D=D, method="random")
+    tables["bp"]     = table.get_matching_table_elements(D=D, method="bp")
+
+    ## Prepare plots:
+    ax = _new_axes()
+    ax.set_xlabel("Time [sec]")
+    ax.set_yscale('log')
+    ax.set_ylabel("1-Fidelity")
+
+    ## Iterate over data:
+    for key in ["random", "bp"]:
+        t = tables[key]
+        x = t['time']
+        y = t['fidelity']
+        
+        color = _method_color(key)
+
+        if (prev_line := visuals.find_line_with_label(ax, key)) is None:
+            label = key
+        else:
+            label = None
+
+        lines = ax.plot(x, y, linestyle="", marker="o", color=color, label=key)
+
+        
+    ax.grid(True)
+    ax.legend()
+    visuals.save_figure(ax.figure, file_name=strings.time_stamp())
+
+
+
+def _plot_results_from_table_per_D(D:int, table:csvs.TableByKey) -> None:
 
     for x, y in [
         # ('time', 'z'), 
@@ -444,6 +505,33 @@ def _get_data_from_csvs(filename:str|None) -> csvs.TableByKey:
     return table
 
 
+def plot_time_results(
+    filename:str|None = None,
+    D:list[int]|None=None
+) -> None:
+    
+    ## Get Data:
+    table = _get_data_from_csvs(filename)
+    print(table)
+
+    if D is None:
+        Ds = table.unique_values('D')
+    elif isinstance(D, list):
+        assert isinstance(D[0], int)
+        Ds = D
+    elif isinstance(D, int):
+        Ds = [D]
+    else:
+        raise TypeError("D must be int or list of ints or None")
+
+    ## Get lists and plot:
+    for D_ in Ds:
+        print(f"D={D_}")
+        _plot_timing_from_table_per_D(D_, table)
+
+    ## Finish:
+    print("Done printing for all Ds")
+
 
 def plot_bp_convergence_results(
     filename:str|None = None,
@@ -464,7 +552,7 @@ def plot_bp_convergence_results(
     ## Get lists and plot:
     for D_ in Ds:
         print(f"D={D_}")
-        _plot_from_table_per_D(D_, table)
+        _plot_results_from_table_per_D(D_, table)
 
     ## Finish:
     print("Done printing for all Ds")
@@ -489,6 +577,7 @@ def _calc_inf_exact_results(D:int) -> dict:
     
 
 ResultsSubFolderName = "results"
+
 @overload
 def get_inf_exact_results(D:int) -> dict: ...
 @overload
@@ -511,10 +600,13 @@ def get_inf_exact_results(D:int|list[int]=2) -> dict|list[dict]:
     return results
 
 
-def main_test():
-    # results = get_inf_exact_results([2, 3]); print(results)
-    # test_bp_convergence_all_runs([2, 3])
-    plot_bp_convergence_results()
+def main_test(
+    D:int|list[int]=3
+) -> None:
+    # results = get_inf_exact_results(D); print(results)
+    # test_bp_convergence_all_runs(D)
+    # plot_bp_convergence_results()
+    plot_time_results(D=D)
 
     print("Done.")
 
